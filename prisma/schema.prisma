@@ -1,0 +1,936 @@
+// Prisma Schema for 100% DESIGN Studio — Multi-Tenant Architecture Project Management Platform
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ==========================================
+// 1. TENANCY & GLOBAL IDENTITY
+// ==========================================
+
+enum TenantLifecycleState {
+  PROVISIONING
+  ACTIVE
+  SUSPENDED
+  DELETION_PENDING
+  DELETED
+}
+
+enum TenantRole {
+  OWNER
+  ADMIN
+  PROJECT_MANAGER
+  EMPLOYEE
+}
+
+enum UserAccountState {
+  ACTIVE
+  DISABLED
+}
+
+model Tenant {
+  id             String               @id @default(uuid())
+  slug           String               @unique @db.VarChar(64)
+  name           String               @db.VarChar(191)
+  timezone       String               @default("Asia/Kolkata") @db.VarChar(64)
+  currency       String               @default("INR") @db.VarChar(10)
+  branding       Json?
+  lifecycleState TenantLifecycleState @default(ACTIVE)
+  settings       Json?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  memberships       TenantMembership[]
+  employees         Employee[]
+  invitations       TenantInvitation[]
+  clients           Client[]
+  projects          Project[]
+  consultants       Consultant[]
+  contractors       Contractor[]
+  tasks             Task[]
+  sites             Site[]
+  siteVisits        SiteVisit[]
+  documents         Document[]
+  privateFiles      PrivateFile[]
+  budgets           Budget[]
+  feeMilestones     FeeMilestone[]
+  expenses          Expense[]
+  notifications     Notification[]
+  outbox            NotificationOutbox[]
+  auditEvents       AuditEvent[]
+  subscriptions     Subscription[]
+  tenantExports     TenantExport[]
+  deletionRequests  DeletionRequest[]
+
+  @@map("tenants")
+}
+
+model User {
+  id               String           @id @default(uuid())
+  email            String           @unique @db.VarChar(191)
+  passwordHash     String           @db.VarChar(255)
+  fullName         String           @db.VarChar(191)
+  accountState     UserAccountState @default(ACTIVE)
+  mfaSecret        String?          @db.VarChar(255)
+  mfaEnabled       Boolean          @default(false)
+  mfaRecoveryCodes Json?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  memberships TenantMembership[]
+  sessions    Session[]
+
+  @@map("users")
+}
+
+model TenantMembership {
+  id               String     @id @default(uuid())
+  tenantId         String
+  tenant           Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId           String
+  user             User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role             TenantRole @default(EMPLOYEE)
+  hasFinanceAccess Boolean    @default(false)
+  isActive         Boolean    @default(true)
+  joinedAt         DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  employee         Employee?
+  projectMembers   ProjectMember[]
+  managedProjects  Project[]        @relation("ProjectManager")
+  assignedTasks    Task[]           @relation("TaskAssignee")
+  createdTasks     Task[]           @relation("TaskCreator")
+  siteVisits       SiteVisit[]      @relation("VisitEmployee")
+  reviewedVisits   SiteVisit[]      @relation("VisitReviewer")
+  notifications    Notification[]   @relation("RecipientNotifications")
+
+  @@unique([tenantId, userId])
+  @@index([tenantId, role])
+  @@map("tenant_memberships")
+}
+
+model Employee {
+  id                 String           @id @default(uuid())
+  tenantId           String
+  tenant             Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  membershipId       String           @unique
+  membership         TenantMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  employeeId         String           @db.VarChar(64)
+  phone              String?          @db.VarChar(100)
+  department         String?          @db.VarChar(100)
+  designation        String?          @db.VarChar(100)
+  joinDate           DateTime?
+  reportingManagerId String?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@unique([tenantId, employeeId])
+  @@index([tenantId, employeeId])
+  @@map("employees")
+}
+
+model Session {
+  id             String    @id @default(uuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token          String    @unique @db.VarChar(128)
+  activeTenantId String?
+  ipAddress      String?   @db.VarChar(64)
+  userAgent      String?   @db.VarChar(255)
+  expiresAt      DateTime
+  revokedAt      DateTime?
+  createdAt      DateTime  @default(now())
+
+  @@index([userId])
+  @@index([token])
+  @@map("sessions")
+}
+
+model TenantInvitation {
+  id          String     @id @default(uuid())
+  tenantId    String
+  tenant      Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  email       String     @db.VarChar(191)
+  role        TenantRole @default(EMPLOYEE)
+  token       String     @unique @db.VarChar(128)
+  invitedById String
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  createdAt   DateTime   @default(now())
+
+  @@index([tenantId, email])
+  @@map("tenant_invitations")
+}
+
+// ==========================================
+// 2. CLIENTS, CONSULTANTS, CONTRACTORS
+// ==========================================
+
+model Client {
+  id        String    @id @default(uuid())
+  tenantId  String
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String    @db.VarChar(191)
+  company   String?   @db.VarChar(191)
+  email     String?   @db.VarChar(191)
+  contact   String?   @db.VarChar(64)
+  address   String?   @db.Text
+  notes     String?   @db.Text
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  projects  Project[]
+
+  @@index([tenantId, isActive])
+  @@map("clients")
+}
+
+model Consultant {
+  id          String              @id @default(uuid())
+  tenantId    String
+  tenant      Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name        String              @db.VarChar(191)
+  email       String?             @db.VarChar(191)
+  contact     String?             @db.VarChar(64)
+  firmName    String?             @db.VarChar(191)
+  firmAddress String?             @db.Text
+  discipline  String              @db.VarChar(100) // Structural, MEP, HVAC, Landscape, Lighting, Acoustics
+  notes       String?             @db.Text
+  isActive    Boolean             @default(true)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  projects    ProjectConsultant[]
+
+  @@index([tenantId, isActive])
+  @@map("consultants")
+}
+
+model Contractor {
+  id        String              @id @default(uuid())
+  tenantId  String
+  tenant    Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String              @db.VarChar(191)
+  contact   String?             @db.VarChar(64)
+  email     String?             @db.VarChar(191)
+  firmName  String?             @db.VarChar(191)
+  trade     String              @db.VarChar(100) // Civil / Masonry, Electrical, Carpentry & Joinery, Plumbing, Painting
+  address   String?             @db.Text
+  isActive  Boolean             @default(true)
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+
+  projects  ProjectContractor[]
+
+  @@index([tenantId, isActive])
+  @@map("contractors")
+}
+
+// ==========================================
+// 3. PROJECTS, PHASES, & EXTERNAL LINKS
+// ==========================================
+
+enum ProjectStatus {
+  PLANNING
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  ARCHIVED
+}
+
+model Project {
+  id               String            @id @default(uuid())
+  tenantId         String
+  tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  code             String            @db.VarChar(32) // Unique per tenant
+  name             String            @db.VarChar(191)
+  description      String?           @db.Text
+  primaryClientId  String?
+  primaryClient    Client?           @relation(fields: [primaryClientId], references: [id], onDelete: SetNull)
+  projectType      String?           @db.VarChar(100)
+  siteAddress      String?           @db.Text
+  projectManagerId String?
+  projectManager   TenantMembership? @relation("ProjectManager", fields: [projectManagerId], references: [id], onDelete: SetNull)
+  currentPhase     String?           @db.VarChar(100)
+  status           ProjectStatus     @default(ACTIVE)
+  startDate        DateTime?
+  targetDate       DateTime?
+  budget           Decimal?          @db.Decimal(15, 2)
+  currency         String            @default("INR") @db.VarChar(10)
+  isArchived       Boolean           @default(false)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  members          ProjectMember[]
+  phases           ProjectPhase[]
+  consultants      ProjectConsultant[]
+  contractors      ProjectContractor[]
+  tasks            Task[]
+  sites            Site[]
+  siteVisits       SiteVisit[]
+  documents        Document[]
+  budgets          Budget[]
+  feeMilestones    FeeMilestone[]
+  expenses         Expense[]
+  approvalRequests ApprovalRequest[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, status])
+  @@index([tenantId, projectManagerId])
+  @@map("projects")
+}
+
+model ProjectMember {
+  id           String           @id @default(uuid())
+  tenantId     String
+  projectId    String
+  project      Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  membershipId String
+  membership   TenantMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  projectRole  String           @default("Team Member") @db.VarChar(100)
+  createdAt    DateTime         @default(now())
+
+  @@unique([projectId, membershipId])
+  @@index([tenantId, projectId])
+  @@map("project_members")
+}
+
+enum PhaseStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  DELAYED
+}
+
+model ProjectPhase {
+  id               String      @id @default(uuid())
+  tenantId         String
+  projectId        String
+  project          Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  phaseName        String      @db.VarChar(100)
+  sortOrder        Int
+  plannedStartDate DateTime?
+  plannedEndDate   DateTime?
+  actualStartDate  DateTime?
+  actualEndDate    DateTime?
+  status           PhaseStatus @default(NOT_STARTED)
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  tasks            Task[]
+
+  @@index([tenantId, projectId, sortOrder])
+  @@map("project_phases")
+}
+
+model ProjectConsultant {
+  id               String     @id @default(uuid())
+  tenantId         String
+  projectId        String
+  project          Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  consultantId     String
+  consultant       Consultant @relation(fields: [consultantId], references: [id], onDelete: Cascade)
+  scope            String?    @db.Text
+  engagementStatus String     @default("Engaged") @db.VarChar(64)
+  createdAt        DateTime   @default(now())
+
+  @@unique([projectId, consultantId])
+  @@index([tenantId, projectId])
+  @@map("project_consultants")
+}
+
+model ProjectContractor {
+  id               String       @id @default(uuid())
+  tenantId         String
+  projectId        String
+  project          Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  contractorId     String
+  contractor       Contractor   @relation(fields: [contractorId], references: [id], onDelete: Cascade)
+  scope            String?      @db.Text
+  engagementStatus String       @default("Active") @db.VarChar(64)
+  createdAt        DateTime     @default(now())
+
+  quotations       Quotation[]
+
+  @@unique([projectId, contractorId])
+  @@index([tenantId, projectId])
+  @@map("project_contractors")
+}
+
+enum QuotationStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  ACCEPTED
+  REJECTED
+  SUPERSEDED
+}
+
+model Quotation {
+  id                  String            @id @default(uuid())
+  tenantId            String
+  projectContractorId String
+  projectContractor   ProjectContractor @relation(fields: [projectContractorId], references: [id], onDelete: Cascade)
+  quotationNumber     String            @db.VarChar(64)
+  revision            Int               @default(1)
+  amount              Decimal           @db.Decimal(15, 2)
+  currency            String            @default("INR") @db.VarChar(10)
+  submittedDate       DateTime
+  validityDate        DateTime?
+  status              QuotationStatus   @default(SUBMITTED)
+  privateFileId       String?
+  notes               String?           @db.Text
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  @@index([tenantId, projectContractorId])
+  @@map("quotations")
+}
+
+// ==========================================
+// 4. TASKS, CHECKLISTS, COMMENTS, WORKFLOW
+// ==========================================
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TaskWorkflowStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  IN_REVIEW
+  COMPLETED
+  BLOCKED
+  CANCELLED
+}
+
+model Task {
+  id             String             @id @default(uuid())
+  tenantId       String
+  tenant         Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  projectId      String
+  project        Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  phaseId        String?
+  phase          ProjectPhase?      @relation(fields: [phaseId], references: [id], onDelete: SetNull)
+  title          String             @db.VarChar(255)
+  description    String?            @db.Text
+  assigneeId     String?
+  assignee       TenantMembership?  @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  creatorId      String
+  creator        TenantMembership   @relation("TaskCreator", fields: [creatorId], references: [id], onDelete: Cascade)
+  priority       TaskPriority       @default(MEDIUM)
+  status         TaskWorkflowStatus @default(NOT_STARTED)
+  startDate      DateTime?
+  dueDate        DateTime?
+  estimatedHours Decimal?           @db.Decimal(6, 2)
+  completionDate DateTime?
+  blockerReason  String?            @db.Text
+  parentTaskId   String?
+  version        Int                @default(1)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  checklistItems   TaskChecklistItem[]
+  comments         TaskComment[]
+  activityHistory  TaskActivityHistory[]
+  siteVisits       SiteVisit[]
+  documents        Document[]
+  approvalRequests ApprovalRequest[]
+
+  @@index([tenantId, projectId, status])
+  @@index([tenantId, assigneeId, dueDate])
+  @@map("tasks")
+}
+
+model TaskChecklistItem {
+  id            String    @id @default(uuid())
+  tenantId      String
+  taskId        String
+  task          Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  title         String    @db.VarChar(255)
+  isCompleted   Boolean   @default(false)
+  sortOrder     Int       @default(0)
+  completedAt   DateTime?
+  completedById String?
+  createdAt     DateTime  @default(now())
+
+  @@index([tenantId, taskId])
+  @@map("task_checklist_items")
+}
+
+model TaskComment {
+  id        String   @id @default(uuid())
+  tenantId  String
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  authorId  String
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, taskId])
+  @@map("task_comments")
+}
+
+model TaskActivityHistory {
+  id        String   @id @default(uuid())
+  tenantId  String
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  actorId   String
+  action    String   @db.VarChar(100)
+  oldValue  String?  @db.VarChar(255)
+  newValue  String?  @db.VarChar(255)
+  reason    String?  @db.Text
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, taskId])
+  @@map("task_activity_history")
+}
+
+// ==========================================
+// 5. SITES, VISITS, & GEOLOCATION
+// ==========================================
+
+model Site {
+  id                      String      @id @default(uuid())
+  tenantId                String
+  tenant                  Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  projectId               String
+  project                 Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name                    String      @db.VarChar(191)
+  address                 String      @db.Text
+  latitude                Float?
+  longitude               Float?
+  radiusMeters            Float       @default(150.0)
+  accuracyThresholdMeters Float       @default(100.0)
+  isActive                Boolean     @default(true)
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+
+  visits                  SiteVisit[]
+
+  @@index([tenantId, projectId])
+  @@map("sites")
+}
+
+enum SiteVisitOperationalState {
+  SCHEDULED
+  ACTIVE
+  CHECKED_OUT
+  CANCELLED
+}
+
+enum SiteVisitReviewDecision {
+  PENDING
+  ACCEPTED
+  NEEDS_CLARIFICATION
+  REJECTED
+}
+
+model SiteVisit {
+  id                  String                    @id @default(uuid())
+  tenantId            String
+  tenant              Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  projectId           String
+  project             Project                   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  siteId              String
+  site                Site                      @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  employeeId          String
+  employee            TenantMembership          @relation("VisitEmployee", fields: [employeeId], references: [id], onDelete: Cascade)
+  taskId              String?
+  task                Task?                     @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  purpose             String                    @db.VarChar(255)
+  scheduledTime       DateTime
+  operationalState    SiteVisitOperationalState @default(SCHEDULED)
+  findings            String?                   @db.Text
+  nextActions         String?                   @db.Text
+  submittedReportTime DateTime?
+  reviewerId          String?
+  reviewer            TenantMembership?         @relation("VisitReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+  reviewDecision      SiteVisitReviewDecision   @default(PENDING)
+  reviewComment       String?                   @db.Text
+  reviewedAt          DateTime?
+  createdAt           DateTime                  @default(now())
+  updatedAt           DateTime                  @updatedAt
+
+  events              SiteVisitEvent[]
+
+  @@index([tenantId, employeeId, operationalState])
+  @@index([tenantId, projectId, scheduledTime])
+  @@map("site_visits")
+}
+
+enum SiteVisitEventType {
+  CHECK_IN
+  CHECK_OUT
+  EXCEPTION
+}
+
+enum GeofenceAssessment {
+  WITHIN_RADIUS
+  OUTSIDE_RADIUS
+  UNCERTAIN
+  LOCATION_UNAVAILABLE
+}
+
+model SiteVisitEvent {
+  id                      String             @id @default(uuid())
+  tenantId                String
+  visitId                 String
+  visit                   SiteVisit          @relation(fields: [visitId], references: [id], onDelete: Cascade)
+  eventType               SiteVisitEventType
+  actorId                 String
+  serverReceiptTime       DateTime           @default(now())
+  clientCaptureTime       DateTime?
+  latitude                Float?
+  longitude               Float?
+  accuracyMeters          Float?
+  calculatedDistanceMeters Float?
+  geofenceAssessment      GeofenceAssessment
+  failureReason           String?            @db.Text
+  idempotencyKey          String             @db.VarChar(64)
+  siteCenterLat           Float?
+  siteCenterLng           Float?
+  siteRadiusMeters        Float?
+  createdAt               DateTime           @default(now())
+
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, visitId, eventType])
+  @@map("site_visit_events")
+}
+
+// ==========================================
+// 6. DOCUMENTS, VERSIONS, & APPROVALS
+// ==========================================
+
+model Document {
+  id           String            @id @default(uuid())
+  tenantId     String
+  tenant       Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  projectId    String
+  project      Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  taskId       String?
+  task         Task?             @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  title        String            @db.VarChar(255)
+  drawingNumber String?          @db.VarChar(64)
+  discipline   String            @db.VarChar(100) // Architectural, Structural, MEP, Interior, Landscape
+  documentType String            @db.VarChar(100) // Working Drawing, Concept Sketch, 3D Render, Specification, Permit
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  versions     DocumentVersion[]
+
+  @@index([tenantId, projectId, discipline])
+  @@map("documents")
+}
+
+enum DocumentApprovalState {
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  REJECTED
+  SUPERSEDED
+}
+
+model DocumentVersion {
+  id             String                @id @default(uuid())
+  tenantId       String
+  documentId     String
+  document       Document              @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  revision       String                @db.VarChar(32) // R0, R1, R2
+  fileId         String
+  uploaderId     String
+  issuePurpose   String                @db.VarChar(100) // For Review, For Construction, Tender, Approval
+  approvalState  DocumentApprovalState @default(DRAFT)
+  supersededById String?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  approvalRequests ApprovalRequest[]
+
+  @@unique([documentId, revision])
+  @@index([tenantId, documentId])
+  @@map("document_versions")
+}
+
+enum ApprovalTargetType {
+  TASK
+  DOCUMENT_VERSION
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  CHANGES_REQUESTED
+  REJECTED
+}
+
+model ApprovalRequest {
+  id                         String             @id @default(uuid())
+  tenantId                   String
+  projectId                  String
+  project                    Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  targetType                 ApprovalTargetType
+  taskId                     String?
+  task                       Task?              @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  documentVersionId          String?
+  documentVersion            DocumentVersion?   @relation(fields: [documentVersionId], references: [id], onDelete: SetNull)
+  requesterId                String
+  reviewerId                 String?
+  status                     ApprovalStatus     @default(PENDING)
+  comment                    String?            @db.Text
+  isClientApproval           Boolean            @default(false)
+  clientApprovalEvidence     String?            @db.Text
+  clientApprovalReceivedDate DateTime?
+  decidedAt                  DateTime?
+  createdAt                  DateTime           @default(now())
+
+  @@index([tenantId, projectId, status])
+  @@map("approval_requests")
+}
+
+// ==========================================
+// 7. PROJECT FINANCE
+// ==========================================
+
+model Budget {
+  id            String   @id @default(uuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  projectId     String
+  project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  category      String   @db.VarChar(100)
+  plannedAmount Decimal  @db.Decimal(15, 2)
+  currency      String   @default("INR") @db.VarChar(10)
+  notes         String?  @db.Text
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([tenantId, projectId])
+  @@map("budgets")
+}
+
+enum MilestoneStatus {
+  DRAFT
+  INVOICED
+  PARTIALLY_PAID
+  PAID
+}
+
+model FeeMilestone {
+  id            String          @id @default(uuid())
+  tenantId      String
+  tenant        Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  projectId     String
+  project       Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title         String          @db.VarChar(191)
+  milestoneDate DateTime
+  amount        Decimal         @db.Decimal(15, 2)
+  currency      String          @default("INR") @db.VarChar(10)
+  status        MilestoneStatus @default(DRAFT)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  payments      FeePayment[]
+
+  @@index([tenantId, projectId])
+  @@map("fee_milestones")
+}
+
+model FeePayment {
+  id              String       @id @default(uuid())
+  tenantId        String
+  feeMilestoneId  String
+  feeMilestone    FeeMilestone @relation(fields: [feeMilestoneId], references: [id], onDelete: Cascade)
+  paymentDate     DateTime
+  amount          Decimal      @db.Decimal(15, 2)
+  currency        String       @default("INR") @db.VarChar(10)
+  paymentMethod   String       @db.VarChar(64)
+  referenceNumber String?      @db.VarChar(100)
+  receiptFileId   String?
+  notes           String?      @db.Text
+  createdAt       DateTime     @default(now())
+
+  @@index([tenantId, feeMilestoneId])
+  @@map("fee_payments")
+}
+
+enum ExpenseStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model Expense {
+  id            String        @id @default(uuid())
+  tenantId      String
+  tenant        Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  projectId     String
+  project       Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  category      String        @db.VarChar(100)
+  amount        Decimal       @db.Decimal(15, 2)
+  currency      String        @default("INR") @db.VarChar(10)
+  expenseDate   DateTime
+  status        ExpenseStatus @default(PENDING)
+  vendor        String?       @db.VarChar(191)
+  receiptFileId String?
+  approverId    String?
+  notes         String?       @db.Text
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([tenantId, projectId])
+  @@map("expenses")
+}
+
+// ==========================================
+// 8. STORAGE, NOTIFICATIONS & AUDIT
+// ==========================================
+
+model PrivateFile {
+  id            String   @id @default(uuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  fileName      String   @db.VarChar(255)
+  storagePath   String   @db.VarChar(512)
+  mimeType      String   @db.VarChar(128)
+  byteSize      Int
+  checksum      String?  @db.VarChar(128)
+  isQuarantined Boolean  @default(false)
+  scanStatus    String   @default("SCANNED_CLEAN") @db.VarChar(64)
+  uploaderId    String
+  createdAt     DateTime @default(now())
+
+  @@index([tenantId, scanStatus])
+  @@map("private_files")
+}
+
+model Notification {
+  id          String           @id @default(uuid())
+  tenantId    String
+  tenant      Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  recipientId String
+  recipient   TenantMembership @relation("RecipientNotifications", fields: [recipientId], references: [id], onDelete: Cascade)
+  title       String           @db.VarChar(191)
+  message     String           @db.Text
+  link        String?          @db.VarChar(255)
+  isRead      Boolean          @default(false)
+  createdAt   DateTime         @default(now())
+
+  @@index([tenantId, recipientId, isRead])
+  @@map("notifications")
+}
+
+model NotificationOutbox {
+  id               String    @id @default(uuid())
+  tenantId         String
+  tenant           Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  recipientEmail   String    @db.VarChar(191)
+  subject          String    @db.VarChar(255)
+  htmlBody         String    @db.Text
+  status           String    @default("PENDING") @db.VarChar(32) // PENDING, SENT, FAILED
+  retryCount       Int       @default(0)
+  deduplicationKey String    @db.VarChar(128)
+  lastAttemptAt    DateTime?
+  createdAt        DateTime  @default(now())
+
+  @@unique([tenantId, deduplicationKey])
+  @@index([tenantId, status])
+  @@map("notification_outbox")
+}
+
+model AuditEvent {
+  id                String   @id @default(uuid())
+  tenantId          String
+  tenant            Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  actorId           String
+  projectId         String?
+  action            String   @db.VarChar(100)
+  entityType        String   @db.VarChar(64)
+  entityId          String   @db.VarChar(64)
+  safeChangeSummary String   @db.Text
+  timestamp         DateTime @default(now())
+
+  @@index([tenantId, entityType, entityId])
+  @@index([tenantId, timestamp])
+  @@map("audit_events")
+}
+
+// ==========================================
+// 9. SAAS COMMODITY, PLANS & LIFECYCLE
+// ==========================================
+
+model Plan {
+  id           String   @id @default(uuid())
+  slug         String   @unique @db.VarChar(64)
+  name         String   @db.VarChar(100)
+  maxSeats     Int      @default(25)
+  maxProjects  Int      @default(50)
+  maxStorageMB Int      @default(10240)
+  features     Json?
+  createdAt    DateTime @default(now())
+
+  subscriptions Subscription[]
+
+  @@map("plans")
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCEL_AT_PERIOD_END
+  CANCELED
+}
+
+model Subscription {
+  id                 String             @id @default(uuid())
+  tenantId           String
+  tenant             Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  planId             String
+  plan               Plan               @relation(fields: [planId], references: [id], onDelete: Restrict)
+  status             SubscriptionStatus @default(ACTIVE)
+  currentPeriodStart DateTime           @default(now())
+  currentPeriodEnd   DateTime
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  @@index([tenantId, status])
+  @@map("subscriptions")
+}
+
+model TenantExport {
+  id          String    @id @default(uuid())
+  tenantId    String
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  requesterId String
+  status      String    @default("PENDING") @db.VarChar(32) // PENDING, READY, EXPIRED
+  downloadUrl String?   @db.VarChar(512)
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([tenantId, status])
+  @@map("tenant_exports")
+}
+
+model DeletionRequest {
+  id                    String    @id @default(uuid())
+  tenantId              String
+  tenant                Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  requesterId           String
+  status                String    @default("PENDING") @db.VarChar(32)
+  scheduledDeletionTime DateTime
+  createdAt             DateTime  @default(now())
+
+  @@index([tenantId, status])
+  @@map("deletion_requests")
+}

@@ -1,0 +1,53 @@
+@import "tailwindcss";
+
+:root {
+  /* Canvas & Surfaces */
+  --background: #F8F9FD;
+  --surface: #FFFFFF;
+  --surface-alt: #F2F4FF;
+  --surface-border: #E2E6F0;
+  --surface-border-strong: #A8B1CE;
+
+  /* Typography / Neutrals from Palette */
+  --foreground: #1F1F1F;
+  --foreground-muted: #696E82;
+  --foreground-subtle: #8A92A6;
+
+  /* Brand Palette from Image */
+  --color-primary: #5A81FA;
+  --color-primary-hover: #426EE8;
+  --color-primary-dark: #375BCB;
+  --color-primary-light: #F2F4FF;
+  --color-primary-border: #CEDEFF;
+
+  --color-secondary: #2C308D;
+  --color-secondary-hover: #22256E;
+
+  --color-accent-ice: #CEDEFF;
+  --color-accent-whisper: #F2F4FF;
+
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Custom architectural scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--surface-border-strong);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--foreground-muted);
+}
