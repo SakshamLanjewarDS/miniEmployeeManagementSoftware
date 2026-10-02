@@ -32,15 +32,20 @@ RUN apk add --no-cache openssl
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-# Create storage directory for uploaded files and set permissions
-RUN mkdir -p /app/storage/uploads && chown -R nextjs:nodejs /app/storage
+# Create required storage and Next.js cache directories
+RUN mkdir -p /app/storage/uploads /app/.next/cache/images && \
+    chown -R nextjs:nodejs /app
 
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/scripts ./scripts
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
+COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
+COPY --from=builder --chown=nextjs:nodejs /app/scripts ./scripts
+
+# Ensure full ownership of .next and storage for nextjs user
+RUN chown -R nextjs:nodejs /app/.next /app/storage && \
+    chmod -R 775 /app/.next /app/storage
 
 USER nextjs
 
