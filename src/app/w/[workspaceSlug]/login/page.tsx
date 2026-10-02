@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
 import {
   Building2,
@@ -58,8 +59,15 @@ export default function WorkspaceLoginPage() {
     <div className="min-h-screen bg-[#F8F9FD] flex flex-col justify-center items-center p-4 selection:bg-[#5A81FA] selection:text-white">
       {/* Brand Header */}
       <div className="w-full max-w-md mb-6 text-center">
-        <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-[#5A81FA] to-[#2C308D] text-white shadow-md mb-3 border border-[#5A81FA]/30">
-          <Building2 className="w-7 h-7" />
+        <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl overflow-hidden shadow-lg mb-3 border border-amber-400/30 bg-[#0B122B] p-1">
+          <Image
+            src="/icons/icon-192.png"
+            alt="100% DESIGN Studio Logo"
+            width={64}
+            height={64}
+            className="w-full h-full object-cover rounded-xl"
+            priority
+          />
         </div>
         <h1 className="text-2xl font-bold tracking-tight text-[#1F1F1F]">{studioName}</h1>
         <p className="text-sm text-[#696E82] mt-1">

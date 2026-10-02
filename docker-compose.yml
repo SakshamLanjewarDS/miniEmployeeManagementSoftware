@@ -1,0 +1,51 @@
+version: "3.8"
+
+services:
+  # MySQL Database Service
+  db:
+    image: mysql:8.0
+    container_name: studio_os_mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-studio_secure_root_pass_2026}
+      MYSQL_DATABASE: ${DB_NAME:-studio_os_db}
+      MYSQL_USER: ${DB_USER:-studio_user}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-studio_secure_pass_2026}
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Next.js Application Service
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: studio_os_app
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: "mysql://${DB_USER:-studio_user}:${DB_PASSWORD:-studio_secure_pass_2026}@db:3306/${DB_NAME:-studio_os_db}"
+      SESSION_SECRET: ${SESSION_SECRET:-d100_architecture_studio_multi_tenant_secret_key_prod_64bytes_hex_secure_token}
+      NEXT_PUBLIC_APP_NAME: "100% DESIGN Studio OS"
+      APP_DEFAULT_TIMEZONE: "Asia/Kolkata"
+      APP_DEFAULT_CURRENCY: "INR"
+      STORAGE_LOCAL_ROOT: "/app/storage/uploads"
+    ports:
+      - "3000:3000"
+    volumes:
+      - app_storage:/app/storage/uploads
+
+volumes:
+  mysql_data:
+    driver: local
+  app_storage:
+    driver: local

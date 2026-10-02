@@ -2,6 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { TenantContext } from "@/server/tenancy/context";
 import {
@@ -96,9 +97,15 @@ export function AppSidebar({ context }: AppSidebarProps) {
     <aside className="w-64 bg-white border-r border-[#E2E6F0] flex flex-col justify-between shrink-0 h-screen sticky top-0">
       {/* Brand Header */}
       <div>
-        <div className="p-5 border-b border-[#E2E6F0] flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#5A81FA] to-[#2C308D] text-white flex items-center justify-center font-bold text-base shadow-sm">
-            <Layers className="w-5 h-5" />
+        <div className="p-4 border-b border-[#E2E6F0] flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl overflow-hidden shadow-sm shrink-0 bg-[#0B122B] p-0.5 border border-amber-400/20">
+            <Image
+              src="/icons/icon-192.png"
+              alt="100% DESIGN Studio Logo"
+              width={40}
+              height={40}
+              className="w-full h-full object-cover rounded-lg"
+            />
           </div>
           <div className="min-w-0">
             <h2 className="text-sm font-bold text-[#1F1F1F] truncate">{context.tenantName}</h2>

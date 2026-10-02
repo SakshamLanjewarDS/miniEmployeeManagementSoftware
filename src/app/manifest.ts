@@ -6,12 +6,13 @@ export default function manifest(): MetadataRoute.Manifest {
     short_name: "Studio OS",
     description: "Enterprise Architectural Project, Site Visit & Team Management OS",
     start_url: "/",
-    display: "standalone",
-    background_color: "#ffffff",
-    theme_color: "#5A81FA",
-    orientation: "portrait-primary",
     scope: "/",
     id: "/",
+    display: "standalone",
+    background_color: "#0B122B",
+    theme_color: "#0B122B",
+    orientation: "any",
+    categories: ["business", "productivity"],
     icons: [
       {
         src: "/icons/icon-192.png",
@@ -20,7 +21,19 @@ export default function manifest(): MetadataRoute.Manifest {
         purpose: "any",
       },
       {
+        src: "/icons/icon-maskable-192.png",
+        sizes: "192x192",
+        type: "image/png",
+        purpose: "maskable",
+      },
+      {
         src: "/icons/icon-512.png",
+        sizes: "512x512",
+        type: "image/png",
+        purpose: "any",
+      },
+      {
+        src: "/icons/icon-maskable-512.png",
         sizes: "512x512",
         type: "image/png",
         purpose: "maskable",
@@ -29,6 +42,27 @@ export default function manifest(): MetadataRoute.Manifest {
         src: "/icons/apple-touch-icon.png",
         sizes: "180x180",
         type: "image/png",
+      },
+      {
+        src: "/icons/favicon-32x32.png",
+        sizes: "32x32",
+        type: "image/png",
+      },
+    ],
+    shortcuts: [
+      {
+        name: "Site Visit Check-In",
+        short_name: "Site Check-In",
+        description: "Quick GPS Site Check-in & Punch In",
+        url: "/visits",
+        icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }],
+      },
+      {
+        name: "Projects",
+        short_name: "Projects",
+        description: "View Active Architectural Projects",
+        url: "/projects",
+        icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }],
       },
     ],
   };

@@ -6,6 +6,7 @@ import { TenantContext } from "@/server/tenancy/context";
 import { MapPin } from "lucide-react";
 import { NotificationDropdown } from "./NotificationDropdown";
 import { UserProfileDropdown } from "./UserProfileDropdown";
+import { PwaInstallButton } from "@/components/pwa/PwaInstallButton";
 
 interface AppTopbarProps {
   context: TenantContext;
@@ -26,6 +27,9 @@ export function AppTopbar({ context }: AppTopbarProps) {
 
       {/* Right Action Bar */}
       <div className="flex items-center gap-3">
+        {/* Quick App Install Button */}
+        <PwaInstallButton variant="compact" />
+
         {/* Quick Check-In Button */}
         <Link
           href={`/w/${context.tenantSlug}/visits`}
