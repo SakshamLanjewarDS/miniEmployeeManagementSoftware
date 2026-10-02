@@ -114,8 +114,9 @@ export async function resolveSessionAndTenant(
   }
 
   // Resolve target tenant by slug
+  const normalizedSlug = workspaceSlug.toLowerCase().trim();
   const tenant = await prisma.tenant.findUnique({
-    where: { slug: workspaceSlug },
+    where: { slug: normalizedSlug },
     include: {
       memberships: {
         where: { userId: session.userId, isActive: true },

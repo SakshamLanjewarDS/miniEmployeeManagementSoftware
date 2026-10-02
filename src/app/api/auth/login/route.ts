@@ -33,11 +33,21 @@ export async function POST(req: NextRequest) {
     // Set secure HttpOnly session cookie
     await setSessionCookie(result.sessionToken, result.expiresAt);
 
-    return NextResponse.json({
+    const res = NextResponse.json({
       success: true,
       user: result.user,
       redirectUrl: `/w/${workspaceSlug}/tasks`,
     });
+
+    res.cookies.set("studio_session_token", result.sessionToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      expires: result.expiresAt,
+    });
+
+    return res;
   } catch (err: any) {
     console.error("Login API error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

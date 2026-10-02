@@ -46,13 +46,20 @@ export default function WorkspaceLoginPage() {
       if (!res.ok) {
         setError(data.error || "Authentication failed. Check your Employee ID and password.");
       } else {
-        router.push(data.redirectUrl || `/w/${workspaceSlug}/tasks`);
+        // Use full navigation to ensure session cookies and tenant context load seamlessly
+        window.location.href = data.redirectUrl || `/w/${workspaceSlug}/tasks`;
       }
     } catch {
-      setError("Network or server connection failed. Please retry.");
+      setError("Network or server connection failed. The server may be waking up from cold start; please retry in a few seconds.");
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleFillDemo = (empId: string, pwd: string) => {
+    setIdentifier(empId);
+    setPassword(pwd);
+    setError(null);
   };
 
   return (
@@ -151,6 +158,34 @@ export default function WorkspaceLoginPage() {
               </>
             )}
           </button>
+
+          {/* Quick Demo Credentials Autofill */}
+          <div className="pt-2">
+            <div className="text-[11px] font-medium text-[#696E82] mb-1.5 flex items-center justify-between">
+              <span>Quick Demo Credentials:</span>
+              <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                1-Click Autofill
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => handleFillDemo("EMP-001", "Password@123")}
+                className="p-2 rounded-lg bg-[#F2F4FF] hover:bg-[#E5E9FF] text-[#2C308D] text-left text-xs transition-colors border border-[#CEDEFF] cursor-pointer"
+              >
+                <div className="font-bold text-[11px]">Principal Admin</div>
+                <div className="font-mono text-[10px] text-[#696E82]">EMP-001 • Tap to fill</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleFillDemo("EMP-002", "Password@123")}
+                className="p-2 rounded-lg bg-[#F8F9FD] hover:bg-[#EBEFF8] text-[#1F1F1F] text-left text-xs transition-colors border border-[#E2E6F0] cursor-pointer"
+              >
+                <div className="font-bold text-[11px]">Project Manager</div>
+                <div className="font-mono text-[10px] text-[#696E82]">EMP-002 • Tap to fill</div>
+              </button>
+            </div>
+          </div>
         </form>
 
         {/* Switch tenant link */}

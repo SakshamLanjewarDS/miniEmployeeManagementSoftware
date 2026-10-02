@@ -1,5 +1,5 @@
 // 100% DESIGN Studio OS — Service Worker for PWA Installation and Asset Caching
-const CACHE_NAME = "studio-os-v1";
+const CACHE_NAME = "studio-os-v2";
 const STATIC_ASSETS = [
   "/manifest.json",
   "/favicon.ico",
@@ -14,7 +14,7 @@ self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(STATIC_ASSETS).catch((err) => {
-        console.warn("[SW] Cache preload error:", err);
+        console.warn("[SW] Cache preload warning:", err);
       });
     })
   );
@@ -37,21 +37,52 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
-  // Pass through all dynamic requests, Next.js server actions, and API endpoints
+  // Only handle GET requests
+  if (event.request.method !== "GET") {
+    return;
+  }
+
+  // CRITICAL: NEVER intercept document navigation (HTML pages), Next.js routing, or API requests
   if (
-    event.request.method !== "GET" ||
-    event.request.url.includes("/api/") ||
-    event.request.url.includes("/_next/webpack-hmr")
+    event.request.mode === "navigate" ||
+    event.request.destination === "document"
   ) {
     return;
   }
 
-  // Network first with cache fallback for static shell assets
+  const url = new URL(event.request.url);
+
+  if (
+    url.pathname.startsWith("/api/") ||
+    url.pathname.startsWith("/_next/")
+  ) {
+    return;
+  }
+
+  // Only handle known static shell assets or icons
+  const isStaticShellAsset =
+    STATIC_ASSETS.includes(url.pathname) ||
+    url.pathname.startsWith("/icons/") ||
+    url.pathname.startsWith("/brand/");
+
+  if (!isStaticShellAsset) {
+    return;
+  }
+
   event.respondWith(
-    fetch(event.request).catch(async () => {
-      const cached = await caches.match(event.request);
-      if (cached) return cached;
-      return caches.match("/");
+    caches.match(event.request).then((cachedResponse) => {
+      if (cachedResponse) {
+        return cachedResponse;
+      }
+      return fetch(event.request).then((networkResponse) => {
+        if (networkResponse && networkResponse.status === 200) {
+          const responseToCache = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseToCache);
+          });
+        }
+        return networkResponse;
+      });
     })
   );
 });
