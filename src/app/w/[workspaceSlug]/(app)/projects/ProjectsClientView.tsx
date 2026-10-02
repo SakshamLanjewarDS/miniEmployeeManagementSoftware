@@ -46,8 +46,18 @@ interface ProjectItem {
   targetDate?: string | Date | null;
   primaryClientId?: string | null;
   projectManagerId?: string | null;
+  projectCoordinatorId?: string | null;
+  siteCity?: string | null;
+  googleMapLocation?: string | null;
+  contractorId?: string | null;
+  consultantId?: string | null;
+  plotArea?: string | null;
+  constructionArea?: string | null;
   primaryClient?: { id: string; name: string; company?: string | null } | null;
   projectManager?: { user: { fullName: string } } | null;
+  projectCoordinator?: { user: { fullName: string } } | null;
+  contractor?: { id: string; name: string; firmName?: string | null; trade?: string | null } | null;
+  consultant?: { id: string; name: string; firmName?: string | null; discipline?: string | null } | null;
   taskProgress: {
     percentage: number;
     label: string;
@@ -78,6 +88,8 @@ interface ProjectsClientViewProps {
     user: { id: string; fullName: string; email: string };
     employee?: { employeeId?: string | null; designation?: string | null } | null;
   }[];
+  contractors?: { id: string; name: string; firmName?: string | null; trade?: string | null }[];
+  consultants?: { id: string; name: string; firmName?: string | null; discipline?: string | null }[];
 }
 
 const PROJECT_TYPOLOGIES = [
@@ -111,6 +123,8 @@ export function ProjectsClientView({
   initialProjects,
   clients,
   members,
+  contractors = [],
+  consultants = [],
 }: ProjectsClientViewProps) {
   const router = useRouter();
 
@@ -142,11 +156,15 @@ export function ProjectsClientView({
     name: "",
     description: "",
     projectType: "Residential Architecture",
-    primaryClientId: "",
     projectManagerId: "",
+    projectCoordinatorId: "",
     siteAddress: "",
-    budget: "",
-    currency: context.currency || "INR",
+    siteCity: "",
+    googleMapLocation: "",
+    contractorId: "",
+    consultantId: "",
+    plotArea: "",
+    constructionArea: "",
     startDate: "",
     targetDate: "",
   });
@@ -157,13 +175,17 @@ export function ProjectsClientView({
     name: "",
     description: "",
     projectType: "",
-    primaryClientId: "",
     projectManagerId: "",
+    projectCoordinatorId: "",
     siteAddress: "",
+    siteCity: "",
+    googleMapLocation: "",
+    contractorId: "",
+    consultantId: "",
+    plotArea: "",
+    constructionArea: "",
     currentPhase: "",
     status: "ACTIVE" as ProjectItem["status"],
-    budget: "",
-    currency: "INR",
     startDate: "",
     targetDate: "",
   });
@@ -173,7 +195,9 @@ export function ProjectsClientView({
     const matchesSearch =
       p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       p.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (p.primaryClient?.name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (p.siteCity || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (p.projectCoordinator?.user?.fullName || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (p.projectManager?.user?.fullName || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
       (p.siteAddress || "").toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchesStatus = statusFilter === "ALL" || p.status === statusFilter;
@@ -204,11 +228,15 @@ export function ProjectsClientView({
           name: formData.name.trim(),
           description: formData.description.trim() || undefined,
           projectType: formData.projectType || undefined,
-          primaryClientId: formData.primaryClientId || undefined,
           projectManagerId: formData.projectManagerId || undefined,
+          projectCoordinatorId: formData.projectCoordinatorId || undefined,
           siteAddress: formData.siteAddress.trim() || undefined,
-          budget: formData.budget ? Number(formData.budget) : undefined,
-          currency: formData.currency,
+          siteCity: formData.siteCity.trim() || undefined,
+          googleMapLocation: formData.googleMapLocation.trim() || undefined,
+          contractorId: formData.contractorId || undefined,
+          consultantId: formData.consultantId || undefined,
+          plotArea: formData.plotArea.trim() || undefined,
+          constructionArea: formData.constructionArea.trim() || undefined,
           startDate: formData.startDate || undefined,
           targetDate: formData.targetDate || undefined,
         }),
@@ -226,11 +254,15 @@ export function ProjectsClientView({
         name: "",
         description: "",
         projectType: "Residential Architecture",
-        primaryClientId: "",
         projectManagerId: "",
+        projectCoordinatorId: "",
         siteAddress: "",
-        budget: "",
-        currency: context.currency || "INR",
+        siteCity: "",
+        googleMapLocation: "",
+        contractorId: "",
+        consultantId: "",
+        plotArea: "",
+        constructionArea: "",
         startDate: "",
         targetDate: "",
       });
@@ -252,13 +284,17 @@ export function ProjectsClientView({
       name: project.name,
       description: project.description || "",
       projectType: project.projectType || "Residential Architecture",
-      primaryClientId: project.primaryClientId || "",
       projectManagerId: project.projectManagerId || "",
+      projectCoordinatorId: project.projectCoordinatorId || "",
       siteAddress: project.siteAddress || "",
+      siteCity: project.siteCity || "",
+      googleMapLocation: project.googleMapLocation || "",
+      contractorId: project.contractorId || "",
+      consultantId: project.consultantId || "",
+      plotArea: project.plotArea || "",
+      constructionArea: project.constructionArea || "",
       currentPhase: project.currentPhase || "Brief",
       status: project.status,
-      budget: project.budget ? String(project.budget) : "",
-      currency: project.currency || "INR",
       startDate: project.startDate
         ? new Date(project.startDate).toISOString().split("T")[0]
         : "",
@@ -286,13 +322,17 @@ export function ProjectsClientView({
           name: editFormData.name.trim(),
           description: editFormData.description.trim() || undefined,
           projectType: editFormData.projectType || undefined,
-          primaryClientId: editFormData.primaryClientId || null,
           projectManagerId: editFormData.projectManagerId || null,
+          projectCoordinatorId: editFormData.projectCoordinatorId || null,
           siteAddress: editFormData.siteAddress.trim() || undefined,
+          siteCity: editFormData.siteCity.trim() || null,
+          googleMapLocation: editFormData.googleMapLocation.trim() || null,
+          contractorId: editFormData.contractorId || null,
+          consultantId: editFormData.consultantId || null,
+          plotArea: editFormData.plotArea.trim() || null,
+          constructionArea: editFormData.constructionArea.trim() || null,
           currentPhase: editFormData.currentPhase || undefined,
           status: editFormData.status,
-          budget: editFormData.budget ? Number(editFormData.budget) : null,
-          currency: editFormData.currency,
           startDate: editFormData.startDate || null,
           targetDate: editFormData.targetDate || null,
         }),
@@ -733,10 +773,10 @@ export function ProjectsClientView({
                 <div className="grid grid-cols-2 gap-2 text-xs pt-3 border-t border-[#E2E6F0]">
                   <div>
                     <span className="text-[#696E82] block text-[10px] uppercase font-semibold">
-                      Client
+                      Project Coordinator
                     </span>
                     <span className="font-semibold text-[#1F1F1F] truncate block">
-                      {p.primaryClient?.name || "Direct Commission"}
+                      {p.projectCoordinator?.user.fullName || p.primaryClient?.name || "Unassigned"}
                     </span>
                   </div>
                   <div>
@@ -747,23 +787,21 @@ export function ProjectsClientView({
                       {p.projectManager?.user.fullName || "Unassigned"}
                     </span>
                   </div>
-                  {p.budget && (
-                    <div>
-                      <span className="text-[#696E82] block text-[10px] uppercase font-semibold">
-                        Budget
-                      </span>
-                      <span className="font-bold text-[#4B5320]">
-                        {p.currency} {Number(p.budget).toLocaleString("en-IN")}
-                      </span>
-                    </div>
-                  )}
                   <div>
                     <span className="text-[#696E82] block text-[10px] uppercase font-semibold flex items-center gap-0.5">
                       <MapPin className="w-2.5 h-2.5 text-[#4B5320]" />
-                      <span>Site Location</span>
+                      <span>{p.siteCity ? `City: ${p.siteCity}` : "Site Location"}</span>
                     </span>
-                    <span className="text-[#696E82] truncate block" title={p.siteAddress || ""}>
-                      {p.siteAddress || "Site address pending"}
+                    <span className="text-[#696E82] truncate block" title={p.siteAddress || p.siteCity || ""}>
+                      {p.siteCity || p.siteAddress || "Site location pending"}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[#696E82] block text-[10px] uppercase font-semibold">
+                      Area
+                    </span>
+                    <span className="font-semibold text-[#4B5320] truncate block">
+                      {p.constructionArea || p.plotArea || "—"}
                     </span>
                   </div>
                 </div>
@@ -812,7 +850,7 @@ export function ProjectsClientView({
                     Commission New Architectural Project
                   </h3>
                   <p className="text-[11px] text-[#696E82]">
-                    Sets up project code, typology, client, manager, and default 11 design phases
+                    Sets up project code, typology, manager, coordinator, site, and default 11 design phases
                   </p>
                 </div>
               </div>
@@ -880,26 +918,6 @@ export function ProjectsClientView({
 
                 <div>
                   <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
-                    Primary Client
-                  </label>
-                  <select
-                    value={formData.primaryClientId}
-                    onChange={(e) => setFormData({ ...formData, primaryClientId: e.target.value })}
-                    className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
-                  >
-                    <option value="">Direct Client / Unassigned</option>
-                    {clients.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name} {c.company ? `(${c.company})` : ""}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
                     Project Manager
                   </label>
                   <select
@@ -917,29 +935,40 @@ export function ProjectsClientView({
                     ))}
                   </select>
                 </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
+                    Project Coordinator
+                  </label>
+                  <select
+                    value={formData.projectCoordinatorId}
+                    onChange={(e) =>
+                      setFormData({ ...formData, projectCoordinatorId: e.target.value })
+                    }
+                    className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
+                  >
+                    <option value="">Select Project Coordinator...</option>
+                    {members.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.user.fullName} ({m.employee?.designation || "Studio Staff"})
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
                 <div>
                   <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
-                    Estimated Budget & Currency
+                    Site City
                   </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="number"
-                      placeholder="e.g. 5000000"
-                      value={formData.budget}
-                      onChange={(e) => setFormData({ ...formData, budget: e.target.value })}
-                      className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
-                    />
-                    <select
-                      value={formData.currency}
-                      onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
-                      className="w-24 px-2 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none font-bold"
-                    >
-                      <option value="INR">INR (₹)</option>
-                      <option value="USD">USD ($)</option>
-                      <option value="EUR">EUR (€)</option>
-                    </select>
-                  </div>
+                  <input
+                    type="text"
+                    placeholder="e.g. Gurugram, Delhi, Mumbai"
+                    value={formData.siteCity}
+                    onChange={(e) => setFormData({ ...formData, siteCity: e.target.value })}
+                    className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
+                  />
                 </div>
               </div>
 
@@ -954,6 +983,85 @@ export function ProjectsClientView({
                   onChange={(e) => setFormData({ ...formData, siteAddress: e.target.value })}
                   className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
                 />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
+                  Google Map Location
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. https://maps.google.com/?q=... or Plus Code"
+                  value={formData.googleMapLocation}
+                  onChange={(e) => setFormData({ ...formData, googleMapLocation: e.target.value })}
+                  className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
+                    Project Contractor
+                  </label>
+                  <select
+                    value={formData.contractorId}
+                    onChange={(e) => setFormData({ ...formData, contractorId: e.target.value })}
+                    className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
+                  >
+                    <option value="">Select Contractor / Vendor...</option>
+                    {contractors.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} {c.firmName ? `(${c.firmName})` : ""} {c.trade ? `• ${c.trade}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
+                    Project Consultant
+                  </label>
+                  <select
+                    value={formData.consultantId}
+                    onChange={(e) => setFormData({ ...formData, consultantId: e.target.value })}
+                    className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
+                  >
+                    <option value="">Select Consultant...</option>
+                    {consultants.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} {c.firmName ? `(${c.firmName})` : ""} {c.discipline ? `• ${c.discipline}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
+                    Plot Area
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 5,000 sq.ft / 555 sq.yd"
+                    value={formData.plotArea}
+                    onChange={(e) => setFormData({ ...formData, plotArea: e.target.value })}
+                    className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
+                    Total Construction Area
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 12,500 sq.ft"
+                    value={formData.constructionArea}
+                    onChange={(e) => setFormData({ ...formData, constructionArea: e.target.value })}
+                    className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1141,28 +1249,6 @@ export function ProjectsClientView({
 
                 <div>
                   <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
-                    Primary Client
-                  </label>
-                  <select
-                    value={editFormData.primaryClientId}
-                    onChange={(e) =>
-                      setEditFormData({ ...editFormData, primaryClientId: e.target.value })
-                    }
-                    className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
-                  >
-                    <option value="">Direct Client / Unassigned</option>
-                    {clients.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name} {c.company ? `(${c.company})` : ""}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
                     Project Manager
                   </label>
                   <select
@@ -1180,29 +1266,42 @@ export function ProjectsClientView({
                     ))}
                   </select>
                 </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
+                    Project Coordinator
+                  </label>
+                  <select
+                    value={editFormData.projectCoordinatorId}
+                    onChange={(e) =>
+                      setEditFormData({ ...editFormData, projectCoordinatorId: e.target.value })
+                    }
+                    className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
+                  >
+                    <option value="">Select Project Coordinator...</option>
+                    {members.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.user.fullName} ({m.employee?.designation || "Studio Staff"})
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
                 <div>
                   <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
-                    Budget & Currency
+                    Site City
                   </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="number"
-                      placeholder="e.g. 5000000"
-                      value={editFormData.budget}
-                      onChange={(e) => setEditFormData({ ...editFormData, budget: e.target.value })}
-                      className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
-                    />
-                    <select
-                      value={editFormData.currency}
-                      onChange={(e) => setEditFormData({ ...editFormData, currency: e.target.value })}
-                      className="w-24 px-2 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none font-bold"
-                    >
-                      <option value="INR">INR (₹)</option>
-                      <option value="USD">USD ($)</option>
-                      <option value="EUR">EUR (€)</option>
-                    </select>
-                  </div>
+                  <input
+                    type="text"
+                    placeholder="e.g. Gurugram, Delhi, Mumbai"
+                    value={editFormData.siteCity}
+                    onChange={(e) =>
+                      setEditFormData({ ...editFormData, siteCity: e.target.value })
+                    }
+                    className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
+                  />
                 </div>
               </div>
 
@@ -1212,12 +1311,102 @@ export function ProjectsClientView({
                 </label>
                 <input
                   type="text"
+                  placeholder="e.g. Plot 42, Sector 15, Golf Course Extension Road, Gurugram"
                   value={editFormData.siteAddress}
                   onChange={(e) =>
                     setEditFormData({ ...editFormData, siteAddress: e.target.value })
                   }
                   className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
                 />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
+                  Google Map Location
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. https://maps.google.com/?q=... or Plus Code"
+                  value={editFormData.googleMapLocation}
+                  onChange={(e) =>
+                    setEditFormData({ ...editFormData, googleMapLocation: e.target.value })
+                  }
+                  className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
+                    Project Contractor
+                  </label>
+                  <select
+                    value={editFormData.contractorId}
+                    onChange={(e) =>
+                      setEditFormData({ ...editFormData, contractorId: e.target.value })
+                    }
+                    className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
+                  >
+                    <option value="">Select Contractor / Vendor...</option>
+                    {contractors.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} {c.firmName ? `(${c.firmName})` : ""} {c.trade ? `• ${c.trade}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
+                    Project Consultant
+                  </label>
+                  <select
+                    value={editFormData.consultantId}
+                    onChange={(e) =>
+                      setEditFormData({ ...editFormData, consultantId: e.target.value })
+                    }
+                    className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
+                  >
+                    <option value="">Select Consultant...</option>
+                    {consultants.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} {c.firmName ? `(${c.firmName})` : ""} {c.discipline ? `• ${c.discipline}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
+                    Plot Area
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 5,000 sq.ft / 555 sq.yd"
+                    value={editFormData.plotArea}
+                    onChange={(e) =>
+                      setEditFormData({ ...editFormData, plotArea: e.target.value })
+                    }
+                    className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
+                    Total Construction Area
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 12,500 sq.ft"
+                    value={editFormData.constructionArea}
+                    onChange={(e) =>
+                      setEditFormData({ ...editFormData, constructionArea: e.target.value })
+                    }
+                    className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

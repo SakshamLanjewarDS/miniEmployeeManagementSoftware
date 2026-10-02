@@ -103,6 +103,7 @@ model TenantMembership {
   employee         Employee?
   projectMembers   ProjectMember[]
   managedProjects  Project[]        @relation("ProjectManager")
+  coordinatedProjects Project[]     @relation("ProjectCoordinator")
   assignedTasks    Task[]           @relation("TaskAssignee")
   createdTasks     Task[]           @relation("TaskCreator")
   siteVisits       SiteVisit[]      @relation("VisitEmployee")
@@ -207,6 +208,7 @@ model Consultant {
   updatedAt   DateTime            @updatedAt
 
   projects    ProjectConsultant[]
+  primaryProjects Project[]
 
   @@index([tenantId, isActive])
   @@map("consultants")
@@ -227,6 +229,7 @@ model Contractor {
   updatedAt DateTime            @updatedAt
 
   projects  ProjectContractor[]
+  primaryProjects Project[]
 
   @@index([tenantId, isActive])
   @@map("contractors")
@@ -257,6 +260,16 @@ model Project {
   siteAddress      String?           @db.Text
   projectManagerId String?
   projectManager   TenantMembership? @relation("ProjectManager", fields: [projectManagerId], references: [id], onDelete: SetNull)
+  projectCoordinatorId String?
+  projectCoordinator   TenantMembership? @relation("ProjectCoordinator", fields: [projectCoordinatorId], references: [id], onDelete: SetNull)
+  siteCity         String?           @db.VarChar(100)
+  googleMapLocation String?          @db.Text
+  contractorId     String?
+  contractor       Contractor?       @relation(fields: [contractorId], references: [id], onDelete: SetNull)
+  consultantId     String?
+  consultant       Consultant?       @relation(fields: [consultantId], references: [id], onDelete: SetNull)
+  plotArea         String?           @db.VarChar(100)
+  constructionArea String?           @db.VarChar(100)
   currentPhase     String?           @db.VarChar(100)
   status           ProjectStatus     @default(ACTIVE)
   startDate        DateTime?
@@ -283,6 +296,9 @@ model Project {
   @@unique([tenantId, code])
   @@index([tenantId, status])
   @@index([tenantId, projectManagerId])
+  @@index([tenantId, projectCoordinatorId])
+  @@index([tenantId, contractorId])
+  @@index([tenantId, consultantId])
   @@map("projects")
 }
 

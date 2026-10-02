@@ -142,6 +142,15 @@ const TYPE_CONFIG: Record<
     targetTabUrl: (slug) => `/w/${slug}/projects`,
     targetTabName: "Projects",
   },
+  all: {
+    title: "All Studio Data",
+    description: "Export full studio dataset across all collections.",
+    icon: FolderKanban,
+    expectedColumns: [],
+    note: "Comprehensive studio backup and data transfer.",
+    targetTabUrl: (slug) => `/w/${slug}/projects`,
+    targetTabName: "Studio OS",
+  },
 };
 
 export function CsvImportExportModal({

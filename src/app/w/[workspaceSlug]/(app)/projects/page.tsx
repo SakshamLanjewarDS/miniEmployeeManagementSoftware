@@ -33,6 +33,13 @@ export default async function ProjectsPage({ params }: ProjectsPageProps) {
     targetDate: p.targetDate ? p.targetDate.toISOString() : null,
     primaryClientId: p.primaryClientId,
     projectManagerId: p.projectManagerId,
+    projectCoordinatorId: p.projectCoordinatorId,
+    siteCity: p.siteCity,
+    googleMapLocation: p.googleMapLocation,
+    contractorId: p.contractorId,
+    consultantId: p.consultantId,
+    plotArea: p.plotArea,
+    constructionArea: p.constructionArea,
     primaryClient: p.primaryClient
       ? {
           id: p.primaryClient.id,
@@ -45,6 +52,29 @@ export default async function ProjectsPage({ params }: ProjectsPageProps) {
           user: {
             fullName: p.projectManager.user.fullName,
           },
+        }
+      : null,
+    projectCoordinator: p.projectCoordinator
+      ? {
+          user: {
+            fullName: p.projectCoordinator.user.fullName,
+          },
+        }
+      : null,
+    contractor: p.contractor
+      ? {
+          id: p.contractor.id,
+          name: p.contractor.name,
+          firmName: p.contractor.firmName,
+          trade: p.contractor.trade,
+        }
+      : null,
+    consultant: p.consultant
+      ? {
+          id: p.consultant.id,
+          name: p.consultant.name,
+          firmName: p.consultant.firmName,
+          discipline: p.consultant.discipline,
         }
       : null,
     taskProgress: p.taskProgress,
@@ -73,12 +103,28 @@ export default async function ProjectsPage({ params }: ProjectsPageProps) {
       : null,
   }));
 
+  const contractors = (formData.contractors || []).map((c) => ({
+    id: c.id,
+    name: c.name,
+    firmName: c.firmName,
+    trade: c.trade,
+  }));
+
+  const consultants = (formData.consultants || []).map((c) => ({
+    id: c.id,
+    name: c.name,
+    firmName: c.firmName,
+    discipline: c.discipline,
+  }));
+
   return (
     <ProjectsClientView
       context={ctx}
       initialProjects={projects}
       clients={clients}
       members={members}
+      contractors={contractors}
+      consultants={consultants}
     />
   );
 }

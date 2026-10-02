@@ -8,11 +8,12 @@ export async function findProjects(ctx: TenantContext) {
     tenantId: ctx.tenantId, // STRICT TENANT ISOLATION
   };
 
-  // Employees and Project Managers only see assigned projects
+  // Employees, Project Managers, and Coordinators only see assigned projects
   if (!isAdminOrOwner(ctx)) {
     whereClause.OR = [
       { members: { some: { membershipId: ctx.membershipId } } },
       { projectManagerId: ctx.membershipId },
+      { projectCoordinatorId: ctx.membershipId },
     ];
   }
 
@@ -33,6 +34,31 @@ export async function findProjects(ctx: TenantContext) {
               fullName: true,
             },
           },
+        },
+      },
+      projectCoordinator: {
+        include: {
+          user: {
+            select: {
+              fullName: true,
+            },
+          },
+        },
+      },
+      contractor: {
+        select: {
+          id: true,
+          name: true,
+          firmName: true,
+          trade: true,
+        },
+      },
+      consultant: {
+        select: {
+          id: true,
+          name: true,
+          firmName: true,
+          discipline: true,
         },
       },
       phases: {
@@ -102,6 +128,7 @@ export async function findProjectDetail(ctx: TenantContext, projectId: string) {
     whereClause.OR = [
       { members: { some: { membershipId: ctx.membershipId } } },
       { projectManagerId: ctx.membershipId },
+      { projectCoordinatorId: ctx.membershipId },
     ];
   }
 
@@ -115,6 +142,14 @@ export async function findProjectDetail(ctx: TenantContext, projectId: string) {
           employee: true,
         },
       },
+      projectCoordinator: {
+        include: {
+          user: true,
+          employee: true,
+        },
+      },
+      contractor: true,
+      consultant: true,
       phases: {
         orderBy: { sortOrder: "asc" },
       },
@@ -244,7 +279,14 @@ export async function createProject(
     primaryClientId?: string;
     projectType?: string;
     siteAddress?: string;
+    siteCity?: string;
+    googleMapLocation?: string;
     projectManagerId?: string;
+    projectCoordinatorId?: string;
+    contractorId?: string;
+    consultantId?: string;
+    plotArea?: string;
+    constructionArea?: string;
     budget?: number;
     currency?: string;
     startDate?: Date;
@@ -260,10 +302,17 @@ export async function createProject(
         code: data.code.trim().toUpperCase(),
         name: data.name.trim(),
         description: data.description,
-        primaryClientId: data.primaryClientId,
+        primaryClientId: data.primaryClientId || null,
         projectType: data.projectType,
         siteAddress: data.siteAddress,
-        projectManagerId: data.projectManagerId,
+        siteCity: data.siteCity,
+        googleMapLocation: data.googleMapLocation,
+        projectManagerId: data.projectManagerId || null,
+        projectCoordinatorId: data.projectCoordinatorId || null,
+        contractorId: data.contractorId || null,
+        consultantId: data.consultantId || null,
+        plotArea: data.plotArea,
+        constructionArea: data.constructionArea,
         budget: data.budget,
         currency: data.currency || ctx.currency,
         startDate: data.startDate,
@@ -271,6 +320,50 @@ export async function createProject(
         status: ProjectStatus.ACTIVE,
       },
     });
+
+    if (data.contractorId) {
+      await tx.projectContractor.create({
+        data: {
+          tenantId: ctx.tenantId,
+          projectId: project.id,
+          contractorId: data.contractorId,
+          scope: "Commissioned Contractor",
+        },
+      }).catch(() => {});
+    }
+
+    if (data.consultantId) {
+      await tx.projectConsultant.create({
+        data: {
+          tenantId: ctx.tenantId,
+          projectId: project.id,
+          consultantId: data.consultantId,
+          scope: "Commissioned Consultant",
+        },
+      }).catch(() => {});
+    }
+
+    if (data.projectCoordinatorId) {
+      await tx.projectMember.create({
+        data: {
+          tenantId: ctx.tenantId,
+          projectId: project.id,
+          membershipId: data.projectCoordinatorId,
+          projectRole: "Project Coordinator",
+        },
+      }).catch(() => {});
+    }
+
+    if (data.projectManagerId) {
+      await tx.projectMember.create({
+        data: {
+          tenantId: ctx.tenantId,
+          projectId: project.id,
+          membershipId: data.projectManagerId,
+          projectRole: "Project Manager",
+        },
+      }).catch(() => {});
+    }
 
     // Seed default architectural phases
     const defaultPhases = [
@@ -330,7 +423,14 @@ export async function updateProject(
     primaryClientId?: string | null;
     projectType?: string;
     siteAddress?: string;
+    siteCity?: string | null;
+    googleMapLocation?: string | null;
     projectManagerId?: string | null;
+    projectCoordinatorId?: string | null;
+    contractorId?: string | null;
+    consultantId?: string | null;
+    plotArea?: string | null;
+    constructionArea?: string | null;
     currentPhase?: string | null;
     status?: ProjectStatus;
     budget?: number | null;
@@ -356,7 +456,14 @@ export async function updateProject(
   if (data.primaryClientId !== undefined) updatePayload.primaryClientId = data.primaryClientId || null;
   if (data.projectType !== undefined) updatePayload.projectType = data.projectType;
   if (data.siteAddress !== undefined) updatePayload.siteAddress = data.siteAddress;
+  if (data.siteCity !== undefined) updatePayload.siteCity = data.siteCity || null;
+  if (data.googleMapLocation !== undefined) updatePayload.googleMapLocation = data.googleMapLocation || null;
   if (data.projectManagerId !== undefined) updatePayload.projectManagerId = data.projectManagerId || null;
+  if (data.projectCoordinatorId !== undefined) updatePayload.projectCoordinatorId = data.projectCoordinatorId || null;
+  if (data.contractorId !== undefined) updatePayload.contractorId = data.contractorId || null;
+  if (data.consultantId !== undefined) updatePayload.consultantId = data.consultantId || null;
+  if (data.plotArea !== undefined) updatePayload.plotArea = data.plotArea || null;
+  if (data.constructionArea !== undefined) updatePayload.constructionArea = data.constructionArea || null;
   if (data.currentPhase !== undefined) updatePayload.currentPhase = data.currentPhase;
   if (data.status !== undefined) updatePayload.status = data.status;
   if (data.budget !== undefined) updatePayload.budget = data.budget;
@@ -423,7 +530,7 @@ export async function deleteProject(ctx: TenantContext, projectId: string) {
 }
 
 export async function getProjectFormData(ctx: TenantContext) {
-  const [clients, members] = await Promise.all([
+  const [clients, members, contractors, consultants] = await Promise.all([
     prisma.client.findMany({
       where: { tenantId: ctx.tenantId, isActive: true },
       select: { id: true, name: true, company: true },
@@ -437,9 +544,19 @@ export async function getProjectFormData(ctx: TenantContext) {
       },
       orderBy: { joinedAt: "asc" },
     }),
+    prisma.contractor.findMany({
+      where: { tenantId: ctx.tenantId, isActive: true },
+      select: { id: true, name: true, firmName: true, trade: true },
+      orderBy: { name: "asc" },
+    }),
+    prisma.consultant.findMany({
+      where: { tenantId: ctx.tenantId, isActive: true },
+      select: { id: true, name: true, firmName: true, discipline: true },
+      orderBy: { name: "asc" },
+    }),
   ]);
 
-  return { clients, members };
+  return { clients, members, contractors, consultants };
 }
 
 export async function updateProjectProgress(
