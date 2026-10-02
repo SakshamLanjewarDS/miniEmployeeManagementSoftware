@@ -32,7 +32,8 @@ export type CsvTargetType =
   | "contractors"
   | "consultants"
   | "clients"
-  | "projects";
+  | "projects"
+  | "all";
 
 interface CsvImportExportModalProps {
   isOpen: boolean;

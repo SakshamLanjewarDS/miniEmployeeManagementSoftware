@@ -399,9 +399,12 @@ export async function importContractorsFromCsv(
               tenantId: ctx.tenantId,
               projectId: proj.id,
               contractorId: contractor.id,
-              trade,
+              scope: trade || null,
+              engagementStatus: "Active",
             },
-            update: {},
+            update: {
+              scope: trade || null,
+            },
           }).catch(() => {});
         }
       }
@@ -563,9 +566,12 @@ export async function importConsultantsFromCsv(
               tenantId: ctx.tenantId,
               projectId: proj.id,
               consultantId: consultant.id,
-              discipline,
+              scope: discipline || null,
+              engagementStatus: "Engaged",
             },
-            update: {},
+            update: {
+              scope: discipline || null,
+            },
           }).catch(() => {});
         }
       }
