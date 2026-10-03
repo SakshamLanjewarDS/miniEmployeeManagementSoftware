@@ -762,7 +762,7 @@ export default function TasksClientView({
     selectedStatusCategory !== "ALL";
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" suppressHydrationWarning>
       {/* 1. ARCHITECTURE STUDIO GREETING & DATE BANNER */}
       <div className="bg-white border border-[#E2E6F0] rounded-2xl p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
