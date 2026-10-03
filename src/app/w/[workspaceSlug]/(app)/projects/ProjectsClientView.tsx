@@ -41,6 +41,10 @@ import {
   Square,
 } from "lucide-react";
 import { CsvImportExportModal } from "@/components/csv/CsvImportExportModal";
+import { CustomFieldDefinition } from "@/server/modules/custom-fields/repository";
+import { CustomFieldsManagerModal } from "@/components/custom-fields/CustomFieldsManagerModal";
+import { DynamicFormFields } from "@/components/custom-fields/DynamicFormFields";
+import { DynamicCardFields } from "@/components/custom-fields/DynamicCardFields";
 
 interface ProjectItem {
   id: string;
@@ -65,6 +69,7 @@ interface ProjectItem {
   consultantId?: string | null;
   plotArea?: string | null;
   constructionArea?: string | null;
+  customFields?: Record<string, any> | null;
   primaryClient?: { id: string; name: string; company?: string | null } | null;
   projectArchitect?: { user: { fullName: string } } | null;
   projectManager?: { user: { fullName: string } } | null;
@@ -103,6 +108,8 @@ interface ProjectsClientViewProps {
   }[];
   contractors?: { id: string; name: string; firmName?: string | null; trade?: string | null }[];
   consultants?: { id: string; name: string; firmName?: string | null; discipline?: string | null }[];
+  initialCustomFields?: CustomFieldDefinition[];
+  initialCustomValues?: Record<string, any>;
 }
 
 const PROJECT_TYPOLOGIES = [
@@ -138,11 +145,31 @@ export function ProjectsClientView({
   members,
   contractors = [],
   consultants = [],
+  initialCustomFields = [],
+  initialCustomValues = {},
 }: ProjectsClientViewProps) {
   const router = useRouter();
 
   // Role Permissions: Owner and Admin have full manipulation rights; Employee is read-only
   const canManage = context.role === "OWNER" || context.role === "ADMIN";
+
+  // Dynamic Custom Fields State (Configurable without code changes)
+  const [customFields, setCustomFields] = useState<CustomFieldDefinition[]>(initialCustomFields);
+  const [customValues, setCustomValues] = useState<Record<string, any>>(initialCustomValues);
+  const [customFieldsModalOpen, setCustomFieldsModalOpen] = useState(false);
+
+  const refreshCustomFields = async () => {
+    try {
+      const res = await fetch(`/api/custom-fields?workspaceSlug=${context.tenantSlug}&entity=PROJECT`);
+      if (res.ok) {
+        const data = await res.json();
+        setCustomFields(data.fields || []);
+        setCustomValues(data.values || {});
+      }
+    } catch {
+      // silent
+    }
+  };
 
   // Mounting state to eliminate browser extension attribute mismatches during hydration
   const [isMounted, setIsMounted] = useState(false);
@@ -219,7 +246,7 @@ export function ProjectsClientView({
     setClientFilter("ALL");
   };
 
-  // Create Project Form State (Supports all 18 fields)
+  // Create Project Form State (Supports all 18 fields + Dynamic Custom Fields)
   const [formData, setFormData] = useState({
     code: "",
     name: "",
@@ -240,9 +267,10 @@ export function ProjectsClientView({
     budget: "",
     currency: "INR",
     description: "",
+    customValues: {} as Record<string, any>,
   });
 
-  // Edit Project Form State (Supports all 18 fields + phase & status)
+  // Edit Project Form State (Supports all 18 fields + phase & status + Dynamic Custom Fields)
   const [editFormData, setEditFormData] = useState({
     code: "",
     name: "",
@@ -265,6 +293,7 @@ export function ProjectsClientView({
     currentPhase: "",
     status: "ACTIVE" as ProjectItem["status"],
     description: "",
+    customValues: {} as Record<string, any>,
   });
 
   // Filter projects with advanced multi-facet filtering
@@ -401,6 +430,27 @@ export function ProjectsClientView({
         throw new Error(data.error || "Failed to create project");
       }
 
+      // Save custom dynamic fields values if supplied
+      if (data.project && formData.customValues && Object.keys(formData.customValues).length > 0) {
+        try {
+          await fetch(`/api/custom-fields/values?workspaceSlug=${context.tenantSlug}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              entity: "PROJECT",
+              recordId: data.project.id,
+              values: formData.customValues,
+            }),
+          });
+          setCustomValues((prev) => ({
+            ...prev,
+            [data.project.id]: formData.customValues,
+          }));
+        } catch (err) {
+          console.error("Failed to persist custom field values:", err);
+        }
+      }
+
       setSuccessMessage(`Project "${formData.name}" created with default architectural phases!`);
       setIsCreateModalOpen(false);
       setFormData({
@@ -423,6 +473,7 @@ export function ProjectsClientView({
         budget: "",
         currency: "INR",
         description: "",
+        customValues: {},
       });
 
       router.refresh();
@@ -463,6 +514,7 @@ export function ProjectsClientView({
       currentPhase: project.currentPhase || "Brief",
       status: project.status,
       description: project.description || "",
+      customValues: customValues[project.id] || project.customFields || {},
     });
   };
 
@@ -507,6 +559,27 @@ export function ProjectsClientView({
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.error || "Failed to update project");
+      }
+
+      // Save updated custom dynamic field values
+      if (editFormData.customValues) {
+        try {
+          await fetch(`/api/custom-fields/values?workspaceSlug=${context.tenantSlug}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              entity: "PROJECT",
+              recordId: editingProject.id,
+              values: editFormData.customValues,
+            }),
+          });
+          setCustomValues((prev) => ({
+            ...prev,
+            [editingProject.id]: editFormData.customValues,
+          }));
+        } catch (err) {
+          console.error("Failed to update custom field values:", err);
+        }
       }
 
       setSuccessMessage(`Project "${editFormData.name}" updated successfully!`);
@@ -712,6 +785,17 @@ export function ProjectsClientView({
         {/* Action Header Button: ONLY for Owner and Admin */}
         {canManage ? (
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              suppressHydrationWarning
+              onClick={() => setCustomFieldsModalOpen(true)}
+              className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-white hover:bg-[#F8F9FD] border border-[#E2E6F0] text-[#1F1F1F] text-xs font-semibold shadow-2xs hover:shadow-xs transition-all cursor-pointer shrink-0"
+              title="Add or remove form fields without writing code"
+            >
+              <SlidersHorizontal className="w-4 h-4 text-[#4865F6]" />
+              <span>Form Fields</span>
+            </button>
+
             <button
               type="button"
               suppressHydrationWarning
@@ -1483,6 +1567,12 @@ export function ProjectsClientView({
                       </div>
                     </div>
                   </div>
+
+                  {/* Dynamic Custom Fields configured by Admin without code changes */}
+                  <DynamicCardFields
+                    fields={customFields}
+                    values={customValues[p.id] || p.customFields}
+                  />
                 </div>
 
                 {/* Bottom Card Footer: 13. Start Date, 14. End Date, Open Project Dashboard */}
@@ -1859,6 +1949,18 @@ export function ProjectsClientView({
                   className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
                 />
               </div>
+
+              {/* Dynamic Custom Fields configured in Admin UI */}
+              <DynamicFormFields
+                fields={customFields}
+                values={formData.customValues || {}}
+                onChange={(key, val) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    customValues: { ...(prev.customValues || {}), [key]: val },
+                  }))
+                }
+              />
 
               {/* Form Buttons */}
               <div className="pt-3 border-t border-[#E2E6F0] flex justify-end gap-2">
@@ -2289,6 +2391,18 @@ export function ProjectsClientView({
                 />
               </div>
 
+              {/* Dynamic Custom Fields configured in Admin UI */}
+              <DynamicFormFields
+                fields={customFields}
+                values={editFormData.customValues || {}}
+                onChange={(key, val) =>
+                  setEditFormData((prev) => ({
+                    ...prev,
+                    customValues: { ...(prev.customValues || {}), [key]: val },
+                  }))
+                }
+              />
+
               {/* Form Buttons */}
               <div className="pt-3 border-t border-[#E2E6F0] flex justify-end gap-2">
                 <button
@@ -2657,6 +2771,15 @@ export function ProjectsClientView({
         defaultType="projects"
         lockedType={true}
         onSuccess={() => router.refresh()}
+      />
+
+      {/* Admin Custom Fields Manager Modal (Zero-Code Dynamic Schema Builder) */}
+      <CustomFieldsManagerModal
+        isOpen={customFieldsModalOpen}
+        onClose={() => setCustomFieldsModalOpen(false)}
+        workspaceSlug={context.tenantSlug}
+        initialEntity="PROJECT"
+        onFieldsUpdated={refreshCustomFields}
       />
     </div>
   );

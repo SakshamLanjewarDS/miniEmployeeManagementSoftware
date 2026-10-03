@@ -1,6 +1,10 @@
 import React from "react";
 import { getCurrentTenantContext } from "@/server/auth/session";
 import { findProjects, getProjectFormData } from "@/server/modules/projects/repository";
+import {
+  getCustomFieldDefinitions,
+  getCustomFieldValues,
+} from "@/server/modules/custom-fields/repository";
 import { ProjectsClientView } from "./ProjectsClientView";
 
 interface ProjectsPageProps {
@@ -12,9 +16,11 @@ export default async function ProjectsPage({ params }: ProjectsPageProps) {
   const ctx = await getCurrentTenantContext(workspaceSlug);
   if (!ctx) return null;
 
-  const [rawProjects, formData] = await Promise.all([
+  const [rawProjects, formData, customFieldDefinitions, customFieldValues] = await Promise.all([
     findProjects(ctx),
     getProjectFormData(ctx),
+    getCustomFieldDefinitions(ctx, "PROJECT"),
+    getCustomFieldValues(ctx, "PROJECT"),
   ]);
 
   // Ensure plain JSON serializable objects for Client Component
@@ -41,6 +47,7 @@ export default async function ProjectsPage({ params }: ProjectsPageProps) {
     consultantId: p.consultantId,
     plotArea: p.plotArea,
     constructionArea: p.constructionArea,
+    customFields: customFieldValues[p.id] || {},
     primaryClient: p.primaryClient
       ? {
           id: p.primaryClient.id,
@@ -133,6 +140,8 @@ export default async function ProjectsPage({ params }: ProjectsPageProps) {
       members={members}
       contractors={contractors}
       consultants={consultants}
+      initialCustomFields={customFieldDefinitions}
+      initialCustomValues={customFieldValues}
     />
   );
 }
