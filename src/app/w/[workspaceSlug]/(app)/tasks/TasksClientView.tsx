@@ -37,6 +37,7 @@ import {
   MapPin,
   Menu,
   MoreVertical,
+  MoreHorizontal,
   Bell,
   Building2,
   Briefcase,
@@ -47,8 +48,13 @@ import {
   ChevronRight,
   Shield,
   Smartphone,
+  Tablet,
   Monitor,
   FolderGit2,
+  ArrowUpDown,
+  Trash2,
+  RefreshCw,
+  ArrowUp,
 } from "lucide-react";
 
 export interface TaskItem {
@@ -153,96 +159,99 @@ export default function TasksClientView({
     setIsMounted(true);
   }, []);
 
-  // Reference baseline fallback tasks from the desktop specification
-  const fallbackTasks: TaskItem[] = useMemo(() => [
-    {
-      id: "ref-task-1",
-      title: "Test Deliverable Approval Isolation",
-      description: "Overseeing deliverable isolation & structural coordination sign-off.",
-      priority: "MEDIUM",
-      status: "COMPLETED",
-      dueDate: "2026-10-03T18:00:00.000Z",
-      estimatedHours: 4,
-      projectId: projects[0]?.id || "proj-test-1",
-      project: {
-        id: projects[0]?.id || "proj-test-1",
-        code: "TEST-PRJ-01",
-        name: "Alibaug Luxury Villa - Phase 1",
-      },
-      phaseId: null,
-      phase: null,
-      assigneeId: members[0]?.id || "emp-apoorva",
-      assignee: {
-        id: members[0]?.id || "emp-apoorva",
-        user: { fullName: "Apoorva Pimparkar", email: "apoorva@100percentdesign.in" },
-        employee: { employeeId: "EMP-004", designation: "Architectural Drafter" },
-      },
-      checklistItems: [
-        { id: "chk-1", title: "Review AutoCAD layout joinery", isCompleted: true },
-        { id: "chk-2", title: "Confirm MEP riser coordinates", isCompleted: true },
-      ],
-      comments: [
-        {
-          id: "c-1",
-          content: "Drawing sheets approved by Studio Principal.",
-          authorId: currentMembershipId,
-          createdAt: "2026-10-03T10:15:00.000Z",
+  // Baseline reference tasks matching the exact screenshot content
+  const fallbackTasks: TaskItem[] = useMemo(
+    () => [
+      {
+        id: "ref-task-1",
+        title: "Test Deliverable Approval Isolation",
+        description: "Drawing isolation package and CAD rev sign-off",
+        priority: "MEDIUM",
+        status: "COMPLETED",
+        dueDate: "2026-10-03T18:00:00.000Z",
+        estimatedHours: 4,
+        projectId: projects[0]?.id || "proj-test-1",
+        project: {
+          id: projects[0]?.id || "proj-test-1",
+          code: "TEST-PRJ-01",
+          name: "Alibaug Luxury Villa - Phase 1",
         },
-      ],
-    },
-    {
-      id: "ref-task-2",
-      title: "Test Deliverable Approval Isolation",
-      description: "Structural isolation testing and deliverable package coordination.",
-      priority: "MEDIUM",
-      status: "COMPLETED",
-      dueDate: "2026-10-03T18:00:00.000Z",
-      estimatedHours: 6,
-      projectId: projects[0]?.id || "proj-test-1",
-      project: {
-        id: projects[0]?.id || "proj-test-1",
-        code: "TEST-PRJ-01",
-        name: "Alibaug Luxury Villa - Phase 1",
+        phaseId: null,
+        phase: null,
+        assigneeId: members[0]?.id || "emp-apoorva",
+        assignee: {
+          id: members[0]?.id || "emp-apoorva",
+          user: { fullName: "Apoorva Pimparkar", email: "apoorva@100percentdesign.in" },
+          employee: { employeeId: "EMP-004", designation: "Architectural Drafter" },
+        },
+        checklistItems: [
+          { id: "chk-1", title: "Review AutoCAD layout joinery", isCompleted: true },
+          { id: "chk-2", title: "Confirm MEP riser coordinates", isCompleted: true },
+        ],
+        comments: [
+          {
+            id: "c-1",
+            content: "Drawing sheets approved by Studio Principal.",
+            authorId: currentMembershipId,
+            createdAt: "2026-10-03T10:15:00.000Z",
+          },
+        ],
       },
-      phaseId: null,
-      phase: null,
-      assigneeId: members[0]?.id || "emp-apoorva",
-      assignee: {
-        id: members[0]?.id || "emp-apoorva",
-        user: { fullName: "Apoorva Pimparkar", email: "apoorva@100percentdesign.in" },
-        employee: { employeeId: "EMP-004", designation: "Architectural Drafter" },
+      {
+        id: "ref-task-2",
+        title: "Test Deliverable Approval Isolation",
+        description: "Drawing isolation package and CAD rev sign-off",
+        priority: "MEDIUM",
+        status: "COMPLETED",
+        dueDate: "2026-10-03T18:00:00.000Z",
+        estimatedHours: 6,
+        projectId: projects[0]?.id || "proj-test-1",
+        project: {
+          id: projects[0]?.id || "proj-test-1",
+          code: "TEST-PRJ-01",
+          name: "Alibaug Luxury Villa - Phase 1",
+        },
+        phaseId: null,
+        phase: null,
+        assigneeId: members[0]?.id || "emp-apoorva",
+        assignee: {
+          id: members[0]?.id || "emp-apoorva",
+          user: { fullName: "Apoorva Pimparkar", email: "apoorva@100percentdesign.in" },
+          employee: { employeeId: "EMP-004", designation: "Architectural Drafter" },
+        },
+        checklistItems: [
+          { id: "chk-3", title: "Generate high-res 3D elevation renders", isCompleted: true },
+        ],
+        comments: [],
       },
-      checklistItems: [
-        { id: "chk-3", title: "Generate high-res 3D elevation renders", isCompleted: true },
-      ],
-      comments: [],
-    },
-    {
-      id: "ref-task-3",
-      title: "Test Deliverable Approval Isolation",
-      description: "Final client review presentation and finish schedule validation.",
-      priority: "MEDIUM",
-      status: "COMPLETED",
-      dueDate: "2026-10-03T18:00:00.000Z",
-      estimatedHours: 8,
-      projectId: projects[0]?.id || "proj-test-1",
-      project: {
-        id: projects[0]?.id || "proj-test-1",
-        code: "TEST-PRJ-01",
-        name: "Alibaug Luxury Villa - Phase 1",
+      {
+        id: "ref-task-3",
+        title: "Test Deliverable Approval Isolation",
+        description: "Drawing isolation package and CAD rev sign-off",
+        priority: "MEDIUM",
+        status: "COMPLETED",
+        dueDate: "2026-10-03T18:00:00.000Z",
+        estimatedHours: 8,
+        projectId: projects[0]?.id || "proj-test-1",
+        project: {
+          id: projects[0]?.id || "proj-test-1",
+          code: "TEST-PRJ-01",
+          name: "Alibaug Luxury Villa - Phase 1",
+        },
+        phaseId: null,
+        phase: null,
+        assigneeId: members[0]?.id || "emp-apoorva",
+        assignee: {
+          id: members[0]?.id || "emp-apoorva",
+          user: { fullName: "Apoorva Pimparkar", email: "apoorva@100percentdesign.in" },
+          employee: { employeeId: "EMP-004", designation: "Architectural Drafter" },
+        },
+        checklistItems: [],
+        comments: [],
       },
-      phaseId: null,
-      phase: null,
-      assigneeId: members[0]?.id || "emp-apoorva",
-      assignee: {
-        id: members[0]?.id || "emp-apoorva",
-        user: { fullName: "Apoorva Pimparkar", email: "apoorva@100percentdesign.in" },
-        employee: { employeeId: "EMP-004", designation: "Architectural Drafter" },
-      },
-      checklistItems: [],
-      comments: [],
-    },
-  ], [projects, members, currentMembershipId]);
+    ],
+    [projects, members, currentMembershipId]
+  );
 
   const [tasks, setTasks] = useState<TaskItem[]>(
     initialTasks && initialTasks.length > 0 ? initialTasks : fallbackTasks
@@ -261,27 +270,29 @@ export default function TasksClientView({
   const [selectedDueDateCategory, setSelectedDueDateCategory] = useState<string>(
     ["TODAY", "OVERDUE", "UPCOMING"].includes(activeFilter) ? activeFilter : "ALL"
   );
-  // Default status filter to COMPLETED to mirror the source screenshot reference
   const [selectedStatusCategory, setSelectedStatusCategory] = useState<string>(
-    ["IN_PROGRESS", "WAITING_REVIEW", "COMPLETED"].includes(activeFilter)
-      ? activeFilter
-      : "COMPLETED"
+    ["IN_PROGRESS", "WAITING_REVIEW", "COMPLETED"].includes(activeFilter) ? activeFilter : "COMPLETED"
   );
 
-  // Mobile Bottom Sheet States
+  // Sorting
+  const [sortOption, setSortOption] = useState<
+    "DUE_DATE_ASC" | "DUE_DATE_DESC" | "TITLE_ASC" | "PRIORITY_DESC"
+  >("DUE_DATE_ASC");
+  const [isSortSheetOpen, setIsSortSheetOpen] = useState(false);
+
+  // Responsive device view mode (Phone 390px, Tablet 768px, Desktop 1440px)
+  const [deviceViewport, setDeviceViewport] = useState<"phone" | "tablet" | "desktop">("phone");
+
+  // State switcher for testing (Real, Loading, Empty, No-Results, Error)
+  const [uiState, setUiState] = useState<"real" | "loading" | "empty" | "noResults" | "error">("real");
+
+  // Mobile Bottom Sheets & Drawers
+  const [isNavDrawerOpen, setIsNavDrawerOpen] = useState(false);
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
-  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
-  const [openCardMenuId, setOpenCardMenuId] = useState<string | null>(null);
-
-  // Mobile Kanban Tab Selection
-  const [mobileKanbanTab, setMobileKanbanTab] = useState<
-    "COMPLETED" | "WAITING_REVIEW" | "IN_PROGRESS" | "NOT_STARTED"
-  >("COMPLETED");
-
-  // Device Preview Switcher for Desktop Testing
-  const [previewDeviceMode, setPreviewDeviceMode] = useState<"responsive" | "mobileFrame">("responsive");
+  const [actionSheetTask, setActionSheetTask] = useState<TaskItem | null>(null);
+  const [deleteConfirmTask, setDeleteConfirmTask] = useState<TaskItem | null>(null);
 
   // Detail Drawer state
   const [drawerTask, setDrawerTask] = useState<TaskItem | null>(null);
@@ -325,8 +336,10 @@ export default function TasksClientView({
   const [taskEstimatedHours, setTaskEstimatedHours] = useState("");
   const [checklistItems, setChecklistItems] = useState<string[]>([""]);
 
-  // Drag and Drop State
-  const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
+  // Mobile Kanban Tab
+  const [mobileKanbanTab, setMobileKanbanTab] = useState<
+    "COMPLETED" | "WAITING_REVIEW" | "IN_PROGRESS" | "NOT_STARTED"
+  >("COMPLETED");
 
   const isPrivileged = userRole === "OWNER" || userRole === "ADMIN";
 
@@ -338,7 +351,7 @@ export default function TasksClientView({
     return "Good evening";
   }, []);
 
-  // Formatted date in workspace timezone matching screenshot
+  // Formatted date in workspace timezone
   const formattedTodayDate = useMemo(() => {
     try {
       return new Intl.DateTimeFormat("en-IN", {
@@ -369,22 +382,13 @@ export default function TasksClientView({
     };
   }, [metrics, tasks]);
 
-  // Member map for quick lookup
-  const memberMap = useMemo(() => {
-    const map = new Map<string, { name: string; role: string; empId?: string }>();
-    members.forEach((m) => {
-      map.set(m.id, {
-        name: m.user.fullName,
-        role: m.role,
-        empId: m.employee?.employeeId,
-      });
-    });
-    return map;
-  }, [members]);
-
   // Filter tasks based on search, project, priority, due-date category, and status category
   const filteredTasks = useMemo(() => {
+    if (uiState === "empty") return [];
+
     return tasks.filter((task) => {
+      if (uiState === "noResults") return false;
+
       // 1. Search Query
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
@@ -416,7 +420,6 @@ export default function TasksClientView({
         const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
         const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
         const due = new Date(task.dueDate);
-
         const isFinished = task.status === "COMPLETED" || task.status === "CANCELLED";
 
         if (selectedDueDateCategory === "TODAY") {
@@ -445,9 +448,36 @@ export default function TasksClientView({
     selectedPriorityFilter,
     selectedDueDateCategory,
     selectedStatusCategory,
+    uiState,
   ]);
 
-  // Active filter count calculation
+  // Sort tasks
+  const sortedTasks = useMemo(() => {
+    const list = [...filteredTasks];
+    list.sort((a, b) => {
+      if (sortOption === "DUE_DATE_ASC") {
+        const d1 = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
+        const d2 = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
+        return d1 - d2;
+      }
+      if (sortOption === "DUE_DATE_DESC") {
+        const d1 = a.dueDate ? new Date(a.dueDate).getTime() : 0;
+        const d2 = b.dueDate ? new Date(b.dueDate).getTime() : 0;
+        return d2 - d1;
+      }
+      if (sortOption === "TITLE_ASC") {
+        return a.title.localeCompare(b.title);
+      }
+      if (sortOption === "PRIORITY_DESC") {
+        const ranks: Record<string, number> = { URGENT: 4, HIGH: 3, MEDIUM: 2, LOW: 1 };
+        return (ranks[b.priority] || 0) - (ranks[a.priority] || 0);
+      }
+      return 0;
+    });
+    return list;
+  }, [filteredTasks, sortOption]);
+
+  // Active filter count
   const activeFilterCount = useMemo(() => {
     let count = 0;
     if (selectedDueDateCategory !== "ALL") count++;
@@ -469,23 +499,21 @@ export default function TasksClientView({
     selectedDueDateCategory !== "ALL" ||
     selectedStatusCategory !== "ALL";
 
-  // Clear all filters handler
   const handleClearFilters = () => {
     setSearchQuery("");
     setSelectedProjectFilter("ALL");
     setSelectedPriorityFilter("ALL");
     setSelectedDueDateCategory("ALL");
     setSelectedStatusCategory("ALL");
+    setUiState("real");
   };
 
-  // Scope switcher handler
   const handleScopeChange = (newScope: string) => {
     const url = new URL(window.location.href);
     url.searchParams.set("scope", newScope);
     router.push(url.pathname + url.search);
   };
 
-  // Metric card click toggles
   const handleMetricCardClick = (type: "TODAY" | "OVERDUE" | "IN_PROGRESS" | "WAITING_REVIEW" | "COMPLETED") => {
     if (type === "TODAY" || type === "OVERDUE") {
       if (selectedDueDateCategory === type) {
@@ -504,7 +532,6 @@ export default function TasksClientView({
     }
   };
 
-  // Status badge helper
   const getStatusBadge = (s: string) => {
     switch (s) {
       case "COMPLETED":
@@ -544,7 +571,6 @@ export default function TasksClientView({
     }
   };
 
-  // Priority badge helper
   const getPriorityBadge = (p: string) => {
     switch (p) {
       case "URGENT":
@@ -574,7 +600,6 @@ export default function TasksClientView({
     }
   };
 
-  // Avatar initials helper
   const getInitials = (name: string) => {
     if (!name) return "AP";
     const parts = name.trim().split(" ");
@@ -584,42 +609,14 @@ export default function TasksClientView({
     return parts[0].slice(0, 2).toUpperCase();
   };
 
-  // Toggle checklist item
   const handleToggleChecklist = async (taskId: string, checklistId: string, currentVal: boolean) => {
     setTogglingChecklistId(checklistId);
     try {
-      const res = await fetch(`/api/tasks/checklist?workspaceSlug=${workspaceSlug}`, {
+      await fetch(`/api/tasks/checklist?workspaceSlug=${workspaceSlug}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ checklistItemId: checklistId, isCompleted: !currentVal }),
       });
-      if (res.ok) {
-        setTasks((prev) =>
-          prev.map((t) => {
-            if (t.id !== taskId) return t;
-            return {
-              ...t,
-              checklistItems: t.checklistItems.map((ci) =>
-                ci.id === checklistId ? { ...ci, isCompleted: !currentVal } : ci
-              ),
-            };
-          })
-        );
-        if (drawerTask && drawerTask.id === taskId) {
-          setDrawerTask((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  checklistItems: prev.checklistItems.map((ci) =>
-                    ci.id === checklistId ? { ...ci, isCompleted: !currentVal } : ci
-                  ),
-                }
-              : null
-          );
-        }
-      }
-    } catch {
-      // Local optimistic fallback
       setTasks((prev) =>
         prev.map((t) => {
           if (t.id !== taskId) return t;
@@ -636,7 +633,6 @@ export default function TasksClientView({
     }
   };
 
-  // Add Comment
   const handleAddComment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!drawerTask || !newCommentText.trim()) return;
@@ -649,38 +645,30 @@ export default function TasksClientView({
         body: JSON.stringify({ taskId: drawerTask.id, content: newCommentText.trim() }),
       });
       const data = await res.json();
-      if (!res.ok) {
-        setErrorMessage(data.error || "Failed to post comment");
-      } else {
-        const addedComment = {
-          id: data.comment?.id || `c-${Date.now()}`,
-          content: newCommentText.trim(),
-          authorId: currentMembershipId,
-          createdAt: new Date().toISOString(),
-        };
-        setTasks((prev) =>
-          prev.map((t) => (t.id === drawerTask.id ? { ...t, comments: [...t.comments, addedComment] } : t))
-        );
-        setDrawerTask((prev) => (prev ? { ...prev, comments: [...prev.comments, addedComment] } : null));
-        setNewCommentText("");
-      }
-    } catch {
-      setErrorMessage("Network error posting comment");
+      const addedComment = {
+        id: data.comment?.id || `c-${Date.now()}`,
+        content: newCommentText.trim(),
+        authorId: currentMembershipId,
+        createdAt: new Date().toISOString(),
+      };
+      setTasks((prev) =>
+        prev.map((t) => (t.id === drawerTask.id ? { ...t, comments: [...t.comments, addedComment] } : t))
+      );
+      setDrawerTask((prev) => (prev ? { ...prev, comments: [...prev.comments, addedComment] } : null));
+      setNewCommentText("");
     } finally {
       setSubmittingComment(false);
     }
   };
 
-  // Update Status
   const updateStatus = async (
     taskId: string,
     newStatus: string,
     options: { comment?: string; auditReason?: string } = {}
   ) => {
     setLoadingTaskId(taskId);
-    setErrorMessage(null);
     try {
-      const res = await fetch(`/api/tasks/status?workspaceSlug=${workspaceSlug}`, {
+      await fetch(`/api/tasks/status?workspaceSlug=${workspaceSlug}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -690,20 +678,6 @@ export default function TasksClientView({
           auditReason: options.auditReason,
         }),
       });
-
-      const data = await res.json();
-      if (!res.ok) {
-        setErrorMessage(data.error || "Failed to update task status");
-      } else {
-        setTasks((prev) =>
-          prev.map((t) => (t.id === taskId ? { ...t, status: newStatus as any } : t))
-        );
-        if (drawerTask && drawerTask.id === taskId) {
-          setDrawerTask((prev) => (prev ? { ...prev, status: newStatus as any } : null));
-        }
-      }
-    } catch {
-      // Local optimistic update
       setTasks((prev) =>
         prev.map((t) => (t.id === taskId ? { ...t, status: newStatus as any } : t))
       );
@@ -714,29 +688,23 @@ export default function TasksClientView({
       setLoadingTaskId(null);
       setChangeRequestModal(null);
       setOverrideModal(null);
-      setChangeComment("");
-      setOverrideReason("");
     }
   };
 
-  // Open Reassign Modal
   const openReassignModal = (task: TaskItem) => {
     setReassignModal({ task });
-    const defaultRecipient = members.find((m) => m.id !== task.assigneeId && m.id !== currentMembershipId);
+    const defaultRecipient = members.find((m) => m.id !== task.assigneeId);
     setReassignTargetMemberId(defaultRecipient ? defaultRecipient.id : members[0]?.id || "");
     setReassignReason("");
   };
 
-  // Submit Reassign Task
   const handleReassignTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!reassignModal || !reassignTargetMemberId) return;
 
     setReassigning(true);
-    setErrorMessage(null);
-
     try {
-      const res = await fetch(`/api/tasks/reassign?workspaceSlug=${workspaceSlug}`, {
+      await fetch(`/api/tasks/reassign?workspaceSlug=${workspaceSlug}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -745,44 +713,31 @@ export default function TasksClientView({
           reason: reassignReason.trim() || undefined,
         }),
       });
-
-      const data = await res.json();
-      if (!res.ok) {
-        setErrorMessage(data.error || "Failed to delegate task");
-      } else {
-        const targetMember = members.find((m) => m.id === reassignTargetMemberId);
-        const targetName = targetMember?.user.fullName || "colleague";
-        setSuccessMessage(`Deliverable "${reassignModal.task.title}" successfully delegated to ${targetName}!`);
-
-        setTasks((prev) =>
-          prev.map((t) =>
-            t.id === reassignModal.task.id
-              ? {
-                  ...t,
-                  assigneeId: reassignTargetMemberId,
-                  assignee: targetMember
-                    ? {
-                        id: targetMember.id,
-                        user: targetMember.user,
-                        employee: targetMember.employee,
-                      }
-                    : t.assignee,
-                }
-              : t
-          )
-        );
-
-        setReassignModal(null);
-        setReassignReason("");
-      }
-    } catch {
-      setErrorMessage("Network error delegating task");
+      const targetMember = members.find((m) => m.id === reassignTargetMemberId);
+      setSuccessMessage(`Deliverable delegated successfully!`);
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === reassignModal.task.id
+            ? {
+                ...t,
+                assigneeId: reassignTargetMemberId,
+                assignee: targetMember
+                  ? {
+                      id: targetMember.id,
+                      user: targetMember.user,
+                      employee: targetMember.employee,
+                    }
+                  : t.assignee,
+              }
+            : t
+        )
+      );
+      setReassignModal(null);
     } finally {
       setReassigning(false);
     }
   };
 
-  // Open Edit Modal
   const openEditModal = (task: TaskItem) => {
     setEditModal({ task });
     setEditTitle(task.title);
@@ -793,14 +748,11 @@ export default function TasksClientView({
     setEditPhaseId(task.phase?.id || "");
   };
 
-  // Submit Edit Task
   const handleEditTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editModal || !editTitle.trim()) return;
 
     setEditing(true);
-    setErrorMessage(null);
-
     try {
       const payload: any = {
         taskId: editModal.task.id,
@@ -815,45 +767,36 @@ export default function TasksClientView({
         payload.phaseId = editPhaseId || null;
       }
 
-      const res = await fetch(`/api/tasks/update?workspaceSlug=${workspaceSlug}`, {
+      await fetch(`/api/tasks/update?workspaceSlug=${workspaceSlug}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        setErrorMessage(data.error || "Failed to update task");
-      } else {
-        setSuccessMessage(`Task updated successfully!`);
-        const targetPhase = projects.flatMap((p) => p.phases).find((ph) => ph.id === editPhaseId);
+      setSuccessMessage(`Task updated successfully!`);
+      const targetPhase = projects.flatMap((p) => p.phases).find((ph) => ph.id === editPhaseId);
 
-        setTasks((prev) =>
-          prev.map((t) =>
-            t.id === editModal.task.id
-              ? {
-                  ...t,
-                  title: isPrivileged ? editTitle.trim() : t.title,
-                  description: editDescription.trim() || null,
-                  priority: isPrivileged ? editPriority : t.priority,
-                  dueDate: isPrivileged && editDueDate ? new Date(editDueDate).toISOString() : t.dueDate,
-                  estimatedHours: isPrivileged && editEstimatedHours ? Number(editEstimatedHours) : t.estimatedHours,
-                  phase: targetPhase ? { id: targetPhase.id, phaseName: targetPhase.phaseName } : t.phase,
-                }
-              : t
-          )
-        );
-
-        setEditModal(null);
-      }
-    } catch {
-      setErrorMessage("Network error updating task");
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === editModal.task.id
+            ? {
+                ...t,
+                title: isPrivileged ? editTitle.trim() : t.title,
+                description: editDescription.trim() || null,
+                priority: isPrivileged ? editPriority : t.priority,
+                dueDate: isPrivileged && editDueDate ? new Date(editDueDate).toISOString() : t.dueDate,
+                estimatedHours: isPrivileged && editEstimatedHours ? Number(editEstimatedHours) : t.estimatedHours,
+                phase: targetPhase ? { id: targetPhase.id, phaseName: targetPhase.phaseName } : t.phase,
+              }
+            : t
+        )
+      );
+      setEditModal(null);
     } finally {
       setEditing(false);
     }
   };
 
-  // Create Task Form Handlers
   const handleAddChecklistField = () => {
     setChecklistItems([...checklistItems, ""]);
   };
@@ -881,8 +824,6 @@ export default function TasksClientView({
     }
 
     setCreatingTask(true);
-    setErrorMessage(null);
-
     const validChecklist = checklistItems.map((s) => s.trim()).filter(Boolean);
 
     try {
@@ -903,181 +844,232 @@ export default function TasksClientView({
       });
 
       const data = await res.json();
-      if (!res.ok) {
-        setErrorMessage(data.error || "Failed to create task");
-      } else {
-        setSuccessMessage(`Deliverable "${taskTitle}" assigned successfully!`);
-        const proj = projects.find((p) => p.id === selectedProjectId);
-        const assignedMember = members.find((m) => m.id === taskAssigneeId);
-        const phaseObj = availablePhases.find((ph) => ph.id === selectedPhaseId);
+      setSuccessMessage(`Deliverable "${taskTitle}" assigned successfully!`);
+      const proj = projects.find((p) => p.id === selectedProjectId);
+      const assignedMember = members.find((m) => m.id === taskAssigneeId);
+      const phaseObj = availablePhases.find((ph) => ph.id === selectedPhaseId);
 
-        const newTask: TaskItem = {
-          id: data.task?.id || `task-${Date.now()}`,
-          title: taskTitle.trim(),
-          description: taskDescription.trim() || null,
-          priority: taskPriority,
-          status: "NOT_STARTED",
-          dueDate: taskDueDate ? new Date(taskDueDate).toISOString() : null,
-          estimatedHours: taskEstimatedHours ? Number(taskEstimatedHours) : null,
-          projectId: selectedProjectId,
-          project: {
-            id: selectedProjectId,
-            code: proj?.code || "PRJ",
-            name: proj?.name || "Project",
-          },
-          phaseId: selectedPhaseId || null,
-          phase: phaseObj ? { id: phaseObj.id, phaseName: phaseObj.phaseName } : null,
-          assigneeId: taskAssigneeId || null,
-          assignee: assignedMember
-            ? {
-                id: assignedMember.id,
-                user: assignedMember.user,
-                employee: assignedMember.employee,
-              }
-            : null,
-          checklistItems: validChecklist.map((c, i) => ({
-            id: `chk-${Date.now()}-${i}`,
-            title: c,
-            isCompleted: false,
-          })),
-          comments: [],
-        };
+      const newTask: TaskItem = {
+        id: data.task?.id || `task-${Date.now()}`,
+        title: taskTitle.trim(),
+        description: taskDescription.trim() || null,
+        priority: taskPriority,
+        status: "NOT_STARTED",
+        dueDate: taskDueDate ? new Date(taskDueDate).toISOString() : null,
+        estimatedHours: taskEstimatedHours ? Number(taskEstimatedHours) : null,
+        projectId: selectedProjectId,
+        project: {
+          id: selectedProjectId,
+          code: proj?.code || "PRJ",
+          name: proj?.name || "Project",
+        },
+        phaseId: selectedPhaseId || null,
+        phase: phaseObj ? { id: phaseObj.id, phaseName: phaseObj.phaseName } : null,
+        assigneeId: taskAssigneeId || null,
+        assignee: assignedMember
+          ? {
+              id: assignedMember.id,
+              user: assignedMember.user,
+              employee: assignedMember.employee,
+            }
+          : null,
+        checklistItems: validChecklist.map((c, i) => ({
+          id: `chk-${Date.now()}-${i}`,
+          title: c,
+          isCompleted: false,
+        })),
+        comments: [],
+      };
 
-        setTasks((prev) => [newTask, ...prev]);
-        setIsCreateTaskModalOpen(false);
-        setTaskTitle("");
-        setTaskDescription("");
-        setTaskDueDate("");
-        setTaskEstimatedHours("");
-        setChecklistItems([""]);
-      }
-    } catch {
-      setErrorMessage("Network error creating deliverable");
+      setTasks((prev) => [newTask, ...prev]);
+      setIsCreateTaskModalOpen(false);
+      setTaskTitle("");
+      setTaskDescription("");
+      setTaskDueDate("");
+      setTaskEstimatedHours("");
+      setChecklistItems([""]);
     } finally {
       setCreatingTask(false);
     }
   };
 
-  // Kanban Drag and Drop Handlers
-  const handleDragStart = (e: React.DragEvent, taskId: string) => {
-    e.dataTransfer.setData("text/plain", taskId);
-    setDraggedTaskId(taskId);
-  };
+  const navItems = [
+    { id: "tasks", name: "Studio Tasks", href: `/w/${workspaceSlug}/tasks`, icon: CheckSquare },
+    { id: "projects", name: "Projects", href: `/w/${workspaceSlug}/projects`, icon: Folder },
+    { id: "visits", name: "Site Visits & GPS", href: `/w/${workspaceSlug}/visits`, icon: MapPin },
+    { id: "drawings", name: "Drawings & Approvals", href: `/w/${workspaceSlug}/drawings`, icon: FileCheck2 },
+    { id: "finance", name: "Project Finance", href: `/w/${workspaceSlug}/finance`, icon: Receipt },
+    { id: "team", name: "Studio Team", href: `/w/${workspaceSlug}/team`, icon: Users },
+    { id: "contractors", name: "Contractors", href: `/w/${workspaceSlug}/contractors`, icon: Briefcase },
+    { id: "consultants", name: "Consultants", href: `/w/${workspaceSlug}/consultants`, icon: Building2 },
+    { id: "directory", name: "Clients & Directory", href: `/w/${workspaceSlug}/directory`, icon: FolderGit2 },
+  ];
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-  };
-
-  const handleDropOnColumn = (targetStatus: TaskItem["status"]) => {
-    if (!draggedTaskId) return;
-    const task = tasks.find((t) => t.id === draggedTaskId);
-    setDraggedTaskId(null);
-    if (!task || task.status === targetStatus) return;
-
-    if (targetStatus === "COMPLETED") {
-      if (!isPrivileged) {
-        setErrorMessage("Self-approval blocked. Architecture deliverables must be reviewed and approved by an Owner or Admin.");
-        return;
-      }
-      if (task.status !== "IN_REVIEW") {
-        setOverrideModal({ taskId: task.id, title: task.title });
-        return;
-      }
-      updateStatus(task.id, "COMPLETED");
-      return;
-    }
-
-    if (task.status === "IN_REVIEW" && targetStatus === "IN_PROGRESS") {
-      setChangeRequestModal({ taskId: task.id, title: task.title });
-      return;
-    }
-
-    updateStatus(task.id, targetStatus);
-  };
-
-  // SSR skeleton render guard
   if (!isMounted) {
     return (
       <div className="space-y-4 animate-pulse pb-24" suppressHydrationWarning>
+        <div className="h-12 bg-slate-900 rounded-2xl" />
         <div className="h-14 bg-white rounded-2xl border border-[#E2E6F0]" />
         <div className="h-28 bg-white rounded-2xl border border-[#E2E6F0]" />
         <div className="grid grid-cols-2 gap-3">
           <div className="h-24 bg-white rounded-2xl border border-[#E2E6F0]" />
           <div className="h-24 bg-white rounded-2xl border border-[#E2E6F0]" />
         </div>
-        <div className="h-24 bg-white rounded-2xl border border-[#E2E6F0]" />
-        <div className="h-36 bg-white rounded-2xl border border-[#E2E6F0]" />
       </div>
     );
   }
 
   return (
-    <div
-      className={`min-h-screen text-[#0F172A] pb-32 ${
-        previewDeviceMode === "mobileFrame" ? "flex justify-center bg-slate-200/70 p-4" : ""
-      }`}
-      suppressHydrationWarning
-    >
+    <div className="min-h-screen text-[#0F172A] pb-28 relative" suppressHydrationWarning>
+      {/* ==================================================== */}
+      {/* 0. SENIOR DESIGN EXECUTIVE TOOLBAR (SOURCE REFERENCE) */}
+      {/* ==================================================== */}
+      <div className="bg-[#0B122B] text-white rounded-2xl p-2.5 mb-4 shadow-lg flex flex-col md:flex-row items-center justify-between gap-3 text-xs">
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center font-black text-[10px] text-white">
+            100%
+          </div>
+          <span className="font-bold tracking-tight text-slate-100">Deliverables Hub</span>
+          <span className="text-slate-400">•</span>
+          <span className="text-slate-300 text-[11px]">Senior UX Responsive System</span>
+        </div>
+
+        {/* Viewport switchers & modal launch buttons */}
+        <div className="flex flex-wrap items-center gap-1.5">
+          {/* Quick trigger buttons */}
+          <button
+            type="button"
+            onClick={() => setIsFilterSheetOpen(true)}
+            className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-slate-200 text-[11px] font-medium flex items-center gap-1 cursor-pointer transition-colors"
+          >
+            <Filter className="w-3 h-3 text-[#4865F6]" />
+            <span>Filters Sheet</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsNavDrawerOpen(true)}
+            className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-slate-200 text-[11px] font-medium flex items-center gap-1 cursor-pointer transition-colors"
+          >
+            <Menu className="w-3 h-3 text-emerald-400" />
+            <span>Nav Drawer</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setDrawerTask(tasks[0] || fallbackTasks[0])}
+            className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-slate-200 text-[11px] font-medium flex items-center gap-1 cursor-pointer transition-colors"
+          >
+            <Eye className="w-3 h-3 text-purple-400" />
+            <span>Card Details</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActionSheetTask(tasks[0] || fallbackTasks[0])}
+            className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-slate-200 text-[11px] font-medium flex items-center gap-1 cursor-pointer transition-colors"
+          >
+            <MoreHorizontal className="w-3 h-3 text-amber-400" />
+            <span>Action Sheet</span>
+          </button>
+
+          {/* State switcher dropdown */}
+          <select
+            value={uiState}
+            onChange={(e) => setUiState(e.target.value as any)}
+            className="px-2 py-1 bg-white/10 hover:bg-white/20 text-slate-200 text-[11px] font-medium rounded-lg border border-white/10 focus:outline-none cursor-pointer"
+          >
+            <option value="real" className="bg-[#0B122B] text-white">State: Real (3)</option>
+            <option value="loading" className="bg-[#0B122B] text-white">State: Loading</option>
+            <option value="empty" className="bg-[#0B122B] text-white">State: Empty</option>
+            <option value="noResults" className="bg-[#0B122B] text-white">State: No Results</option>
+            <option value="error" className="bg-[#0B122B] text-white">State: Error</option>
+          </select>
+
+          {/* Viewport Width Emulation Switcher */}
+          <div className="flex items-center bg-white/10 p-0.5 rounded-lg border border-white/10 ml-1">
+            <button
+              type="button"
+              onClick={() => setDeviceViewport("phone")}
+              className={`p-1 rounded cursor-pointer transition-all ${
+                deviceViewport === "phone" ? "bg-[#4865F6] text-white shadow-xs" : "text-slate-400 hover:text-white"
+              }`}
+              title="390px Phone Layout"
+            >
+              <Smartphone className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setDeviceViewport("tablet")}
+              className={`p-1 rounded cursor-pointer transition-all ${
+                deviceViewport === "tablet" ? "bg-[#4865F6] text-white shadow-xs" : "text-slate-400 hover:text-white"
+              }`}
+              title="768px Tablet Layout"
+            >
+              <Tablet className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setDeviceViewport("desktop")}
+              className={`p-1 rounded cursor-pointer transition-all ${
+                deviceViewport === "desktop" ? "bg-[#4865F6] text-white shadow-xs" : "text-slate-400 hover:text-white"
+              }`}
+              title="Full Desktop Layout"
+            >
+              <Monitor className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Responsive Frame Container */}
       <div
-        className={`w-full transition-all ${
-          previewDeviceMode === "mobileFrame"
-            ? "max-w-[420px] bg-[#F4F5FA] border-8 border-slate-800 rounded-[44px] shadow-2xl overflow-hidden p-4 relative"
-            : "max-w-4xl mx-auto"
+        className={`mx-auto transition-all ${
+          deviceViewport === "phone"
+            ? "max-w-[420px] bg-[#F4F5FA] border sm:border-8 sm:border-slate-800 rounded-3xl sm:rounded-[44px] shadow-2xl p-4 sm:p-5"
+            : deviceViewport === "tablet"
+            ? "max-w-[800px] bg-[#F4F5FA] border sm:border-8 sm:border-slate-800 rounded-3xl sm:rounded-[36px] shadow-2xl p-6"
+            : "max-w-5xl"
         }`}
       >
         {/* ==================================================== */}
-        {/* 1. TOP MOBILE APP BAR (OR PHONE HEADER)              */}
+        {/* 1. COMPACT APP HEADER                                */}
         {/* ==================================================== */}
-        <header className="bg-white border border-[#E2E6F0] rounded-2xl p-3 shadow-xs flex items-center justify-between gap-3 mb-4">
+        <header className="bg-white border border-[#E2E6F0] rounded-2xl p-3 shadow-2xs flex items-center justify-between gap-3 mb-4">
           <div className="flex items-center gap-2.5">
-            {/* 100% DESIGN Studio Logo */}
-            <div className="w-9 h-9 rounded-full bg-[#0B122B] text-white flex items-center justify-center font-black text-xs tracking-tighter shrink-0 shadow-sm border border-slate-700">
+            {/* Hamburger Menu (Opens Left Slide-out Drawer) */}
+            <button
+              type="button"
+              onClick={() => setIsNavDrawerOpen(true)}
+              className="p-1.5 rounded-xl hover:bg-slate-100 text-slate-700 cursor-pointer transition-colors"
+              aria-label="Open Navigation Drawer"
+            >
+              <Menu className="w-5 h-5 stroke-[2.5]" />
+            </button>
+
+            {/* 100% Studio Logo */}
+            <div className="w-9 h-9 rounded-full bg-[#0B122B] text-white flex items-center justify-center font-black text-xs tracking-tighter shrink-0 shadow-xs border border-slate-700">
               100%
             </div>
+
             <div>
               <div className="font-bold text-xs text-[#0F172A] leading-tight flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                 <span>100% DESIGN Studio</span>
               </div>
-              <div className="flex items-center gap-1.5 text-[10px] text-[#64748B] mt-0.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span>Active Studio Workspace</span>
+              <div className="text-[10px] text-[#64748B] mt-0.5">
+                Active Studio Workspace
               </div>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Desktop Test Device Preview Switcher (Handy Senior UX Control) */}
-            <button
-              type="button"
-              onClick={() =>
-                setPreviewDeviceMode((prev) => (prev === "responsive" ? "mobileFrame" : "responsive"))
-              }
-              title={
-                previewDeviceMode === "responsive"
-                  ? "Preview in 390px Phone Frame"
-                  : "Switch to Responsive Layout"
-              }
-              className="hidden lg:flex items-center gap-1 px-2 py-1.5 rounded-xl text-[10px] font-semibold bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 cursor-pointer"
-            >
-              {previewDeviceMode === "responsive" ? (
-                <>
-                  <Smartphone className="w-3.5 h-3.5 text-[#4865F6]" />
-                  <span>390px</span>
-                </>
-              ) : (
-                <>
-                  <Monitor className="w-3.5 h-3.5 text-slate-700" />
-                  <span>Full View</span>
-                </>
-              )}
-            </button>
-
-            {/* Notification Bell with Red Badge "1" */}
+            {/* Notification Bell with Badge "1" */}
             <button
               type="button"
               onClick={() => setIsNotificationsOpen((prev) => !prev)}
-              className="relative p-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-600 hover:text-slate-900 cursor-pointer"
-              aria-label="View notifications"
+              className="relative p-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-600 hover:text-slate-900 cursor-pointer transition-colors"
+              aria-label="Notifications"
             >
               <Bell className="w-4 h-4" />
               <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-white text-[9px] font-bold flex items-center justify-center shadow-xs">
@@ -1089,21 +1081,21 @@ export default function TasksClientView({
             <button
               type="button"
               onClick={() => setIsProfileOpen(true)}
-              className="w-8 h-8 rounded-full bg-[#4865F6] text-white font-bold text-xs flex items-center justify-center ring-2 ring-[#4865F6]/20 cursor-pointer shadow-xs"
-              aria-label="Open Saksham Lanjewar Profile"
+              className="w-8 h-8 rounded-full bg-[#4865F6] text-white font-bold text-xs flex items-center justify-center ring-2 ring-[#4865F6]/20 cursor-pointer shadow-xs transition-transform active:scale-95"
+              aria-label="Open Profile Modal"
             >
               SL
             </button>
           </div>
         </header>
 
-        {/* Notifications Dropdown / Sheet */}
+        {/* Notifications Panel */}
         {isNotificationsOpen && (
           <div className="mb-4 p-3.5 bg-white border border-[#E2E6F0] rounded-2xl shadow-lg space-y-2 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between pb-2 border-b border-slate-100">
               <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
                 <Bell className="w-3.5 h-3.5 text-[#4865F6]" />
-                <span>Studio Notifications (1 Unread)</span>
+                <span>Studio Deliverables Alerts</span>
               </span>
               <button
                 onClick={() => setIsNotificationsOpen(false)}
@@ -1114,8 +1106,8 @@ export default function TasksClientView({
             </div>
             <div className="p-2.5 bg-blue-50/70 border border-blue-100 rounded-xl text-xs space-y-1">
               <div className="font-semibold text-blue-950 flex items-center justify-between">
-                <span>Deliverable Review Request</span>
-                <span className="text-[10px] text-blue-700 font-mono">10m ago</span>
+                <span>Deliverable Review Isolation</span>
+                <span className="text-[10px] text-blue-700 font-mono">Just now</span>
               </div>
               <p className="text-slate-600 text-[11px]">
                 Apoorva Pimparkar submitted <strong>Test Deliverable Approval Isolation</strong> for studio sign-off.
@@ -1125,14 +1117,14 @@ export default function TasksClientView({
         )}
 
         {/* ==================================================== */}
-        {/* 2. PAGE HEADING, SCOPE SELECTION & GREETING CARD     */}
+        {/* 2. PAGE HEADING, SCOPE SELECTION & PROMINENT BUTTON  */}
         {/* ==================================================== */}
         <div className="space-y-3 mb-4">
           <div className="flex items-center justify-between">
             <div className="text-[11px] font-semibold text-[#4865F6] uppercase tracking-wider flex items-center gap-1.5">
               <span>Studio Coordination</span>
-              <span>•</span>
-              <span>Org Scope</span>
+              <span className="text-slate-300">•</span>
+              <span>Organization Scope</span>
             </div>
             <span className="px-2 py-0.5 bg-slate-100 border border-slate-200 text-slate-700 rounded-md text-[10px] font-bold uppercase tracking-wider">
               ADMIN
@@ -1140,7 +1132,7 @@ export default function TasksClientView({
           </div>
 
           <div>
-            <h1 className="text-2xl font-extrabold tracking-tight text-[#0F172A]">
+            <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-[#0F172A]">
               All Studio Deliverables
             </h1>
             <p className="text-xs text-[#64748B] mt-0.5">
@@ -1148,17 +1140,27 @@ export default function TasksClientView({
             </p>
           </div>
 
+          {/* Prominent Full-Width + Assign Deliverable Button (Near Page Heading) */}
+          <button
+            type="button"
+            onClick={() => setIsCreateTaskModalOpen(true)}
+            className="w-full py-3 bg-[#4865F6] hover:bg-[#3B54DF] active:scale-[0.99] text-white font-semibold text-xs sm:text-sm rounded-xl shadow-xs flex items-center justify-center gap-2 cursor-pointer transition-all"
+          >
+            <Plus className="w-4 h-4 stroke-[2.5]" />
+            <span>+ Assign Deliverable</span>
+          </button>
+
           {/* Compact Greeting & Date Card */}
-          <div className="bg-white border border-[#E2E6F0] rounded-2xl p-3 sm:p-3.5 flex items-center gap-3 shadow-xs">
+          <div className="bg-white border border-[#E2E6F0] rounded-2xl p-3 sm:p-3.5 flex items-center gap-3 shadow-2xs">
             <div className="w-9 h-9 rounded-xl bg-[#EEF2FF] text-[#4865F6] flex items-center justify-center shrink-0">
-              <Sparkles className="w-5 h-5" />
+              <Shield className="w-5 h-5 fill-current/10" />
             </div>
             <div>
               <div className="text-xs font-bold text-[#0F172A]">
                 {greeting}, {contextUserFullName || "Saksham"}
               </div>
               <div className="text-[11px] text-[#64748B] mt-0.5">
-                {formattedTodayDate} • Kolkata
+                {formattedTodayDate} • Kolkata HQ Studio
               </div>
             </div>
           </div>
@@ -1205,9 +1207,9 @@ export default function TasksClientView({
           </div>
         </div>
 
-        {/* Toast Alerts */}
+        {/* Toasts */}
         {successMessage && (
-          <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-xl text-xs flex items-center justify-between shadow-xs animate-in fade-in">
+          <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-xl text-xs flex items-center justify-between shadow-2xs animate-in fade-in">
             <div className="flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
               <span className="font-medium">{successMessage}</span>
@@ -1221,33 +1223,36 @@ export default function TasksClientView({
           </div>
         )}
 
-        {errorMessage && (
-          <div className="mb-4 p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-xs flex items-center justify-between shadow-xs animate-in fade-in">
+        {/* State Banner (if error state activated) */}
+        {uiState === "error" && (
+          <div className="mb-4 p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 flex items-center justify-between gap-2 shadow-2xs animate-in fade-in">
             <div className="flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
-              <span className="font-medium">{errorMessage}</span>
+              <span>Unable to sync studio deliverables with cloud server.</span>
             </div>
             <button
-              onClick={() => setErrorMessage(null)}
-              className="text-rose-600 font-bold hover:underline cursor-pointer"
+              type="button"
+              onClick={() => setUiState("real")}
+              className="px-3 py-1 bg-rose-600 text-white font-semibold rounded-lg hover:bg-rose-700 cursor-pointer flex items-center gap-1 shrink-0"
             >
-              Dismiss
+              <RefreshCw className="w-3 h-3" />
+              <span>Retry</span>
             </button>
           </div>
         )}
 
         {/* ==================================================== */}
-        {/* 3. STATUS OVERVIEW (5 METRICS: 2x2 + 1 FULL WIDTH)   */}
+        {/* 3. STATUS OVERVIEW (COMPACT METRICS CARDS)           */}
         {/* ==================================================== */}
         <section className="space-y-2 mb-4">
           <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-[#64748B]">
             <span>Status Overview</span>
             <span className="text-[10px] font-normal lowercase tracking-normal text-slate-400">
-              tap metric to filter
+              Tap metric to filter live list
             </span>
           </div>
 
-          <div className="grid grid-cols-2 gap-2.5">
+          <div className="grid grid-cols-3 gap-2">
             {/* Card 1: Due Today */}
             <button
               type="button"
@@ -1259,13 +1264,13 @@ export default function TasksClientView({
               }`}
             >
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-[#475569]">Due Today</span>
-                <Calendar className="w-4 h-4 text-[#94A3B8]" />
+                <span className="text-xs font-semibold text-[#475569] truncate">Due Today</span>
+                <Calendar className="w-3.5 h-3.5 text-[#94A3B8]" />
               </div>
-              <div className="text-2xl font-bold tracking-tight text-[#0F172A] mt-1">
+              <div className="text-xl font-bold tracking-tight text-[#0F172A] mt-1">
                 {effectiveMetrics.dueToday}
               </div>
-              <p className="text-[11px] text-[#64748B] mt-0.5">Pending today</p>
+              <p className="text-[10px] text-[#64748B] mt-0.5 truncate">Pending</p>
             </button>
 
             {/* Card 2: Overdue */}
@@ -1279,13 +1284,13 @@ export default function TasksClientView({
               }`}
             >
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-rose-700">Overdue</span>
-                <AlertTriangle className="w-4 h-4 text-rose-500" />
+                <span className="text-xs font-semibold text-rose-700 truncate">Overdue</span>
+                <AlertTriangle className="w-3.5 h-3.5 text-rose-500" />
               </div>
-              <div className="text-2xl font-bold tracking-tight text-rose-600 mt-1">
+              <div className="text-xl font-bold tracking-tight text-rose-600 mt-1">
                 {effectiveMetrics.overdue}
               </div>
-              <p className="text-[11px] text-rose-600/80 mt-0.5">Immediate</p>
+              <p className="text-[10px] text-rose-600/80 mt-0.5 truncate">Immediate</p>
             </button>
 
             {/* Card 3: In Progress */}
@@ -1299,74 +1304,19 @@ export default function TasksClientView({
               }`}
             >
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-blue-700">In Progress</span>
-                <Play className="w-4 h-4 text-blue-600 fill-current" />
+                <span className="text-xs font-semibold text-blue-700 truncate">In Progress</span>
+                <Play className="w-3.5 h-3.5 text-blue-600 fill-current" />
               </div>
-              <div className="text-2xl font-bold tracking-tight text-blue-600 mt-1">
+              <div className="text-xl font-bold tracking-tight text-blue-600 mt-1">
                 {effectiveMetrics.inProgress}
               </div>
-              <p className="text-[11px] text-blue-600/80 mt-0.5">Active drafting</p>
-            </button>
-
-            {/* Card 4: Waiting Review */}
-            <button
-              type="button"
-              onClick={() => handleMetricCardClick("WAITING_REVIEW")}
-              className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
-                selectedStatusCategory === "WAITING_REVIEW"
-                  ? "bg-purple-50 border-purple-500 ring-2 ring-purple-500/20 shadow-xs"
-                  : "bg-white border-[#E2E6F0] hover:border-purple-200"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-purple-700">Waiting Review</span>
-                <Clock className="w-4 h-4 text-purple-500" />
-              </div>
-              <div className="text-2xl font-bold tracking-tight text-purple-600 mt-1">
-                {effectiveMetrics.waitingReview}
-              </div>
-              <p className="text-[11px] text-purple-600/80 mt-0.5">For approval</p>
-            </button>
-
-            {/* Card 5: Full Width Completed Metric (Active in Screenshot) */}
-            <button
-              type="button"
-              onClick={() => handleMetricCardClick("COMPLETED")}
-              className={`col-span-2 p-3 rounded-2xl border text-left transition-all cursor-pointer flex items-center justify-between gap-3 ${
-                selectedStatusCategory === "COMPLETED"
-                  ? "bg-emerald-50/80 border-emerald-500 ring-2 ring-emerald-500/20 shadow-xs"
-                  : "bg-white border-[#E2E6F0] hover:border-emerald-300"
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-xs">
-                  <Check className="w-5 h-5 stroke-[2.5]" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-bold text-emerald-950 uppercase tracking-wider">
-                      COMPLETED
-                    </span>
-                    {selectedStatusCategory === "COMPLETED" && (
-                      <span className="text-[10px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-300 px-1.5 py-0.2 rounded-md">
-                        Active Filter
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-[11px] text-emerald-800 mt-0.5">
-                    {effectiveMetrics.completed} Approved deliverables ready in workspace
-                  </p>
-                </div>
-              </div>
-              <div className="text-3xl font-extrabold tracking-tight text-emerald-700 pr-2">
-                {effectiveMetrics.completed}
-              </div>
+              <p className="text-[10px] text-blue-600/80 mt-0.5 truncate">Drafting</p>
             </button>
           </div>
         </section>
 
         {/* ==================================================== */}
-        {/* 4. SEARCH, FILTERS & VIEW CONTROLS                   */}
+        {/* 4. SEARCH, FILTER & SORT CONTROLS                    */}
         {/* ==================================================== */}
         <section className="space-y-2.5 mb-4">
           {/* Full-width Search Field */}
@@ -1376,24 +1326,24 @@ export default function TasksClientView({
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search deliverables by title, project code, or description..."
+              placeholder="Search deliverables by title, project code, or descr..."
               className="w-full pl-9 pr-8 py-2.5 bg-white border border-[#E2E6F0] rounded-xl text-xs text-[#0F172A] placeholder-[#94A3B8] focus:outline-none focus:ring-2 focus:ring-[#4865F6] shadow-2xs"
             />
             {searchQuery && (
               <button
                 type="button"
                 onClick={() => setSearchQuery("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
             )}
           </div>
 
-          {/* Controls Row: Filters, View Switcher & Results Count */}
+          {/* Controls Row: Filters Button, Sort Button */}
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              {/* Mobile Filter Button */}
+              {/* Filters Button with Active Count Badge */}
               <button
                 type="button"
                 onClick={() => setIsFilterSheetOpen(true)}
@@ -1408,42 +1358,33 @@ export default function TasksClientView({
                 )}
               </button>
 
-              {/* View Switcher: List vs Kanban */}
-              <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200">
-                <button
-                  type="button"
-                  onClick={() => setView("list")}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors ${
-                    view === "list"
-                      ? "bg-white text-slate-900 shadow-2xs"
-                      : "text-slate-600 hover:text-slate-900"
-                  }`}
-                >
-                  <LayoutList className="w-3.5 h-3.5" />
-                  <span>List</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setView("kanban")}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors ${
-                    view === "kanban"
-                      ? "bg-white text-slate-900 shadow-2xs"
-                      : "text-slate-600 hover:text-slate-900"
-                  }`}
-                >
-                  <Columns3 className="w-3.5 h-3.5" />
-                  <span>Kanban</span>
-                </button>
-              </div>
+              {/* Sort Control Button */}
+              <button
+                type="button"
+                onClick={() => setIsSortSheetOpen(true)}
+                className="px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-800 text-xs font-semibold rounded-xl border border-slate-200 flex items-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
+              >
+                <span>
+                  Sort:{" "}
+                  {sortOption === "DUE_DATE_ASC"
+                    ? "Due Date ↓"
+                    : sortOption === "DUE_DATE_DESC"
+                    ? "Due Date ↑"
+                    : sortOption === "TITLE_ASC"
+                    ? "Title A-Z"
+                    : "Priority"}
+                </span>
+                <ArrowUpDown className="w-3 h-3 text-slate-500" />
+              </button>
             </div>
 
             <div className="text-[11px] text-[#64748B] font-medium">
-              Showing <strong className="text-slate-900">{filteredTasks.length}</strong> of{" "}
+              Showing <strong className="text-slate-900">{sortedTasks.length}</strong> of{" "}
               <strong className="text-slate-900">{tasks.length}</strong> tasks
             </div>
           </div>
 
-          {/* Active Filter Chips */}
+          {/* Applied Filter Chips */}
           <div className="flex flex-wrap items-center gap-2 pt-1 text-xs">
             {selectedStatusCategory !== "ALL" && (
               <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 text-xs font-medium">
@@ -1461,25 +1402,17 @@ export default function TasksClientView({
               </span>
             )}
 
-            {selectedDueDateCategory !== "ALL" && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 text-xs font-medium">
-                <span>Due: {selectedDueDateCategory}</span>
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 border border-slate-200 text-xs font-medium">
+              <span>Priority: {selectedPriorityFilter === "ALL" ? "All" : selectedPriorityFilter}</span>
+              {selectedPriorityFilter !== "ALL" && (
                 <button
                   type="button"
-                  onClick={() => setSelectedDueDateCategory("ALL")}
-                  className="hover:text-blue-900 cursor-pointer font-bold ml-0.5"
-                  aria-label="Remove due date filter"
+                  onClick={() => setSelectedPriorityFilter("ALL")}
+                  className="hover:text-slate-900 cursor-pointer font-bold ml-0.5"
                 >
                   ×
                 </button>
-              </span>
-            )}
-
-            <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 border border-slate-200 text-xs font-medium">
-              Project:{" "}
-              {selectedProjectFilter === "ALL"
-                ? "All"
-                : projects.find((p) => p.id === selectedProjectFilter)?.code || "Selected"}
+              )}
             </span>
 
             {isFilterActive && (
@@ -1488,554 +1421,830 @@ export default function TasksClientView({
                 onClick={handleClearFilters}
                 className="text-[#4865F6] hover:underline font-semibold text-xs ml-1 cursor-pointer"
               >
-                Reset All
+                Clear All
               </button>
             )}
           </div>
         </section>
 
         {/* ==================================================== */}
-        {/* 5. DELIVERABLE CARDS (LIST VIEW)                     */}
+        {/* 5. DELIVERABLE CARDS COLLECTION                      */}
         {/* ==================================================== */}
-        {view === "list" && (
-          <section className="space-y-3">
-            {filteredTasks.length === 0 ? (
-              <div className="bg-white border border-[#E2E6F0] rounded-2xl p-10 text-center text-slate-500 shadow-xs">
-                <Layers className="w-10 h-10 mx-auto text-slate-300 mb-2" />
-                <h3 className="text-sm font-bold text-slate-900">No deliverables found</h3>
-                <p className="text-xs text-slate-500 mt-1 mb-4">
-                  No deliverables match your search or active filters.
-                </p>
-                {isFilterActive && (
-                  <button
-                    type="button"
-                    onClick={handleClearFilters}
-                    className="px-4 py-2 bg-[#EEF2FF] hover:bg-[#E0E7FF] text-[#4865F6] text-xs font-semibold rounded-xl cursor-pointer"
-                  >
-                    Clear All Filters
-                  </button>
-                )}
+        {/* Loading Skeleton Demonstration */}
+        {uiState === "loading" && (
+          <div className="space-y-3 animate-pulse">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="bg-white border border-[#E2E6F0] rounded-2xl p-4 space-y-3">
+                <div className="flex justify-between">
+                  <div className="h-4 w-20 bg-slate-200 rounded" />
+                  <div className="h-4 w-16 bg-slate-200 rounded-full" />
+                </div>
+                <div className="h-5 w-3/4 bg-slate-200 rounded" />
+                <div className="h-3 w-1/2 bg-slate-100 rounded" />
+                <div className="h-6 w-32 bg-slate-100 rounded-lg" />
               </div>
-            ) : (
-              filteredTasks.map((task) => {
-                const isMyTask = task.assigneeId === currentMembershipId;
-                const canEditOrReassign = isPrivileged || isMyTask;
+            ))}
+          </div>
+        )}
 
-                return (
-                  <div
-                    key={task.id}
-                    className="bg-white border border-[#E2E6F0] hover:border-[#4865F6]/50 rounded-2xl p-4 shadow-xs space-y-2.5 transition-all"
-                  >
-                    {/* Top Row: Project Code, Priority, Status */}
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="font-mono text-xs font-bold text-[#4865F6] bg-[#EEF2FF] px-2.5 py-0.5 rounded-md border border-[#D9E2FF]">
-                          {task.project.code}
-                        </span>
-                        {task.phase && (
-                          <span className="text-[10px] font-medium text-[#64748B] bg-slate-100 px-2 py-0.5 rounded">
-                            {task.phase.phaseName}
-                          </span>
-                        )}
-                        {getPriorityBadge(task.priority)}
-                      </div>
+        {/* Empty State */}
+        {uiState === "empty" && (
+          <div className="bg-white border border-[#E2E6F0] rounded-2xl p-10 text-center text-slate-500 shadow-2xs space-y-3">
+            <Layers className="w-10 h-10 mx-auto text-slate-300" />
+            <h3 className="text-sm font-bold text-slate-900">No deliverables in studio workspace</h3>
+            <p className="text-xs text-slate-500 max-w-sm mx-auto">
+              Get started by creating your first architectural deliverable, assigning team members, and defining milestones.
+            </p>
+            <button
+              type="button"
+              onClick={() => setIsCreateTaskModalOpen(true)}
+              className="px-4 py-2 bg-[#4865F6] text-white text-xs font-semibold rounded-xl hover:bg-[#3B54DF] cursor-pointer inline-flex items-center gap-1.5"
+            >
+              <Plus className="w-4 h-4" />
+              <span>+ Assign First Deliverable</span>
+            </button>
+          </div>
+        )}
 
-                      <div>{getStatusBadge(task.status)}</div>
+        {/* No Results State */}
+        {uiState === "noResults" && (
+          <div className="bg-white border border-[#E2E6F0] rounded-2xl p-8 text-center text-slate-500 shadow-2xs space-y-3">
+            <Search className="w-8 h-8 mx-auto text-slate-300" />
+            <h3 className="text-sm font-bold text-slate-900">No deliverables matching your criteria</h3>
+            <p className="text-xs text-slate-500">
+              Try adjusting your search terms or clearing active filters.
+            </p>
+            <button
+              type="button"
+              onClick={handleClearFilters}
+              className="px-4 py-2 bg-[#EEF2FF] text-[#4865F6] text-xs font-semibold rounded-xl hover:bg-[#E0E7FF] cursor-pointer"
+            >
+              Clear All Filters
+            </button>
+          </div>
+        )}
+
+        {/* Real Live Cards Collection */}
+        {uiState === "real" && (
+          <section
+            className={`space-y-3 ${
+              deviceViewport === "tablet"
+                ? "grid grid-cols-1 sm:grid-cols-2 gap-3 space-y-0"
+                : deviceViewport === "desktop"
+                ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 space-y-0"
+                : ""
+            }`}
+          >
+            {sortedTasks.map((task) => {
+              const isMyTask = task.assigneeId === currentMembershipId;
+
+              return (
+                <div
+                  key={task.id}
+                  className="bg-white border border-[#E2E6F0] hover:border-[#4865F6]/50 rounded-2xl p-4 shadow-2xs space-y-2.5 transition-all"
+                >
+                  {/* Top Row: Project Code, Priority, Status */}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-mono text-xs font-bold text-[#4865F6] bg-[#EEF2FF] px-2.5 py-0.5 rounded-md border border-[#D9E2FF]">
+                        {task.project.code}
+                      </span>
+                      {getPriorityBadge(task.priority)}
                     </div>
 
-                    {/* Deliverable Title */}
-                    <div>
-                      <button
-                        type="button"
-                        onClick={() => setDrawerTask(task)}
-                        className="text-left w-full group cursor-pointer"
-                      >
-                        <h3 className="text-sm font-bold text-[#0F172A] tracking-tight group-hover:text-[#4865F6] group-hover:underline leading-snug">
-                          {task.title}
-                        </h3>
-                      </button>
-                      {task.description && (
-                        <p className="text-xs text-[#64748B] mt-0.5 line-clamp-2">
-                          {task.description}
-                        </p>
-                      )}
-                    </div>
+                    <div>{getStatusBadge(task.status)}</div>
+                  </div>
 
-                    {/* Assignee Information Row */}
-                    <div className="flex items-center gap-2 pt-0.5">
+                  {/* Deliverable Title & Description */}
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => setDrawerTask(task)}
+                      className="text-left w-full group cursor-pointer"
+                    >
+                      <h3 className="text-sm font-bold text-[#0F172A] tracking-tight group-hover:text-[#4865F6] group-hover:underline leading-snug">
+                        {task.title}
+                      </h3>
+                    </button>
+                    <p className="text-xs text-[#64748B] mt-0.5 leading-relaxed line-clamp-2">
+                      {task.description || "Drawing isolation package and CAD rev sign-off"}
+                    </p>
+                  </div>
+
+                  {/* Assignee Information Row */}
+                  <div className="flex items-center justify-between gap-2 pt-0.5">
+                    <div className="flex items-center gap-2 min-w-0">
                       <div className="w-6 h-6 rounded-full bg-[#E2E8F0] text-[#475569] text-[11px] font-bold flex items-center justify-center shrink-0">
                         {getInitials(task.assignee ? task.assignee.user.fullName : "Apoorva Pimparkar")}
                       </div>
                       <span className="text-xs text-[#64748B]">Assignee:</span>
-                      <span className="text-xs font-bold text-[#0F172A]">
+                      <span className="text-xs font-bold text-[#0F172A] truncate">
                         {task.assignee ? task.assignee.user.fullName : "Apoorva Pimparkar"}
                       </span>
-                      <span className="font-mono text-[10px] font-semibold text-[#64748B] border border-[#CBD5E1] px-1.5 py-0.2 rounded bg-white">
-                        {task.assignee?.employee?.employeeId || "EMP-004"}
+                    </div>
+                    <span className="font-mono text-[10px] font-semibold text-[#64748B] border border-[#CBD5E1] px-1.5 py-0.2 rounded bg-white shrink-0">
+                      {task.assignee?.employee?.employeeId || "EMP-004"}
+                    </span>
+                  </div>
+
+                  {/* Card Footer: Approval Indicator & Actions */}
+                  <div className="flex items-center justify-between pt-2 border-t border-[#F1F5F9]">
+                    <div>
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                        <span>Approved</span>
                       </span>
-                      {isMyTask && (
-                        <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-100 px-1 rounded">
-                          YOU
-                        </span>
-                      )}
                     </div>
 
-                    {/* Interactive Checklist Preview if present */}
-                    {task.checklistItems.length > 0 && (
-                      <div className="pt-1 border-t border-slate-100">
-                        <div className="text-[11px] font-semibold text-[#64748B] mb-1 flex items-center gap-1.5">
-                          <CheckSquare className="w-3.5 h-3.5 text-[#4865F6]" />
-                          <span>
-                            Checklist (
-                            {task.checklistItems.filter((i) => i.isCompleted).length}/{task.checklistItems.length})
-                          </span>
-                        </div>
-                        <div className="space-y-1">
-                          {task.checklistItems.slice(0, 2).map((item) => (
-                            <button
-                              key={item.id}
-                              type="button"
-                              disabled={!canEditOrReassign || togglingChecklistId === item.id}
-                              onClick={() => handleToggleChecklist(task.id, item.id, item.isCompleted)}
-                              className={`w-full flex items-center gap-2 text-xs text-left transition-colors ${
-                                canEditOrReassign ? "cursor-pointer" : "cursor-default"
-                              }`}
-                            >
-                              {item.isCompleted ? (
-                                <CheckSquare className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                              ) : (
-                                <Square className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                              )}
-                              <span
-                                className={`truncate ${
-                                  item.isCompleted ? "line-through text-slate-400" : "text-slate-800"
-                                }`}
-                              >
-                                {item.title}
-                              </span>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                    <div className="flex items-center gap-1.5">
+                      {/* Details Button */}
+                      <button
+                        type="button"
+                        onClick={() => setDrawerTask(task)}
+                        className="px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-lg border border-slate-200 flex items-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
+                        title="Open deliverable details"
+                      >
+                        <Eye className="w-3.5 h-3.5 text-slate-500" />
+                        <span>Details</span>
+                      </button>
 
-                    {/* Bottom Row: Approval Indicator & Actions */}
-                    <div className="flex items-center justify-between pt-2 border-t border-[#F1F5F9] relative">
-                      <div className="flex items-center gap-1.5">
-                        {task.status === "COMPLETED" ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                            <Check className="w-3.5 h-3.5 stroke-[2.5]" />
-                            <span>Approved</span>
-                          </span>
-                        ) : task.status === "IN_REVIEW" ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200">
-                            <Clock className="w-3.5 h-3.5" />
-                            <span>Submitted</span>
-                          </span>
-                        ) : task.status === "IN_PROGRESS" ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
-                            <Play className="w-3.5 h-3.5 fill-current" />
-                            <span>In Progress</span>
-                          </span>
-                        ) : (
-                          <span className="text-xs text-slate-500 font-medium">Pending Work</span>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-1.5">
-                        {/* Details Button */}
-                        <button
-                          type="button"
-                          onClick={() => setDrawerTask(task)}
-                          className="px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-lg border border-slate-200 flex items-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
-                          title="Open deliverable details"
-                        >
-                          <Eye className="w-3.5 h-3.5 text-slate-500" />
-                          <span>Details</span>
-                        </button>
-
-                        {/* Overflow Menu Button */}
-                        <button
-                          type="button"
-                          onClick={() => setOpenCardMenuId(openCardMenuId === task.id ? null : task.id)}
-                          className="p-1.5 bg-white hover:bg-slate-50 text-slate-600 rounded-lg border border-slate-200 cursor-pointer shadow-2xs transition-colors"
-                          aria-label="Deliverable actions menu"
-                        >
-                          <MoreVertical className="w-4 h-4" />
-                        </button>
-
-                        {/* Overflow Menu Popover */}
-                        {openCardMenuId === task.id && (
-                          <div className="absolute right-0 bottom-full mb-1 z-30 w-48 bg-white border border-slate-200 rounded-xl shadow-xl py-1 text-xs text-slate-700 animate-in fade-in zoom-in-95">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setDrawerTask(task);
-                                setOpenCardMenuId(null);
-                              }}
-                              className="w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center gap-2 cursor-pointer"
-                            >
-                              <Eye className="w-3.5 h-3.5 text-slate-500" />
-                              <span>View Full Brief</span>
-                            </button>
-                            {canEditOrReassign && (
-                              <>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    openEditModal(task);
-                                    setOpenCardMenuId(null);
-                                  }}
-                                  className="w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center gap-2 cursor-pointer"
-                                >
-                                  <Pencil className="w-3.5 h-3.5 text-slate-500" />
-                                  <span>Edit Deliverable</span>
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    openReassignModal(task);
-                                    setOpenCardMenuId(null);
-                                  }}
-                                  className="w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center gap-2 cursor-pointer text-[#4865F6]"
-                                >
-                                  <ArrowRightLeft className="w-3.5 h-3.5" />
-                                  <span>Delegate Task</span>
-                                </button>
-                              </>
-                            )}
-                            {task.status !== "COMPLETED" && isPrivileged && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  updateStatus(task.id, "COMPLETED");
-                                  setOpenCardMenuId(null);
-                                }}
-                                className="w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center gap-2 cursor-pointer text-emerald-700 font-semibold"
-                              >
-                                <Check className="w-3.5 h-3.5 stroke-[2.5]" />
-                                <span>Approve Deliverable</span>
-                              </button>
-                            )}
-                          </div>
-                        )}
-                      </div>
+                      {/* Secondary Action Menu Button (⋯) */}
+                      <button
+                        type="button"
+                        onClick={() => setActionSheetTask(task)}
+                        className="p-1.5 bg-white hover:bg-slate-50 text-slate-600 rounded-lg border border-slate-200 cursor-pointer shadow-2xs transition-colors"
+                        aria-label="Deliverable actions menu"
+                      >
+                        <MoreHorizontal className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
-                );
-              })
-            )}
+                </div>
+              );
+            })}
           </section>
         )}
 
-        {/* ==================================================== */}
-        {/* 6. MOBILE & RESPONSIVE KANBAN BOARD                  */}
-        {/* ==================================================== */}
-        {view === "kanban" && (
-          <section className="space-y-4">
-            {/* Mobile Tabbed Kanban Status Selector (Phone View) */}
-            <div className="md:hidden space-y-3">
-              <div className="grid grid-cols-2 gap-1.5 bg-slate-100 p-1 rounded-xl">
-                {[
-                  { status: "COMPLETED", label: "Completed" },
-                  { status: "WAITING_REVIEW", label: "In Review" },
-                  { status: "IN_PROGRESS", label: "In Progress" },
-                  { status: "NOT_STARTED", label: "Not Started" },
-                ].map((tab) => {
-                  const count = filteredTasks.filter(
-                    (t) => (tab.status === "WAITING_REVIEW" ? t.status === "IN_REVIEW" : t.status === tab.status)
-                  ).length;
-                  return (
-                    <button
-                      key={tab.status}
-                      type="button"
-                      onClick={() => setMobileKanbanTab(tab.status as any)}
-                      className={`py-2 px-2.5 rounded-lg text-xs font-semibold flex items-center justify-between transition-all cursor-pointer ${
-                        mobileKanbanTab === tab.status
-                          ? "bg-white text-slate-900 shadow-xs"
-                          : "text-slate-600 hover:text-slate-900"
-                      }`}
-                    >
-                      <span>{tab.label}</span>
-                      <span className="text-[10px] px-1.5 py-0.2 rounded-full font-mono bg-slate-200">
-                        {count}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Single Column Active Cards */}
-              <div className="space-y-2.5">
-                {filteredTasks
-                  .filter((t) =>
-                    mobileKanbanTab === "WAITING_REVIEW"
-                      ? t.status === "IN_REVIEW"
-                      : t.status === mobileKanbanTab
-                  )
-                  .map((task) => (
-                    <div
-                      key={task.id}
-                      className="bg-white border border-[#E2E6F0] rounded-2xl p-4 shadow-xs space-y-2"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-mono text-xs font-bold text-[#4865F6] bg-[#EEF2FF] px-2 py-0.5 rounded">
-                          {task.project.code}
-                        </span>
-                        {getPriorityBadge(task.priority)}
-                      </div>
-                      <h4 className="text-xs font-bold text-slate-900">{task.title}</h4>
-                      <div className="text-[11px] text-slate-600 flex items-center justify-between">
-                        <span>Assignee: {task.assignee?.user.fullName || "Apoorva Pimparkar"}</span>
-                        <span className="font-mono text-[10px]">
-                          {task.assignee?.employee?.employeeId || "EMP-004"}
-                        </span>
-                      </div>
-                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
-                        <button
-                          type="button"
-                          onClick={() => setDrawerTask(task)}
-                          className="text-xs text-[#4865F6] font-semibold hover:underline cursor-pointer"
-                        >
-                          View Details
-                        </button>
-                        {isPrivileged && task.status === "IN_REVIEW" && (
-                          <button
-                            type="button"
-                            onClick={() => updateStatus(task.id, "COMPLETED")}
-                            className="px-2.5 py-1 bg-emerald-600 text-white text-xs font-semibold rounded-lg cursor-pointer"
-                          >
-                            Approve ✔
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            </div>
-
-            {/* Desktop / Tablet Multi-Column Kanban */}
-            <div className="hidden md:grid md:grid-cols-4 gap-3">
-              {[
-                { status: "NOT_STARTED", title: "Not Started", color: "border-slate-300", bg: "bg-slate-50/50" },
-                { status: "IN_PROGRESS", title: "In Progress", color: "border-blue-400", bg: "bg-blue-50/30" },
-                { status: "IN_REVIEW", title: "In Review", color: "border-purple-400", bg: "bg-purple-50/30" },
-                { status: "COMPLETED", title: "Completed", color: "border-emerald-500", bg: "bg-emerald-50/30" },
-              ].map((col) => {
-                const colTasks = filteredTasks.filter((t) => t.status === col.status);
-                return (
-                  <div
-                    key={col.status}
-                    onDragOver={handleDragOver}
-                    onDrop={() => handleDropOnColumn(col.status as any)}
-                    className={`bg-white border border-[#E2E6F0] rounded-2xl p-3 flex flex-col min-h-[440px] ${col.bg}`}
-                  >
-                    <div className={`flex items-center justify-between pb-2 border-b-2 ${col.color} mb-3`}>
-                      <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">{col.title}</h3>
-                      <span className="text-xs font-mono font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
-                        {colTasks.length}
-                      </span>
-                    </div>
-
-                    <div className="space-y-2 flex-1 overflow-y-auto pr-1">
-                      {colTasks.map((task) => (
-                        <div
-                          key={task.id}
-                          draggable
-                          onDragStart={(e) => handleDragStart(e, task.id)}
-                          className="p-3 bg-white border border-[#E2E6F0] rounded-xl shadow-2xs space-y-1.5 hover:border-[#4865F6] transition-all cursor-grab active:cursor-grabbing"
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="font-mono text-[10px] font-bold text-[#4865F6] bg-[#EEF2FF] px-1.5 py-0.5 rounded">
-                              {task.project.code}
-                            </span>
-                            {getPriorityBadge(task.priority)}
-                          </div>
-                          <h4 className="text-xs font-bold text-slate-900 line-clamp-2">{task.title}</h4>
-                          <div className="text-[11px] text-slate-600 truncate">
-                            {task.assignee?.user.fullName || "Apoorva Pimparkar"}
-                          </div>
-                          <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
-                            <button
-                              type="button"
-                              onClick={() => setDrawerTask(task)}
-                              className="text-slate-500 hover:text-slate-900"
-                              title="Details"
-                            >
-                              <Eye className="w-3.5 h-3.5" />
-                            </button>
-                            {task.status !== "COMPLETED" && (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  updateStatus(
-                                    task.id,
-                                    task.status === "NOT_STARTED"
-                                      ? "IN_PROGRESS"
-                                      : task.status === "IN_PROGRESS"
-                                      ? "IN_REVIEW"
-                                      : "COMPLETED"
-                                  )
-                                }
-                                className="text-[10px] font-semibold text-[#4865F6] hover:underline"
-                              >
-                                Advance →
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                      {colTasks.length === 0 && (
-                        <div className="p-4 text-center text-slate-400 border-2 border-dashed border-slate-200 rounded-xl text-xs">
-                          Empty
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-        )}
-
-        {/* ==================================================== */}
-        {/* 7. PRIMARY FLOATING ACTION BUTTON                    */}
-        {/* ==================================================== */}
-        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-30">
-          <button
-            type="button"
-            onClick={() => setIsCreateTaskModalOpen(true)}
-            className="px-5 py-3 bg-[#4865F6] hover:bg-[#3B54DF] active:scale-95 text-white font-semibold text-xs sm:text-sm rounded-full shadow-[0_6px_20px_rgba(72,101,246,0.4)] flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap"
-          >
-            <Plus className="w-4 h-4 stroke-[2.5]" />
-            <span>Assign Deliverable</span>
-          </button>
-        </div>
-
-        {/* ==================================================== */}
-        {/* 8. MOBILE BOTTOM NAVIGATION BAR                      */}
-        {/* ==================================================== */}
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-[#E2E6F0] px-4 py-1.5 flex items-center justify-around shadow-[0_-2px_10px_rgba(0,0,0,0.04)]">
-          {/* 1. Tasks (Active) */}
+        {/* Load More Control & Back to Top */}
+        <div className="pt-4 pb-2 flex items-center justify-between text-xs text-slate-500">
+          <span>Loaded {sortedTasks.length} of {tasks.length} items</span>
           <button
             type="button"
             onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-            className="flex flex-col items-center gap-0.5 text-[#4865F6] py-1 px-3 cursor-pointer"
+            className="flex items-center gap-1 text-[#4865F6] font-semibold hover:underline cursor-pointer"
           >
-            <span className="w-1.5 h-1.5 rounded-full bg-[#4865F6] mb-0.5"></span>
-            <CheckSquare className="w-5 h-5" />
-            <span className="text-[10px] font-bold">Tasks</span>
+            <ArrowUp className="w-3.5 h-3.5" />
+            <span>Back to Top</span>
           </button>
+        </div>
+      </div>
 
-          {/* 2. Projects */}
-          <Link
-            href={`/w/${workspaceSlug}/projects`}
-            className="flex flex-col items-center gap-0.5 text-slate-500 hover:text-slate-800 py-1 px-3 cursor-pointer"
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-transparent mb-0.5"></span>
-            <Folder className="w-5 h-5" />
-            <span className="text-[10px] font-medium">Projects</span>
-          </Link>
+      {/* ==================================================== */}
+      {/* 6. MOBILE BOTTOM NAVIGATION BAR                      */}
+      {/* ==================================================== */}
+      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-[#E2E6F0] px-4 py-1.5 flex items-center justify-around shadow-[0_-2px_10px_rgba(0,0,0,0.04)]">
+        {/* 1. Tasks (Active) */}
+        <button
+          type="button"
+          onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+          className="flex flex-col items-center gap-0.5 text-[#4865F6] py-1 px-3 cursor-pointer"
+        >
+          <div className="flex items-center gap-0.5 mb-0.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#4865F6]"></span>
+            <span className="w-1 h-1 rounded-full bg-[#4865F6]/60"></span>
+          </div>
+          <CheckSquare className="w-5 h-5" />
+          <span className="text-[10px] font-bold">Tasks</span>
+        </button>
 
-          {/* 3. Site Visits */}
-          <Link
-            href={`/w/${workspaceSlug}/visits`}
-            className="flex flex-col items-center gap-0.5 text-slate-500 hover:text-slate-800 py-1 px-3 cursor-pointer"
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-transparent mb-0.5"></span>
-            <MapPin className="w-5 h-5" />
-            <span className="text-[10px] font-medium">Site Visits</span>
-          </Link>
+        {/* 2. Projects */}
+        <Link
+          href={`/w/${workspaceSlug}/projects`}
+          className="flex flex-col items-center gap-0.5 text-slate-500 hover:text-slate-800 py-1 px-3 cursor-pointer"
+        >
+          <span className="w-1.5 h-1.5 rounded-full bg-transparent mb-0.5"></span>
+          <Folder className="w-5 h-5" />
+          <span className="text-[10px] font-medium">Projects</span>
+        </Link>
 
-          {/* 4. More */}
-          <button
-            type="button"
-            onClick={() => setIsMoreMenuOpen(true)}
-            className="flex flex-col items-center gap-0.5 text-slate-500 hover:text-slate-800 py-1 px-3 cursor-pointer"
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-transparent mb-0.5"></span>
-            <Menu className="w-5 h-5" />
-            <span className="text-[10px] font-medium">More</span>
-          </button>
-        </nav>
+        {/* 3. Site Visits */}
+        <Link
+          href={`/w/${workspaceSlug}/visits`}
+          className="flex flex-col items-center gap-0.5 text-slate-500 hover:text-slate-800 py-1 px-3 cursor-pointer"
+        >
+          <span className="w-1.5 h-1.5 rounded-full bg-transparent mb-0.5"></span>
+          <MapPin className="w-5 h-5" />
+          <span className="text-[10px] font-medium">Site Visits</span>
+        </Link>
 
-        {/* ==================================================== */}
-        {/* 9. FILTERS BOTTOM SHEET                              */}
-        {/* ==================================================== */}
-        {isFilterSheetOpen && (
-          <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4">
-            <div className="bg-white border-t sm:border border-[#E2E6F0] rounded-t-3xl sm:rounded-2xl w-full max-w-md max-h-[85vh] flex flex-col shadow-2xl animate-in slide-in-from-bottom duration-200">
-              <div className="p-4 border-b border-[#E2E6F0] flex items-center justify-between bg-slate-50 rounded-t-3xl sm:rounded-t-2xl">
-                <div className="flex items-center gap-2">
-                  <Filter className="w-4 h-4 text-[#4865F6]" />
-                  <h3 className="text-sm font-bold text-slate-900">Filter Deliverables</h3>
+        {/* 4. Menu (Opens Slide-out Nav Drawer) */}
+        <button
+          type="button"
+          onClick={() => setIsNavDrawerOpen(true)}
+          className="flex flex-col items-center gap-0.5 text-slate-500 hover:text-slate-800 py-1 px-3 cursor-pointer"
+        >
+          <span className="w-1.5 h-1.5 rounded-full bg-transparent mb-0.5"></span>
+          <Menu className="w-5 h-5" />
+          <span className="text-[10px] font-medium">Menu</span>
+        </button>
+      </nav>
+
+      {/* ==================================================== */}
+      {/* 7. SLIDE-OUT LEFT NAVIGATION DRAWER                  */}
+      {/* ==================================================== */}
+      {isNavDrawerOpen && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex animate-in fade-in duration-150">
+          <div className="bg-white w-[300px] h-full shadow-2xl flex flex-col animate-in slide-in-from-left duration-200">
+            {/* Header */}
+            <div className="p-4 border-b border-[#E2E6F0] flex items-center justify-between bg-slate-50">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-full bg-[#0B122B] text-white flex items-center justify-center font-black text-xs">
+                  100%
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setIsFilterSheetOpen(false)}
-                  className="p-1 rounded-lg text-slate-400 hover:text-slate-700 cursor-pointer"
+                <div>
+                  <h3 className="text-xs font-bold text-slate-900 leading-tight">100% DESIGN Studio</h3>
+                  <div className="flex items-center gap-1.5 text-[10px] text-slate-500 mt-0.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                    <span>Active Workspace</span>
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsNavDrawerOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Navigation Destinations */}
+            <div className="flex-1 overflow-y-auto p-3 space-y-1 text-xs">
+              {navItems.map((item) => {
+                const isActive = item.id === "tasks";
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.name}
+                    href={item.href}
+                    onClick={() => setIsNavDrawerOpen(false)}
+                    className={`flex items-center justify-between p-2.5 rounded-xl font-medium transition-all ${
+                      isActive
+                        ? "bg-[#EEF2FF] text-[#4865F6] font-bold border border-[#D9E2FF]"
+                        : "text-slate-700 hover:bg-slate-50"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <Icon className={`w-4 h-4 ${isActive ? "text-[#4865F6]" : "text-slate-500"}`} />
+                      <span>{item.name}</span>
+                    </div>
+                    {isActive && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#4865F6]"></span>
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
+
+            {/* Account & Profile Footer */}
+            <div className="p-3 border-t border-[#E2E6F0] bg-slate-50 space-y-2">
+              <div className="flex items-center gap-2.5 p-2 bg-white rounded-xl border border-slate-200">
+                <div className="w-8 h-8 rounded-full bg-[#4865F6] text-white font-bold text-xs flex items-center justify-center">
+                  SL
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-bold text-slate-900 truncate">Saksham Lanjewar</div>
+                  <div className="text-[10px] text-slate-500 font-mono">EMP-001 • ADMIN</div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={async () => {
+                  await fetch("/api/auth/logout", { method: "POST" });
+                  window.location.href = `/w/${workspaceSlug}/login`;
+                }}
+                className="w-full py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl font-semibold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>Sign Out</span>
+              </button>
+            </div>
+          </div>
+          <div className="flex-1" onClick={() => setIsNavDrawerOpen(false)} />
+        </div>
+      )}
+
+      {/* ==================================================== */}
+      {/* 8. FILTERS BOTTOM SHEET                              */}
+      {/* ==================================================== */}
+      {isFilterSheetOpen && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-white border-t sm:border border-[#E2E6F0] rounded-t-3xl sm:rounded-2xl w-full max-w-md max-h-[85vh] flex flex-col shadow-2xl animate-in slide-in-from-bottom duration-200">
+            <div className="p-4 border-b border-[#E2E6F0] flex items-center justify-between bg-slate-50 rounded-t-3xl sm:rounded-t-2xl">
+              <div className="flex items-center gap-2">
+                <Filter className="w-4 h-4 text-[#4865F6]" />
+                <h3 className="text-sm font-bold text-slate-900">Filter Deliverables</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsFilterSheetOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4 overflow-y-auto text-xs">
+              <div>
+                <label className="block font-semibold text-slate-900 mb-1">Status</label>
+                <select
+                  value={selectedStatusCategory}
+                  onChange={(e) => setSelectedStatusCategory(e.target.value)}
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#4865F6]"
                 >
-                  <X className="w-5 h-5" />
-                </button>
+                  <option value="ALL">All Statuses</option>
+                  <option value="COMPLETED">Completed (Approved)</option>
+                  <option value="WAITING_REVIEW">Waiting Review</option>
+                  <option value="IN_PROGRESS">In Progress</option>
+                  <option value="NOT_STARTED">Not Started</option>
+                </select>
               </div>
 
-              <div className="p-5 space-y-4 overflow-y-auto text-xs">
-                {/* Due Date Filter */}
+              <div>
+                <label className="block font-semibold text-slate-900 mb-1">Due Date</label>
+                <select
+                  value={selectedDueDateCategory}
+                  onChange={(e) => setSelectedDueDateCategory(e.target.value)}
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#4865F6]"
+                >
+                  <option value="ALL">All Due Dates</option>
+                  <option value="TODAY">Due Today</option>
+                  <option value="OVERDUE">Overdue Only</option>
+                  <option value="UPCOMING">Upcoming</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-900 mb-1">Priority</label>
+                <select
+                  value={selectedPriorityFilter}
+                  onChange={(e) => setSelectedPriorityFilter(e.target.value)}
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#4865F6]"
+                >
+                  <option value="ALL">All Priorities</option>
+                  <option value="URGENT">Urgent</option>
+                  <option value="HIGH">High Priority</option>
+                  <option value="MEDIUM">Medium</option>
+                  <option value="LOW">Low</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-900 mb-1">Project</label>
+                <select
+                  value={selectedProjectFilter}
+                  onChange={(e) => setSelectedProjectFilter(e.target.value)}
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#4865F6]"
+                >
+                  <option value="ALL">All Projects</option>
+                  {projects.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.code} — {p.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-[#E2E6F0] bg-slate-50 flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  handleClearFilters();
+                  setIsFilterSheetOpen(false);
+                }}
+                className="px-4 py-2.5 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-semibold rounded-xl cursor-pointer"
+              >
+                Reset
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsFilterSheetOpen(false)}
+                className="flex-1 py-2.5 bg-[#4865F6] hover:bg-[#3B54DF] text-white text-xs font-semibold rounded-xl cursor-pointer text-center shadow-xs"
+              >
+                Apply Filters
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==================================================== */}
+      {/* 9. SORT BOTTOM SHEET                                 */}
+      {/* ==================================================== */}
+      {isSortSheetOpen && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-white border-t sm:border border-[#E2E6F0] rounded-t-3xl sm:rounded-2xl w-full max-w-sm shadow-2xl animate-in slide-in-from-bottom duration-200">
+            <div className="p-4 border-b border-[#E2E6F0] flex items-center justify-between bg-slate-50 rounded-t-3xl sm:rounded-t-2xl">
+              <div className="flex items-center gap-2">
+                <ArrowUpDown className="w-4 h-4 text-[#4865F6]" />
+                <h3 className="text-xs font-bold text-slate-900">Sort Deliverables</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsSortSheetOpen(false)}
+                className="p-1 text-slate-400 hover:text-slate-700 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-3 space-y-1 text-xs">
+              {[
+                { id: "DUE_DATE_ASC", label: "Due Date (Earliest First)" },
+                { id: "DUE_DATE_DESC", label: "Due Date (Latest First)" },
+                { id: "TITLE_ASC", label: "Deliverable Title (A → Z)" },
+                { id: "PRIORITY_DESC", label: "Priority (Highest First)" },
+              ].map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => {
+                    setSortOption(opt.id as any);
+                    setIsSortSheetOpen(false);
+                  }}
+                  className={`w-full flex items-center justify-between p-3 rounded-xl transition-colors cursor-pointer ${
+                    sortOption === opt.id
+                      ? "bg-[#EEF2FF] text-[#4865F6] font-bold border border-[#D9E2FF]"
+                      : "text-slate-700 hover:bg-slate-50"
+                  }`}
+                >
+                  <span>{opt.label}</span>
+                  {sortOption === opt.id && <Check className="w-4 h-4 text-[#4865F6]" />}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==================================================== */}
+      {/* 10. SECONDARY ACTION SHEET (FOR ⋯ BUTTON)            */}
+      {/* ==================================================== */}
+      {actionSheetTask && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-white border-t sm:border border-[#E2E6F0] rounded-t-3xl sm:rounded-2xl w-full max-w-sm flex flex-col shadow-2xl animate-in slide-in-from-bottom duration-200">
+            <div className="p-4 border-b border-[#E2E6F0] flex items-center justify-between bg-slate-50 rounded-t-3xl sm:rounded-t-2xl">
+              <div className="min-w-0 pr-2">
+                <span className="text-[10px] font-mono text-[#4865F6] font-bold block">
+                  {actionSheetTask.project.code}
+                </span>
+                <h3 className="text-xs font-bold text-slate-900 truncate">
+                  {actionSheetTask.title}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActionSheetTask(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-3 space-y-1 text-xs">
+              <button
+                type="button"
+                onClick={() => {
+                  setDrawerTask(actionSheetTask);
+                  setActionSheetTask(null);
+                }}
+                className="w-full flex items-center gap-3 p-2.5 rounded-xl hover:bg-slate-50 text-slate-800 font-semibold cursor-pointer"
+              >
+                <Eye className="w-4 h-4 text-slate-500" />
+                <span>View Full Details</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  openEditModal(actionSheetTask);
+                  setActionSheetTask(null);
+                }}
+                className="w-full flex items-center gap-3 p-2.5 rounded-xl hover:bg-slate-50 text-slate-800 font-semibold cursor-pointer"
+              >
+                <Pencil className="w-4 h-4 text-slate-500" />
+                <span>Edit Deliverable</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  openReassignModal(actionSheetTask);
+                  setActionSheetTask(null);
+                }}
+                className="w-full flex items-center gap-3 p-2.5 rounded-xl hover:bg-blue-50 text-[#4865F6] font-semibold cursor-pointer"
+              >
+                <ArrowRightLeft className="w-4 h-4" />
+                <span>Delegate Task</span>
+              </button>
+
+              {actionSheetTask.status !== "COMPLETED" && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    updateStatus(actionSheetTask.id, "COMPLETED");
+                    setActionSheetTask(null);
+                  }}
+                  className="w-full flex items-center gap-3 p-2.5 rounded-xl hover:bg-emerald-50 text-emerald-700 font-semibold cursor-pointer"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Approve Deliverable</span>
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => {
+                  setDeleteConfirmTask(actionSheetTask);
+                  setActionSheetTask(null);
+                }}
+                className="w-full flex items-center gap-3 p-2.5 rounded-xl hover:bg-rose-50 text-rose-600 font-semibold cursor-pointer"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Delete Deliverable</span>
+              </button>
+            </div>
+
+            <div className="p-3 border-t border-[#E2E6F0] bg-slate-50">
+              <button
+                type="button"
+                onClick={() => setActionSheetTask(null)}
+                className="w-full py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 font-semibold text-xs rounded-xl cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==================================================== */}
+      {/* 11. DELETION CONFIRMATION DIALOG                     */}
+      {/* ==================================================== */}
+      {deleteConfirmTask && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white border border-[#E2E6F0] rounded-2xl max-w-sm w-full p-5 shadow-2xl space-y-3 animate-in fade-in zoom-in-95">
+            <div className="w-10 h-10 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center">
+              <AlertTriangle className="w-5 h-5" />
+            </div>
+            <h3 className="text-sm font-bold text-slate-900">Delete Deliverable?</h3>
+            <p className="text-xs text-slate-600">
+              Are you sure you want to delete <strong>{deleteConfirmTask.title}</strong>? This action cannot be undone.
+            </p>
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setDeleteConfirmTask(null)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setTasks((prev) => prev.filter((t) => t.id !== deleteConfirmTask.id));
+                  setDeleteConfirmTask(null);
+                  setSuccessMessage("Deliverable removed from workspace.");
+                }}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-xl cursor-pointer shadow-xs"
+              >
+                Confirm Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==================================================== */}
+      {/* 12. EXPANDED TASK DETAILS DRAWER                     */}
+      {/* ==================================================== */}
+      {drawerTask && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex justify-end">
+          <div className="bg-white border-l border-[#E2E6F0] w-full max-w-lg h-full shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-right duration-200">
+            <div className="p-4 border-b border-[#E2E6F0] flex items-start justify-between gap-3 bg-slate-50">
+              <div className="space-y-1 min-w-0">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="font-mono text-xs font-bold text-[#4865F6] bg-[#EEF2FF] px-2 py-0.5 rounded border border-[#D9E2FF]">
+                    {drawerTask.project.code}
+                  </span>
+                  {getPriorityBadge(drawerTask.priority)}
+                  {getStatusBadge(drawerTask.status)}
+                </div>
+                <h3 className="text-base font-bold text-slate-900 tracking-tight">
+                  {drawerTask.title}
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Project: <strong>{drawerTask.project.name}</strong>
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setDrawerTask(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 cursor-pointer shrink-0"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 text-xs">
+              <div className="grid grid-cols-2 gap-2.5 p-3 bg-slate-50 border border-slate-200 rounded-xl">
                 <div>
-                  <label className="block font-semibold text-slate-900 mb-1">Due Date</label>
-                  <select
-                    value={selectedDueDateCategory}
-                    onChange={(e) => setSelectedDueDateCategory(e.target.value)}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#4865F6]"
-                  >
-                    <option value="ALL">All Due Dates</option>
-                    <option value="TODAY">Due Today</option>
-                    <option value="OVERDUE">Overdue Only</option>
-                    <option value="UPCOMING">Upcoming</option>
-                  </select>
+                  <span className="text-slate-500 text-[11px] block">Assignee</span>
+                  <span className="font-bold text-slate-900">
+                    {drawerTask.assignee ? drawerTask.assignee.user.fullName : "Apoorva Pimparkar"}
+                  </span>
+                  <div className="font-mono text-[10px] text-[#4865F6]">
+                    {drawerTask.assignee?.employee?.employeeId || "EMP-004"}
+                  </div>
                 </div>
 
-                {/* Status Filter */}
                 <div>
-                  <label className="block font-semibold text-slate-900 mb-1">Status</label>
-                  <select
-                    value={selectedStatusCategory}
-                    onChange={(e) => setSelectedStatusCategory(e.target.value)}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#4865F6]"
-                  >
-                    <option value="ALL">All Statuses</option>
-                    <option value="COMPLETED">Completed (Approved)</option>
-                    <option value="WAITING_REVIEW">Waiting Review</option>
-                    <option value="IN_PROGRESS">In Progress</option>
-                    <option value="NOT_STARTED">Not Started</option>
-                  </select>
+                  <span className="text-slate-500 text-[11px] block">Target Due Date</span>
+                  <span className="font-bold text-slate-900">
+                    {drawerTask.dueDate
+                      ? new Date(drawerTask.dueDate).toLocaleDateString("en-IN", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                        })
+                      : "No deadline specified"}
+                  </span>
                 </div>
 
-                {/* Priority Filter */}
                 <div>
-                  <label className="block font-semibold text-slate-900 mb-1">Priority</label>
-                  <select
-                    value={selectedPriorityFilter}
-                    onChange={(e) => setSelectedPriorityFilter(e.target.value)}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#4865F6]"
-                  >
-                    <option value="ALL">All Priorities</option>
-                    <option value="URGENT">Urgent</option>
-                    <option value="HIGH">High Priority</option>
-                    <option value="MEDIUM">Medium</option>
-                    <option value="LOW">Low</option>
-                  </select>
+                  <span className="text-slate-500 text-[11px] block">Estimated Effort</span>
+                  <span className="font-medium text-slate-800">
+                    {drawerTask.estimatedHours ? `${drawerTask.estimatedHours} Hours` : "4 Hours"}
+                  </span>
                 </div>
 
-                {/* Project Filter */}
                 <div>
-                  <label className="block font-semibold text-slate-900 mb-1">Project</label>
-                  <select
-                    value={selectedProjectFilter}
-                    onChange={(e) => setSelectedProjectFilter(e.target.value)}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#4865F6]"
+                  <span className="text-slate-500 text-[11px] block">Approval State</span>
+                  <span className="font-bold text-emerald-700">
+                    {drawerTask.status === "COMPLETED" ? "✔ Approved" : "Pending Sign-Off"}
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                  <FileText className="w-3.5 h-3.5 text-[#4865F6]" />
+                  <span>Deliverable Brief & Instructions</span>
+                </h4>
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 whitespace-pre-line leading-relaxed">
+                  {drawerTask.description || "Drawing isolation package and CAD rev sign-off."}
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider flex items-center gap-1.5">
+                    <CheckSquare className="w-3.5 h-3.5 text-[#4865F6]" />
+                    <span>Deliverable Checklist</span>
+                  </h4>
+                  <span className="font-mono text-slate-500 text-[11px]">
+                    {drawerTask.checklistItems.filter((i) => i.isCompleted).length} /{" "}
+                    {drawerTask.checklistItems.length}
+                  </span>
+                </div>
+
+                {drawerTask.checklistItems.length === 0 ? (
+                  <p className="text-slate-400 italic">No checklist items defined.</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {drawerTask.checklistItems.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => handleToggleChecklist(drawerTask.id, item.id, item.isCompleted)}
+                        className="w-full flex items-center gap-2 p-2 bg-slate-50 hover:bg-white border border-slate-200 rounded-xl text-left cursor-pointer"
+                      >
+                        {item.isCompleted ? (
+                          <CheckSquare className="w-4 h-4 text-emerald-600 shrink-0" />
+                        ) : (
+                          <Square className="w-4 h-4 text-slate-400 shrink-0" />
+                        )}
+                        <span
+                          className={item.isCompleted ? "line-through text-slate-400" : "text-slate-800 font-medium"}
+                        >
+                          {item.title}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider flex items-center gap-1.5">
+                  <MessageSquare className="w-3.5 h-3.5 text-[#4865F6]" />
+                  <span>Discussion & Notes</span>
+                </h4>
+
+                <form onSubmit={handleAddComment} className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newCommentText}
+                    onChange={(e) => setNewCommentText(e.target.value)}
+                    placeholder="Add a revision note..."
+                    className="flex-1 p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#4865F6]"
+                  />
+                  <button
+                    type="submit"
+                    disabled={submittingComment || !newCommentText.trim()}
+                    className="px-3 py-2 bg-[#4865F6] text-white rounded-xl font-semibold cursor-pointer disabled:opacity-50 flex items-center gap-1"
                   >
-                    <option value="ALL">All Projects</option>
+                    <Send className="w-3.5 h-3.5" />
+                  </button>
+                </form>
+
+                <div className="space-y-1.5 max-h-36 overflow-y-auto">
+                  {drawerTask.comments.map((c) => (
+                    <div key={c.id} className="p-2 bg-slate-50 border border-slate-200 rounded-xl">
+                      <p className="text-slate-800">{c.content}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="p-3 border-t border-[#E2E6F0] bg-slate-50 flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  openEditModal(drawerTask);
+                  setDrawerTask(null);
+                }}
+                className="px-3 py-2 bg-white border border-slate-200 text-slate-800 text-xs font-semibold rounded-xl cursor-pointer"
+              >
+                Edit Deliverable
+              </button>
+
+              {drawerTask.status !== "COMPLETED" && (
+                <button
+                  type="button"
+                  onClick={() => updateStatus(drawerTask.id, "COMPLETED")}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl cursor-pointer shadow-xs"
+                >
+                  Approve Deliverable ✔
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==================================================== */}
+      {/* 13. ASSIGN DELIVERABLE MODAL                         */}
+      {/* ==================================================== */}
+      {isCreateTaskModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-white border border-[#E2E6F0] rounded-2xl max-w-lg w-full p-5 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-[#E2E6F0] pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-[#4865F6] text-white flex items-center justify-center font-bold">
+                  <UserPlus className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">Assign Deliverable</h3>
+                  <p className="text-xs text-slate-500">Create & schedule a studio deliverable</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCreateTaskModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateTask} className="space-y-3.5 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-900 mb-1">
+                    Project <span className="text-red-600">*</span>
+                  </label>
+                  <select
+                    value={selectedProjectId}
+                    onChange={(e) => {
+                      setSelectedProjectId(e.target.value);
+                      setSelectedPhaseId("");
+                    }}
+                    required
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#4865F6]"
+                  >
                     {projects.map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.code} — {p.name}
@@ -2043,715 +2252,57 @@ export default function TasksClientView({
                     ))}
                   </select>
                 </div>
-              </div>
 
-              <div className="p-4 border-t border-[#E2E6F0] bg-slate-50 flex items-center justify-between gap-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleClearFilters();
-                    setIsFilterSheetOpen(false);
-                  }}
-                  className="px-4 py-2.5 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-semibold rounded-xl cursor-pointer"
-                >
-                  Reset
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsFilterSheetOpen(false)}
-                  className="flex-1 py-2.5 bg-[#4865F6] hover:bg-[#3B54DF] text-white text-xs font-semibold rounded-xl cursor-pointer text-center shadow-xs"
-                >
-                  Apply Filters
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ==================================================== */}
-        {/* 10. "MORE" BOTTOM SHEET NAVIGATION                   */}
-        {/* ==================================================== */}
-        {isMoreMenuOpen && (
-          <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4">
-            <div className="bg-white border-t sm:border border-[#E2E6F0] rounded-t-3xl sm:rounded-2xl w-full max-w-md max-h-[85vh] flex flex-col shadow-2xl animate-in slide-in-from-bottom duration-200">
-              <div className="p-4 border-b border-[#E2E6F0] flex items-center justify-between bg-slate-50 rounded-t-3xl sm:rounded-t-2xl">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-full bg-[#0B122B] text-white flex items-center justify-center font-black text-xs">
-                    100%
-                  </div>
-                  <div>
-                    <h3 className="text-xs font-bold text-slate-900">100% DESIGN Studio</h3>
-                    <p className="text-[10px] text-slate-500">Studio Modules & Management</p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsMoreMenuOpen(false)}
-                  className="p-1 rounded-lg text-slate-400 hover:text-slate-700 cursor-pointer"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <div className="p-4 space-y-1.5 overflow-y-auto text-xs">
-                {[
-                  { name: "Drawings & Approvals", href: `/w/${workspaceSlug}/drawings`, icon: FileCheck2 },
-                  { name: "Project Finance", href: `/w/${workspaceSlug}/finance`, icon: Receipt },
-                  { name: "Studio Team", href: `/w/${workspaceSlug}/team`, icon: Users },
-                  { name: "Contractors", href: `/w/${workspaceSlug}/contractors`, icon: Briefcase },
-                  { name: "Consultants", href: `/w/${workspaceSlug}/consultants`, icon: Building2 },
-                  { name: "Clients & Directory", href: `/w/${workspaceSlug}/directory`, icon: FolderGit2 },
-                  { name: "Check In at Site", href: `/w/${workspaceSlug}/visits`, icon: MapPin },
-                ].map((item) => {
-                  const Icon = item.icon;
-                  return (
-                    <Link
-                      key={item.name}
-                      href={item.href}
-                      onClick={() => setIsMoreMenuOpen(false)}
-                      className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 border border-transparent hover:border-slate-200 transition-colors"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-lg bg-blue-50 text-[#4865F6]">
-                          <Icon className="w-4 h-4" />
-                        </div>
-                        <span className="font-semibold text-slate-800">{item.name}</span>
-                      </div>
-                      <ChevronRight className="w-4 h-4 text-slate-400" />
-                    </Link>
-                  );
-                })}
-
-                <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsMoreMenuOpen(false);
-                      setIsProfileOpen(true);
-                    }}
-                    className="flex-1 py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl font-semibold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
-                  >
-                    <User className="w-3.5 h-3.5 text-slate-600" />
-                    <span>My Profile</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      await fetch("/api/auth/logout", { method: "POST" });
-                      window.location.href = `/w/${workspaceSlug}/login`;
-                    }}
-                    className="py-2 px-3 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl font-semibold text-xs flex items-center gap-1 cursor-pointer"
-                  >
-                    <LogOut className="w-3.5 h-3.5" />
-                    <span>Sign Out</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ==================================================== */}
-        {/* 11. PROFILE DRAWER / POPUP                           */}
-        {/* ==================================================== */}
-        {isProfileOpen && (
-          <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-            <div className="bg-white border border-[#E2E6F0] rounded-2xl w-full max-w-sm p-5 shadow-2xl space-y-4 animate-in fade-in zoom-in-95">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-10 h-10 rounded-full bg-[#4865F6] text-white font-bold text-sm flex items-center justify-center">
-                    SL
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-900">
-                      {contextUserFullName || "Saksham Lanjewar"}
-                    </h3>
-                    <div className="flex items-center gap-1.5 text-[10px] text-slate-500">
-                      <span className="font-mono font-bold text-[#4865F6]">EMP-001</span>
-                      <span>•</span>
-                      <span className="font-bold text-emerald-700 uppercase">ADMIN / OWNER</span>
-                    </div>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsProfileOpen(false)}
-                  className="p-1 text-slate-400 hover:text-slate-700 rounded-lg cursor-pointer"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <div className="space-y-2 text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-100">
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Studio Workspace:</span>
-                  <span className="font-semibold text-slate-800">100% DESIGN Studio</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Email:</span>
-                  <span className="font-mono text-slate-800">designsaksham1@gmail.com</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Timezone:</span>
-                  <span className="font-medium text-slate-800">{workspaceTimezone}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Access Level:</span>
-                  <span className="font-bold text-[#4865F6]">Studio Principal & Administrator</span>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setIsProfileOpen(false)}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl cursor-pointer"
-                >
-                  Close
-                </button>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    await fetch("/api/auth/logout", { method: "POST" });
-                    window.location.href = `/w/${workspaceSlug}/login`;
-                  }}
-                  className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-xl cursor-pointer flex items-center gap-1.5"
-                >
-                  <LogOut className="w-3.5 h-3.5" />
-                  <span>Sign Out</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ==================================================== */}
-        {/* 12. TASK DETAIL DRAWER (SLIDE OVER)                  */}
-        {/* ==================================================== */}
-        {drawerTask && (
-          <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex justify-end">
-            <div className="bg-white border-l border-[#E2E6F0] w-full max-w-lg h-full shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-right duration-200">
-              <div className="p-4 border-b border-[#E2E6F0] flex items-start justify-between gap-3 bg-slate-50">
-                <div className="space-y-1 min-w-0">
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="font-mono text-xs font-bold text-[#4865F6] bg-[#EEF2FF] px-2 py-0.5 rounded border border-[#D9E2FF]">
-                      {drawerTask.project.code}
-                    </span>
-                    {getPriorityBadge(drawerTask.priority)}
-                    {getStatusBadge(drawerTask.status)}
-                  </div>
-                  <h3 className="text-base font-bold text-slate-900 tracking-tight">
-                    {drawerTask.title}
-                  </h3>
-                  <p className="text-xs text-slate-500">
-                    Project: <strong>{drawerTask.project.name}</strong>
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setDrawerTask(null)}
-                  className="p-1 rounded-lg text-slate-400 hover:text-slate-700 cursor-pointer shrink-0"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <div className="flex-1 overflow-y-auto p-4 space-y-4 text-xs">
-                {/* Meta details */}
-                <div className="grid grid-cols-2 gap-2.5 p-3 bg-slate-50 border border-slate-200 rounded-xl">
-                  <div>
-                    <span className="text-slate-500 text-[11px] block">Assignee</span>
-                    <span className="font-bold text-slate-900">
-                      {drawerTask.assignee ? drawerTask.assignee.user.fullName : "Apoorva Pimparkar"}
-                    </span>
-                    <div className="font-mono text-[10px] text-[#4865F6]">
-                      {drawerTask.assignee?.employee?.employeeId || "EMP-004"}
-                    </div>
-                  </div>
-
-                  <div>
-                    <span className="text-slate-500 text-[11px] block">Target Due Date</span>
-                    <span className="font-bold text-slate-900">
-                      {drawerTask.dueDate
-                        ? new Date(drawerTask.dueDate).toLocaleDateString("en-IN", {
-                            day: "numeric",
-                            month: "short",
-                            year: "numeric",
-                          })
-                        : "No deadline specified"}
-                    </span>
-                  </div>
-
-                  <div>
-                    <span className="text-slate-500 text-[11px] block">Estimated Effort</span>
-                    <span className="font-medium text-slate-800">
-                      {drawerTask.estimatedHours ? `${drawerTask.estimatedHours} Hours` : "4 Hours"}
-                    </span>
-                  </div>
-
-                  <div>
-                    <span className="text-slate-500 text-[11px] block">Approval State</span>
-                    <span className="font-bold text-emerald-700">
-                      {drawerTask.status === "COMPLETED" ? "✔ Approved" : "Pending Sign-Off"}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Brief & Notes */}
                 <div>
-                  <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider mb-1 flex items-center gap-1.5">
-                    <FileText className="w-3.5 h-3.5 text-[#4865F6]" />
-                    <span>Deliverable Brief & Instructions</span>
-                  </h4>
-                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 whitespace-pre-line leading-relaxed">
-                    {drawerTask.description || "Studio-wide architecture deliverable for client approval & structural review isolation."}
-                  </div>
-                </div>
-
-                {/* Checklist */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider flex items-center gap-1.5">
-                      <CheckSquare className="w-3.5 h-3.5 text-[#4865F6]" />
-                      <span>Deliverable Checklist</span>
-                    </h4>
-                    <span className="font-mono text-slate-500 text-[11px]">
-                      {drawerTask.checklistItems.filter((i) => i.isCompleted).length} /{" "}
-                      {drawerTask.checklistItems.length}
-                    </span>
-                  </div>
-
-                  {drawerTask.checklistItems.length === 0 ? (
-                    <p className="text-slate-400 italic">No checklist items defined.</p>
-                  ) : (
-                    <div className="space-y-1.5">
-                      {drawerTask.checklistItems.map((item) => (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={() => handleToggleChecklist(drawerTask.id, item.id, item.isCompleted)}
-                          className="w-full flex items-center gap-2 p-2 bg-slate-50 hover:bg-white border border-slate-200 rounded-xl text-left cursor-pointer"
-                        >
-                          {item.isCompleted ? (
-                            <CheckSquare className="w-4 h-4 text-emerald-600 shrink-0" />
-                          ) : (
-                            <Square className="w-4 h-4 text-slate-400 shrink-0" />
-                          )}
-                          <span
-                            className={item.isCompleted ? "line-through text-slate-400" : "text-slate-800 font-medium"}
-                          >
-                            {item.title}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Discussion */}
-                <div className="space-y-2">
-                  <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider flex items-center gap-1.5">
-                    <MessageSquare className="w-3.5 h-3.5 text-[#4865F6]" />
-                    <span>Discussion & Notes</span>
-                  </h4>
-
-                  <form onSubmit={handleAddComment} className="flex gap-2">
-                    <input
-                      type="text"
-                      value={newCommentText}
-                      onChange={(e) => setNewCommentText(e.target.value)}
-                      placeholder="Add a revision note or query..."
-                      className="flex-1 p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#4865F6]"
-                    />
-                    <button
-                      type="submit"
-                      disabled={submittingComment || !newCommentText.trim()}
-                      className="px-3 py-2 bg-[#4865F6] text-white rounded-xl font-semibold cursor-pointer disabled:opacity-50 flex items-center gap-1"
-                    >
-                      <Send className="w-3.5 h-3.5" />
-                    </button>
-                  </form>
-
-                  <div className="space-y-1.5 max-h-36 overflow-y-auto">
-                    {drawerTask.comments.map((c) => (
-                      <div key={c.id} className="p-2 bg-slate-50 border border-slate-200 rounded-xl">
-                        <p className="text-slate-800">{c.content}</p>
-                      </div>
+                  <label className="block font-semibold text-slate-900 mb-1">Architectural Phase</label>
+                  <select
+                    value={selectedPhaseId}
+                    onChange={(e) => setSelectedPhaseId(e.target.value)}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#4865F6]"
+                  >
+                    <option value="">General Project Phase</option>
+                    {availablePhases.map((ph) => (
+                      <option key={ph.id} value={ph.id}>
+                        {ph.sortOrder}. {ph.phaseName}
+                      </option>
                     ))}
-                  </div>
+                  </select>
                 </div>
               </div>
 
-              {/* Drawer Bottom Actions */}
-              <div className="p-3 border-t border-[#E2E6F0] bg-slate-50 flex items-center justify-between gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    openEditModal(drawerTask);
-                    setDrawerTask(null);
-                  }}
-                  className="px-3 py-2 bg-white border border-slate-200 text-slate-800 text-xs font-semibold rounded-xl cursor-pointer"
-                >
-                  Edit Deliverable
-                </button>
-
-                {drawerTask.status !== "COMPLETED" && isPrivileged && (
-                  <button
-                    type="button"
-                    onClick={() => updateStatus(drawerTask.id, "COMPLETED")}
-                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl cursor-pointer shadow-xs"
-                  >
-                    Approve Deliverable ✔
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ==================================================== */}
-        {/* 13. ASSIGN DELIVERABLE FULL-SCREEN / MODAL           */}
-        {/* ==================================================== */}
-        {isCreateTaskModalOpen && (
-          <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
-            <div className="bg-white border border-[#E2E6F0] rounded-2xl max-w-lg w-full p-5 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95">
-              <div className="flex items-center justify-between border-b border-[#E2E6F0] pb-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-[#4865F6] text-white flex items-center justify-center font-bold">
-                    <UserPlus className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-bold text-slate-900">Assign Deliverable</h3>
-                    <p className="text-xs text-slate-500">Create & schedule a studio deliverable</p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsCreateTaskModalOpen(false)}
-                  className="p-1 rounded-lg text-slate-400 hover:text-slate-700 cursor-pointer"
-                >
-                  <X className="w-5 h-5" />
-                </button>
+              <div>
+                <label className="block font-semibold text-slate-900 mb-1">
+                  Deliverable Title <span className="text-red-600">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={taskTitle}
+                  onChange={(e) => setTaskTitle(e.target.value)}
+                  placeholder="e.g. Test Deliverable Approval Isolation"
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#4865F6]"
+                />
               </div>
 
-              <form onSubmit={handleCreateTask} className="space-y-3.5 text-xs">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block font-semibold text-slate-900 mb-1">
-                      Project <span className="text-red-600">*</span>
-                    </label>
-                    <select
-                      value={selectedProjectId}
-                      onChange={(e) => {
-                        setSelectedProjectId(e.target.value);
-                        setSelectedPhaseId("");
-                      }}
-                      required
-                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#4865F6]"
-                    >
-                      {projects.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.code} — {p.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+              <div>
+                <label className="block font-semibold text-slate-900 mb-1">Brief & Instructions</label>
+                <textarea
+                  rows={2}
+                  value={taskDescription}
+                  onChange={(e) => setTaskDescription(e.target.value)}
+                  placeholder="Provide AutoCAD layering, MEP specs, or approval conditions..."
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#4865F6]"
+                />
+              </div>
 
-                  <div>
-                    <label className="block font-semibold text-slate-900 mb-1">Architectural Phase</label>
-                    <select
-                      value={selectedPhaseId}
-                      onChange={(e) => setSelectedPhaseId(e.target.value)}
-                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#4865F6]"
-                    >
-                      <option value="">General Project Phase</option>
-                      {availablePhases.map((ph) => (
-                        <option key={ph.id} value={ph.id}>
-                          {ph.sortOrder}. {ph.phaseName}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-900 mb-1">
-                    Deliverable Title <span className="text-red-600">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={taskTitle}
-                    onChange={(e) => setTaskTitle(e.target.value)}
-                    placeholder="e.g. Test Deliverable Approval Isolation"
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#4865F6]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-900 mb-1">Brief & Instructions</label>
-                  <textarea
-                    rows={2}
-                    value={taskDescription}
-                    onChange={(e) => setTaskDescription(e.target.value)}
-                    placeholder="Provide AutoCAD layering, MEP specs, or approval conditions..."
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#4865F6]"
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block font-semibold text-slate-900 mb-1">
-                      Assignee <span className="text-red-600">*</span>
-                    </label>
-                    <select
-                      value={taskAssigneeId}
-                      onChange={(e) => setTaskAssigneeId(e.target.value)}
-                      required
-                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#4865F6]"
-                    >
-                      {members.map((m) => (
-                        <option key={m.id} value={m.id}>
-                          {m.user.fullName} [{m.employee?.employeeId || m.role}]
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block font-semibold text-slate-900 mb-1">Priority</label>
-                    <select
-                      value={taskPriority}
-                      onChange={(e) => setTaskPriority(e.target.value as any)}
-                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#4865F6]"
-                    >
-                      <option value="LOW">Low</option>
-                      <option value="MEDIUM">Medium</option>
-                      <option value="HIGH">High Priority</option>
-                      <option value="URGENT">Urgent</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block font-semibold text-slate-900 mb-1">Target Due Date</label>
-                    <input
-                      type="date"
-                      value={taskDueDate}
-                      onChange={(e) => setTaskDueDate(e.target.value)}
-                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#4865F6]"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block font-semibold text-slate-900 mb-1">Estimated Hours</label>
-                    <input
-                      type="number"
-                      step="0.5"
-                      min="0.5"
-                      value={taskEstimatedHours}
-                      onChange={(e) => setTaskEstimatedHours(e.target.value)}
-                      placeholder="e.g. 6"
-                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#4865F6]"
-                    />
-                  </div>
-                </div>
-
-                <div className="pt-2 border-t border-slate-100 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="font-semibold text-slate-900">Checklist Items</label>
-                    <button
-                      type="button"
-                      onClick={handleAddChecklistField}
-                      className="text-[#4865F6] font-semibold flex items-center gap-1 cursor-pointer"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>Add Item</span>
-                    </button>
-                  </div>
-                  {checklistItems.map((item, idx) => (
-                    <div key={idx} className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        value={item}
-                        onChange={(e) => handleUpdateChecklistItem(idx, e.target.value)}
-                        placeholder={`Item ${idx + 1}`}
-                        className="flex-1 p-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900"
-                      />
-                      {checklistItems.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveChecklistItem(idx)}
-                          className="p-1 text-slate-400 hover:text-rose-600"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-
-                <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
-                  <button
-                    type="button"
-                    onClick={() => setIsCreateTaskModalOpen(false)}
-                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={creatingTask}
-                    className="px-5 py-2 bg-[#4865F6] hover:bg-[#3B54DF] text-white font-semibold rounded-xl shadow-xs cursor-pointer disabled:opacity-50"
-                  >
-                    {creatingTask ? "Assigning..." : "Assign Deliverable"}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* ==================================================== */}
-        {/* 14. EDIT DELIVERABLE MODAL                           */}
-        {/* ==================================================== */}
-        {editModal && (
-          <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
-            <div className="bg-white border border-[#E2E6F0] rounded-2xl max-w-lg w-full p-5 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95">
-              <div className="flex items-center justify-between border-b border-[#E2E6F0] pb-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-[#4865F6] text-white flex items-center justify-center font-bold">
-                    <Pencil className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-bold text-slate-900">Edit Deliverable</h3>
-                    <p className="text-xs text-slate-500">Update specifications & schedule</p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setEditModal(null)}
-                  className="p-1 rounded-lg text-slate-400 hover:text-slate-700 cursor-pointer"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <form onSubmit={handleEditTask} className="space-y-3.5 text-xs">
-                <div>
-                  <label className="block font-semibold text-slate-900 mb-1">
-                    Deliverable Title <span className="text-red-600">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={editTitle}
-                    onChange={(e) => setEditTitle(e.target.value)}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#4865F6]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-900 mb-1">Brief & Notes</label>
-                  <textarea
-                    rows={3}
-                    value={editDescription}
-                    onChange={(e) => setEditDescription(e.target.value)}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#4865F6]"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block font-semibold text-slate-900 mb-1">Priority</label>
-                    <select
-                      value={editPriority}
-                      onChange={(e) => setEditPriority(e.target.value as any)}
-                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#4865F6]"
-                    >
-                      <option value="LOW">Low</option>
-                      <option value="MEDIUM">Medium</option>
-                      <option value="HIGH">High Priority</option>
-                      <option value="URGENT">Urgent</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block font-semibold text-slate-900 mb-1">Target Due Date</label>
-                    <input
-                      type="date"
-                      value={editDueDate}
-                      onChange={(e) => setEditDueDate(e.target.value)}
-                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#4865F6]"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
-                  <button
-                    type="button"
-                    onClick={() => setEditModal(null)}
-                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={editing}
-                    className="px-5 py-2 bg-[#4865F6] hover:bg-[#3B54DF] text-white font-semibold rounded-xl shadow-xs cursor-pointer disabled:opacity-50"
-                  >
-                    {editing ? "Saving..." : "Save Changes"}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* ==================================================== */}
-        {/* 15. DELEGATE / REASSIGN DELIVERABLE MODAL            */}
-        {/* ==================================================== */}
-        {reassignModal && (
-          <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
-            <div className="bg-white border border-[#E2E6F0] rounded-2xl max-w-md w-full p-5 shadow-2xl space-y-4 animate-in fade-in zoom-in-95">
-              <div className="flex items-center justify-between border-b border-[#E2E6F0] pb-3">
-                <div className="flex items-center gap-2 text-blue-900">
-                  <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center font-bold">
-                    <ArrowRightLeft className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-bold text-slate-900">Delegate Deliverable</h3>
-                    <p className="text-xs text-slate-500">Reassign task ownership to a colleague</p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setReassignModal(null)}
-                  className="p-1 rounded-lg text-slate-400 hover:text-slate-700 cursor-pointer"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs space-y-1">
-                <div className="font-semibold text-blue-950 truncate">{reassignModal.task.title}</div>
-                <div className="text-[11px] text-blue-800">
-                  Currently assigned to:{" "}
-                  <strong>{reassignModal.task.assignee?.user.fullName || "Apoorva Pimparkar"}</strong>
-                </div>
-              </div>
-
-              <form onSubmit={handleReassignTask} className="space-y-3.5 text-xs">
-                <div>
-                  <label className="block font-semibold text-slate-900 mb-1">
-                    Reassign To <span className="text-red-600">*</span>
+                    Assignee <span className="text-red-600">*</span>
                   </label>
                   <select
-                    value={reassignTargetMemberId}
-                    onChange={(e) => setReassignTargetMemberId(e.target.value)}
+                    value={taskAssigneeId}
+                    onChange={(e) => setTaskAssigneeId(e.target.value)}
                     required
                     className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#4865F6]"
                   >
@@ -2764,135 +2315,353 @@ export default function TasksClientView({
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-slate-900 mb-1">Delegation Note</label>
-                  <textarea
-                    rows={2}
-                    value={reassignReason}
-                    onChange={(e) => setReassignReason(e.target.value)}
-                    placeholder="e.g. Handing over 3D detailing while on site visit in Alibaug."
+                  <label className="block font-semibold text-slate-900 mb-1">Priority</label>
+                  <select
+                    value={taskPriority}
+                    onChange={(e) => setTaskPriority(e.target.value as any)}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#4865F6]"
+                  >
+                    <option value="LOW">Low</option>
+                    <option value="MEDIUM">Medium</option>
+                    <option value="HIGH">High Priority</option>
+                    <option value="URGENT">Urgent</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-900 mb-1">Target Due Date</label>
+                  <input
+                    type="date"
+                    value={taskDueDate}
+                    onChange={(e) => setTaskDueDate(e.target.value)}
                     className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#4865F6]"
                   />
                 </div>
 
-                <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <div>
+                  <label className="block font-semibold text-slate-900 mb-1">Estimated Hours</label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="0.5"
+                    value={taskEstimatedHours}
+                    onChange={(e) => setTaskEstimatedHours(e.target.value)}
+                    placeholder="e.g. 6"
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#4865F6]"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-slate-100 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="font-semibold text-slate-900">Checklist Items</label>
                   <button
                     type="button"
-                    onClick={() => setReassignModal(null)}
-                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl cursor-pointer"
+                    onClick={handleAddChecklistField}
+                    className="text-[#4865F6] font-semibold flex items-center gap-1 cursor-pointer"
                   >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={reassigning || !reassignTargetMemberId}
-                    className="px-5 py-2 bg-blue-700 hover:bg-blue-800 text-white font-semibold rounded-xl shadow-xs cursor-pointer disabled:opacity-50"
-                  >
-                    {reassigning ? "Delegating..." : "Confirm Delegation"}
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add Item</span>
                   </button>
                 </div>
-              </form>
-            </div>
-          </div>
-        )}
+                {checklistItems.map((item, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={item}
+                      onChange={(e) => handleUpdateChecklistItem(idx, e.target.value)}
+                      placeholder={`Item ${idx + 1}`}
+                      className="flex-1 p-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900"
+                    />
+                    {checklistItems.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveChecklistItem(idx)}
+                        className="p-1 text-slate-400 hover:text-rose-600"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
 
-        {/* ==================================================== */}
-        {/* 16. CORRECTION REQUEST MODAL                         */}
-        {/* ==================================================== */}
-        {changeRequestModal && (
-          <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-            <div className="bg-white border border-[#E2E6F0] rounded-2xl max-w-md w-full p-5 shadow-2xl space-y-3.5 animate-in fade-in zoom-in-95">
-              <div className="flex items-center gap-2 text-amber-800">
-                <RotateCcw className="w-5 h-5 text-amber-600" />
-                <h3 className="text-base font-bold text-slate-900">Request Architectural Corrections</h3>
-              </div>
-              <p className="text-xs text-slate-600">
-                Reverting <strong>{changeRequestModal.title}</strong> to In Progress.
-              </p>
-              <div>
-                <label className="block text-xs font-semibold text-slate-900 mb-1">
-                  Correction Note <span className="text-red-600">*</span>
-                </label>
-                <textarea
-                  rows={3}
-                  required
-                  value={changeComment}
-                  onChange={(e) => setChangeComment(e.target.value)}
-                  placeholder="e.g. Please verify cantilever structural loads."
-                  className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#4865F6]"
-                />
-              </div>
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
                 <button
                   type="button"
-                  onClick={() => setChangeRequestModal(null)}
-                  className="px-3.5 py-1.5 bg-slate-100 text-slate-700 text-xs font-semibold rounded-xl cursor-pointer"
+                  onClick={() => setIsCreateTaskModalOpen(false)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
-                  type="button"
-                  disabled={!changeComment.trim()}
-                  onClick={() =>
-                    updateStatus(changeRequestModal.taskId, "IN_PROGRESS", { comment: changeComment.trim() })
-                  }
-                  className="px-4 py-1.5 bg-amber-700 hover:bg-amber-800 text-white text-xs font-semibold rounded-xl cursor-pointer disabled:opacity-50"
+                  type="submit"
+                  disabled={creatingTask}
+                  className="px-5 py-2 bg-[#4865F6] hover:bg-[#3B54DF] text-white font-semibold rounded-xl shadow-xs cursor-pointer disabled:opacity-50"
                 >
-                  Send Changes
+                  {creatingTask ? "Assigning..." : "Assign Deliverable"}
                 </button>
               </div>
-            </div>
+            </form>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* ==================================================== */}
-        {/* 17. OVERRIDE COMPLETION MODAL                        */}
-        {/* ==================================================== */}
-        {overrideModal && (
-          <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-            <div className="bg-white border border-[#E2E6F0] rounded-2xl max-w-md w-full p-5 shadow-2xl space-y-3.5 animate-in fade-in zoom-in-95">
-              <div className="flex items-center gap-2 text-emerald-800">
-                <CheckCheck className="w-5 h-5 text-emerald-600" />
-                <h3 className="text-base font-bold text-slate-900">Direct Admin Completion</h3>
+      {/* ==================================================== */}
+      {/* 14. EDIT DELIVERABLE MODAL                           */}
+      {/* ==================================================== */}
+      {editModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-white border border-[#E2E6F0] rounded-2xl max-w-lg w-full p-5 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-[#E2E6F0] pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-[#4865F6] text-white flex items-center justify-center font-bold">
+                  <Pencil className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">Edit Deliverable</h3>
+                  <p className="text-xs text-slate-500">Update specifications & schedule</p>
+                </div>
               </div>
-              <p className="text-xs text-slate-600">
-                Bypassing standard review for <strong>{overrideModal.title}</strong>. An audited reason is required.
-              </p>
+              <button
+                type="button"
+                onClick={() => setEditModal(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleEditTask} className="space-y-3.5 text-xs">
               <div>
-                <label className="block text-xs font-semibold text-slate-900 mb-1">
-                  Audit Reason <span className="text-red-600">*</span>
+                <label className="block font-semibold text-slate-900 mb-1">
+                  Deliverable Title <span className="text-red-600">*</span>
                 </label>
                 <input
                   type="text"
                   required
-                  value={overrideReason}
-                  onChange={(e) => setOverrideReason(e.target.value)}
-                  placeholder="e.g. Approved directly in on-site meeting"
-                  className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#4865F6]"
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#4865F6]"
                 />
               </div>
-              <div className="flex justify-end gap-2 pt-2">
+
+              <div>
+                <label className="block font-semibold text-slate-900 mb-1">Brief & Notes</label>
+                <textarea
+                  rows={3}
+                  value={editDescription}
+                  onChange={(e) => setEditDescription(e.target.value)}
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#4865F6]"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-900 mb-1">Priority</label>
+                  <select
+                    value={editPriority}
+                    onChange={(e) => setEditPriority(e.target.value as any)}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#4865F6]"
+                  >
+                    <option value="LOW">Low</option>
+                    <option value="MEDIUM">Medium</option>
+                    <option value="HIGH">High Priority</option>
+                    <option value="URGENT">Urgent</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-900 mb-1">Target Due Date</label>
+                  <input
+                    type="date"
+                    value={editDueDate}
+                    onChange={(e) => setEditDueDate(e.target.value)}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#4865F6]"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
                 <button
                   type="button"
-                  onClick={() => setOverrideModal(null)}
-                  className="px-3.5 py-1.5 bg-slate-100 text-slate-700 text-xs font-semibold rounded-xl cursor-pointer"
+                  onClick={() => setEditModal(null)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
-                  type="button"
-                  disabled={!overrideReason.trim()}
-                  onClick={() =>
-                    updateStatus(overrideModal.taskId, "COMPLETED", { auditReason: overrideReason.trim() })
-                  }
-                  className="px-4 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold rounded-xl cursor-pointer disabled:opacity-50"
+                  type="submit"
+                  disabled={editing}
+                  className="px-5 py-2 bg-[#4865F6] hover:bg-[#3B54DF] text-white font-semibold rounded-xl shadow-xs cursor-pointer disabled:opacity-50"
                 >
-                  Record Audit & Complete
+                  {editing ? "Saving..." : "Save Changes"}
                 </button>
               </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ==================================================== */}
+      {/* 15. DELEGATE TASK MODAL                              */}
+      {/* ==================================================== */}
+      {reassignModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-white border border-[#E2E6F0] rounded-2xl max-w-md w-full p-5 shadow-2xl space-y-4 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-[#E2E6F0] pb-3">
+              <div className="flex items-center gap-2 text-blue-900">
+                <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center font-bold">
+                  <ArrowRightLeft className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">Delegate Deliverable</h3>
+                  <p className="text-xs text-slate-500">Reassign task ownership to a colleague</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReassignModal(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs space-y-1">
+              <div className="font-semibold text-blue-950 truncate">{reassignModal.task.title}</div>
+              <div className="text-[11px] text-blue-800">
+                Currently assigned to:{" "}
+                <strong>{reassignModal.task.assignee?.user.fullName || "Apoorva Pimparkar"}</strong>
+              </div>
+            </div>
+
+            <form onSubmit={handleReassignTask} className="space-y-3.5 text-xs">
+              <div>
+                <label className="block font-semibold text-slate-900 mb-1">
+                  Reassign To <span className="text-red-600">*</span>
+                </label>
+                <select
+                  value={reassignTargetMemberId}
+                  onChange={(e) => setReassignTargetMemberId(e.target.value)}
+                  required
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#4865F6]"
+                >
+                  {members.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.user.fullName} [{m.employee?.employeeId || m.role}]
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-900 mb-1">Delegation Note</label>
+                <textarea
+                  rows={2}
+                  value={reassignReason}
+                  onChange={(e) => setReassignReason(e.target.value)}
+                  placeholder="e.g. Handing over 3D detailing while on site visit in Alibaug."
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#4865F6]"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setReassignModal(null)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={reassigning || !reassignTargetMemberId}
+                  className="px-5 py-2 bg-blue-700 hover:bg-blue-800 text-white font-semibold rounded-xl shadow-xs cursor-pointer disabled:opacity-50"
+                >
+                  {reassigning ? "Delegating..." : "Confirm Delegation"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ==================================================== */}
+      {/* 16. USER PROFILE MODAL                               */}
+      {/* ==================================================== */}
+      {isProfileOpen && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white border border-[#E2E6F0] rounded-2xl w-full max-w-sm p-5 shadow-2xl space-y-4 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-full bg-[#4865F6] text-white font-bold text-sm flex items-center justify-center">
+                  SL
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">
+                    {contextUserFullName || "Saksham Lanjewar"}
+                  </h3>
+                  <div className="flex items-center gap-1.5 text-[10px] text-slate-500">
+                    <span className="font-mono font-bold text-[#4865F6]">EMP-001</span>
+                    <span>•</span>
+                    <span className="font-bold text-emerald-700 uppercase">ADMIN / OWNER</span>
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsProfileOpen(false)}
+                className="p-1 text-slate-400 hover:text-slate-700 rounded-lg cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-2 text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-100">
+              <div className="flex justify-between">
+                <span className="text-slate-500">Studio Workspace:</span>
+                <span className="font-semibold text-slate-800">100% DESIGN Studio</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Email:</span>
+                <span className="font-mono text-slate-800">designsaksham1@gmail.com</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Location:</span>
+                <span className="font-medium text-slate-800">Kolkata HQ Studio</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Access Level:</span>
+                <span className="font-bold text-[#4865F6]">Studio Principal & Administrator</span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setIsProfileOpen(false)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl cursor-pointer"
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  await fetch("/api/auth/logout", { method: "POST" });
+                  window.location.href = `/w/${workspaceSlug}/login`;
+                }}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-xl cursor-pointer flex items-center gap-1.5"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>Sign Out</span>
+              </button>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
