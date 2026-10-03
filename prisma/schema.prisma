@@ -102,6 +102,7 @@ model TenantMembership {
 
   employee         Employee?
   projectMembers   ProjectMember[]
+  architectedProjects Project[]   @relation("ProjectArchitect")
   managedProjects  Project[]        @relation("ProjectManager")
   coordinatedProjects Project[]     @relation("ProjectCoordinator")
   assignedTasks    Task[]           @relation("TaskAssignee")
@@ -258,6 +259,8 @@ model Project {
   primaryClient    Client?           @relation(fields: [primaryClientId], references: [id], onDelete: SetNull)
   projectType      String?           @db.VarChar(100)
   siteAddress      String?           @db.Text
+  projectArchitectId String?
+  projectArchitect   TenantMembership? @relation("ProjectArchitect", fields: [projectArchitectId], references: [id], onDelete: SetNull)
   projectManagerId String?
   projectManager   TenantMembership? @relation("ProjectManager", fields: [projectManagerId], references: [id], onDelete: SetNull)
   projectCoordinatorId String?
@@ -295,6 +298,7 @@ model Project {
 
   @@unique([tenantId, code])
   @@index([tenantId, status])
+  @@index([tenantId, projectArchitectId])
   @@index([tenantId, projectManagerId])
   @@index([tenantId, projectCoordinatorId])
   @@index([tenantId, contractorId])

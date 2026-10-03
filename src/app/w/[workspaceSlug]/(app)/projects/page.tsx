@@ -32,6 +32,7 @@ export default async function ProjectsPage({ params }: ProjectsPageProps) {
     startDate: p.startDate ? p.startDate.toISOString() : null,
     targetDate: p.targetDate ? p.targetDate.toISOString() : null,
     primaryClientId: p.primaryClientId,
+    projectArchitectId: (p as any).projectArchitectId,
     projectManagerId: p.projectManagerId,
     projectCoordinatorId: p.projectCoordinatorId,
     siteCity: p.siteCity,
@@ -45,6 +46,13 @@ export default async function ProjectsPage({ params }: ProjectsPageProps) {
           id: p.primaryClient.id,
           name: p.primaryClient.name,
           company: p.primaryClient.company,
+        }
+      : null,
+    projectArchitect: (p as any).projectArchitect
+      ? {
+          user: {
+            fullName: (p as any).projectArchitect.user.fullName,
+          },
         }
       : null,
     projectManager: p.projectManager

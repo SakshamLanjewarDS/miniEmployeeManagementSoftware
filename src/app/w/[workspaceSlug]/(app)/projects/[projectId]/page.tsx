@@ -197,37 +197,96 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
           </div>
 
           {/* Details Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="bg-white border border-[#E2E6F0] rounded-2xl p-6 shadow-2xs space-y-3">
               <h3 className="text-sm font-bold text-[#1F1F1F]">Client & Site Details</h3>
               <div className="space-y-2 text-xs">
                 <div>
                   <span className="text-[#696E82] block text-[10px]">Client Name</span>
-                  <span className="font-semibold text-[#1F1F1F]">{project.primaryClient?.name}</span>
+                  <span className="font-semibold text-[#1F1F1F]">{project.primaryClient?.name || "Direct / Private"}</span>
                 </div>
                 <div>
                   <span className="text-[#696E82] block text-[10px]">Client Company</span>
                   <span className="text-[#696E82]">{project.primaryClient?.company || "Private"}</span>
                 </div>
                 <div>
-                  <span className="text-[#696E82] block text-[10px]">Site Address</span>
-                  <span className="text-[#1F1F1F]">{project.siteAddress}</span>
+                  <span className="text-[#696E82] block text-[10px]">Site Address & City</span>
+                  <span className="text-[#1F1F1F]">{project.siteAddress || "—"}{project.siteCity ? `, ${project.siteCity}` : ""}</span>
                 </div>
+                {project.googleMapLocation && (
+                  <div>
+                    <span className="text-[#696E82] block text-[10px]">Map Location</span>
+                    <a
+                      href={project.googleMapLocation.startsWith("http") ? project.googleMapLocation : `https://maps.google.com/?q=${encodeURIComponent(project.googleMapLocation)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[#5A81FA] underline font-medium break-all hover:text-[#4B5320] transition-colors"
+                    >
+                      View on Google Maps →
+                    </a>
+                  </div>
+                )}
               </div>
             </div>
 
             <div className="bg-white border border-[#E2E6F0] rounded-2xl p-6 shadow-2xs space-y-3">
-              <h3 className="text-sm font-bold text-[#1F1F1F]">Project Leadership</h3>
+              <h3 className="text-sm font-bold text-[#1F1F1F]">Project Leadership & Team</h3>
               <div className="space-y-2 text-xs">
+                <div>
+                  <span className="text-[#696E82] block text-[10px]">Project Architect</span>
+                  <span className="font-semibold text-[#1F1F1F]">
+                    {project.projectArchitect?.user.fullName
+                      ? `${project.projectArchitect.user.fullName} (${project.projectArchitect.employee?.designation || "Architect"})`
+                      : "Unassigned"}
+                  </span>
+                </div>
                 <div>
                   <span className="text-[#696E82] block text-[10px]">Project Manager</span>
                   <span className="font-semibold text-[#1F1F1F]">
-                    {project.projectManager?.user.fullName} ({project.projectManager?.employee?.designation})
+                    {project.projectManager?.user.fullName
+                      ? `${project.projectManager.user.fullName} (${project.projectManager.employee?.designation || "Project Manager"})`
+                      : "Unassigned"}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[#696E82] block text-[10px]">Project Coordinator</span>
+                  <span className="font-semibold text-[#1F1F1F]">
+                    {project.projectCoordinator?.user.fullName
+                      ? `${project.projectCoordinator.user.fullName} (${project.projectCoordinator.employee?.designation || "Coordinator"})`
+                      : "Unassigned"}
                   </span>
                 </div>
                 <div>
                   <span className="text-[#696E82] block text-[10px]">Assigned Studio Members</span>
                   <span className="text-[#696E82]">{project.members.length} team members</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white border border-[#E2E6F0] rounded-2xl p-6 shadow-2xs space-y-3">
+              <h3 className="text-sm font-bold text-[#1F1F1F]">Spatial & Financial Metrics</h3>
+              <div className="space-y-2 text-xs">
+                <div>
+                  <span className="text-[#696E82] block text-[10px]">Plot Area</span>
+                  <span className="font-semibold text-[#1F1F1F]">{project.plotArea || "—"}</span>
+                </div>
+                <div>
+                  <span className="text-[#696E82] block text-[10px]">Total Construction Area</span>
+                  <span className="font-semibold text-[#1F1F1F]">{project.constructionArea || "—"}</span>
+                </div>
+                <div>
+                  <span className="text-[#696E82] block text-[10px]">Budget</span>
+                  <span className="font-semibold text-[#4B5320]">
+                    {project.budget ? `${project.currency || "INR"} ${Number(project.budget).toLocaleString("en-IN")}` : "Not Disclosed / Open"}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[#696E82] block text-[10px]">Timeline</span>
+                  <span className="text-[#696E82]">
+                    {project.startDate ? new Date(project.startDate).toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" }) : "Start TBD"}
+                    {" → "}
+                    {project.targetDate ? new Date(project.targetDate).toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" }) : "End TBD"}
+                  </span>
                 </div>
               </div>
             </div>

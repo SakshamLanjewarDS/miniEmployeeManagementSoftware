@@ -746,15 +746,95 @@ export async function importProjectsFromCsv(
   const created: any[] = [];
   const errors: { row: number; identifier: string; error: string }[] = [];
 
+  // Pre-fetch memberships for name matching
+  const memberships = await prisma.tenantMembership.findMany({
+    where: { tenantId: ctx.tenantId },
+    include: { user: true, employee: true },
+  });
+
+  const findMemberId = (query: string | undefined): string | undefined => {
+    if (!query || !query.trim()) return undefined;
+    const q = query.trim().toLowerCase();
+    const found = memberships.find((m) => {
+      const fn = m.user.fullName.toLowerCase();
+      const em = m.user.email.toLowerCase();
+      const empId = m.employee?.employeeId?.toLowerCase() || "";
+      return fn === q || fn.includes(q) || q.includes(fn) || em === q || empId === q;
+    });
+    return found?.id;
+  };
+
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
     const rowNum = i + 2;
 
     const name = findValue(row, ["project name", "name", "project title", "project"]);
-    const clientName = findValue(row, ["clients", "client", "client name", "client company"]);
+    let code = findValue(row, ["project code", "code", "id", "project id"]);
+    const clientName = findValue(row, ["client name", "clients", "client", "client company"]);
     const projectType =
-      findValue(row, ["project type", "type", "typology", "category"]) || "Residential Architecture";
-    const phase = findValue(row, ["phase", "current phase", "project phase"]);
+      findValue(row, ["typology", "project type", "type", "category"]) || "Residential Architecture";
+    
+    // Architect, Manager, Coordinator
+    const architectName = findValue(row, ["project architect", "architect", "lead architect", "project architec"]);
+    const managerName = findValue(row, ["project manager", "manager", "secondary architect", "co-architect"]);
+    const coordinatorName = findValue(row, [
+      "project coordinator",
+      "coordinator",
+      "project cordina",
+      "project cordinat",
+      "project cordinator",
+    ]);
+
+    // Contractor & Consultant
+    const contractorName = findValue(row, [
+      "project contractor",
+      "contractor",
+      "vendor",
+      "project contrac",
+      "project contract",
+    ]);
+    const consultantName = findValue(row, [
+      "project consultant",
+      "consultant",
+      "specialist",
+      "project consultan",
+    ]);
+
+    // Location
+    const siteAddress = findValue(row, [
+      "site address",
+      "address",
+      "site location",
+      "location",
+      "physical address",
+      "site location / physical address",
+    ]);
+    const siteCity = findValue(row, ["site city", "city", "location city"]);
+    const googleMapLocation = findValue(row, [
+      "google map location",
+      "google map",
+      "map location",
+      "google maps",
+      "map link",
+      "maps",
+    ]);
+
+    // Dates
+    const startDateStr = findValue(row, [
+      "start date",
+      "start",
+      "starting date",
+      "commencement date",
+      "commencement / start date",
+    ]);
+    const endDateStr = findValue(row, [
+      "end date",
+      "end",
+      "deadline",
+      "target date",
+      "target completion date",
+      "completion date",
+    ]);
     const dateRange = findValue(row, [
       "starting - deadline",
       "starting deadline",
@@ -764,15 +844,45 @@ export async function importProjectsFromCsv(
       "dates",
       "duration",
     ]);
-    const otherInfo = findValue(row, [
+
+    // Areas
+    const plotArea = findValue(row, ["plot area", "plot ar", "plot size", "plot"]);
+    const constructionArea = findValue(row, [
+      "total construction",
+      "total construction area",
+      "construction area",
+      "built up area",
+      "built-up area",
+      "super area",
+    ]);
+
+    // Budget
+    const budgetRaw = findValue(row, [
+      "budget",
+      "estimated budget",
+      "cost",
+      "project cost",
+      "estimated budget & currency",
+      "budget & currency",
+    ]);
+
+    // Brief / Narrative
+    const brief = findValue(row, [
+      "brief / project brief",
+      "brief project brief",
+      "project brief",
+      "brief",
+      "architectural scope & narrative",
+      "scope & architectural description",
+      "description",
       "other info",
       "other info.",
-      "description",
       "notes",
       "remarks",
       "scope",
     ]);
-    let code = findValue(row, ["project code", "code", "id", "project id"]);
+
+    const phase = findValue(row, ["phase", "current phase", "project phase"]);
 
     if (!name) {
       errors.push({
@@ -798,13 +908,14 @@ export async function importProjectsFromCsv(
 
       // Associate or auto-create client
       let primaryClientId: string | undefined = undefined;
-      if (clientName) {
+      if (clientName && clientName.trim()) {
+        const trimmedClient = clientName.trim();
         let client = await prisma.client.findFirst({
           where: {
             tenantId: ctx.tenantId,
             OR: [
-              { name: { contains: clientName } },
-              { company: { contains: clientName } },
+              { name: { contains: trimmedClient } },
+              { company: { contains: trimmedClient } },
             ],
           },
         });
@@ -812,7 +923,7 @@ export async function importProjectsFromCsv(
           client = await prisma.client.create({
             data: {
               tenantId: ctx.tenantId,
-              name: clientName,
+              name: trimmedClient,
               isActive: true,
               notes: `Auto-registered via project "${name}" CSV import`,
             },
@@ -821,14 +932,106 @@ export async function importProjectsFromCsv(
         primaryClientId = client.id;
       }
 
-      const { startDate, targetDate } = parseDateRange(dateRange);
+      // Architect, Manager, Coordinator IDs
+      const projectArchitectId = findMemberId(architectName);
+      const projectManagerId = findMemberId(managerName);
+      const projectCoordinatorId = findMemberId(coordinatorName);
+
+      // Contractor
+      let contractorId: string | undefined = undefined;
+      if (contractorName && contractorName.trim()) {
+        const trimmedCont = contractorName.trim();
+        let cont = await prisma.contractor.findFirst({
+          where: {
+            tenantId: ctx.tenantId,
+            OR: [
+              { name: { contains: trimmedCont } },
+              { firmName: { contains: trimmedCont } },
+            ],
+          },
+        });
+        if (!cont) {
+          cont = await prisma.contractor.create({
+            data: {
+              tenantId: ctx.tenantId,
+              name: trimmedCont,
+              firmName: trimmedCont,
+              trade: "General Contractor",
+              isActive: true,
+            },
+          });
+        }
+        contractorId = cont.id;
+      }
+
+      // Consultant
+      let consultantId: string | undefined = undefined;
+      if (consultantName && consultantName.trim()) {
+        const trimmedCons = consultantName.trim();
+        let cons = await prisma.consultant.findFirst({
+          where: {
+            tenantId: ctx.tenantId,
+            OR: [
+              { name: { contains: trimmedCons } },
+              { firmName: { contains: trimmedCons } },
+            ],
+          },
+        });
+        if (!cons) {
+          cons = await prisma.consultant.create({
+            data: {
+              tenantId: ctx.tenantId,
+              name: trimmedCons,
+              firmName: trimmedCons,
+              discipline: "Architectural Consultant",
+              isActive: true,
+            },
+          });
+        }
+        consultantId = cons.id;
+      }
+
+      // Dates parsing
+      let startDate: Date | undefined = undefined;
+      let targetDate: Date | undefined = undefined;
+      if (startDateStr && !isNaN(new Date(startDateStr).getTime())) {
+        startDate = new Date(startDateStr);
+      }
+      if (endDateStr && !isNaN(new Date(endDateStr).getTime())) {
+        targetDate = new Date(endDateStr);
+      }
+      if (!startDate && !targetDate && dateRange) {
+        const parsed = parseDateRange(dateRange);
+        startDate = parsed.startDate;
+        targetDate = parsed.targetDate;
+      }
+
+      // Budget parsing
+      let budget: number | undefined = undefined;
+      if (budgetRaw) {
+        const cleanB = Number(budgetRaw.replace(/[^0-9.]/g, ""));
+        if (!isNaN(cleanB) && cleanB > 0) {
+          budget = cleanB;
+        }
+      }
 
       const project = await createProject(ctx, {
         code: code.trim().toUpperCase(),
         name: name.trim(),
-        description: otherInfo || undefined,
+        description: brief || undefined,
         primaryClientId,
         projectType,
+        siteAddress: siteAddress || undefined,
+        siteCity: siteCity || undefined,
+        googleMapLocation: googleMapLocation || undefined,
+        projectArchitectId,
+        projectManagerId,
+        projectCoordinatorId,
+        contractorId,
+        consultantId,
+        plotArea: plotArea || undefined,
+        constructionArea: constructionArea || undefined,
+        budget,
         startDate,
         targetDate,
       });
@@ -1012,35 +1215,57 @@ export async function exportDataToCsv(
     case "projects": {
       const projects = await prisma.project.findMany({
         where: { tenantId: ctx.tenantId },
-        include: { primaryClient: true },
+        include: {
+          primaryClient: true,
+          projectArchitect: { include: { user: true } },
+          projectManager: { include: { user: true } },
+          projectCoordinator: { include: { user: true } },
+          contractor: true,
+          consultant: true,
+        },
         orderBy: { createdAt: "desc" },
       });
       const columns = [
-        { key: "name" as const, header: "Project name" },
         { key: "code" as const, header: "Project Code" },
-        { key: "client" as const, header: "Clients" },
-        { key: "projectType" as const, header: "Project type" },
-        { key: "currentPhase" as const, header: "Phase" },
-        { key: "timeline" as const, header: "Starting - Deadline" },
-        { key: "status" as const, header: "Status" },
-        { key: "description" as const, header: "Other info" },
+        { key: "name" as const, header: "Project name" },
+        { key: "client" as const, header: "Client Name" },
+        { key: "projectType" as const, header: "Typology" },
+        { key: "architect" as const, header: "Project Architect" },
+        { key: "manager" as const, header: "Project Manager" },
+        { key: "coordinator" as const, header: "Project Coordinator" },
+        { key: "contractor" as const, header: "Project Contractor" },
+        { key: "consultant" as const, header: "Project Consultant" },
+        { key: "siteAddress" as const, header: "Site Address" },
+        { key: "siteCity" as const, header: "Site City" },
+        { key: "googleMapLocation" as const, header: "Google map location" },
+        { key: "startDate" as const, header: "Start Date" },
+        { key: "targetDate" as const, header: "End Date" },
+        { key: "plotArea" as const, header: "Plot Area" },
+        { key: "constructionArea" as const, header: "Total Construction" },
+        { key: "budget" as const, header: "Budget" },
+        { key: "description" as const, header: "Brief / Project Brief" },
       ];
 
-      const mapped = projects.map((p) => {
-        const startStr = p.startDate ? new Date(p.startDate).toISOString().split("T")[0] : "";
-        const endStr = p.targetDate ? new Date(p.targetDate).toISOString().split("T")[0] : "";
-        const timeline = startStr && endStr ? `${startStr} - ${endStr}` : startStr || endStr || "";
-        return {
-          name: p.name,
-          code: p.code,
-          client: p.primaryClient?.name || "",
-          projectType: p.projectType || "",
-          currentPhase: p.currentPhase || "Brief",
-          timeline,
-          status: p.status,
-          description: p.description || "",
-        };
-      });
+      const mapped = projects.map((p) => ({
+        code: p.code,
+        name: p.name,
+        client: p.primaryClient?.name || "",
+        projectType: p.projectType || "",
+        architect: p.projectArchitect?.user.fullName || "",
+        manager: p.projectManager?.user.fullName || "",
+        coordinator: p.projectCoordinator?.user.fullName || "",
+        contractor: p.contractor?.name || "",
+        consultant: p.consultant?.name || "",
+        siteAddress: p.siteAddress || "",
+        siteCity: p.siteCity || "",
+        googleMapLocation: p.googleMapLocation || "",
+        startDate: p.startDate ? new Date(p.startDate).toISOString().split("T")[0] : "",
+        targetDate: p.targetDate ? new Date(p.targetDate).toISOString().split("T")[0] : "",
+        plotArea: p.plotArea || "",
+        constructionArea: p.constructionArea || "",
+        budget: p.budget ? String(p.budget) : "",
+        description: p.description || "",
+      }));
 
       return {
         filename: `${ctx.tenantSlug}-projects-${dateStr}.csv`,
@@ -1323,9 +1548,9 @@ export function getSampleCsvTemplate(type: string): { filename: string; content:
       return {
         filename: "sample-projects-template.csv",
         content: [
-          "Project name,Clients,Project type,Phase,Starting - Deadline,Other info",
-          'Villa Serenita,Arun Singhal,Luxury Villa Architecture,Execution,2026-01-15 - 2026-12-31,Contemporary 5-BHK seaside villa with cantilevered pools',
-          'Apex Corporate HQ,Verdant Logistics Ltd,Commercial Office Fitout,Detailed Design,2026-03-01 - 2026-10-15,Modern sustainable workspace with biophilic interior design',
+          "Project Code,Project name,Client Name,Typology,Project Architect,Project Manager,Project Coordinator,Project Contractor,Project Consultant,Site Address,Site City,Google map location,Start Date,End Date,Plot Area,Total Construction,Budget,Brief / Project Brief",
+          'PRJ-101,Villa Serenita,Arun Singhal,Residential Architecture,Priya Patel,Rohan Verma,Priya Patel,Shree Ram Civil LLP,Dr. Amit Joshi,"Plot 42, Sector 15",Gurugram,https://maps.google.com/?q=28.4595,2026-01-15,2026-12-31,5000 sq.ft,12500 sq.ft,15000000,Contemporary 5-BHK luxury seaside villa with cantilevered pools',
+          'PRJ-102,Apex Corporate HQ,Verdant Logistics Ltd,Commercial & Corporate Office,Rohan Verma,Priya Patel,Rohan Verma,Apex Modular,Karan Johar,"BKC Bandra East",Mumbai,https://maps.google.com/?q=19.0657,2026-03-01,2026-10-15,10000 sq.ft,35000 sq.ft,45000000,Modern sustainable corporate headquarters with biophilic design',
         ].join("\r\n"),
       };
 

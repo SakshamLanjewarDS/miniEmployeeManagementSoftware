@@ -45,6 +45,7 @@ interface ProjectItem {
   startDate?: string | Date | null;
   targetDate?: string | Date | null;
   primaryClientId?: string | null;
+  projectArchitectId?: string | null;
   projectManagerId?: string | null;
   projectCoordinatorId?: string | null;
   siteCity?: string | null;
@@ -54,6 +55,7 @@ interface ProjectItem {
   plotArea?: string | null;
   constructionArea?: string | null;
   primaryClient?: { id: string; name: string; company?: string | null } | null;
+  projectArchitect?: { user: { fullName: string } } | null;
   projectManager?: { user: { fullName: string } } | null;
   projectCoordinator?: { user: { fullName: string } } | null;
   contractor?: { id: string; name: string; firmName?: string | null; trade?: string | null } | null;
@@ -150,44 +152,52 @@ export function ProjectsClientView({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  // Create Project Form State
+  // Create Project Form State (Supports all 18 fields)
   const [formData, setFormData] = useState({
     code: "",
     name: "",
-    description: "",
+    primaryClientId: "",
     projectType: "Residential Architecture",
+    projectArchitectId: "",
     projectManagerId: "",
     projectCoordinatorId: "",
+    contractorId: "",
+    consultantId: "",
     siteAddress: "",
     siteCity: "",
     googleMapLocation: "",
-    contractorId: "",
-    consultantId: "",
-    plotArea: "",
-    constructionArea: "",
     startDate: "",
     targetDate: "",
+    plotArea: "",
+    constructionArea: "",
+    budget: "",
+    currency: "INR",
+    description: "",
   });
 
-  // Edit Project Form State
+  // Edit Project Form State (Supports all 18 fields + phase & status)
   const [editFormData, setEditFormData] = useState({
     code: "",
     name: "",
-    description: "",
+    primaryClientId: "",
     projectType: "",
+    projectArchitectId: "",
     projectManagerId: "",
     projectCoordinatorId: "",
+    contractorId: "",
+    consultantId: "",
     siteAddress: "",
     siteCity: "",
     googleMapLocation: "",
-    contractorId: "",
-    consultantId: "",
-    plotArea: "",
-    constructionArea: "",
-    currentPhase: "",
-    status: "ACTIVE" as ProjectItem["status"],
     startDate: "",
     targetDate: "",
+    plotArea: "",
+    constructionArea: "",
+    budget: "",
+    currency: "INR",
+    currentPhase: "",
+    status: "ACTIVE" as ProjectItem["status"],
+    description: "",
   });
 
   // Filter projects
@@ -198,6 +208,8 @@ export function ProjectsClientView({
       (p.siteCity || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
       (p.projectCoordinator?.user?.fullName || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
       (p.projectManager?.user?.fullName || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (p.projectArchitect?.user?.fullName || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (p.primaryClient?.name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
       (p.siteAddress || "").toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchesStatus = statusFilter === "ALL" || p.status === statusFilter;
@@ -226,19 +238,23 @@ export function ProjectsClientView({
         body: JSON.stringify({
           code: formData.code.trim(),
           name: formData.name.trim(),
-          description: formData.description.trim() || undefined,
+          primaryClientId: formData.primaryClientId || undefined,
           projectType: formData.projectType || undefined,
+          projectArchitectId: formData.projectArchitectId || undefined,
           projectManagerId: formData.projectManagerId || undefined,
           projectCoordinatorId: formData.projectCoordinatorId || undefined,
+          contractorId: formData.contractorId || undefined,
+          consultantId: formData.consultantId || undefined,
           siteAddress: formData.siteAddress.trim() || undefined,
           siteCity: formData.siteCity.trim() || undefined,
           googleMapLocation: formData.googleMapLocation.trim() || undefined,
-          contractorId: formData.contractorId || undefined,
-          consultantId: formData.consultantId || undefined,
-          plotArea: formData.plotArea.trim() || undefined,
-          constructionArea: formData.constructionArea.trim() || undefined,
           startDate: formData.startDate || undefined,
           targetDate: formData.targetDate || undefined,
+          plotArea: formData.plotArea.trim() || undefined,
+          constructionArea: formData.constructionArea.trim() || undefined,
+          budget: formData.budget ? parseFloat(formData.budget) : undefined,
+          currency: formData.currency || "INR",
+          description: formData.description.trim() || undefined,
         }),
       });
 
@@ -252,19 +268,23 @@ export function ProjectsClientView({
       setFormData({
         code: "",
         name: "",
-        description: "",
+        primaryClientId: "",
         projectType: "Residential Architecture",
+        projectArchitectId: "",
         projectManagerId: "",
         projectCoordinatorId: "",
+        contractorId: "",
+        consultantId: "",
         siteAddress: "",
         siteCity: "",
         googleMapLocation: "",
-        contractorId: "",
-        consultantId: "",
-        plotArea: "",
-        constructionArea: "",
         startDate: "",
         targetDate: "",
+        plotArea: "",
+        constructionArea: "",
+        budget: "",
+        currency: "INR",
+        description: "",
       });
 
       router.refresh();
@@ -282,25 +302,29 @@ export function ProjectsClientView({
     setEditFormData({
       code: project.code,
       name: project.name,
-      description: project.description || "",
+      primaryClientId: project.primaryClientId || "",
       projectType: project.projectType || "Residential Architecture",
+      projectArchitectId: project.projectArchitectId || "",
       projectManagerId: project.projectManagerId || "",
       projectCoordinatorId: project.projectCoordinatorId || "",
+      contractorId: project.contractorId || "",
+      consultantId: project.consultantId || "",
       siteAddress: project.siteAddress || "",
       siteCity: project.siteCity || "",
       googleMapLocation: project.googleMapLocation || "",
-      contractorId: project.contractorId || "",
-      consultantId: project.consultantId || "",
-      plotArea: project.plotArea || "",
-      constructionArea: project.constructionArea || "",
-      currentPhase: project.currentPhase || "Brief",
-      status: project.status,
       startDate: project.startDate
         ? new Date(project.startDate).toISOString().split("T")[0]
         : "",
       targetDate: project.targetDate
         ? new Date(project.targetDate).toISOString().split("T")[0]
         : "",
+      plotArea: project.plotArea || "",
+      constructionArea: project.constructionArea || "",
+      budget: project.budget !== null && project.budget !== undefined ? String(project.budget) : "",
+      currency: project.currency || "INR",
+      currentPhase: project.currentPhase || "Brief",
+      status: project.status,
+      description: project.description || "",
     });
   };
 
@@ -320,21 +344,25 @@ export function ProjectsClientView({
           projectId: editingProject.id,
           code: editFormData.code.trim(),
           name: editFormData.name.trim(),
-          description: editFormData.description.trim() || undefined,
+          primaryClientId: editFormData.primaryClientId || null,
           projectType: editFormData.projectType || undefined,
+          projectArchitectId: editFormData.projectArchitectId || null,
           projectManagerId: editFormData.projectManagerId || null,
           projectCoordinatorId: editFormData.projectCoordinatorId || null,
+          contractorId: editFormData.contractorId || null,
+          consultantId: editFormData.consultantId || null,
           siteAddress: editFormData.siteAddress.trim() || undefined,
           siteCity: editFormData.siteCity.trim() || null,
           googleMapLocation: editFormData.googleMapLocation.trim() || null,
-          contractorId: editFormData.contractorId || null,
-          consultantId: editFormData.consultantId || null,
-          plotArea: editFormData.plotArea.trim() || null,
-          constructionArea: editFormData.constructionArea.trim() || null,
-          currentPhase: editFormData.currentPhase || undefined,
-          status: editFormData.status,
           startDate: editFormData.startDate || null,
           targetDate: editFormData.targetDate || null,
+          plotArea: editFormData.plotArea.trim() || null,
+          constructionArea: editFormData.constructionArea.trim() || null,
+          budget: editFormData.budget ? parseFloat(editFormData.budget) : null,
+          currency: editFormData.currency || "INR",
+          currentPhase: editFormData.currentPhase || undefined,
+          status: editFormData.status,
+          description: editFormData.description.trim() || undefined,
         }),
       });
 
@@ -770,21 +798,29 @@ export function ProjectsClientView({
                 </div>
 
                 {/* Metadata Details Grid */}
-                <div className="grid grid-cols-2 gap-2 text-xs pt-3 border-t border-[#E2E6F0]">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs pt-3 border-t border-[#E2E6F0]">
                   <div>
                     <span className="text-[#696E82] block text-[10px] uppercase font-semibold">
-                      Project Coordinator
+                      Client
                     </span>
-                    <span className="font-semibold text-[#1F1F1F] truncate block">
-                      {p.projectCoordinator?.user.fullName || p.primaryClient?.name || "Unassigned"}
+                    <span className="font-semibold text-[#1F1F1F] truncate block" title={p.primaryClient?.name || "Direct / Private"}>
+                      {p.primaryClient?.name || "Direct / Private"}
                     </span>
                   </div>
                   <div>
                     <span className="text-[#696E82] block text-[10px] uppercase font-semibold">
-                      Project Manager
+                      Project Architect
                     </span>
-                    <span className="font-semibold text-[#1F1F1F] truncate block">
-                      {p.projectManager?.user.fullName || "Unassigned"}
+                    <span className="font-semibold text-[#1F1F1F] truncate block" title={p.projectArchitect?.user.fullName || "Unassigned"}>
+                      {p.projectArchitect?.user.fullName || "Unassigned"}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[#696E82] block text-[10px] uppercase font-semibold">
+                      Project Coordinator
+                    </span>
+                    <span className="font-semibold text-[#1F1F1F] truncate block" title={p.projectCoordinator?.user.fullName || "Unassigned"}>
+                      {p.projectCoordinator?.user.fullName || "Unassigned"}
                     </span>
                   </div>
                   <div>
@@ -802,6 +838,14 @@ export function ProjectsClientView({
                     </span>
                     <span className="font-semibold text-[#4B5320] truncate block">
                       {p.constructionArea || p.plotArea || "—"}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[#696E82] block text-[10px] uppercase font-semibold">
+                      Budget
+                    </span>
+                    <span className="font-semibold text-[#1F1F1F] truncate block">
+                      {p.budget ? `${p.currency || "₹"} ${Number(p.budget).toLocaleString("en-IN")}` : "—"}
                     </span>
                   </div>
                 </div>
@@ -865,6 +909,7 @@ export function ProjectsClientView({
 
             {/* Modal Form */}
             <form onSubmit={handleCreateSubmit} className="p-6 overflow-y-auto space-y-4 text-xs">
+              {/* Row 1: Project Code & Project Name */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
@@ -898,10 +943,29 @@ export function ProjectsClientView({
                 </div>
               </div>
 
+              {/* Row 2: Client Name & Typology */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
-                    Typology / Commission Type
+                    Client Name
+                  </label>
+                  <select
+                    value={formData.primaryClientId}
+                    onChange={(e) => setFormData({ ...formData, primaryClientId: e.target.value })}
+                    className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
+                  >
+                    <option value="">Select Primary Client...</option>
+                    {clients.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} {c.company ? `(${c.company})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
+                    Typology
                   </label>
                   <select
                     value={formData.projectType}
@@ -911,6 +975,29 @@ export function ProjectsClientView({
                     {PROJECT_TYPOLOGIES.map((typ) => (
                       <option key={typ} value={typ}>
                         {typ}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Row 3: Project Architect & Project Manager */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
+                    Project Architect
+                  </label>
+                  <select
+                    value={formData.projectArchitectId}
+                    onChange={(e) =>
+                      setFormData({ ...formData, projectArchitectId: e.target.value })
+                    }
+                    className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
+                  >
+                    <option value="">Select Project Architect...</option>
+                    {members.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.user.fullName} ({m.employee?.designation || "Studio Staff"})
                       </option>
                     ))}
                   </select>
@@ -937,6 +1024,7 @@ export function ProjectsClientView({
                 </div>
               </div>
 
+              {/* Row 4: Project Coordinator & Site City */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
@@ -972,32 +1060,7 @@ export function ProjectsClientView({
                 </div>
               </div>
 
-              <div>
-                <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
-                  Site Location / Physical Address
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Plot 42, Sector 15, Golf Course Extension Road, Gurugram"
-                  value={formData.siteAddress}
-                  onChange={(e) => setFormData({ ...formData, siteAddress: e.target.value })}
-                  className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
-                  Google Map Location
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. https://maps.google.com/?q=... or Plus Code"
-                  value={formData.googleMapLocation}
-                  onChange={(e) => setFormData({ ...formData, googleMapLocation: e.target.value })}
-                  className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
-                />
-              </div>
-
+              {/* Row 5: Project Contractor & Project Consultant */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
@@ -1036,6 +1099,61 @@ export function ProjectsClientView({
                 </div>
               </div>
 
+              {/* Row 6: Site Address */}
+              <div>
+                <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
+                  Site Address
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Plot 42, Sector 15, Golf Course Extension Road, Gurugram"
+                  value={formData.siteAddress}
+                  onChange={(e) => setFormData({ ...formData, siteAddress: e.target.value })}
+                  className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
+                />
+              </div>
+
+              {/* Row 7: Google map location */}
+              <div>
+                <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
+                  Google map location
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. https://maps.google.com/?q=... or Plus Code"
+                  value={formData.googleMapLocation}
+                  onChange={(e) => setFormData({ ...formData, googleMapLocation: e.target.value })}
+                  className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
+                />
+              </div>
+
+              {/* Row 8: Start Date & End Date */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
+                    Start Date
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.startDate}
+                    onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                    className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
+                    End Date
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.targetDate}
+                    onChange={(e) => setFormData({ ...formData, targetDate: e.target.value })}
+                    className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Row 9: Plot Area & Total Construction */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
@@ -1052,7 +1170,7 @@ export function ProjectsClientView({
 
                 <div>
                   <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
-                    Total Construction Area
+                    Total Construction
                   </label>
                   <input
                     type="text"
@@ -1064,34 +1182,38 @@ export function ProjectsClientView({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
-                    Commencement / Start Date
-                  </label>
+              {/* Row 10: Budget */}
+              <div>
+                <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
+                  Budget
+                </label>
+                <div className="flex gap-2">
+                  <select
+                    value={formData.currency}
+                    onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
+                    className="w-24 px-2 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none font-semibold text-xs"
+                  >
+                    <option value="INR">INR (₹)</option>
+                    <option value="USD">USD ($)</option>
+                    <option value="EUR">EUR (€)</option>
+                    <option value="AED">AED</option>
+                    <option value="GBP">GBP (£)</option>
+                  </select>
                   <input
-                    type="date"
-                    value={formData.startDate}
-                    onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                    className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
-                    Target Completion Date
-                  </label>
-                  <input
-                    type="date"
-                    value={formData.targetDate}
-                    onChange={(e) => setFormData({ ...formData, targetDate: e.target.value })}
-                    className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
+                    type="number"
+                    step="any"
+                    placeholder="e.g. 5000000"
+                    value={formData.budget}
+                    onChange={(e) => setFormData({ ...formData, budget: e.target.value })}
+                    className="flex-1 px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none font-mono"
                   />
                 </div>
               </div>
 
+              {/* Row 11: Brief / Project Brief */}
               <div>
                 <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
-                  Architectural Scope & Narrative
+                  Brief / Project Brief
                 </label>
                 <textarea
                   rows={3}
@@ -1227,10 +1349,31 @@ export function ProjectsClientView({
                 </div>
               </div>
 
+              {/* Row 3: Client Name & Typology */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
-                    Typology / Commission Type
+                    Client Name
+                  </label>
+                  <select
+                    value={editFormData.primaryClientId}
+                    onChange={(e) =>
+                      setEditFormData({ ...editFormData, primaryClientId: e.target.value })
+                    }
+                    className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
+                  >
+                    <option value="">Select Primary Client...</option>
+                    {clients.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} {c.company ? `(${c.company})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
+                    Typology
                   </label>
                   <select
                     value={editFormData.projectType}
@@ -1242,6 +1385,29 @@ export function ProjectsClientView({
                     {PROJECT_TYPOLOGIES.map((typ) => (
                       <option key={typ} value={typ}>
                         {typ}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Row 4: Project Architect & Project Manager */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
+                    Project Architect
+                  </label>
+                  <select
+                    value={editFormData.projectArchitectId}
+                    onChange={(e) =>
+                      setEditFormData({ ...editFormData, projectArchitectId: e.target.value })
+                    }
+                    className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
+                  >
+                    <option value="">Select Project Architect...</option>
+                    {members.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.user.fullName} ({m.employee?.designation || "Studio Staff"})
                       </option>
                     ))}
                   </select>
@@ -1268,6 +1434,7 @@ export function ProjectsClientView({
                 </div>
               </div>
 
+              {/* Row 5: Project Coordinator & Site City */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
@@ -1305,36 +1472,7 @@ export function ProjectsClientView({
                 </div>
               </div>
 
-              <div>
-                <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
-                  Site Location / Physical Address
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Plot 42, Sector 15, Golf Course Extension Road, Gurugram"
-                  value={editFormData.siteAddress}
-                  onChange={(e) =>
-                    setEditFormData({ ...editFormData, siteAddress: e.target.value })
-                  }
-                  className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
-                  Google Map Location
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. https://maps.google.com/?q=... or Plus Code"
-                  value={editFormData.googleMapLocation}
-                  onChange={(e) =>
-                    setEditFormData({ ...editFormData, googleMapLocation: e.target.value })
-                  }
-                  className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
-                />
-              </div>
-
+              {/* Row 6: Project Contractor & Project Consultant */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
@@ -1377,6 +1515,69 @@ export function ProjectsClientView({
                 </div>
               </div>
 
+              {/* Row 7: Site Address */}
+              <div>
+                <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
+                  Site Address
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Plot 42, Sector 15, Golf Course Extension Road, Gurugram"
+                  value={editFormData.siteAddress}
+                  onChange={(e) =>
+                    setEditFormData({ ...editFormData, siteAddress: e.target.value })
+                  }
+                  className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
+                />
+              </div>
+
+              {/* Row 8: Google map location */}
+              <div>
+                <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
+                  Google map location
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. https://maps.google.com/?q=... or Plus Code"
+                  value={editFormData.googleMapLocation}
+                  onChange={(e) =>
+                    setEditFormData({ ...editFormData, googleMapLocation: e.target.value })
+                  }
+                  className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
+                />
+              </div>
+
+              {/* Row 9: Start Date & End Date */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
+                    Start Date
+                  </label>
+                  <input
+                    type="date"
+                    value={editFormData.startDate}
+                    onChange={(e) =>
+                      setEditFormData({ ...editFormData, startDate: e.target.value })
+                    }
+                    className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
+                    End Date
+                  </label>
+                  <input
+                    type="date"
+                    value={editFormData.targetDate}
+                    onChange={(e) =>
+                      setEditFormData({ ...editFormData, targetDate: e.target.value })
+                    }
+                    className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Row 10: Plot Area & Total Construction */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
@@ -1395,7 +1596,7 @@ export function ProjectsClientView({
 
                 <div>
                   <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
-                    Total Construction Area
+                    Total Construction
                   </label>
                   <input
                     type="text"
@@ -1409,38 +1610,38 @@ export function ProjectsClientView({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
-                    Start Date
-                  </label>
+              {/* Row 11: Budget */}
+              <div>
+                <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
+                  Budget
+                </label>
+                <div className="flex gap-2">
+                  <select
+                    value={editFormData.currency}
+                    onChange={(e) => setEditFormData({ ...editFormData, currency: e.target.value })}
+                    className="w-24 px-2 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none font-semibold text-xs"
+                  >
+                    <option value="INR">INR (₹)</option>
+                    <option value="USD">USD ($)</option>
+                    <option value="EUR">EUR (€)</option>
+                    <option value="AED">AED</option>
+                    <option value="GBP">GBP (£)</option>
+                  </select>
                   <input
-                    type="date"
-                    value={editFormData.startDate}
-                    onChange={(e) =>
-                      setEditFormData({ ...editFormData, startDate: e.target.value })
-                    }
-                    className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
-                    Target Completion Date
-                  </label>
-                  <input
-                    type="date"
-                    value={editFormData.targetDate}
-                    onChange={(e) =>
-                      setEditFormData({ ...editFormData, targetDate: e.target.value })
-                    }
-                    className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
+                    type="number"
+                    step="any"
+                    placeholder="e.g. 5000000"
+                    value={editFormData.budget}
+                    onChange={(e) => setEditFormData({ ...editFormData, budget: e.target.value })}
+                    className="flex-1 px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none font-mono"
                   />
                 </div>
               </div>
 
+              {/* Row 12: Brief / Project Brief */}
               <div>
                 <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
-                  Scope & Architectural Description
+                  Brief / Project Brief
                 </label>
                 <textarea
                   rows={3}

@@ -8,10 +8,11 @@ export async function findProjects(ctx: TenantContext) {
     tenantId: ctx.tenantId, // STRICT TENANT ISOLATION
   };
 
-  // Employees, Project Managers, and Coordinators only see assigned projects
+  // Employees, Project Managers, Architects, and Coordinators only see assigned projects
   if (!isAdminOrOwner(ctx)) {
     whereClause.OR = [
       { members: { some: { membershipId: ctx.membershipId } } },
+      { projectArchitectId: ctx.membershipId },
       { projectManagerId: ctx.membershipId },
       { projectCoordinatorId: ctx.membershipId },
     ];
@@ -25,6 +26,15 @@ export async function findProjects(ctx: TenantContext) {
           id: true,
           name: true,
           company: true,
+        },
+      },
+      projectArchitect: {
+        include: {
+          user: {
+            select: {
+              fullName: true,
+            },
+          },
         },
       },
       projectManager: {
@@ -127,6 +137,7 @@ export async function findProjectDetail(ctx: TenantContext, projectId: string) {
   if (!isAdminOrOwner(ctx)) {
     whereClause.OR = [
       { members: { some: { membershipId: ctx.membershipId } } },
+      { projectArchitectId: ctx.membershipId },
       { projectManagerId: ctx.membershipId },
       { projectCoordinatorId: ctx.membershipId },
     ];
@@ -136,6 +147,12 @@ export async function findProjectDetail(ctx: TenantContext, projectId: string) {
     where: whereClause,
     include: {
       primaryClient: true,
+      projectArchitect: {
+        include: {
+          user: true,
+          employee: true,
+        },
+      },
       projectManager: {
         include: {
           user: true,
@@ -281,6 +298,7 @@ export async function createProject(
     siteAddress?: string;
     siteCity?: string;
     googleMapLocation?: string;
+    projectArchitectId?: string;
     projectManagerId?: string;
     projectCoordinatorId?: string;
     contractorId?: string;
@@ -307,6 +325,7 @@ export async function createProject(
         siteAddress: data.siteAddress,
         siteCity: data.siteCity,
         googleMapLocation: data.googleMapLocation,
+        projectArchitectId: data.projectArchitectId || null,
         projectManagerId: data.projectManagerId || null,
         projectCoordinatorId: data.projectCoordinatorId || null,
         contractorId: data.contractorId || null,
@@ -339,6 +358,17 @@ export async function createProject(
           projectId: project.id,
           consultantId: data.consultantId,
           scope: "Commissioned Consultant",
+        },
+      }).catch(() => {});
+    }
+
+    if (data.projectArchitectId) {
+      await tx.projectMember.create({
+        data: {
+          tenantId: ctx.tenantId,
+          projectId: project.id,
+          membershipId: data.projectArchitectId,
+          projectRole: "Project Architect",
         },
       }).catch(() => {});
     }
@@ -425,6 +455,7 @@ export async function updateProject(
     siteAddress?: string;
     siteCity?: string | null;
     googleMapLocation?: string | null;
+    projectArchitectId?: string | null;
     projectManagerId?: string | null;
     projectCoordinatorId?: string | null;
     contractorId?: string | null;
@@ -458,6 +489,7 @@ export async function updateProject(
   if (data.siteAddress !== undefined) updatePayload.siteAddress = data.siteAddress;
   if (data.siteCity !== undefined) updatePayload.siteCity = data.siteCity || null;
   if (data.googleMapLocation !== undefined) updatePayload.googleMapLocation = data.googleMapLocation || null;
+  if (data.projectArchitectId !== undefined) updatePayload.projectArchitectId = data.projectArchitectId || null;
   if (data.projectManagerId !== undefined) updatePayload.projectManagerId = data.projectManagerId || null;
   if (data.projectCoordinatorId !== undefined) updatePayload.projectCoordinatorId = data.projectCoordinatorId || null;
   if (data.contractorId !== undefined) updatePayload.contractorId = data.contractorId || null;
