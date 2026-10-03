@@ -14,7 +14,7 @@ interface AppTopbarProps {
 
 export function AppTopbar({ context }: AppTopbarProps) {
   return (
-    <header className="hidden md:flex h-16 bg-white border-b border-[#E2E6F0] px-6 items-center justify-between sticky top-0 z-10" suppressHydrationWarning>
+    <header className="h-16 bg-white border-b border-[#E2E6F0] px-6 flex items-center justify-between sticky top-0 z-10" suppressHydrationWarning>
       {/* Studio Location & Status */}
       <div className="flex items-center gap-3">
         <div className="flex items-center gap-2 text-xs font-semibold text-[#1F1F1F]">

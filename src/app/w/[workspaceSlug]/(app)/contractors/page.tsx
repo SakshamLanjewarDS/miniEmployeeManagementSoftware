@@ -32,13 +32,28 @@ export default async function ContractorsPage({ params, searchParams }: Contract
   ]);
 
   return (
-    <ContractorsClientView
-      initialContractors={serializeForClient(contractors) as any}
-      projects={serializeForClient(projects)}
-      workspaceSlug={ctx.tenantSlug}
-      userRole={ctx.role}
-      userFullName={ctx.userFullName}
-      hasFinanceAccess={ctx.hasFinanceAccess || isPrivileged}
-    />
+    <div className="space-y-6">
+      <div className="border-b border-[#E2E6F0] pb-5">
+        <div className="flex items-center gap-2 text-xs font-semibold text-[#5A81FA] uppercase tracking-wider">
+          <span>Studio Partner Directory</span>
+          <span>•</span>
+          <span>External Contractors & Specialist Trades</span>
+        </div>
+        <h1 className="text-2xl font-bold tracking-tight text-[#1F1F1F] mt-1">Contractor Directory</h1>
+        <p className="text-xs text-[#696E82] mt-0.5">
+          {isPrivileged
+            ? "Manage general contractors, trade specialists, project assignments, and quotation records."
+            : "Studio trade directory: view approved contractors, contact points, and your assigned project links."}
+        </p>
+      </div>
+
+      <ContractorsClientView
+        initialContractors={serializeForClient(contractors) as any}
+        projects={serializeForClient(projects)}
+        workspaceSlug={ctx.tenantSlug}
+        userRole={ctx.role}
+        hasFinanceAccess={ctx.hasFinanceAccess || isPrivileged}
+      />
+    </div>
   );
 }
