@@ -32,9 +32,14 @@ import {
   ExternalLink,
   MessageSquare,
   Share2,
+  SlidersHorizontal,
 } from "lucide-react";
 import { CsvImportExportModal } from "@/components/csv/CsvImportExportModal";
 import BulkMailModal from "@/components/team/BulkMailModal";
+import { CustomFieldsManagerModal } from "@/components/custom-fields/CustomFieldsManagerModal";
+import { DynamicFormFields } from "@/components/custom-fields/DynamicFormFields";
+import { DynamicCardFields } from "@/components/custom-fields/DynamicCardFields";
+import { CustomFieldDefinition } from "@/server/modules/custom-fields/repository";
 
 interface ProjectOption {
   id: string;
@@ -63,6 +68,7 @@ export interface EmployeeItem {
   joinDate: string | null;
   hasFinanceAccess?: boolean;
   projects?: ProjectAssignment[];
+  customFields?: Record<string, any>;
 }
 
 interface TeamClientViewProps {
@@ -71,6 +77,8 @@ interface TeamClientViewProps {
   userRole: string;
   initialEmployees: EmployeeItem[];
   availableProjects?: ProjectOption[];
+  initialCustomFields?: CustomFieldDefinition[];
+  initialCustomValues?: Record<string, any>;
 }
 
 export default function TeamClientView({
@@ -78,9 +86,41 @@ export default function TeamClientView({
   userRole,
   initialEmployees,
   availableProjects = [],
+  initialCustomFields = [],
+  initialCustomValues = {},
 }: TeamClientViewProps) {
   const router = useRouter();
   const [employees, setEmployees] = useState<EmployeeItem[]>(initialEmployees);
+  const [customFields, setCustomFields] = useState<CustomFieldDefinition[]>(initialCustomFields);
+  const [customValuesByEmployee, setCustomValuesByEmployee] = useState<Record<string, Record<string, any>>>(initialCustomValues);
+  const [customFieldValues, setCustomFieldValues] = useState<Record<string, any>>({});
+  const [customFieldsModalOpen, setCustomFieldsModalOpen] = useState(false);
+
+  const refreshCustomFields = async () => {
+    try {
+      const [fRes, vRes] = await Promise.all([
+        fetch(`/api/custom-fields?workspaceSlug=${workspaceSlug}&entity=TEAM`),
+        fetch(`/api/custom-fields/values?workspaceSlug=${workspaceSlug}&entity=TEAM`),
+      ]);
+      if (fRes.ok) {
+        const fData = await fRes.json();
+        setCustomFields(fData.fields || []);
+      }
+      if (vRes.ok) {
+        const vData = await vRes.json();
+        setCustomValuesByEmployee(vData.values || {});
+      }
+    } catch (e) {
+      console.error("Failed to reload team custom fields:", e);
+    }
+  };
+
+  const handleCustomFieldChange = (key: string, value: any) => {
+    setCustomFieldValues((prev) => ({
+      ...prev,
+      [key]: value,
+    }));
+  };
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState<"ALL" | "ACTIVE" | "INACTIVE">("ALL");
@@ -223,6 +263,7 @@ export default function TeamClientView({
   const openAddEmployeeModal = async () => {
     setModalError(null);
     setError(null);
+    setCustomFieldValues({});
     const fallbackId = computeNextEmployeeId();
     setEmployeeId(fallbackId);
     setIsAddModalOpen(true);
@@ -310,6 +351,8 @@ export default function TeamClientView({
     setEditRole(emp.role);
     setEditHasFinanceAccess(emp.hasFinanceAccess ?? false);
     setEditProjectIds(emp.projects ? emp.projects.map((p) => p.id) : []);
+    const empVals = customValuesByEmployee[emp.id] || customValuesByEmployee[emp.membershipId] || (emp as any).customFields || {};
+    setCustomFieldValues(empVals);
   };
 
   const handleCreateEmployee = async (e: React.FormEvent) => {
@@ -350,6 +393,27 @@ export default function TeamClientView({
 
         if (data.employee) {
           setEmployees((prev) => [data.employee, ...prev.filter((e) => e.membershipId !== data.employee.membershipId)]);
+        }
+
+        const createdId = data.employee?.id || data.employee?.membershipId || targetEmpId;
+        if (Object.keys(customFieldValues).length > 0) {
+          try {
+            await fetch(`/api/custom-fields/values?workspaceSlug=${workspaceSlug}`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                entity: "TEAM",
+                recordId: createdId,
+                values: customFieldValues,
+              }),
+            });
+            setCustomValuesByEmployee((prev) => ({
+              ...prev,
+              [createdId]: customFieldValues,
+            }));
+          } catch (err) {
+            console.error("Failed to save employee custom fields", err);
+          }
         }
 
         // Show credentials ready dialog with 1-click Gmail, WhatsApp, and Copy
@@ -455,6 +519,28 @@ export default function TeamClientView({
             )
           );
         }
+
+        const targetId = editingEmployee.id || editingEmployee.membershipId;
+        if (Object.keys(customFieldValues).length > 0) {
+          try {
+            await fetch(`/api/custom-fields/values?workspaceSlug=${workspaceSlug}`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                entity: "TEAM",
+                recordId: targetId,
+                values: customFieldValues,
+              }),
+            });
+            setCustomValuesByEmployee((prev) => ({
+              ...prev,
+              [targetId]: customFieldValues,
+            }));
+          } catch (err) {
+            console.error("Failed to save updated employee custom fields", err);
+          }
+        }
+
         await fetchFreshEmployees();
         router.refresh();
       }
@@ -803,6 +889,16 @@ export default function TeamClientView({
               <button
                 type="button"
                 suppressHydrationWarning
+                onClick={() => setCustomFieldsModalOpen(true)}
+                className="bg-white border border-[#E2E6F0] text-slate-700 hover:bg-[#F8F9FD] px-3.5 py-2 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 shadow-2xs shrink-0 cursor-pointer"
+                title="Configure dynamic fields for Team & Employees without changing code"
+              >
+                <SlidersHorizontal className="w-3.5 h-3.5 text-[#5A81FA]" />
+                <span>Form Fields</span>
+              </button>
+              <button
+                type="button"
+                suppressHydrationWarning
                 onClick={() => setIsCsvModalOpen(true)}
                 className="bg-white border border-[#CEDEFF] text-[#2C308D] hover:bg-[#F2F4FF] px-3.5 py-2 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-2 shadow-xs shrink-0 cursor-pointer"
                 title="Bulk import studio team employees from CSV"
@@ -966,6 +1062,12 @@ export default function TeamClientView({
                               {emp.phone}
                             </span>
                           )}
+                        </div>
+                        <div className="mt-1.5">
+                          <DynamicCardFields
+                            fields={customFields}
+                            values={customValuesByEmployee[emp.id] || customValuesByEmployee[emp.membershipId] || (emp as any).customFields || {}}
+                          />
                         </div>
                       </div>
                     </td>
@@ -1401,6 +1503,14 @@ export default function TeamClientView({
                 </div>
               )}
 
+              {/* Dynamic Custom Fields */}
+              <DynamicFormFields
+                fields={customFields}
+                values={customFieldValues}
+                onChange={handleCustomFieldChange}
+                disabled={loading}
+              />
+
               <div className="pt-4 border-t border-[#E2E6F0] flex justify-end gap-2">
                 <button
                   type="button"
@@ -1581,6 +1691,14 @@ export default function TeamClientView({
                   </div>
                 </div>
               )}
+
+              {/* Dynamic Custom Fields */}
+              <DynamicFormFields
+                fields={customFields}
+                values={customFieldValues}
+                onChange={handleCustomFieldChange}
+                disabled={loading}
+              />
 
               <div className="pt-4 border-t border-[#E2E6F0] flex justify-end gap-2">
                 <button
@@ -1954,6 +2072,15 @@ export default function TeamClientView({
           await fetchFreshEmployees();
           router.refresh();
         }}
+      />
+
+      {/* Dynamic Form Fields Manager Modal */}
+      <CustomFieldsManagerModal
+        isOpen={customFieldsModalOpen}
+        onClose={() => setCustomFieldsModalOpen(false)}
+        workspaceSlug={workspaceSlug}
+        initialEntity="TEAM"
+        onFieldsUpdated={refreshCustomFields}
       />
     </div>
   );

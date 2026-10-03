@@ -292,6 +292,7 @@ export function CustomFieldsManagerModal({
             >
               <option value="PROJECT">Projects Form & Cards</option>
               <option value="TASK">Tasks & Deliverables Form</option>
+              <option value="TEAM">Studio Team & Staff Form</option>
               <option value="CONTRACTOR">Contractor Directory Form</option>
               <option value="CONSULTANT">Consultant Directory Form</option>
             </select>

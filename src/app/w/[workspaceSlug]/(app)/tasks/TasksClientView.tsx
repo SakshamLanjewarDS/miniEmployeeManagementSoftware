@@ -33,7 +33,12 @@ import {
   FileText,
   AlertTriangle,
   FolderGit2,
+  SlidersHorizontal,
 } from "lucide-react";
+import { CustomFieldsManagerModal } from "@/components/custom-fields/CustomFieldsManagerModal";
+import { DynamicFormFields } from "@/components/custom-fields/DynamicFormFields";
+import { DynamicCardFields } from "@/components/custom-fields/DynamicCardFields";
+import { CustomFieldDefinition } from "@/server/modules/custom-fields/repository";
 
 export interface TaskItem {
   id: string;
@@ -43,6 +48,7 @@ export interface TaskItem {
   status: "NOT_STARTED" | "IN_PROGRESS" | "IN_REVIEW" | "COMPLETED" | "BLOCKED" | "CANCELLED";
   dueDate: string | null;
   estimatedHours: any;
+  customFields?: Record<string, any>;
   projectId: string;
   project: {
     id: string;
@@ -114,6 +120,8 @@ export interface TasksClientViewProps {
   metrics?: TaskDashboardMetrics;
   contextUserFullName?: string;
   workspaceTimezone?: string;
+  initialCustomFields?: CustomFieldDefinition[];
+  initialCustomValues?: Record<string, any>;
 }
 
 export default function TasksClientView({
@@ -129,9 +137,41 @@ export default function TasksClientView({
   metrics,
   contextUserFullName,
   workspaceTimezone = "Asia/Kolkata",
+  initialCustomFields = [],
+  initialCustomValues = {},
 }: TasksClientViewProps) {
   const router = useRouter();
   const [tasks, setTasks] = useState<TaskItem[]>(initialTasks);
+  const [customFields, setCustomFields] = useState<CustomFieldDefinition[]>(initialCustomFields);
+  const [customValuesByTask, setCustomValuesByTask] = useState<Record<string, Record<string, any>>>(initialCustomValues);
+  const [customFieldValues, setCustomFieldValues] = useState<Record<string, any>>({});
+  const [customFieldsModalOpen, setCustomFieldsModalOpen] = useState(false);
+
+  const refreshCustomFields = async () => {
+    try {
+      const [fRes, vRes] = await Promise.all([
+        fetch(`/api/custom-fields?workspaceSlug=${workspaceSlug}&entity=TASK`),
+        fetch(`/api/custom-fields/values?workspaceSlug=${workspaceSlug}&entity=TASK`),
+      ]);
+      if (fRes.ok) {
+        const fData = await fRes.json();
+        setCustomFields(fData.fields || []);
+      }
+      if (vRes.ok) {
+        const vData = await vRes.json();
+        setCustomValuesByTask(vData.values || {});
+      }
+    } catch (e) {
+      console.error("Failed to reload task custom fields:", e);
+    }
+  };
+
+  const handleCustomFieldChange = (key: string, value: any) => {
+    setCustomFieldValues((prev) => ({
+      ...prev,
+      [key]: value,
+    }));
+  };
   const [view, setView] = useState<"list" | "kanban">(initialView === "kanban" ? "kanban" : "list");
   const [loadingTaskId, setLoadingTaskId] = useState<string | null>(null);
   const [togglingChecklistId, setTogglingChecklistId] = useState<string | null>(null);
@@ -370,12 +410,33 @@ export default function TasksClientView({
         const assigneeName = assignedMember?.user.fullName || "colleague";
         setSuccessMessage(`Task "${taskTitle}" assigned successfully to ${assigneeName}!`);
 
+        if (data.task?.id && Object.keys(customFieldValues).length > 0) {
+          try {
+            await fetch(`/api/custom-fields/values?workspaceSlug=${workspaceSlug}`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                entity: "TASK",
+                recordId: data.task.id,
+                values: customFieldValues,
+              }),
+            });
+            setCustomValuesByTask((prev) => ({
+              ...prev,
+              [data.task.id]: customFieldValues,
+            }));
+          } catch (err) {
+            console.error("Failed to save task custom fields", err);
+          }
+        }
+
         // Reset form
         setTaskTitle("");
         setTaskDescription("");
         setTaskDueDate("");
         setTaskEstimatedHours("");
         setChecklistItems([""]);
+        setCustomFieldValues({});
         setIsCreateTaskModalOpen(false);
 
         router.refresh();
@@ -970,8 +1031,22 @@ export default function TasksClientView({
 
           {/* Right Action buttons: Assign Task & View Switcher */}
           <div className="flex items-center gap-2">
+            {(userRole === "OWNER" || userRole === "ADMIN") && (
+              <button
+                type="button"
+                onClick={() => setCustomFieldsModalOpen(true)}
+                className="px-3.5 py-2 bg-white border border-[#E2E6F0] hover:bg-[#F8F9FD] text-slate-700 text-xs font-semibold rounded-xl shadow-2xs transition-colors flex items-center gap-1.5 cursor-pointer shrink-0"
+                title="Configure dynamic task & deliverable fields without code"
+              >
+                <SlidersHorizontal className="w-3.5 h-3.5 text-[#5A81FA]" />
+                <span>Form Fields</span>
+              </button>
+            )}
             <button
-              onClick={() => setIsCreateTaskModalOpen(true)}
+              onClick={() => {
+                setCustomFieldValues({});
+                setIsCreateTaskModalOpen(true);
+              }}
               className="px-3.5 py-2 bg-[#5A81FA] hover:bg-[#426EE8] text-white text-xs font-semibold rounded-xl shadow-2xs transition-colors flex items-center gap-1.5 cursor-pointer shrink-0"
             >
               <Plus className="w-4 h-4" />
@@ -1200,6 +1275,12 @@ export default function TasksClientView({
                           </button>
                         )}
                       </div>
+
+                      {/* Dynamic Custom Fields */}
+                      <DynamicCardFields
+                        fields={customFields}
+                        values={customValuesByTask[task.id] || (task as any).customFields || {}}
+                      />
 
                       {/* Interactive Checklist Sub-items */}
                       {task.checklistItems.length > 0 && (
@@ -2226,6 +2307,14 @@ export default function TasksClientView({
                 ))}
               </div>
 
+              {/* Dynamic Custom Fields */}
+              <DynamicFormFields
+                fields={customFields}
+                values={customFieldValues}
+                onChange={handleCustomFieldChange}
+                disabled={creatingTask}
+              />
+
               {/* Modal Buttons */}
               <div className="flex justify-end gap-2 pt-4 border-t border-[#E2E6F0]">
                 <button
@@ -2358,6 +2447,15 @@ export default function TasksClientView({
           </div>
         </div>
       )}
+
+      {/* Dynamic Form Fields Manager Modal */}
+      <CustomFieldsManagerModal
+        isOpen={customFieldsModalOpen}
+        onClose={() => setCustomFieldsModalOpen(false)}
+        workspaceSlug={workspaceSlug}
+        initialEntity="TASK"
+        onFieldsUpdated={refreshCustomFields}
+      />
     </div>
   );
 }

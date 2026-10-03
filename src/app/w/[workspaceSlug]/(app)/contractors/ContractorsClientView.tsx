@@ -22,8 +22,13 @@ import {
   Link as LinkIcon,
   ShieldCheck,
   ShieldAlert,
+  SlidersHorizontal,
 } from "lucide-react";
 import { CsvImportExportModal } from "@/components/csv/CsvImportExportModal";
+import { CustomFieldsManagerModal } from "@/components/custom-fields/CustomFieldsManagerModal";
+import { DynamicFormFields } from "@/components/custom-fields/DynamicFormFields";
+import { DynamicCardFields } from "@/components/custom-fields/DynamicCardFields";
+import { CustomFieldDefinition } from "@/server/modules/custom-fields/repository";
 
 export interface ProjectContractorItem {
   id: string;
@@ -64,6 +69,7 @@ export interface ContractorItem {
   updatedAt: string;
   projects: ProjectContractorItem[];
   totalAccessibleProjects: number;
+  customFields?: Record<string, any>;
 }
 
 export interface ContractorsClientViewProps {
@@ -72,6 +78,8 @@ export interface ContractorsClientViewProps {
   workspaceSlug: string;
   userRole: string;
   hasFinanceAccess: boolean;
+  initialCustomFields?: CustomFieldDefinition[];
+  initialCustomValues?: Record<string, any>;
 }
 
 export default function ContractorsClientView({
@@ -80,9 +88,41 @@ export default function ContractorsClientView({
   workspaceSlug,
   userRole,
   hasFinanceAccess,
+  initialCustomFields = [],
+  initialCustomValues = {},
 }: ContractorsClientViewProps) {
   const router = useRouter();
   const [contractors, setContractors] = useState<ContractorItem[]>(initialContractors);
+  const [customFields, setCustomFields] = useState<CustomFieldDefinition[]>(initialCustomFields);
+  const [customValuesByContractor, setCustomValuesByContractor] = useState<Record<string, Record<string, any>>>(initialCustomValues);
+  const [customFieldValues, setCustomFieldValues] = useState<Record<string, any>>({});
+  const [customFieldsModalOpen, setCustomFieldsModalOpen] = useState(false);
+
+  const refreshCustomFields = async () => {
+    try {
+      const [fRes, vRes] = await Promise.all([
+        fetch(`/api/custom-fields?workspaceSlug=${workspaceSlug}&entity=CONTRACTOR`),
+        fetch(`/api/custom-fields/values?workspaceSlug=${workspaceSlug}&entity=CONTRACTOR`),
+      ]);
+      if (fRes.ok) {
+        const fData = await fRes.json();
+        setCustomFields(fData.fields || []);
+      }
+      if (vRes.ok) {
+        const vData = await vRes.json();
+        setCustomValuesByContractor(vData.values || {});
+      }
+    } catch (e) {
+      console.error("Failed to reload contractor custom fields:", e);
+    }
+  };
+
+  const handleCustomFieldChange = (key: string, value: any) => {
+    setCustomFieldValues((prev) => ({
+      ...prev,
+      [key]: value,
+    }));
+  };
 
   // Synchronize state dynamically whenever server component re-renders
   React.useEffect(() => {
@@ -189,6 +229,8 @@ export default function ContractorsClientView({
     setEditEmail(contractor.email || "");
     setEditFirmName(contractor.firmName || "");
     setEditAddress(contractor.address || "");
+    const vals = customValuesByContractor[contractor.id] || (contractor as any).customFields || {};
+    setCustomFieldValues(vals);
   };
 
   // Create Contractor Submit
@@ -220,6 +262,27 @@ export default function ContractorsClientView({
       } else {
         setSuccessMessage(`Contractor "${createName}" successfully added.`);
         setIsCreateModalOpen(false);
+
+        if (data.contractor?.id && Object.keys(customFieldValues).length > 0) {
+          try {
+            await fetch(`/api/custom-fields/values?workspaceSlug=${workspaceSlug}`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                entity: "CONTRACTOR",
+                recordId: data.contractor.id,
+                values: customFieldValues,
+              }),
+            });
+            setCustomValuesByContractor((prev) => ({
+              ...prev,
+              [data.contractor.id]: customFieldValues,
+            }));
+          } catch (err) {
+            console.error("Failed to save contractor custom fields", err);
+          }
+        }
+
         // Reset form
         setCreateName("");
         setCreateContact("");
@@ -264,6 +327,27 @@ export default function ContractorsClientView({
         setErrorMessage(data.error || "Failed to update contractor");
       } else {
         setSuccessMessage(`Contractor updated successfully.`);
+
+        if (editingContractor.id && Object.keys(customFieldValues).length > 0) {
+          try {
+            await fetch(`/api/custom-fields/values?workspaceSlug=${workspaceSlug}`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                entity: "CONTRACTOR",
+                recordId: editingContractor.id,
+                values: customFieldValues,
+              }),
+            });
+            setCustomValuesByContractor((prev) => ({
+              ...prev,
+              [editingContractor.id]: customFieldValues,
+            }));
+          } catch (err) {
+            console.error("Failed to save contractor custom fields", err);
+          }
+        }
+
         setContractors((prev) =>
           prev.map((c) =>
             c.id === editingContractor.id
@@ -435,6 +519,15 @@ export default function ContractorsClientView({
             {isPrivileged ? (
               <>
                 <button
+                  type="button"
+                  onClick={() => setCustomFieldsModalOpen(true)}
+                  className="px-3.5 py-2 bg-white border border-[#E2E6F0] hover:bg-[#F8F9FD] text-slate-700 text-xs font-semibold rounded-xl shadow-2xs transition-colors flex items-center gap-1.5 cursor-pointer shrink-0"
+                  title="Configure dynamic form fields for Contractor Directory without code"
+                >
+                  <SlidersHorizontal className="w-3.5 h-3.5 text-[#5A81FA]" />
+                  <span>Form Fields</span>
+                </button>
+                <button
                   onClick={() => setIsCsvModalOpen(true)}
                   className="px-3.5 py-2 bg-white border border-[#CEDEFF] hover:bg-[#F2F4FF] text-[#2C308D] text-xs font-semibold rounded-xl shadow-2xs transition-colors flex items-center gap-1.5 cursor-pointer shrink-0"
                 >
@@ -442,7 +535,10 @@ export default function ContractorsClientView({
                   <span>Import / Export CSV</span>
                 </button>
                 <button
-                  onClick={() => setIsCreateModalOpen(true)}
+                  onClick={() => {
+                    setCustomFieldValues({});
+                    setIsCreateModalOpen(true);
+                  }}
                   className="px-3.5 py-2 bg-[#5A81FA] hover:bg-[#426EE8] text-white text-xs font-semibold rounded-xl shadow-2xs transition-colors flex items-center gap-1.5 cursor-pointer shrink-0"
                 >
                   <Plus className="w-4 h-4" />
@@ -572,6 +668,12 @@ export default function ContractorsClientView({
                     </div>
                   )}
                 </div>
+
+                {/* Dynamic Custom Fields */}
+                <DynamicCardFields
+                  fields={customFields}
+                  values={customValuesByContractor[contractor.id] || (contractor as any).customFields || {}}
+                />
 
                 {/* Associated Projects Section */}
                 <div className="pt-2 border-t border-[#E2E6F0] space-y-1.5">
@@ -794,6 +896,14 @@ export default function ContractorsClientView({
                 </div>
               </div>
 
+              {/* Dynamic Custom Fields */}
+              <DynamicFormFields
+                fields={customFields}
+                values={customFieldValues}
+                onChange={handleCustomFieldChange}
+                disabled={submittingCreate}
+              />
+
               <div className="flex justify-end gap-2 pt-4 border-t border-[#E2E6F0]">
                 <button
                   type="button"
@@ -906,6 +1016,14 @@ export default function ContractorsClientView({
                   className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
                 />
               </div>
+
+              {/* Dynamic Custom Fields */}
+              <DynamicFormFields
+                fields={customFields}
+                values={customFieldValues}
+                onChange={handleCustomFieldChange}
+                disabled={submittingEdit}
+              />
 
               <div className="flex justify-end gap-2 pt-4 border-t border-[#E2E6F0]">
                 <button
@@ -1185,6 +1303,15 @@ export default function ContractorsClientView({
           await fetchFreshContractors();
           router.refresh();
         }}
+      />
+
+      {/* Dynamic Form Fields Manager Modal */}
+      <CustomFieldsManagerModal
+        isOpen={customFieldsModalOpen}
+        onClose={() => setCustomFieldsModalOpen(false)}
+        workspaceSlug={workspaceSlug}
+        initialEntity="CONTRACTOR"
+        onFieldsUpdated={refreshCustomFields}
       />
     </div>
   );

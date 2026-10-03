@@ -86,6 +86,195 @@ export const DEFAULT_PROJECT_CUSTOM_FIELDS: CustomFieldDefinition[] = [
   },
 ];
 
+export const DEFAULT_TASK_CUSTOM_FIELDS: CustomFieldDefinition[] = [
+  {
+    id: "cf_task_milestone",
+    entity: "TASK",
+    key: "milestonePhase",
+    label: "Milestone Stage",
+    type: "select",
+    options: ["Concept & Feasibility", "Schematic Design", "Design Development", "Good for Construction (GFC)", "Client Handover"],
+    placeholder: "Select project milestone",
+    required: false,
+    showOnCard: true,
+    showInFilters: true,
+    category: "Workflow",
+    sortOrder: 1,
+    createdAt: "2024-01-01T00:00:00.000Z",
+  },
+  {
+    id: "cf_task_client_signoff",
+    entity: "TASK",
+    key: "clientSignoffRequired",
+    label: "Client Sign-off Required",
+    type: "boolean",
+    required: false,
+    showOnCard: true,
+    showInFilters: true,
+    category: "Approvals",
+    sortOrder: 2,
+    createdAt: "2024-01-01T00:00:00.000Z",
+  },
+  {
+    id: "cf_task_deliverable_format",
+    entity: "TASK",
+    key: "deliverableFormat",
+    label: "Deliverable Format",
+    type: "select",
+    options: ["Architectural PDF", "AutoCAD DWG", "Revit BIM Model", "Physical A1 Print", "3D Renderings Pack"],
+    placeholder: "Select deliverable format",
+    required: false,
+    showOnCard: false,
+    showInFilters: true,
+    category: "Deliverables",
+    sortOrder: 3,
+    createdAt: "2024-01-01T00:00:00.000Z",
+  },
+];
+
+export const DEFAULT_TEAM_CUSTOM_FIELDS: CustomFieldDefinition[] = [
+  {
+    id: "cf_team_coa",
+    entity: "TEAM",
+    key: "coaRegistrationNo",
+    label: "CoA Registration No.",
+    type: "text",
+    placeholder: "e.g. CA/2021/12345",
+    required: false,
+    showOnCard: true,
+    showInFilters: true,
+    category: "Professional Credentials",
+    sortOrder: 1,
+    createdAt: "2024-01-01T00:00:00.000Z",
+  },
+  {
+    id: "cf_team_blood_group",
+    entity: "TEAM",
+    key: "bloodGroup",
+    label: "Blood Group",
+    type: "select",
+    options: ["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"],
+    placeholder: "Select blood group",
+    required: false,
+    showOnCard: false,
+    showInFilters: false,
+    category: "Medical & Safety",
+    sortOrder: 2,
+    createdAt: "2024-01-01T00:00:00.000Z",
+  },
+  {
+    id: "cf_team_emergency_contact",
+    entity: "TEAM",
+    key: "emergencyContact",
+    label: "Emergency Contact Phone",
+    type: "text",
+    placeholder: "+91 98765 43210 (Kin)",
+    required: false,
+    showOnCard: false,
+    showInFilters: false,
+    category: "Medical & Safety",
+    sortOrder: 3,
+    createdAt: "2024-01-01T00:00:00.000Z",
+  },
+];
+
+export const DEFAULT_CONTRACTOR_CUSTOM_FIELDS: CustomFieldDefinition[] = [
+  {
+    id: "cf_contractor_gstin",
+    entity: "CONTRACTOR",
+    key: "gstinNumber",
+    label: "GSTIN / Tax ID",
+    type: "text",
+    placeholder: "e.g. 27ABCDE1234F1Z5",
+    required: false,
+    showOnCard: true,
+    showInFilters: true,
+    category: "Commercial & Compliance",
+    sortOrder: 1,
+    createdAt: "2024-01-01T00:00:00.000Z",
+  },
+  {
+    id: "cf_contractor_safety",
+    entity: "CONTRACTOR",
+    key: "safetyCertified",
+    label: "Safety Compliance Certified",
+    type: "boolean",
+    required: false,
+    showOnCard: true,
+    showInFilters: true,
+    category: "Site Standards",
+    sortOrder: 2,
+    createdAt: "2024-01-01T00:00:00.000Z",
+  },
+  {
+    id: "cf_contractor_labor",
+    entity: "CONTRACTOR",
+    key: "laborStrength",
+    label: "Labor Force Capacity",
+    type: "number",
+    placeholder: "e.g. 45 workers",
+    required: false,
+    showOnCard: false,
+    showInFilters: false,
+    category: "Operations",
+    sortOrder: 3,
+    createdAt: "2024-01-01T00:00:00.000Z",
+  },
+];
+
+export const DEFAULT_CONSULTANT_CUSTOM_FIELDS: CustomFieldDefinition[] = [
+  {
+    id: "cf_consultant_license",
+    entity: "CONSULTANT",
+    key: "licenseNumber",
+    label: "Chartered License / Registration",
+    type: "text",
+    placeholder: "e.g. STR-MH-2023-882",
+    required: false,
+    showOnCard: true,
+    showInFilters: true,
+    category: "Credentials",
+    sortOrder: 1,
+    createdAt: "2024-01-01T00:00:00.000Z",
+  },
+  {
+    id: "cf_consultant_fee_basis",
+    entity: "CONSULTANT",
+    key: "feeBasis",
+    label: "Fee Basis",
+    type: "select",
+    options: ["Per Sq.Ft Built-Up", "Lumpsum Milestone", "% of Project Cost", "Hourly Retainer"],
+    placeholder: "Select fee basis",
+    required: false,
+    showOnCard: false,
+    showInFilters: true,
+    category: "Commercial",
+    sortOrder: 2,
+    createdAt: "2024-01-01T00:00:00.000Z",
+  },
+  {
+    id: "cf_consultant_undertaking",
+    entity: "CONSULTANT",
+    key: "undertakingSubmitted",
+    label: "Safety Undertaking Submitted",
+    type: "boolean",
+    required: false,
+    showOnCard: true,
+    showInFilters: false,
+    category: "Compliance",
+    sortOrder: 3,
+    createdAt: "2024-01-01T00:00:00.000Z",
+  },
+];
+
+const DEFAULT_DEFINITIONS_BY_ENTITY: Record<string, CustomFieldDefinition[]> = {
+  PROJECT: DEFAULT_PROJECT_CUSTOM_FIELDS,
+  TASK: DEFAULT_TASK_CUSTOM_FIELDS,
+  TEAM: DEFAULT_TEAM_CUSTOM_FIELDS,
+  CONTRACTOR: DEFAULT_CONTRACTOR_CUSTOM_FIELDS,
+  CONSULTANT: DEFAULT_CONSULTANT_CUSTOM_FIELDS,
+};
+
 /**
  * Retrieve custom field definitions for a tenant and specific entity
  */
@@ -102,10 +291,11 @@ export async function getCustomFieldDefinitions(
   const definitions = settings.customFieldDefinitions?.[entity];
 
   if (!definitions || !Array.isArray(definitions) || definitions.length === 0) {
-    if (entity === "PROJECT") {
-      // Seed default project fields in background
-      await saveCustomFieldDefinitions(ctx, "PROJECT", DEFAULT_PROJECT_CUSTOM_FIELDS);
-      return DEFAULT_PROJECT_CUSTOM_FIELDS;
+    const defaults = DEFAULT_DEFINITIONS_BY_ENTITY[entity];
+    if (defaults && defaults.length > 0) {
+      // Seed default entity fields in background
+      await saveCustomFieldDefinitions(ctx, entity, defaults);
+      return defaults;
     }
     return [];
   }

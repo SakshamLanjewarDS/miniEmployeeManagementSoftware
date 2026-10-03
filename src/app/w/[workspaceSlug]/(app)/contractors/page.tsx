@@ -3,6 +3,10 @@ import { getCurrentTenantContext } from "@/server/auth/session";
 import { findContractors } from "@/server/modules/contractors/repository";
 import { prisma } from "@/server/db/prisma";
 import { serializeForClient } from "@/server/utils/serialize";
+import {
+  getCustomFieldDefinitions,
+  getCustomFieldValues,
+} from "@/server/modules/custom-fields/repository";
 import ContractorsClientView from "./ContractorsClientView";
 
 interface ContractorsPageProps {
@@ -19,7 +23,7 @@ export default async function ContractorsPage({ params, searchParams }: Contract
 
   const isPrivileged = ctx.role === "OWNER" || ctx.role === "ADMIN";
 
-  const [contractors, projects] = await Promise.all([
+  const [contractors, projects, customFieldDefinitions, customFieldValues] = await Promise.all([
     findContractors(ctx, {
       search,
       isActive: status === "archived" ? false : status === "active" ? true : undefined,
@@ -29,7 +33,14 @@ export default async function ContractorsPage({ params, searchParams }: Contract
       select: { id: true, code: true, name: true },
       orderBy: { code: "asc" },
     }),
+    getCustomFieldDefinitions(ctx, "CONTRACTOR"),
+    getCustomFieldValues(ctx, "CONTRACTOR"),
   ]);
+
+  const serializedContractors = contractors.map((c) => ({
+    ...c,
+    customFields: customFieldValues[c.id] || {},
+  }));
 
   return (
     <div className="space-y-6">
@@ -48,11 +59,13 @@ export default async function ContractorsPage({ params, searchParams }: Contract
       </div>
 
       <ContractorsClientView
-        initialContractors={serializeForClient(contractors) as any}
+        initialContractors={serializeForClient(serializedContractors) as any}
         projects={serializeForClient(projects)}
         workspaceSlug={ctx.tenantSlug}
         userRole={ctx.role}
         hasFinanceAccess={ctx.hasFinanceAccess || isPrivileged}
+        initialCustomFields={serializeForClient(customFieldDefinitions) as any}
+        initialCustomValues={serializeForClient(customFieldValues) as any}
       />
     </div>
   );

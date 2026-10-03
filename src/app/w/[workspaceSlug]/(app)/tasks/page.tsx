@@ -3,6 +3,10 @@ import { getCurrentTenantContext } from "@/server/auth/session";
 import { findTasks, getTaskDashboardMetrics } from "@/server/modules/tasks/repository";
 import { findProjects } from "@/server/modules/projects/repository";
 import { prisma } from "@/server/db/prisma";
+import {
+  getCustomFieldDefinitions,
+  getCustomFieldValues,
+} from "@/server/modules/custom-fields/repository";
 import TasksClientView from "./TasksClientView";
 
 interface TasksPageProps {
@@ -23,7 +27,7 @@ export default async function TasksPage({ params, searchParams }: TasksPageProps
   const myTasksOnly = effectiveScope === "my" || !isPrivileged;
 
   // Load all dashboard data in a single parallel batch for maximum speed
-  const [metrics, rawTasks, projects, members, upcomingVisit] = await Promise.all([
+  const [metrics, rawTasks, projects, members, upcomingVisit, customFieldDefinitions, customFieldValues] = await Promise.all([
     getTaskDashboardMetrics(ctx, myTasksOnly),
     findTasks(ctx, {
       myTasksOnly,
@@ -123,6 +127,7 @@ export default async function TasksPage({ params, searchParams }: TasksPageProps
       reason: ah.reason,
       createdAt: ah.createdAt.toISOString(),
     })) || [],
+    customFields: customFieldValues[t.id] || {},
   }));
 
   return (
@@ -192,6 +197,8 @@ export default async function TasksPage({ params, searchParams }: TasksPageProps
         metrics={metrics}
         contextUserFullName={ctx.userFullName}
         workspaceTimezone={ctx.timezone}
+        initialCustomFields={customFieldDefinitions as any}
+        initialCustomValues={customFieldValues as any}
       />
     </div>
   );

@@ -3,6 +3,10 @@ import { getCurrentTenantContext } from "@/server/auth/session";
 import { findConsultants } from "@/server/modules/consultants/repository";
 import { prisma } from "@/server/db/prisma";
 import { serializeForClient } from "@/server/utils/serialize";
+import {
+  getCustomFieldDefinitions,
+  getCustomFieldValues,
+} from "@/server/modules/custom-fields/repository";
 import ConsultantsClientView from "./ConsultantsClientView";
 
 interface ConsultantsPageProps {
@@ -19,7 +23,7 @@ export default async function ConsultantsPage({ params, searchParams }: Consulta
 
   const isPrivileged = ctx.role === "OWNER" || ctx.role === "ADMIN";
 
-  const [consultants, projects] = await Promise.all([
+  const [consultants, projects, customFieldDefinitions, customFieldValues] = await Promise.all([
     findConsultants(ctx, {
       search,
       isActive: status === "archived" ? false : status === "active" ? true : undefined,
@@ -29,7 +33,14 @@ export default async function ConsultantsPage({ params, searchParams }: Consulta
       select: { id: true, code: true, name: true },
       orderBy: { code: "asc" },
     }),
+    getCustomFieldDefinitions(ctx, "CONSULTANT"),
+    getCustomFieldValues(ctx, "CONSULTANT"),
   ]);
+
+  const serializedConsultants = consultants.map((c) => ({
+    ...c,
+    customFields: customFieldValues[c.id] || {},
+  }));
 
   return (
     <div className="space-y-6">
@@ -48,10 +59,12 @@ export default async function ConsultantsPage({ params, searchParams }: Consulta
       </div>
 
       <ConsultantsClientView
-        initialConsultants={serializeForClient(consultants) as any}
+        initialConsultants={serializeForClient(serializedConsultants) as any}
         projects={serializeForClient(projects)}
         workspaceSlug={ctx.tenantSlug}
         userRole={ctx.role}
+        initialCustomFields={serializeForClient(customFieldDefinitions) as any}
+        initialCustomValues={serializeForClient(customFieldValues) as any}
       />
     </div>
   );
