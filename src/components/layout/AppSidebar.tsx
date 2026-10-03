@@ -94,7 +94,7 @@ export function AppSidebar({ context }: AppSidebarProps) {
   ];
 
   return (
-    <aside className="w-64 bg-white border-r border-[#E2E6F0] flex flex-col justify-between shrink-0 h-screen sticky top-0">
+    <aside className="hidden md:flex w-64 bg-white border-r border-[#E2E6F0] flex-col justify-between shrink-0 h-screen sticky top-0">
       {/* Brand Header */}
       <div>
         <div className="p-4 border-b border-[#E2E6F0] flex items-center gap-3">

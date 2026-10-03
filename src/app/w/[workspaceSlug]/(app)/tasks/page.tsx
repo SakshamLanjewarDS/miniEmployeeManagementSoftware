@@ -126,10 +126,10 @@ export default async function TasksPage({ params, searchParams }: TasksPageProps
   }));
 
   return (
-    <div className="space-y-6">
-      {/* Top Banner: Upcoming Visit Quick Action */}
+    <div className="space-y-4">
+      {/* Top Banner: Upcoming Visit Quick Action (desktop only to avoid occupying mobile dashboard) */}
       {upcomingVisit && (
-        <div className="bg-[#F2F4FF] border border-[#CEDEFF] rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
+        <div className="hidden md:flex bg-[#F2F4FF] border border-[#CEDEFF] rounded-2xl p-4 flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
           <div className="flex items-start gap-3">
             <div className="p-2.5 bg-[#5A81FA] text-white rounded-xl shrink-0 mt-0.5">
               <span className="font-bold text-xs uppercase tracking-wider">VISIT</span>
@@ -159,23 +159,6 @@ export default async function TasksPage({ params, searchParams }: TasksPageProps
           </a>
         </div>
       )}
-
-      {/* Main Tasks Header */}
-      <div className="border-b border-[#E2E6F0] pb-5">
-        <div className="flex items-center gap-2 text-xs font-semibold text-[#5A81FA] uppercase tracking-wider">
-          <span>Studio Coordination</span>
-          <span>•</span>
-          <span>{effectiveScope === "all" ? "Organization Scope" : "Personal Workspace"}</span>
-        </div>
-        <h1 className="text-2xl font-bold tracking-tight text-[#1F1F1F] mt-1">
-          {effectiveScope === "all" ? "All Studio Deliverables" : "My Assigned Tasks"}
-        </h1>
-        <p className="text-xs text-[#696E82] mt-0.5">
-          {effectiveScope === "all"
-            ? `Studio-wide tasks & architecture deliverables (Access: ${ctx.userFullName} • ${ctx.role})`
-            : `Tasks assigned to ${ctx.userFullName} (${ctx.employeeId || ctx.role})`}
-        </p>
-      </div>
 
       {/* Interactive Client Component */}
       <TasksClientView

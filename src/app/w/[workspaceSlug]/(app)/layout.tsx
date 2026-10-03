@@ -25,7 +25,7 @@ export default async function AppLayout({ children, params }: AppLayoutProps) {
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0">
         <AppTopbar context={ctx} />
-        <main className="flex-1 p-6 md:p-8 max-w-7xl mx-auto w-full">
+        <main className="flex-1 p-3 sm:p-6 md:p-8 max-w-7xl mx-auto w-full">
           {children}
         </main>
       </div>
