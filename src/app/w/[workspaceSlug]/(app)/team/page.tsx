@@ -29,28 +29,13 @@ export default async function TeamPage({ params }: TeamPageProps) {
   }));
 
   return (
-    <div className="space-y-6">
-      <div className="border-b border-[#E2E6F0] pb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 text-xs font-semibold text-[#5A81FA] uppercase tracking-wider">
-            <span>Studio Directory & Administration</span>
-            <span>•</span>
-            <span>Staff Directory</span>
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight text-[#1F1F1F] mt-1">Studio Team Members</h1>
-          <p className="text-xs text-[#696E82] mt-0.5">
-            Architecture partners, project architects, and studio administrative staff with project assignments
-          </p>
-        </div>
-      </div>
-
-      <TeamClientView
-        workspaceSlug={ctx.tenantSlug}
-        currentUserId={ctx.userId}
-        userRole={ctx.role}
-        initialEmployees={serializeForClient(serializedEmployees) as any}
-        availableProjects={serializeForClient(projects)}
-      />
-    </div>
+    <TeamClientView
+      workspaceSlug={ctx.tenantSlug}
+      currentUserId={ctx.userId}
+      userRole={ctx.role}
+      userFullName={ctx.userFullName}
+      initialEmployees={serializeForClient(serializedEmployees) as any}
+      availableProjects={serializeForClient(projects)}
+    />
   );
 }
