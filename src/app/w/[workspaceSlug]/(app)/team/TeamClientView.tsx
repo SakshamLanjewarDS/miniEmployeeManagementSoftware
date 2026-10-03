@@ -693,11 +693,13 @@ export default function TeamClientView({
       )}
 
       {/* Control Bar */}
-      <div className="bg-white border border-[#E2E6F0] rounded-2xl p-4 shadow-2xs space-y-4">
+      <div className="bg-white border border-[#E2E6F0] rounded-2xl p-4 shadow-2xs space-y-4" suppressHydrationWarning>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           {/* Status Tabs */}
           <div className="flex items-center gap-1 bg-[#F8F9FD] p-1 rounded-xl border border-[#E2E6F0]">
             <button
+              type="button"
+              suppressHydrationWarning
               onClick={() => {
                 setStatusFilter("ALL");
                 setCurrentPage(1);
@@ -711,6 +713,8 @@ export default function TeamClientView({
               All ({employees.length})
             </button>
             <button
+              type="button"
+              suppressHydrationWarning
               onClick={() => {
                 setStatusFilter("ACTIVE");
                 setCurrentPage(1);
@@ -724,6 +728,8 @@ export default function TeamClientView({
               Active ({employees.filter((e) => e.isActive).length})
             </button>
             <button
+              type="button"
+              suppressHydrationWarning
               onClick={() => {
                 setStatusFilter("INACTIVE");
                 setCurrentPage(1);
@@ -743,6 +749,7 @@ export default function TeamClientView({
             <div className="flex items-center gap-2">
               <button
                 type="button"
+                suppressHydrationWarning
                 onClick={fetchFreshEmployees}
                 disabled={isRefreshing}
                 title="Synchronize live changes with database"
@@ -752,6 +759,8 @@ export default function TeamClientView({
                 <span className="hidden sm:inline text-[11px]">{isRefreshing ? "Syncing..." : "Sync Live"}</span>
               </button>
               <button
+                type="button"
+                suppressHydrationWarning
                 onClick={() => setIsBulkMailModalOpen(true)}
                 className="bg-white border border-[#E2E6F0] text-[#1F1F1F] hover:bg-[#F8F9FD] hover:border-[#EA4335] px-3.5 py-2 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-2 shadow-xs shrink-0 cursor-pointer"
                 title="Send personalized bulk mail (leave notices, festive greetings, circulars)"
@@ -765,6 +774,8 @@ export default function TeamClientView({
                 )}
               </button>
               <button
+                type="button"
+                suppressHydrationWarning
                 onClick={() => setIsCsvModalOpen(true)}
                 className="bg-white border border-[#CEDEFF] text-[#2C308D] hover:bg-[#F2F4FF] px-3.5 py-2 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-2 shadow-xs shrink-0 cursor-pointer"
                 title="Bulk import studio team employees from CSV"
@@ -773,6 +784,8 @@ export default function TeamClientView({
                 <span>Import CSV</span>
               </button>
               <button
+                type="button"
+                suppressHydrationWarning
                 onClick={openAddEmployeeModal}
                 className="bg-[#5A81FA] text-white px-3.5 py-2 rounded-xl text-xs font-semibold hover:bg-[#426EE8] transition-all flex items-center justify-center gap-2 shadow-xs shrink-0 cursor-pointer"
               >
@@ -789,6 +802,7 @@ export default function TeamClientView({
             <Search className="w-4 h-4 absolute left-3 top-2.5 text-[#696E82]" />
             <input
               type="text"
+              suppressHydrationWarning
               placeholder="Search by name, employee ID (EMP-...), email, or designation..."
               value={search}
               onChange={(e) => {
@@ -801,6 +815,7 @@ export default function TeamClientView({
 
           <div>
             <select
+              suppressHydrationWarning
               value={roleFilter}
               onChange={(e) => {
                 setRoleFilter(e.target.value);

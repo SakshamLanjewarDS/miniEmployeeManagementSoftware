@@ -688,6 +688,7 @@ export function ProjectsClientView({
           <div className="flex items-center gap-2">
             <button
               type="button"
+              suppressHydrationWarning
               onClick={() => setCsvModalOpen(true)}
               className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-white hover:bg-[#F8F9FD] border border-[#E2E6F0] text-[#1F1F1F] text-xs font-semibold shadow-2xs hover:shadow-xs transition-all cursor-pointer shrink-0"
               title="Bulk import projects or export data to CSV"
@@ -698,6 +699,7 @@ export function ProjectsClientView({
 
             <button
               type="button"
+              suppressHydrationWarning
               onClick={() => {
                 setErrorMessage(null);
                 setIsCreateModalOpen(true);
@@ -718,13 +720,14 @@ export function ProjectsClientView({
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="bg-white border border-[#E2E6F0] rounded-2xl p-4 shadow-2xs space-y-3">
+      <div className="bg-white border border-[#E2E6F0] rounded-2xl p-4 shadow-2xs space-y-3" suppressHydrationWarning>
         <div className="flex flex-col md:flex-row items-center gap-3">
           {/* Search Box */}
           <div className="relative flex-1 w-full">
             <Search className="w-4 h-4 text-[#696E82] absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
+              suppressHydrationWarning
               placeholder="Search by project name, code (e.g. PRJ-001), client, or site..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -736,6 +739,7 @@ export function ProjectsClientView({
           <div className="flex items-center gap-2 w-full md:w-auto">
             <span className="text-xs font-medium text-[#696E82] shrink-0">Status:</span>
             <select
+              suppressHydrationWarning
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
               className="text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl px-3 py-2 text-[#1F1F1F] focus:outline-none focus:border-[#4B5320]"
@@ -752,6 +756,7 @@ export function ProjectsClientView({
           <div className="flex items-center gap-2 w-full md:w-auto">
             <span className="text-xs font-medium text-[#696E82] shrink-0">Phase:</span>
             <select
+              suppressHydrationWarning
               value={phaseFilter}
               onChange={(e) => setPhaseFilter(e.target.value)}
               className="text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl px-3 py-2 text-[#1F1F1F] focus:outline-none focus:border-[#4B5320]"
@@ -768,6 +773,7 @@ export function ProjectsClientView({
           {/* Advanced Filters Toggle Button */}
           <button
             type="button"
+            suppressHydrationWarning
             onClick={() => setIsAdvancedFilterOpen(!isAdvancedFilterOpen)}
             className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer shrink-0 ${
               isAdvancedFilterOpen || activeFiltersCount > 0
@@ -793,6 +799,7 @@ export function ProjectsClientView({
           {activeFiltersCount > 0 && (
             <button
               type="button"
+              suppressHydrationWarning
               onClick={handleResetFilters}
               className="inline-flex items-center gap-1 px-2.5 py-2 rounded-xl text-xs font-semibold text-rose-600 hover:text-rose-800 hover:bg-rose-50 border border-transparent transition-colors cursor-pointer shrink-0"
               title="Reset all filters"
@@ -1072,6 +1079,7 @@ export function ProjectsClientView({
           <div className="flex items-center gap-3">
             <button
               type="button"
+              suppressHydrationWarning
               onClick={handleToggleSelectAll}
               className="inline-flex items-center gap-2 text-xs font-semibold text-[#1F1F1F] hover:text-[#4B5320] cursor-pointer"
             >
