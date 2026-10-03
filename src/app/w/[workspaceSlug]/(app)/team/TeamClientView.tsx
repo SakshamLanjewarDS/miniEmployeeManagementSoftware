@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   Users,
@@ -123,6 +123,12 @@ export default function TeamClientView({
   );
   const [resetNotifyEmployee, setResetNotifyEmployee] = useState<boolean>(true);
   const [showResetPassword, setShowResetPassword] = useState<boolean>(false);
+
+  // Mounting state to prevent browser extension hydration attribute mismatches
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // Feedback & Loading
   const [loading, setLoading] = useState(false);
@@ -664,6 +670,27 @@ export default function TeamClientView({
       plainTextMessage: plainMsg,
     });
   };
+
+  if (!isMounted) {
+    return (
+      <div className="space-y-6 animate-pulse" suppressHydrationWarning>
+        <div className="border-b border-[#E2E6F0] pb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-2">
+            <div className="h-4 w-48 bg-gray-200 rounded" />
+            <div className="h-7 w-64 bg-gray-200 rounded" />
+            <div className="h-3 w-96 bg-gray-100 rounded" />
+          </div>
+          <div className="h-9 w-40 bg-gray-200 rounded-xl" />
+        </div>
+        <div className="bg-white border border-[#E2E6F0] rounded-2xl p-4 h-14" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="bg-white border border-[#E2E6F0] rounded-2xl p-6 h-64" />
+          <div className="bg-white border border-[#E2E6F0] rounded-2xl p-6 h-64" />
+          <div className="bg-white border border-[#E2E6F0] rounded-2xl p-6 h-64" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6" suppressHydrationWarning>

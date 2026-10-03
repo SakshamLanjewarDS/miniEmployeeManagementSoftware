@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { TenantContext } from "@/server/tenancy/context";
@@ -143,6 +143,12 @@ export function ProjectsClientView({
 
   // Role Permissions: Owner and Admin have full manipulation rights; Employee is read-only
   const canManage = context.role === "OWNER" || context.role === "ADMIN";
+
+  // Mounting state to eliminate browser extension attribute mismatches during hydration
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // Filter & Search states
   const [searchQuery, setSearchQuery] = useState("");
@@ -621,6 +627,26 @@ export function ProjectsClientView({
         );
     }
   };
+
+  if (!isMounted) {
+    return (
+      <div className="space-y-6 animate-pulse" suppressHydrationWarning>
+        <div className="border-b border-[#E2E6F0] pb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-2">
+            <div className="h-4 w-48 bg-gray-200 rounded" />
+            <div className="h-7 w-64 bg-gray-200 rounded" />
+            <div className="h-3 w-96 bg-gray-100 rounded" />
+          </div>
+          <div className="h-9 w-40 bg-gray-200 rounded-xl" />
+        </div>
+        <div className="bg-white border border-[#E2E6F0] rounded-2xl p-4 h-14" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-white border border-[#E2E6F0] rounded-2xl p-6 h-72" />
+          <div className="bg-white border border-[#E2E6F0] rounded-2xl p-6 h-72" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6" suppressHydrationWarning>

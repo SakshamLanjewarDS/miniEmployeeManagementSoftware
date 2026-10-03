@@ -63,6 +63,37 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-title" content="Studio OS" />
         <meta name="msapplication-TileColor" content="#0B122B" />
         <meta name="msapplication-TileImage" content="/icons/icon-192.png" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                if (typeof window !== 'undefined') {
+                  window.addEventListener('error', function(event) {
+                    var fn = (event && event.filename) || '';
+                    var msg = (event && event.message) || '';
+                    if (
+                      fn.includes('share-modal') ||
+                      fn.includes('chext_') ||
+                      fn.includes('inspector.') ||
+                      msg.includes("Cannot read properties of null (reading 'addEventListener')")
+                    ) {
+                      event.preventDefault();
+                      event.stopImmediatePropagation();
+                      return true;
+                    }
+                  }, true);
+                  window.addEventListener('unhandledrejection', function(event) {
+                    var r = (event && event.reason && (event.reason.message || event.reason.stack || '')) || '';
+                    if (r.includes('share-modal') || r.includes('chext_')) {
+                      event.preventDefault();
+                      event.stopImmediatePropagation();
+                    }
+                  });
+                }
+              })();
+            `,
+          }}
+        />
       </head>
       <body suppressHydrationWarning className="antialiased min-h-screen selection:bg-[#5A81FA] selection:text-white">
         {children}
