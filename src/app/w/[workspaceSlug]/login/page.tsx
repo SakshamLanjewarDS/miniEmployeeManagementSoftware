@@ -23,8 +23,7 @@ export default function WorkspaceLoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const is100Design = workspaceSlug === "100percentdesign";
-  const studioName = is100Design ? "100% DESIGN Studio" : "Apex Architecture Studio";
+  const studioName = "100% DESIGN Studio";
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,12 +55,6 @@ export default function WorkspaceLoginPage() {
     }
   };
 
-  const handleFillDemo = (empId: string, pwd: string) => {
-    setIdentifier(empId);
-    setPassword(pwd);
-    setError(null);
-  };
-
   return (
     <div className="min-h-screen bg-[#F8F9FD] flex flex-col justify-center items-center p-4 selection:bg-[#5A81FA] selection:text-white">
       {/* Brand Header */}
@@ -78,10 +71,7 @@ export default function WorkspaceLoginPage() {
         </div>
         <h1 className="text-2xl font-bold tracking-tight text-[#1F1F1F]">{studioName}</h1>
         <p className="text-sm text-[#696E82] mt-1">
-          Workspace:{" "}
-          <span className="font-mono bg-[#CEDEFF] px-2 py-0.5 rounded text-xs text-[#2C308D] font-semibold border border-[#A8B1CE]/40">
-            {workspaceSlug}
-          </span>
+          Architectural Employee & Project OS
         </p>
       </div>
 
@@ -158,57 +148,7 @@ export default function WorkspaceLoginPage() {
               </>
             )}
           </button>
-
-          {/* Quick Demo Credentials Autofill */}
-          <div className="pt-2">
-            <div className="text-[11px] font-medium text-[#696E82] mb-1.5 flex items-center justify-between">
-              <span>Quick Demo Credentials:</span>
-              <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
-                1-Click Autofill
-              </span>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => handleFillDemo("EMP-001", "Password@123")}
-                className="p-2 rounded-lg bg-[#F2F4FF] hover:bg-[#E5E9FF] text-[#2C308D] text-left text-xs transition-colors border border-[#CEDEFF] cursor-pointer"
-              >
-                <div className="font-bold text-[11px]">Principal Admin</div>
-                <div className="font-mono text-[10px] text-[#696E82]">EMP-001 • Tap to fill</div>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleFillDemo("EMP-002", "Password@123")}
-                className="p-2 rounded-lg bg-[#F8F9FD] hover:bg-[#EBEFF8] text-[#1F1F1F] text-left text-xs transition-colors border border-[#E2E6F0] cursor-pointer"
-              >
-                <div className="font-bold text-[11px]">Project Manager</div>
-                <div className="font-mono text-[10px] text-[#696E82]">EMP-002 • Tap to fill</div>
-              </button>
-            </div>
-          </div>
         </form>
-
-        {/* Switch tenant link */}
-        <div className="mt-8 pt-5 border-t border-[#E2E6F0] flex justify-between items-center text-xs text-[#696E82]">
-          <span>Need alternate practice?</span>
-          {is100Design ? (
-            <a
-              href="/w/apex-studio/login"
-              className="text-[#5A81FA] hover:underline font-semibold flex items-center gap-1"
-            >
-              <span>Apex Architecture Studio</span>
-              <span>→</span>
-            </a>
-          ) : (
-            <a
-              href="/w/100percentdesign/login"
-              className="text-[#5A81FA] hover:underline font-semibold flex items-center gap-1"
-            >
-              <span>100% DESIGN Studio</span>
-              <span>→</span>
-            </a>
-          )}
-        </div>
       </div>
 
       <div className="w-full max-w-md mt-3">

@@ -1520,7 +1520,7 @@ export function getSampleCsvTemplate(type: string): { filename: string; content:
         content: [
           "Contractor Name,Company Name,Type,Contact,Alternate Contact,Email,Projects,Office Location",
           'Suresh Patel,Shree Ram Civil LLP,Civil / Masonry,+91 98200 45678,+91 98200 45699,suresh@shreeramcivil.com,Villa Serenita,"Panvel, Navi Mumbai"',
-          'Dinesh Sharma,Apex Modular,Carpentry & Millwork,+91 98190 33445,,dinesh@apexmillwork.in,Apex HQ,"Goregaon West, Mumbai"',
+          'Dinesh Sharma,Prime Modular,Carpentry & Millwork,+91 98190 33445,,dinesh@primemillwork.in,Horizon HQ,"Goregaon West, Mumbai"',
         ].join("\r\n"),
       };
 
@@ -1530,7 +1530,7 @@ export function getSampleCsvTemplate(type: string): { filename: string; content:
         content: [
           "Consultant Name,Company Name,Type of service,Designation,Email,Contact,Alternate Contact,Firm Location,Project",
           'Dr. Amit Joshi,Joshi Structural Engineers,Structural,Chief Structural Engineer,amit@joshistructures.com,+91 98205 66778,+91 98205 66700,"Nariman Point, Mumbai",Villa Serenita',
-          'Karan Johar,EnviroTech Solutions,MEP / HVAC,Director,karan@envirotechmep.com,+91 98700 98765,,Andheri East Mumbai,Apex HQ',
+          'Karan Johar,EnviroTech Solutions,MEP / HVAC,Director,karan@envirotechmep.com,+91 98700 98765,,Andheri East Mumbai,Horizon HQ',
         ].join("\r\n"),
       };
 
@@ -1540,7 +1540,7 @@ export function getSampleCsvTemplate(type: string): { filename: string; content:
         content: [
           "Client Name,Projects,Client Type,Email,Contact No,Location,Notes (Extra info.)",
           'Arun Singhal,Villa Serenita,Private Luxury Villa,arun@singhalestates.com,+91 98110 54321,"14 Altamount Road, Mumbai",Client prefers Italian marble flooring and sustainable solar integration',
-          'Verdant Logistics Ltd,Apex Corporate HQ,Corporate Office,projects@verdantlogistics.com,+91 22 6677 8899,"Bandra Kurla Complex, Mumbai",Turnkey commercial execution',
+          'Verdant Logistics Ltd,Horizon Corporate HQ,Corporate Office,projects@verdantlogistics.com,+91 22 6677 8899,"Bandra Kurla Complex, Mumbai",Turnkey commercial execution',
         ].join("\r\n"),
       };
 
@@ -1550,7 +1550,7 @@ export function getSampleCsvTemplate(type: string): { filename: string; content:
         content: [
           "Project Code,Project name,Client Name,Typology,Project Architect,Project Manager,Project Coordinator,Project Contractor,Project Consultant,Site Address,Site City,Google map location,Start Date,End Date,Plot Area,Total Construction,Budget,Brief / Project Brief",
           'PRJ-101,Villa Serenita,Arun Singhal,Residential Architecture,Priya Patel,Rohan Verma,Priya Patel,Shree Ram Civil LLP,Dr. Amit Joshi,"Plot 42, Sector 15",Gurugram,https://maps.google.com/?q=28.4595,2026-01-15,2026-12-31,5000 sq.ft,12500 sq.ft,15000000,Contemporary 5-BHK luxury seaside villa with cantilevered pools',
-          'PRJ-102,Apex Corporate HQ,Verdant Logistics Ltd,Commercial & Corporate Office,Rohan Verma,Priya Patel,Rohan Verma,Apex Modular,Karan Johar,"BKC Bandra East",Mumbai,https://maps.google.com/?q=19.0657,2026-03-01,2026-10-15,10000 sq.ft,35000 sq.ft,45000000,Modern sustainable corporate headquarters with biophilic design',
+          'PRJ-102,Horizon Corporate HQ,Verdant Logistics Ltd,Commercial & Corporate Office,Rohan Verma,Priya Patel,Rohan Verma,Prime Modular,Karan Johar,"BKC Bandra East",Mumbai,https://maps.google.com/?q=19.0657,2026-03-01,2026-10-15,10000 sq.ft,35000 sq.ft,45000000,Modern sustainable corporate headquarters with biophilic design',
         ].join("\r\n"),
       };
 
@@ -1563,27 +1563,27 @@ export function getSampleCsvTemplate(type: string): { filename: string; content:
           "=== CLIENT DETAILS ===",
           "Client Name,Projects,Client Type,Email,Contact No,Location,Notes (Extra info.)",
           'Arun Singhal,Villa Serenita,Luxury Villa,arun@singhalestates.com,+91 98110 54321,"14 Altamount Road, Mumbai",Private luxury villa client',
-          'Verdant Logistics,Apex Corporate HQ,Corporate,projects@verdantlogistics.com,+91 22 6677 8899,"BKC, Mumbai",Corporate office fitout',
+          'Verdant Logistics,Horizon Corporate HQ,Corporate,projects@verdantlogistics.com,+91 22 6677 8899,"BKC, Mumbai",Corporate office fitout',
           "",
           "=== CONTRACTORS DETAILS ===",
           "Contractor Name,Company Name,Type,Contact,Alternate Contact,Email,Projects,Office Location",
           'Suresh Patel,Shree Ram Civil LLP,Civil / Masonry,+91 98200 45678,+91 98200 45699,suresh@shreeramcivil.com,Villa Serenita,"Panvel, Navi Mumbai"',
-          'Dinesh Sharma,Apex Modular,Carpentry,+91 98190 33445,,dinesh@apexmillwork.in,Apex Corporate HQ,"Goregaon West, Mumbai"',
+          'Dinesh Sharma,Prime Modular,Carpentry,+91 98190 33445,,dinesh@primemillwork.in,Horizon Corporate HQ,"Goregaon West, Mumbai"',
           "",
           "=== VENDOR DETAILS ===",
           "Vendor Name,Company Name,Service,Contact,Alternate Contact,Email,Projects,Office Location",
           'Marble Hub India,StoneCraft Ltd,Italian Marble Supply,+91 98330 11223,,info@marblehub.in,Villa Serenita,"Lower Parel, Mumbai"',
-          'Lumina Lighting Studio,Lumina Tech,Architectural LED Lighting,+91 98330 44556,,sales@lumina.in,Apex Corporate HQ,"Worli, Mumbai"',
+          'Lumina Lighting Studio,Lumina Tech,Architectural LED Lighting,+91 98330 44556,,sales@lumina.in,Horizon Corporate HQ,"Worli, Mumbai"',
           "",
           "=== CONSULTANT DETAILS ===",
           "Consultant Name,Company Name,Type of service,Designation,Email,Contact,Alternate Contact,Firm Location,Project",
           'Dr. Amit Joshi,Joshi Structural Engineers,Structural,Chief Engineer,amit@joshistructures.com,+91 98205 66778,,Nariman Point Mumbai,Villa Serenita',
-          'Karan Johar,EnviroTech Solutions,MEP / HVAC,Director,karan@envirotechmep.com,+91 98700 98765,,Andheri East Mumbai,Apex Corporate HQ',
+          'Karan Johar,EnviroTech Solutions,MEP / HVAC,Director,karan@envirotechmep.com,+91 98700 98765,,Andheri East Mumbai,Horizon Corporate HQ',
           "",
           "=== PROJECTS DETAILS ===",
           "Project name,Clients,Project type,Phase,Starting - Deadline,Other info",
           'Villa Serenita,Arun Singhal,Luxury Villa,Execution,2026-01-15 - 2026-12-31,Exclusive seaside residential villa',
-          'Apex Corporate HQ,Verdant Logistics,Corporate Office,Detailed Design,2026-03-01 - 2026-10-15,Commercial workplace project',
+          'Horizon Corporate HQ,Verdant Logistics,Corporate Office,Detailed Design,2026-03-01 - 2026-10-15,Commercial workplace project',
           "",
           "=== STUDIO TEAM (EMPLOYEES) ===",
           "Full Name,Contact,Alternate Contact,Work Mail,Department,Designation",

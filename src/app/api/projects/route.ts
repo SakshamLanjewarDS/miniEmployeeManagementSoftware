@@ -5,6 +5,7 @@ import {
   createProject,
   updateProject,
   deleteProject,
+  deleteProjectsBulk,
   getProjectFormData,
   findProjects,
   updateProjectProgress,
@@ -215,12 +216,32 @@ export async function PUT(req: NextRequest) {
   }
 }
 
-// DELETE /api/projects?workspaceSlug=...&projectId=... (Owner and Admin only)
+// DELETE /api/projects?workspaceSlug=... (Owner and Admin only)
+// Supports single projectId or bulk projectIds: string[]
 export async function DELETE(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const workspaceSlug = searchParams.get("workspaceSlug") || "100percentdesign";
-    const projectId = searchParams.get("projectId");
+    let projectId = searchParams.get("projectId");
+    let projectIds: string[] = [];
+
+    const queryIds = searchParams.get("projectIds");
+    if (queryIds) {
+      projectIds = queryIds.split(",").map((s) => s.trim()).filter(Boolean);
+    }
+
+    // Try reading JSON body if available
+    try {
+      const body = await req.json();
+      if (body?.projectIds && Array.isArray(body.projectIds)) {
+        projectIds = body.projectIds;
+      }
+      if (body?.projectId && typeof body.projectId === "string") {
+        projectId = body.projectId;
+      }
+    } catch {
+      // Body may be empty if called with query params only
+    }
 
     const ctx = await getCurrentTenantContext(workspaceSlug);
     if (!ctx) {
@@ -234,8 +255,17 @@ export async function DELETE(req: NextRequest) {
       );
     }
 
+    if (projectIds.length > 0) {
+      const result = await deleteProjectsBulk(ctx, projectIds);
+      return NextResponse.json({
+        success: true,
+        message: `Successfully deleted ${result.count} project(s)`,
+        count: result.count,
+      });
+    }
+
     if (!projectId) {
-      return NextResponse.json({ error: "projectId is required" }, { status: 400 });
+      return NextResponse.json({ error: "projectId or projectIds is required" }, { status: 400 });
     }
 
     await deleteProject(ctx, projectId);
@@ -243,7 +273,7 @@ export async function DELETE(req: NextRequest) {
   } catch (error: any) {
     console.error("DELETE /api/projects error:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to delete project" },
+      { error: error.message || "Failed to delete project(s)" },
       { status: error.status || 400 }
     );
   }

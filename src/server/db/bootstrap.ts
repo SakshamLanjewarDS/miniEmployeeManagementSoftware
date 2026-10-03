@@ -74,36 +74,7 @@ async function runBootstrap(): Promise<void> {
       });
     }
 
-    // 3. Ensure Secondary Tenant (apex-studio) exists for multi-tenant isolation
-    let tenant2 = await prisma.tenant.findUnique({
-      where: { slug: "apex-studio" },
-    });
-
-    if (!tenant2) {
-      tenant2 = await prisma.tenant.create({
-        data: {
-          slug: "apex-studio",
-          name: "Apex Architecture Studio",
-          timezone: "Asia/Kolkata",
-          currency: "INR",
-          lifecycleState: TenantLifecycleState.ACTIVE,
-          branding: {
-            primaryColor: "#1A365D",
-            accentColor: "#3182CE",
-          },
-        },
-      });
-
-      await prisma.subscription.create({
-        data: {
-          tenantId: tenant2.id,
-          planId: plan.id,
-          status: "ACTIVE",
-          currentPeriodStart: new Date(),
-          currentPeriodEnd: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
-        },
-      });
-    }
+    // 3. Default Passwords Hash
 
     // 4. Default Passwords Hash
     const defaultPasswordHash = await bcrypt.hash("Saksham@2003", 10);

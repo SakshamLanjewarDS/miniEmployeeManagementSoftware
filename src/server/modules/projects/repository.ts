@@ -561,6 +561,52 @@ export async function deleteProject(ctx: TenantContext, projectId: string) {
   return deleted;
 }
 
+export async function deleteProjectsBulk(ctx: TenantContext, projectIds: string[]) {
+  assertAdminOrOwner(ctx, "Only Studio Administrators or Owners can delete projects.");
+
+  if (!projectIds || projectIds.length === 0) {
+    return { count: 0 };
+  }
+
+  const validProjects = await prisma.project.findMany({
+    where: {
+      id: { in: projectIds },
+      tenantId: ctx.tenantId,
+    },
+    select: { id: true, code: true, name: true },
+  });
+
+  if (validProjects.length === 0) {
+    return { count: 0 };
+  }
+
+  const idsToDelete = validProjects.map((p) => p.id);
+
+  const res = await prisma.project.deleteMany({
+    where: {
+      id: { in: idsToDelete },
+      tenantId: ctx.tenantId,
+    },
+  });
+
+  try {
+    await prisma.auditEvent.create({
+      data: {
+        tenantId: ctx.tenantId,
+        actorId: ctx.membershipId,
+        action: "PROJECTS_BULK_DELETED",
+        entityType: "Project",
+        entityId: idsToDelete[0],
+        safeChangeSummary: `Bulk deleted ${validProjects.length} projects (${validProjects.map((p) => p.code).join(", ")})`,
+      },
+    });
+  } catch (e) {
+    console.error("Failed to log bulk project deletion audit event:", e);
+  }
+
+  return res;
+}
+
 export async function getProjectFormData(ctx: TenantContext) {
   const [clients, members, contractors, consultants] = await Promise.all([
     prisma.client.findMany({

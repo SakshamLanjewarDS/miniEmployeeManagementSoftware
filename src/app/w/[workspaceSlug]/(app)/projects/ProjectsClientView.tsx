@@ -28,6 +28,17 @@ import {
   Sparkles,
   TrendingUp,
   FileSpreadsheet,
+  SlidersHorizontal,
+  ExternalLink,
+  HardHat,
+  UserCheck,
+  Compass,
+  FileText,
+  ChevronDown,
+  ChevronUp,
+  RotateCcw,
+  CheckSquare,
+  Square,
 } from "lucide-react";
 import { CsvImportExportModal } from "@/components/csv/CsvImportExportModal";
 
@@ -137,6 +148,19 @@ export function ProjectsClientView({
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [phaseFilter, setPhaseFilter] = useState<string>("ALL");
+  const [isAdvancedFilterOpen, setIsAdvancedFilterOpen] = useState(false);
+  const [typologyFilter, setTypologyFilter] = useState<string>("ALL");
+  const [architectFilter, setArchitectFilter] = useState<string>("ALL");
+  const [managerFilter, setManagerFilter] = useState<string>("ALL");
+  const [coordinatorFilter, setCoordinatorFilter] = useState<string>("ALL");
+  const [cityFilter, setCityFilter] = useState<string>("ALL");
+  const [contractorFilter, setContractorFilter] = useState<string>("ALL");
+  const [consultantFilter, setConsultantFilter] = useState<string>("ALL");
+  const [clientFilter, setClientFilter] = useState<string>("ALL");
+
+  // Selection & Bulk Delete states
+  const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
+  const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false);
 
   // Modal states
   const [csvModalOpen, setCsvModalOpen] = useState(false);
@@ -151,6 +175,43 @@ export function ProjectsClientView({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // Distinct cities from initialProjects
+  const availableCities = Array.from(
+    new Set(
+      initialProjects
+        .map((p) => p.siteCity?.trim())
+        .filter((c): c is string => Boolean(c && c.length > 0))
+    )
+  ).sort();
+
+  // Active filters count
+  const activeFiltersCount = [
+    statusFilter !== "ALL",
+    phaseFilter !== "ALL",
+    typologyFilter !== "ALL",
+    architectFilter !== "ALL",
+    managerFilter !== "ALL",
+    coordinatorFilter !== "ALL",
+    cityFilter !== "ALL",
+    contractorFilter !== "ALL",
+    consultantFilter !== "ALL",
+    clientFilter !== "ALL",
+  ].filter(Boolean).length;
+
+  const handleResetFilters = () => {
+    setSearchQuery("");
+    setStatusFilter("ALL");
+    setPhaseFilter("ALL");
+    setTypologyFilter("ALL");
+    setArchitectFilter("ALL");
+    setManagerFilter("ALL");
+    setCoordinatorFilter("ALL");
+    setCityFilter("ALL");
+    setContractorFilter("ALL");
+    setConsultantFilter("ALL");
+    setClientFilter("ALL");
+  };
 
   // Create Project Form State (Supports all 18 fields)
   const [formData, setFormData] = useState({
@@ -200,23 +261,94 @@ export function ProjectsClientView({
     description: "",
   });
 
-  // Filter projects
+  // Filter projects with advanced multi-facet filtering
   const filteredProjects = initialProjects.filter((p) => {
+    const q = searchQuery.toLowerCase().trim();
     const matchesSearch =
-      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (p.siteCity || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (p.projectCoordinator?.user?.fullName || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (p.projectManager?.user?.fullName || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (p.projectArchitect?.user?.fullName || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (p.primaryClient?.name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (p.siteAddress || "").toLowerCase().includes(searchQuery.toLowerCase());
+      !q ||
+      p.name.toLowerCase().includes(q) ||
+      p.code.toLowerCase().includes(q) ||
+      (p.siteCity || "").toLowerCase().includes(q) ||
+      (p.siteAddress || "").toLowerCase().includes(q) ||
+      (p.projectCoordinator?.user?.fullName || "").toLowerCase().includes(q) ||
+      (p.projectManager?.user?.fullName || "").toLowerCase().includes(q) ||
+      (p.projectArchitect?.user?.fullName || "").toLowerCase().includes(q) ||
+      (p.primaryClient?.name || "").toLowerCase().includes(q) ||
+      (p.contractor?.firmName || p.contractor?.name || "").toLowerCase().includes(q) ||
+      (p.consultant?.firmName || p.consultant?.name || "").toLowerCase().includes(q) ||
+      (p.description || "").toLowerCase().includes(q);
 
     const matchesStatus = statusFilter === "ALL" || p.status === statusFilter;
     const matchesPhase = phaseFilter === "ALL" || p.currentPhase === phaseFilter;
+    const matchesTypology = typologyFilter === "ALL" || p.projectType === typologyFilter;
+    const matchesArchitect = architectFilter === "ALL" || p.projectArchitectId === architectFilter;
+    const matchesManager = managerFilter === "ALL" || p.projectManagerId === managerFilter;
+    const matchesCoordinator = coordinatorFilter === "ALL" || p.projectCoordinatorId === coordinatorFilter;
+    const matchesCity = cityFilter === "ALL" || (p.siteCity || "").toLowerCase() === cityFilter.toLowerCase();
+    const matchesContractor = contractorFilter === "ALL" || p.contractorId === contractorFilter;
+    const matchesConsultant = consultantFilter === "ALL" || p.consultantId === consultantFilter;
+    const matchesClient = clientFilter === "ALL" || p.primaryClientId === clientFilter;
 
-    return matchesSearch && matchesStatus && matchesPhase;
+    return (
+      matchesSearch &&
+      matchesStatus &&
+      matchesPhase &&
+      matchesTypology &&
+      matchesArchitect &&
+      matchesManager &&
+      matchesCoordinator &&
+      matchesCity &&
+      matchesContractor &&
+      matchesConsultant &&
+      matchesClient
+    );
   });
+
+  const handleToggleSelect = (id: string) => {
+    setSelectedProjectIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const isAllSelected =
+    filteredProjects.length > 0 &&
+    filteredProjects.every((p) => selectedProjectIds.includes(p.id));
+
+  const handleToggleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedProjectIds([]);
+    } else {
+      setSelectedProjectIds(filteredProjects.map((p) => p.id));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (!canManage || selectedProjectIds.length === 0) return;
+    setIsSubmitting(true);
+    setErrorMessage(null);
+
+    try {
+      const res = await fetch(`/api/projects?workspaceSlug=${context.tenantSlug}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectIds: selectedProjectIds }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to delete selected projects");
+      }
+
+      setSuccessMessage(`Successfully deleted ${selectedProjectIds.length} project(s)!`);
+      setSelectedProjectIds([]);
+      setIsBulkDeleteModalOpen(false);
+      router.refresh();
+    } catch (err: any) {
+      setErrorMessage(err.message || "An unexpected error occurred during bulk deletion");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   // Handle Create Project
   const handleCreateSubmit = async (e: React.FormEvent) => {
@@ -632,8 +764,356 @@ export function ProjectsClientView({
               ))}
             </select>
           </div>
+
+          {/* Advanced Filters Toggle Button */}
+          <button
+            type="button"
+            onClick={() => setIsAdvancedFilterOpen(!isAdvancedFilterOpen)}
+            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer shrink-0 ${
+              isAdvancedFilterOpen || activeFiltersCount > 0
+                ? "bg-[#4B5320] text-white border-[#4B5320] shadow-2xs"
+                : "bg-[#F8F9FD] text-[#1F1F1F] border-[#E2E6F0] hover:bg-white"
+            }`}
+          >
+            <SlidersHorizontal className="w-3.5 h-3.5" />
+            <span>Filters</span>
+            {activeFiltersCount > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-[#D4AF37] text-[#1F1F1F]">
+                {activeFiltersCount}
+              </span>
+            )}
+            {isAdvancedFilterOpen ? (
+              <ChevronUp className="w-3.5 h-3.5" />
+            ) : (
+              <ChevronDown className="w-3.5 h-3.5" />
+            )}
+          </button>
+
+          {/* Quick Reset Button if active filters */}
+          {activeFiltersCount > 0 && (
+            <button
+              type="button"
+              onClick={handleResetFilters}
+              className="inline-flex items-center gap-1 px-2.5 py-2 rounded-xl text-xs font-semibold text-rose-600 hover:text-rose-800 hover:bg-rose-50 border border-transparent transition-colors cursor-pointer shrink-0"
+              title="Reset all filters"
+            >
+              <RotateCcw className="w-3 h-3" />
+              <span>Reset</span>
+            </button>
+          )}
         </div>
+
+        {/* Collapsible Advanced Filter Panel */}
+        {isAdvancedFilterOpen && (
+          <div className="pt-3 border-t border-[#E2E6F0] animate-in fade-in duration-150">
+            <div className="text-[11px] font-bold text-[#4B5320] uppercase tracking-wider mb-2.5 flex items-center justify-between">
+              <span>Multi-Facet Studio Filters</span>
+              <button
+                type="button"
+                onClick={handleResetFilters}
+                className="text-[11px] font-medium text-rose-600 hover:underline cursor-pointer"
+              >
+                Clear all filters
+              </button>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+              {/* Typology */}
+              <div>
+                <label className="block text-[10px] font-bold text-[#696E82] uppercase mb-1">
+                  Typology
+                </label>
+                <select
+                  value={typologyFilter}
+                  onChange={(e) => setTypologyFilter(e.target.value)}
+                  className="w-full bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl px-2.5 py-1.5 text-xs text-[#1F1F1F] focus:outline-none focus:border-[#4B5320]"
+                >
+                  <option value="ALL">All Typologies</option>
+                  {PROJECT_TYPOLOGIES.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Project Architect */}
+              <div>
+                <label className="block text-[10px] font-bold text-[#696E82] uppercase mb-1">
+                  Project Architect
+                </label>
+                <select
+                  value={architectFilter}
+                  onChange={(e) => setArchitectFilter(e.target.value)}
+                  className="w-full bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl px-2.5 py-1.5 text-xs text-[#1F1F1F] focus:outline-none focus:border-[#4B5320]"
+                >
+                  <option value="ALL">All Architects</option>
+                  {members.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.user.fullName} {m.employee?.designation ? `(${m.employee.designation})` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Project Manager */}
+              <div>
+                <label className="block text-[10px] font-bold text-[#696E82] uppercase mb-1">
+                  Project Manager
+                </label>
+                <select
+                  value={managerFilter}
+                  onChange={(e) => setManagerFilter(e.target.value)}
+                  className="w-full bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl px-2.5 py-1.5 text-xs text-[#1F1F1F] focus:outline-none focus:border-[#4B5320]"
+                >
+                  <option value="ALL">All Managers</option>
+                  {members.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.user.fullName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Project Coordinator */}
+              <div>
+                <label className="block text-[10px] font-bold text-[#696E82] uppercase mb-1">
+                  Project Coordinator
+                </label>
+                <select
+                  value={coordinatorFilter}
+                  onChange={(e) => setCoordinatorFilter(e.target.value)}
+                  className="w-full bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl px-2.5 py-1.5 text-xs text-[#1F1F1F] focus:outline-none focus:border-[#4B5320]"
+                >
+                  <option value="ALL">All Coordinators</option>
+                  {members.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.user.fullName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Site City */}
+              <div>
+                <label className="block text-[10px] font-bold text-[#696E82] uppercase mb-1">
+                  Site City
+                </label>
+                <select
+                  value={cityFilter}
+                  onChange={(e) => setCityFilter(e.target.value)}
+                  className="w-full bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl px-2.5 py-1.5 text-xs text-[#1F1F1F] focus:outline-none focus:border-[#4B5320]"
+                >
+                  <option value="ALL">All Cities</option>
+                  {availableCities.map((city) => (
+                    <option key={city} value={city}>
+                      {city}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Contractor */}
+              <div>
+                <label className="block text-[10px] font-bold text-[#696E82] uppercase mb-1">
+                  Contractor
+                </label>
+                <select
+                  value={contractorFilter}
+                  onChange={(e) => setContractorFilter(e.target.value)}
+                  className="w-full bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl px-2.5 py-1.5 text-xs text-[#1F1F1F] focus:outline-none focus:border-[#4B5320]"
+                >
+                  <option value="ALL">All Contractors</option>
+                  {contractors.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.firmName || c.name} {c.trade ? `(${c.trade})` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Consultant */}
+              <div>
+                <label className="block text-[10px] font-bold text-[#696E82] uppercase mb-1">
+                  Consultant
+                </label>
+                <select
+                  value={consultantFilter}
+                  onChange={(e) => setConsultantFilter(e.target.value)}
+                  className="w-full bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl px-2.5 py-1.5 text-xs text-[#1F1F1F] focus:outline-none focus:border-[#4B5320]"
+                >
+                  <option value="ALL">All Consultants</option>
+                  {consultants.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.firmName || c.name} {c.discipline ? `(${c.discipline})` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Client */}
+              <div>
+                <label className="block text-[10px] font-bold text-[#696E82] uppercase mb-1">
+                  Client
+                </label>
+                <select
+                  value={clientFilter}
+                  onChange={(e) => setClientFilter(e.target.value)}
+                  className="w-full bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl px-2.5 py-1.5 text-xs text-[#1F1F1F] focus:outline-none focus:border-[#4B5320]"
+                >
+                  <option value="ALL">All Clients</option>
+                  {clients.map((cl) => (
+                    <option key={cl.id} value={cl.id}>
+                      {cl.name} {cl.company ? `(${cl.company})` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Active Filter Chips / Pills */}
+        {activeFiltersCount > 0 && (
+          <div className="pt-2 border-t border-[#E2E6F0]/60 flex flex-wrap items-center gap-1.5 text-xs">
+            <span className="text-[10px] uppercase font-bold text-[#696E82] mr-1">Active:</span>
+            {statusFilter !== "ALL" && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#4B5320]/10 text-[#4B5320] border border-[#4B5320]/20 text-[11px] font-medium">
+                Status: {statusFilter}
+                <button onClick={() => setStatusFilter("ALL")} className="hover:text-rose-600 cursor-pointer">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            {phaseFilter !== "ALL" && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#4B5320]/10 text-[#4B5320] border border-[#4B5320]/20 text-[11px] font-medium">
+                Phase: {phaseFilter}
+                <button onClick={() => setPhaseFilter("ALL")} className="hover:text-rose-600 cursor-pointer">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            {typologyFilter !== "ALL" && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#4B5320]/10 text-[#4B5320] border border-[#4B5320]/20 text-[11px] font-medium">
+                Typology: {typologyFilter}
+                <button onClick={() => setTypologyFilter("ALL")} className="hover:text-rose-600 cursor-pointer">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            {cityFilter !== "ALL" && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#4B5320]/10 text-[#4B5320] border border-[#4B5320]/20 text-[11px] font-medium">
+                City: {cityFilter}
+                <button onClick={() => setCityFilter("ALL")} className="hover:text-rose-600 cursor-pointer">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            {architectFilter !== "ALL" && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#4B5320]/10 text-[#4B5320] border border-[#4B5320]/20 text-[11px] font-medium">
+                Architect: {members.find((m) => m.id === architectFilter)?.user.fullName || "Selected"}
+                <button onClick={() => setArchitectFilter("ALL")} className="hover:text-rose-600 cursor-pointer">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            {managerFilter !== "ALL" && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#4B5320]/10 text-[#4B5320] border border-[#4B5320]/20 text-[11px] font-medium">
+                Manager: {members.find((m) => m.id === managerFilter)?.user.fullName || "Selected"}
+                <button onClick={() => setManagerFilter("ALL")} className="hover:text-rose-600 cursor-pointer">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            {coordinatorFilter !== "ALL" && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#4B5320]/10 text-[#4B5320] border border-[#4B5320]/20 text-[11px] font-medium">
+                Coordinator: {members.find((m) => m.id === coordinatorFilter)?.user.fullName || "Selected"}
+                <button onClick={() => setCoordinatorFilter("ALL")} className="hover:text-rose-600 cursor-pointer">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            {contractorFilter !== "ALL" && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#4B5320]/10 text-[#4B5320] border border-[#4B5320]/20 text-[11px] font-medium">
+                Contractor: {contractors.find((c) => c.id === contractorFilter)?.firmName || contractors.find((c) => c.id === contractorFilter)?.name || "Selected"}
+                <button onClick={() => setContractorFilter("ALL")} className="hover:text-rose-600 cursor-pointer">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            {consultantFilter !== "ALL" && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#4B5320]/10 text-[#4B5320] border border-[#4B5320]/20 text-[11px] font-medium">
+                Consultant: {consultants.find((c) => c.id === consultantFilter)?.firmName || consultants.find((c) => c.id === consultantFilter)?.name || "Selected"}
+                <button onClick={() => setConsultantFilter("ALL")} className="hover:text-rose-600 cursor-pointer">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            {clientFilter !== "ALL" && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#4B5320]/10 text-[#4B5320] border border-[#4B5320]/20 text-[11px] font-medium">
+                Client: {clients.find((cl) => cl.id === clientFilter)?.name || "Selected"}
+                <button onClick={() => setClientFilter("ALL")} className="hover:text-rose-600 cursor-pointer">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            <button
+              onClick={handleResetFilters}
+              className="text-[11px] text-rose-600 hover:underline font-semibold ml-1 cursor-pointer"
+            >
+              Clear all
+            </button>
+          </div>
+        )}
       </div>
+
+      {/* Bulk Action & Selection Toolbar */}
+      {filteredProjects.length > 0 && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-2 py-1">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={handleToggleSelectAll}
+              className="inline-flex items-center gap-2 text-xs font-semibold text-[#1F1F1F] hover:text-[#4B5320] cursor-pointer"
+            >
+              {isAllSelected ? (
+                <CheckSquare className="w-4 h-4 text-[#4B5320]" />
+              ) : (
+                <Square className="w-4 h-4 text-[#696E82]" />
+              )}
+              <span>{isAllSelected ? "Deselect All" : "Select All"}</span>
+            </button>
+            <span className="text-xs text-[#696E82]">
+              Showing <span className="font-bold text-[#1F1F1F]">{filteredProjects.length}</span>{" "}
+              {filteredProjects.length === 1 ? "project" : "projects"}
+              {selectedProjectIds.length > 0 && (
+                <span className="ml-1 text-[#4B5320] font-bold">
+                  ({selectedProjectIds.length} selected)
+                </span>
+              )}
+            </span>
+          </div>
+
+          {canManage && selectedProjectIds.length > 0 && (
+            <div className="flex items-center gap-2 animate-in fade-in">
+              <button
+                type="button"
+                onClick={() => setIsBulkDeleteModalOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-xs hover:shadow-md transition-all cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Delete Selected ({selectedProjectIds.length})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedProjectIds([])}
+                className="text-xs text-[#696E82] hover:text-[#1F1F1F] px-2 py-1 cursor-pointer font-medium"
+              >
+                Cancel Selection
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Projects Grid */}
       {filteredProjects.length === 0 ? (
@@ -641,7 +1121,7 @@ export function ProjectsClientView({
           <FolderKanban className="w-10 h-10 text-[#A8B1CE] mx-auto" />
           <h3 className="text-base font-bold text-[#1F1F1F]">No projects found</h3>
           <p className="text-xs text-[#696E82] max-w-sm mx-auto">
-            {searchQuery || statusFilter !== "ALL" || phaseFilter !== "ALL"
+            {searchQuery || activeFiltersCount > 0
               ? "Try adjusting your search query or filter selection."
               : "No architectural projects have been created in this studio yet."}
           </p>
@@ -657,223 +1137,345 @@ export function ProjectsClientView({
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {filteredProjects.map((p) => (
-            <div
-              key={p.id}
-              className="bg-white border border-[#E2E6F0] hover:border-[#4B5320]/50 rounded-2xl p-6 shadow-2xs hover:shadow-md transition-all flex flex-col justify-between space-y-4 group relative"
-            >
-              <div className="space-y-3">
-                {/* Header Top: Code, Typology & Action buttons */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-xs font-bold text-[#4B5320] bg-[#4B5320]/10 px-2.5 py-1 rounded-md border border-[#4B5320]/20">
-                      {p.code}
-                    </span>
-                    {getStatusBadge(p.status)}
-                  </div>
-
-                  {/* Owner/Admin Action Buttons (Edit / Progress / Delete) */}
-                  {canManage && (
-                    <div className="flex items-center gap-1.5 opacity-90 group-hover:opacity-100 transition-opacity">
+          {filteredProjects.map((p) => {
+            const isSelected = selectedProjectIds.includes(p.id);
+            return (
+              <div
+                key={p.id}
+                className={`bg-white border rounded-2xl p-6 shadow-2xs hover:shadow-md transition-all flex flex-col justify-between space-y-4 group relative ${
+                  isSelected
+                    ? "border-[#4B5320] ring-2 ring-[#4B5320]/25 bg-[#4B5320]/[0.02]"
+                    : "border-[#E2E6F0] hover:border-[#4B5320]/50"
+                }`}
+              >
+                <div className="space-y-4">
+                  {/* Header Top: Select Checkbox, Code, Typology & Actions */}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {/* Selection Checkbox */}
                       <button
                         type="button"
-                        onClick={() => handleOpenProgressModal(p)}
-                        className="px-2 py-1 rounded-lg border border-[#4B5320]/30 bg-[#4B5320]/10 text-[#4B5320] hover:bg-[#4B5320] hover:text-white transition-all text-[11px] font-bold flex items-center gap-1 cursor-pointer shadow-2xs"
-                        title="Manipulate Project Progress & Phases"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleToggleSelect(p.id);
+                        }}
+                        className="text-[#4B5320] hover:text-[#3d441a] transition-colors cursor-pointer p-0.5"
+                        title={isSelected ? "Deselect project" : "Select project"}
                       >
-                        <TrendingUp className="w-3.5 h-3.5 text-[#D4AF37]" />
-                        <span>Progress</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleOpenEdit(p)}
-                        className="p-1.5 rounded-lg border border-[#E2E6F0] bg-white text-[#696E82] hover:text-[#4B5320] hover:border-[#4B5320] hover:bg-[#4B5320]/5 transition-colors cursor-pointer shadow-2xs"
-                        title="Edit Project Details"
-                      >
-                        <Pencil className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setDeletingProject(p)}
-                        className="p-1.5 rounded-lg border border-[#E2E6F0] bg-white text-[#696E82] hover:text-rose-600 hover:border-rose-300 hover:bg-rose-50 transition-colors cursor-pointer shadow-2xs"
-                        title="Delete Project"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                {/* Title and Typology */}
-                <div>
-                  <div className="flex items-center gap-2 text-[10px] font-semibold text-[#696E82] uppercase tracking-wider mb-1">
-                    <Building2 className="w-3 h-3 text-[#4B5320]" />
-                    <span>{p.projectType || "Architecture"}</span>
-                    <span>•</span>
-                    <span className="font-mono text-[#D4AF37] font-bold">
-                      Phase: {p.currentPhase || "Brief"}
-                    </span>
-                  </div>
-                  <h3 className="text-lg font-bold text-[#1F1F1F] tracking-tight group-hover:text-[#4B5320] transition-colors">
-                    {p.name}
-                  </h3>
-                  <p className="text-xs text-[#696E82] line-clamp-2 mt-1">
-                    {p.description || "Architectural scope defined for execution and design coordination."}
-                  </p>
-                </div>
-
-                {/* Architectural Phase Progress Bar */}
-                <div className="pt-2">
-                  <div className="flex justify-between items-center text-xs mb-1">
-                    <span className="text-[#696E82] font-medium flex items-center gap-1">
-                      <Layers className="w-3.5 h-3.5 text-[#4B5320]" />
-                      <span>Phase Progress</span>
-                      <span className="font-semibold text-[#1F1F1F]">({p.currentPhase || "Brief"})</span>
-                    </span>
-                    <span className="font-bold text-[#4B5320]">
-                      {p.phaseProgress?.percentage ??
-                        Math.round(
-                          ((ARCHITECTURAL_PHASES.indexOf(p.currentPhase || "Brief") + 1) /
-                            ARCHITECTURAL_PHASES.length) *
-                            100
+                        {isSelected ? (
+                          <CheckSquare className="w-4 h-4 text-[#4B5320]" />
+                        ) : (
+                          <Square className="w-4 h-4 text-[#A8B1CE] hover:text-[#4B5320]" />
                         )}
-                      %
-                    </span>
+                      </button>
+
+                      {/* 1. Project Code */}
+                      <span className="font-mono text-xs font-bold text-[#4B5320] bg-[#4B5320]/10 px-2.5 py-1 rounded-md border border-[#4B5320]/20">
+                        {p.code}
+                      </span>
+
+                      {/* 4. Typology Badge */}
+                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#696E82] bg-gray-100 px-2 py-0.5 rounded-full border border-gray-200">
+                        <Building2 className="w-3 h-3 text-[#4B5320]" />
+                        <span>{p.projectType || "Architecture"}</span>
+                      </span>
+
+                      {getStatusBadge(p.status)}
+                    </div>
+
+                    {/* Owner/Admin Action Buttons (Edit / Progress / Delete) */}
+                    {canManage && (
+                      <div className="flex items-center gap-1.5 opacity-90 group-hover:opacity-100 transition-opacity shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenProgressModal(p)}
+                          className="px-2 py-1 rounded-lg border border-[#4B5320]/30 bg-[#4B5320]/10 text-[#4B5320] hover:bg-[#4B5320] hover:text-white transition-all text-[11px] font-bold flex items-center gap-1 cursor-pointer shadow-2xs"
+                          title="Manipulate Project Progress & Phases"
+                        >
+                          <TrendingUp className="w-3.5 h-3.5 text-[#D4AF37]" />
+                          <span>Progress</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEdit(p)}
+                          className="p-1.5 rounded-lg border border-[#E2E6F0] bg-white text-[#696E82] hover:text-[#4B5320] hover:border-[#4B5320] hover:bg-[#4B5320]/5 transition-colors cursor-pointer shadow-2xs"
+                          title="Edit Project Details"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDeletingProject(p)}
+                          className="p-1.5 rounded-lg border border-[#E2E6F0] bg-white text-[#696E82] hover:text-rose-600 hover:border-rose-300 hover:bg-rose-50 transition-colors cursor-pointer shadow-2xs"
+                          title="Delete Project"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
                   </div>
-                  <div className="w-full bg-[#F2F4FF] h-2 rounded-full overflow-hidden">
-                    <div
-                      className="bg-[#4B5320] h-full rounded-full transition-all duration-500"
-                      style={{
-                        width: `${
-                          p.phaseProgress?.percentage ??
+
+                  {/* 2. Project Name */}
+                  <div>
+                    <h3 className="text-lg font-bold text-[#1F1F1F] tracking-tight group-hover:text-[#4B5320] transition-colors">
+                      {p.name}
+                    </h3>
+                    {/* 18. Brief / Project Brief */}
+                    {p.description ? (
+                      <div className="mt-1.5 p-2 rounded-xl bg-[#F8F9FD] border border-[#E2E6F0]/80 text-xs text-[#696E82] flex items-start gap-1.5">
+                        <FileText className="w-3.5 h-3.5 text-[#4B5320] shrink-0 mt-0.5" />
+                        <p className="line-clamp-2">{p.description}</p>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-[#696E82] italic mt-1">
+                        No project brief provided.
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Phase Progress Bar */}
+                  <div className="pt-1">
+                    <div className="flex justify-between items-center text-xs mb-1">
+                      <span className="text-[#696E82] font-medium flex items-center gap-1">
+                        <Layers className="w-3.5 h-3.5 text-[#4B5320]" />
+                        <span>Phase Progress</span>
+                        <span className="font-semibold text-[#1F1F1F]">({p.currentPhase || "Brief"})</span>
+                      </span>
+                      <span className="font-bold text-[#4B5320]">
+                        {p.phaseProgress?.percentage ??
                           Math.round(
                             ((ARCHITECTURAL_PHASES.indexOf(p.currentPhase || "Brief") + 1) /
                               ARCHITECTURAL_PHASES.length) *
                               100
-                          )
-                        }%`,
-                      }}
-                    />
+                          )}
+                        %
+                      </span>
+                    </div>
+                    <div className="w-full bg-[#F2F4FF] h-2 rounded-full overflow-hidden">
+                      <div
+                        className="bg-[#4B5320] h-full rounded-full transition-all duration-500"
+                        style={{
+                          width: `${
+                            p.phaseProgress?.percentage ??
+                            Math.round(
+                              ((ARCHITECTURAL_PHASES.indexOf(p.currentPhase || "Brief") + 1) /
+                                ARCHITECTURAL_PHASES.length) *
+                                100
+                            )
+                          }%`,
+                        }}
+                      />
+                    </div>
+                    <div className="text-[10px] text-[#696E82] mt-1 flex justify-between">
+                      <span>
+                        Phase {ARCHITECTURAL_PHASES.indexOf(p.currentPhase || "Brief") + 1} of{" "}
+                        {ARCHITECTURAL_PHASES.length} • {p.currentPhase || "Brief"}
+                      </span>
+                      {canManage && (
+                        <button
+                          type="button"
+                          onClick={() => handleOpenProgressModal(p)}
+                          className="text-[10px] font-bold text-[#4B5320] hover:underline cursor-pointer"
+                        >
+                          Adjust Phase →
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  <div className="text-[10px] text-[#696E82] mt-1 flex justify-between">
-                    <span>
-                      Phase {ARCHITECTURAL_PHASES.indexOf(p.currentPhase || "Brief") + 1} of{" "}
-                      {ARCHITECTURAL_PHASES.length} • {p.currentPhase || "Brief"}
+
+                  {/* Task Completion Progress Bar */}
+                  <div className="pt-0.5">
+                    <div className="flex justify-between items-center text-xs mb-1">
+                      <span className="text-[#696E82] font-medium flex items-center gap-1">
+                        <TrendingUp className="w-3.5 h-3.5 text-[#5A81FA]" />
+                        <span>Task Deliverables</span>
+                      </span>
+                      <span className="font-bold text-[#1F1F1F]">{p.taskProgress.percentage}%</span>
+                    </div>
+                    <div className="w-full bg-[#F2F4FF] h-1.5 rounded-full overflow-hidden">
+                      <div
+                        className="bg-[#5A81FA] h-full rounded-full transition-all duration-500"
+                        style={{ width: `${p.taskProgress.percentage}%` }}
+                      />
+                    </div>
+                    <div className="text-[10px] text-[#696E82] mt-1 flex justify-between">
+                      <span>
+                        {p.taskProgress.completedCount} of {p.taskProgress.totalCount} tasks completed
+                      </span>
+                      {p._count?.siteVisits !== undefined && (
+                        <span>{p._count.siteVisits} Site Visits</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Team & Leadership Grid (Client, Architect, Manager, Coordinator, Contractor, Consultant) */}
+                  <div className="pt-3 border-t border-[#E2E6F0] space-y-2">
+                    <span className="text-[10px] font-bold text-[#4B5320] uppercase tracking-wider block">
+                      Team & Stakeholders
                     </span>
-                    {canManage && (
-                      <button
-                        type="button"
-                        onClick={() => handleOpenProgressModal(p)}
-                        className="text-[10px] font-bold text-[#4B5320] hover:underline cursor-pointer"
-                      >
-                        Adjust Phase →
-                      </button>
-                    )}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs">
+                      {/* 3. Client Name */}
+                      <div>
+                        <span className="text-[#696E82] block text-[10px] uppercase font-semibold">
+                          Client Name
+                        </span>
+                        <span className="font-semibold text-[#1F1F1F] truncate block" title={p.primaryClient?.name || "Direct / Private"}>
+                          {p.primaryClient?.name || "Direct / Private"}
+                        </span>
+                      </div>
+
+                      {/* 5. Project Architect */}
+                      <div>
+                        <span className="text-[#696E82] block text-[10px] uppercase font-semibold">
+                          Project Architect
+                        </span>
+                        <span className="font-semibold text-[#1F1F1F] truncate block" title={p.projectArchitect?.user.fullName || "Unassigned"}>
+                          {p.projectArchitect?.user.fullName || "Unassigned"}
+                        </span>
+                      </div>
+
+                      {/* 6. Project Manager */}
+                      <div>
+                        <span className="text-[#696E82] block text-[10px] uppercase font-semibold">
+                          Project Manager
+                        </span>
+                        <span className="font-semibold text-[#1F1F1F] truncate block" title={p.projectManager?.user.fullName || "Unassigned"}>
+                          {p.projectManager?.user.fullName || "Unassigned"}
+                        </span>
+                      </div>
+
+                      {/* 7. Project Coordinator */}
+                      <div>
+                        <span className="text-[#696E82] block text-[10px] uppercase font-semibold">
+                          Coordinator
+                        </span>
+                        <span className="font-semibold text-[#1F1F1F] truncate block" title={p.projectCoordinator?.user.fullName || "Unassigned"}>
+                          {p.projectCoordinator?.user.fullName || "Unassigned"}
+                        </span>
+                      </div>
+
+                      {/* 8. Project Contractor */}
+                      <div>
+                        <span className="text-[#696E82] block text-[10px] uppercase font-semibold">
+                          Contractor
+                        </span>
+                        <span className="font-semibold text-[#1F1F1F] truncate block" title={p.contractor?.firmName || p.contractor?.name || "Unassigned"}>
+                          {p.contractor?.firmName || p.contractor?.name || "Unassigned"}
+                        </span>
+                      </div>
+
+                      {/* 9. Project Consultant */}
+                      <div>
+                        <span className="text-[#696E82] block text-[10px] uppercase font-semibold">
+                          Consultant
+                        </span>
+                        <span className="font-semibold text-[#1F1F1F] truncate block" title={p.consultant?.firmName || p.consultant?.name || "Unassigned"}>
+                          {p.consultant?.firmName || p.consultant?.name || "Unassigned"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Site, Spatial & Financial Grid (10, 11, 12, 15, 16, 17) */}
+                  <div className="pt-3 border-t border-[#E2E6F0] space-y-2">
+                    <span className="text-[10px] font-bold text-[#4B5320] uppercase tracking-wider block">
+                      Site & Specifications
+                    </span>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs">
+                      {/* 10 & 11. Site Address & City */}
+                      <div className="sm:col-span-2">
+                        <span className="text-[#696E82] block text-[10px] uppercase font-semibold flex items-center gap-0.5">
+                          <MapPin className="w-2.5 h-2.5 text-[#4B5320]" />
+                          <span>Site Address & City</span>
+                        </span>
+                        <span className="text-[#1F1F1F] font-medium truncate block" title={`${p.siteAddress || ""} ${p.siteCity ? `(${p.siteCity})` : ""}`}>
+                          {p.siteAddress ? `${p.siteAddress}${p.siteCity ? `, ${p.siteCity}` : ""}` : p.siteCity || "Site pending"}
+                        </span>
+                      </div>
+
+                      {/* 12. Google Map Location */}
+                      <div>
+                        <span className="text-[#696E82] block text-[10px] uppercase font-semibold">
+                          Map Location
+                        </span>
+                        {p.googleMapLocation ? (
+                          <a
+                            href={
+                              p.googleMapLocation.startsWith("http://") || p.googleMapLocation.startsWith("https://")
+                                ? p.googleMapLocation
+                                : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.googleMapLocation)}`
+                            }
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-[#4B5320] hover:text-[#3d441a] font-semibold hover:underline"
+                            title={p.googleMapLocation}
+                          >
+                            <ExternalLink className="w-3 h-3 text-[#D4AF37]" />
+                            <span className="truncate max-w-[100px]">View Map</span>
+                          </a>
+                        ) : (
+                          <span className="text-[#A8B1CE] italic">Not set</span>
+                        )}
+                      </div>
+
+                      {/* 15. Plot Area */}
+                      <div>
+                        <span className="text-[#696E82] block text-[10px] uppercase font-semibold">
+                          Plot Area
+                        </span>
+                        <span className="font-semibold text-[#1F1F1F] truncate block">
+                          {p.plotArea || "—"}
+                        </span>
+                      </div>
+
+                      {/* 16. Total Construction Area */}
+                      <div>
+                        <span className="text-[#696E82] block text-[10px] uppercase font-semibold">
+                          Total Construction
+                        </span>
+                        <span className="font-semibold text-[#4B5320] truncate block">
+                          {p.constructionArea || "—"}
+                        </span>
+                      </div>
+
+                      {/* 17. Budget */}
+                      <div>
+                        <span className="text-[#696E82] block text-[10px] uppercase font-semibold">
+                          Budget
+                        </span>
+                        <span className="font-bold text-[#1F1F1F] truncate block">
+                          {p.budget ? `${p.currency || "₹"} ${Number(p.budget).toLocaleString("en-IN")}` : "—"}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                {/* Task Completion Progress Bar */}
-                <div className="pt-1">
-                  <div className="flex justify-between items-center text-xs mb-1">
-                    <span className="text-[#696E82] font-medium flex items-center gap-1">
-                      <TrendingUp className="w-3.5 h-3.5 text-[#5A81FA]" />
-                      <span>Task Deliverables</span>
+                {/* Bottom Card Footer: 13. Start Date, 14. End Date, Open Project Dashboard */}
+                <div className="pt-3 border-t border-[#E2E6F0] flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-3 text-[11px] text-[#696E82]">
+                    <span className="flex items-center gap-1" title="Start Date">
+                      <Calendar className="w-3 h-3 text-[#4B5320]" />
+                      <span>Start: {p.startDate ? new Date(p.startDate).toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" }) : "—"}</span>
                     </span>
-                    <span className="font-bold text-[#1F1F1F]">{p.taskProgress.percentage}%</span>
-                  </div>
-                  <div className="w-full bg-[#F2F4FF] h-1.5 rounded-full overflow-hidden">
-                    <div
-                      className="bg-[#5A81FA] h-full rounded-full transition-all duration-500"
-                      style={{ width: `${p.taskProgress.percentage}%` }}
-                    />
-                  </div>
-                  <div className="text-[10px] text-[#696E82] mt-1 flex justify-between">
-                    <span>
-                      {p.taskProgress.completedCount} of {p.taskProgress.totalCount} tasks completed
+                    <span>•</span>
+                    <span className="flex items-center gap-1" title="End Date">
+                      <Clock className="w-3 h-3 text-[#5A81FA]" />
+                      <span>End: {p.targetDate ? new Date(p.targetDate).toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" }) : "—"}</span>
                     </span>
-                    {p._count?.siteVisits !== undefined && (
-                      <span>{p._count.siteVisits} Site Visits</span>
-                    )}
                   </div>
-                </div>
 
-                {/* Metadata Details Grid */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs pt-3 border-t border-[#E2E6F0]">
-                  <div>
-                    <span className="text-[#696E82] block text-[10px] uppercase font-semibold">
-                      Client
-                    </span>
-                    <span className="font-semibold text-[#1F1F1F] truncate block" title={p.primaryClient?.name || "Direct / Private"}>
-                      {p.primaryClient?.name || "Direct / Private"}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-[#696E82] block text-[10px] uppercase font-semibold">
-                      Project Architect
-                    </span>
-                    <span className="font-semibold text-[#1F1F1F] truncate block" title={p.projectArchitect?.user.fullName || "Unassigned"}>
-                      {p.projectArchitect?.user.fullName || "Unassigned"}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-[#696E82] block text-[10px] uppercase font-semibold">
-                      Project Coordinator
-                    </span>
-                    <span className="font-semibold text-[#1F1F1F] truncate block" title={p.projectCoordinator?.user.fullName || "Unassigned"}>
-                      {p.projectCoordinator?.user.fullName || "Unassigned"}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-[#696E82] block text-[10px] uppercase font-semibold flex items-center gap-0.5">
-                      <MapPin className="w-2.5 h-2.5 text-[#4B5320]" />
-                      <span>{p.siteCity ? `City: ${p.siteCity}` : "Site Location"}</span>
-                    </span>
-                    <span className="text-[#696E82] truncate block" title={p.siteAddress || p.siteCity || ""}>
-                      {p.siteCity || p.siteAddress || "Site location pending"}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-[#696E82] block text-[10px] uppercase font-semibold">
-                      Area
-                    </span>
-                    <span className="font-semibold text-[#4B5320] truncate block">
-                      {p.constructionArea || p.plotArea || "—"}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-[#696E82] block text-[10px] uppercase font-semibold">
-                      Budget
-                    </span>
-                    <span className="font-semibold text-[#1F1F1F] truncate block">
-                      {p.budget ? `${p.currency || "₹"} ${Number(p.budget).toLocaleString("en-IN")}` : "—"}
-                    </span>
-                  </div>
+                  <Link
+                    href={`/w/${context.tenantSlug}/projects/${p.id}`}
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-[#4B5320] hover:text-[#3d441a] hover:underline cursor-pointer ml-auto sm:ml-0"
+                  >
+                    <span>Open Project Dashboard</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </Link>
                 </div>
               </div>
-
-              {/* Bottom Card Footer */}
-              <div className="pt-2 border-t border-[#E2E6F0]/60 flex items-center justify-between">
-                <span className="text-[10px] text-[#696E82] flex items-center gap-1">
-                  <Clock className="w-3 h-3" />
-                  <span>
-                    {p.targetDate
-                      ? `Due ${new Date(p.targetDate).toLocaleDateString("en-IN", {
-                          month: "short",
-                          year: "numeric",
-                        })}`
-                      : "Timeline Open"}
-                  </span>
-                </span>
-                <Link
-                  href={`/w/${context.tenantSlug}/projects/${p.id}`}
-                  className="inline-flex items-center gap-1.5 text-xs font-bold text-[#4B5320] hover:text-[#3d441a] hover:underline cursor-pointer"
-                >
-                  <span>Open Project Dashboard</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </Link>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -1712,6 +2314,74 @@ export function ProjectsClientView({
                 className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-sm transition-colors cursor-pointer disabled:opacity-50"
               >
                 {isSubmitting ? "Deleting..." : "Confirm Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* MODAL 3B: BULK DELETE CONFIRMATION (Owner & Admin Only)        */}
+      {/* ============================================================== */}
+      {isBulkDeleteModalOpen && canManage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl border border-[#E2E6F0] shadow-2xl max-w-lg w-full p-6 space-y-4">
+            <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center border border-rose-200">
+              <AlertCircle className="w-5 h-5" />
+            </div>
+
+            <div>
+              <h3 className="text-base font-bold text-[#1F1F1F]">
+                Delete {selectedProjectIds.length} Selected Project(s)?
+              </h3>
+              <p className="text-xs text-[#696E82] mt-1.5 leading-relaxed">
+                Are you sure you want to permanently delete these{" "}
+                <strong className="text-rose-600 font-bold">{selectedProjectIds.length}</strong>{" "}
+                project(s)? This will remove all their phases, tasks, checklists, and linked records from the database.
+                This action is <span className="font-semibold text-rose-700">irreversible</span>.
+              </p>
+            </div>
+
+            {/* List of projects to delete */}
+            <div className="max-h-48 overflow-y-auto p-3 rounded-xl bg-[#F8F9FD] border border-[#E2E6F0] space-y-1.5">
+              <span className="text-[10px] font-bold text-[#696E82] uppercase block mb-1">
+                Selected Projects for Deletion:
+              </span>
+              {initialProjects
+                .filter((p) => selectedProjectIds.includes(p.id))
+                .map((p) => (
+                  <div
+                    key={p.id}
+                    className="flex items-center justify-between text-xs py-1.5 px-2.5 rounded-lg bg-white border border-[#E2E6F0]"
+                  >
+                    <div className="flex items-center gap-2 truncate">
+                      <span className="font-mono text-[11px] font-bold text-[#4B5320] bg-[#4B5320]/10 px-1.5 py-0.5 rounded">
+                        {p.code}
+                      </span>
+                      <span className="font-medium text-[#1F1F1F] truncate">{p.name}</span>
+                    </div>
+                    <span className="text-[10px] text-[#696E82] shrink-0 ml-2">
+                      {p.projectType || "Architecture"}
+                    </span>
+                  </div>
+                ))}
+            </div>
+
+            <div className="pt-2 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setIsBulkDeleteModalOpen(false)}
+                className="px-4 py-2 rounded-xl border border-[#E2E6F0] text-xs font-semibold text-[#696E82] hover:bg-[#F2F4FF] cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleBulkDelete}
+                disabled={isSubmitting}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-sm transition-colors cursor-pointer disabled:opacity-50"
+              >
+                {isSubmitting ? "Deleting..." : `Confirm Delete (${selectedProjectIds.length})`}
               </button>
             </div>
           </div>
