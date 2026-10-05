@@ -128,6 +128,8 @@ export function AppSidebar({ context }: AppSidebarProps) {
                 key={item.name}
                 href={item.href}
                 prefetch={true}
+                onMouseEnter={() => router.prefetch(item.href)}
+                onTouchStart={() => router.prefetch(item.href)}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium transition-all ${
                   isActive
                     ? "bg-[#5A81FA] text-white shadow-xs font-semibold"

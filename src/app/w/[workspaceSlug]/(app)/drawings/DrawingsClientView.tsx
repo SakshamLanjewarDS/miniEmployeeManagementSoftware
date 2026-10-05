@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   FileCheck2,
@@ -26,7 +26,9 @@ import {
   Trash2,
   Award,
   FolderGit2,
+  ArrowUpDown,
 } from "lucide-react";
+import { SearchableSelect } from "@/components/ui/SearchableSelect";
 
 export interface ApprovalRequestItem {
   id: string;
@@ -100,6 +102,12 @@ export default function DrawingsClientView({
   const [selectedProjectFilter, setSelectedProjectFilter] = useState<string>("ALL");
   const [selectedDisciplineFilter, setSelectedDisciplineFilter] = useState<string>("ALL");
   const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>("ALL");
+  const [drawingSortBy, setDrawingSortBy] = useState<string>("DATE_DESC");
+
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // Notifications
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -174,8 +182,25 @@ export default function DrawingsClientView({
         if (!matchTitle && !matchNum && !matchDisc && !matchProj) return false;
       }
       return true;
+    }).sort((a, b) => {
+      switch (drawingSortBy) {
+        case "DATE_DESC":
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        case "DATE_ASC":
+          return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        case "ALPHA_TITLE_ASC":
+          return a.title.localeCompare(b.title);
+        case "ALPHA_TITLE_DESC":
+          return b.title.localeCompare(a.title);
+        case "ALPHA_NUMBER_ASC":
+          return (a.drawingNumber || "").localeCompare(b.drawingNumber || "");
+        case "ALPHA_NUMBER_DESC":
+          return (b.drawingNumber || "").localeCompare(a.drawingNumber || "");
+        default:
+          return 0;
+      }
     });
-  }, [drawings, selectedProjectFilter, selectedDisciplineFilter, selectedStatusFilter, searchQuery]);
+  }, [drawings, selectedProjectFilter, selectedDisciplineFilter, selectedStatusFilter, searchQuery, drawingSortBy]);
 
   // Handle File Upload Helper
   const uploadFileToStorage = async (file: File): Promise<string> => {
@@ -466,8 +491,22 @@ export default function DrawingsClientView({
     }
   };
 
+  if (!isMounted) {
+    return (
+      <div className="space-y-6 animate-pulse" suppressHydrationWarning>
+        <div className="bg-white border border-[#E2E6F0] rounded-2xl p-5 h-20" />
+        <div className="bg-white border border-[#E2E6F0] rounded-2xl p-4 h-14" />
+        <div className="bg-white border border-[#E2E6F0] rounded-2xl p-6 space-y-4">
+          <div className="h-16 bg-gray-50 rounded-xl" />
+          <div className="h-16 bg-gray-50 rounded-xl" />
+          <div className="h-16 bg-gray-50 rounded-xl" />
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" suppressHydrationWarning>
       {/* Notifications */}
       {successMessage && (
         <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-xl text-xs flex items-center justify-between shadow-2xs">
@@ -571,6 +610,45 @@ export default function DrawingsClientView({
             <option value="IN_REVIEW">In Review</option>
             <option value="APPROVED">Approved Deliverables</option>
           </select>
+
+          {/* Sort By Filter (Date, Day & Alphabetical Order) */}
+          <div className="flex items-center gap-1.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-lg px-2 py-1 text-xs">
+            <ArrowUpDown className="w-3.5 h-3.5 text-[#5A81FA] shrink-0" />
+            <select
+              value={drawingSortBy}
+              onChange={(e) => setDrawingSortBy(e.target.value)}
+              className="bg-transparent font-medium text-[#1F1F1F] focus:outline-none cursor-pointer"
+              title="Sort drawings by date day or alphabetical order"
+            >
+              <option value="DATE_DESC">Sort: Date (Newest First)</option>
+              <option value="DATE_ASC">Sort: Date (Oldest First)</option>
+              <option value="ALPHA_TITLE_ASC">Sort: Title (A → Z)</option>
+              <option value="ALPHA_TITLE_DESC">Sort: Title (Z → A)</option>
+              <option value="ALPHA_NUMBER_ASC">Sort: Drawing No. (A → Z)</option>
+              <option value="ALPHA_NUMBER_DESC">Sort: Drawing No. (Z → A)</option>
+            </select>
+          </div>
+
+          {(selectedProjectFilter !== "ALL" ||
+            selectedDisciplineFilter !== "ALL" ||
+            selectedStatusFilter !== "ALL" ||
+            searchQuery.trim().length > 0 ||
+            drawingSortBy !== "DATE_DESC") && (
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedProjectFilter("ALL");
+                setSelectedDisciplineFilter("ALL");
+                setSelectedStatusFilter("ALL");
+                setSearchQuery("");
+                setDrawingSortBy("DATE_DESC");
+              }}
+              className="text-[#696E82] hover:text-red-700 font-semibold text-xs flex items-center gap-1 cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+              <span>Clear filters</span>
+            </button>
+          )}
 
           <div className="text-[11px] text-[#696E82] ml-auto">
             Showing {filteredDrawings.length} of {drawings.length} drawings

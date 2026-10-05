@@ -23,12 +23,15 @@ import {
   Compass,
   FileSpreadsheet,
   SlidersHorizontal,
+  ArrowUpDown,
+  Share2,
 } from "lucide-react";
 import { CsvImportExportModal } from "@/components/csv/CsvImportExportModal";
 import { CustomFieldsManagerModal } from "@/components/custom-fields/CustomFieldsManagerModal";
 import { DynamicFormFields } from "@/components/custom-fields/DynamicFormFields";
 import { DynamicCardFields } from "@/components/custom-fields/DynamicCardFields";
 import { CustomFieldDefinition } from "@/server/modules/custom-fields/repository";
+import { ContactShareModal, ShareableContact, ClientOption } from "@/components/share/ContactShareModal";
 
 export interface ProjectConsultantItem {
   id: string;
@@ -65,6 +68,8 @@ export interface ConsultantItem {
 export interface ConsultantsClientViewProps {
   initialConsultants: ConsultantItem[];
   projects: Array<{ id: string; code: string; name: string }>;
+  clients?: ClientOption[];
+  workspaceName?: string;
   workspaceSlug: string;
   userRole: string;
   initialCustomFields?: CustomFieldDefinition[];
@@ -74,6 +79,8 @@ export interface ConsultantsClientViewProps {
 export default function ConsultantsClientView({
   initialConsultants,
   projects,
+  clients = [],
+  workspaceName = "100% DESIGN Studio",
   workspaceSlug,
   userRole,
   initialCustomFields = [],
@@ -85,6 +92,50 @@ export default function ConsultantsClientView({
   const [customValuesByConsultant, setCustomValuesByConsultant] = useState<Record<string, Record<string, any>>>(initialCustomValues);
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, any>>({});
   const [customFieldsModalOpen, setCustomFieldsModalOpen] = useState(false);
+
+  // Bulk Selection & Client Contact Sharing States
+  const [selectedConsultantIds, setSelectedConsultantIds] = useState<string[]>([]);
+  const [shareModalOpen, setShareModalOpen] = useState(false);
+  const [shareContactsList, setShareContactsList] = useState<ShareableContact[]>([]);
+
+  const handleShareSingle = (consultant: ConsultantItem) => {
+    setShareContactsList([
+      {
+        id: consultant.id,
+        name: consultant.name,
+        category: consultant.discipline,
+        firmName: consultant.firmName,
+        contact: consultant.contact,
+        email: consultant.email,
+        address: consultant.firmAddress,
+      },
+    ]);
+    setShareModalOpen(true);
+  };
+
+  const handleShareBulk = () => {
+    const list = consultants
+      .filter((c) => selectedConsultantIds.includes(c.id))
+      .map((c) => ({
+        id: c.id,
+        name: c.name,
+        category: c.discipline,
+        firmName: c.firmName,
+        contact: c.contact,
+        email: c.email,
+        address: c.firmAddress,
+      }));
+    if (list.length > 0) {
+      setShareContactsList(list);
+      setShareModalOpen(true);
+    }
+  };
+
+  const toggleSelectConsultant = (id: string) => {
+    setSelectedConsultantIds((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+    );
+  };
 
   const refreshCustomFields = async () => {
     try {
@@ -112,6 +163,11 @@ export default function ConsultantsClientView({
     }));
   };
 
+  const [isMounted, setIsMounted] = useState(false);
+  React.useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   // Synchronize state dynamically whenever server component re-renders
   React.useEffect(() => {
     if (initialConsultants) {
@@ -137,6 +193,7 @@ export default function ConsultantsClientView({
   const [searchQuery, setSearchQuery] = useState("");
   const [statusTab, setStatusTab] = useState<"all" | "active" | "archived">("active");
   const [selectedDiscipline, setSelectedDiscipline] = useState<string>("ALL");
+  const [consultantSortBy, setConsultantSortBy] = useState<string>("DATE_DESC");
 
   // Messages
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -188,7 +245,7 @@ export default function ConsultantsClientView({
 
   // Filtered Consultants
   const filteredConsultants = useMemo(() => {
-    return consultants.filter((c) => {
+    const list = consultants.filter((c) => {
       if (statusTab === "active" && !c.isActive) return false;
       if (statusTab === "archived" && c.isActive) return false;
 
@@ -209,7 +266,28 @@ export default function ConsultantsClientView({
 
       return true;
     });
-  }, [consultants, statusTab, selectedDiscipline, searchQuery]);
+
+    return [...list].sort((a, b) => {
+      switch (consultantSortBy) {
+        case "DATE_DESC":
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        case "DATE_ASC":
+          return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        case "ALPHA_NAME_ASC":
+          return a.name.localeCompare(b.name);
+        case "ALPHA_NAME_DESC":
+          return b.name.localeCompare(a.name);
+        case "ALPHA_FIRM_ASC":
+          return (a.firmName || a.name).localeCompare(b.firmName || b.name);
+        case "ALPHA_FIRM_DESC":
+          return (b.firmName || b.name).localeCompare(a.firmName || a.name);
+        case "DISCIPLINE_ASC":
+          return a.discipline.localeCompare(b.discipline);
+        default:
+          return 0;
+      }
+    });
+  }, [consultants, statusTab, selectedDiscipline, searchQuery, consultantSortBy]);
 
   // Open Edit Modal
   const openEditModal = (consultant: ConsultantItem) => {
@@ -460,6 +538,20 @@ export default function ConsultantsClientView({
     }
   };
 
+  if (!isMounted) {
+    return (
+      <div className="space-y-6 animate-pulse" suppressHydrationWarning>
+        <div className="bg-white border border-[#E2E6F0] rounded-2xl p-5 h-20" />
+        <div className="bg-white border border-[#E2E6F0] rounded-2xl p-4 h-14" />
+        <div className="bg-white border border-[#E2E6F0] rounded-2xl p-6 space-y-4">
+          <div className="h-16 bg-gray-50 rounded-xl" />
+          <div className="h-16 bg-gray-50 rounded-xl" />
+          <div className="h-16 bg-gray-50 rounded-xl" />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6" suppressHydrationWarning>
       {/* Alert Banners */}
@@ -580,23 +672,94 @@ export default function ConsultantsClientView({
             </button>
           </div>
 
-          {/* Discipline Filter */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-[#696E82]">Filter Discipline:</span>
-            <select
-              value={selectedDiscipline}
-              onChange={(e) => setSelectedDiscipline(e.target.value)}
-              className="p-1.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-lg text-xs text-[#1F1F1F] focus:outline-none focus:ring-1 focus:ring-[#5A81FA]"
-            >
-              <option value="ALL">All Disciplines</option>
-              {availableDisciplines.map((disc) => (
-                <option key={disc} value={disc}>
-                  {disc}
-                </option>
-              ))}
-            </select>
+          {/* Filter Discipline & Sort Dropdown */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-[#696E82]">Filter Discipline:</span>
+              <select
+                value={selectedDiscipline}
+                onChange={(e) => setSelectedDiscipline(e.target.value)}
+                className="p-1.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-lg text-xs text-[#1F1F1F] focus:outline-none focus:ring-1 focus:ring-[#5A81FA]"
+              >
+                <option value="ALL">All Disciplines</option>
+                {availableDisciplines.map((disc) => (
+                  <option key={disc} value={disc}>
+                    {disc}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex items-center gap-1.5 bg-[#F8F9FD] border border-[#E2E6F0] px-2.5 py-1 rounded-lg">
+              <ArrowUpDown className="w-3.5 h-3.5 text-[#696E82]" />
+              <span className="text-xs text-[#696E82] font-medium">Sort:</span>
+              <select
+                value={consultantSortBy}
+                onChange={(e) => setConsultantSortBy(e.target.value)}
+                className="bg-transparent text-xs text-[#1F1F1F] font-semibold focus:outline-none cursor-pointer"
+              >
+                <option value="DATE_DESC">Date Created (Newest First)</option>
+                <option value="DATE_ASC">Date Created (Oldest First)</option>
+                <option value="ALPHA_NAME_ASC">Consultant Name (A → Z)</option>
+                <option value="ALPHA_NAME_DESC">Consultant Name (Z → A)</option>
+                <option value="ALPHA_FIRM_ASC">Firm Name (A → Z)</option>
+                <option value="ALPHA_FIRM_DESC">Firm Name (Z → A)</option>
+                <option value="DISCIPLINE_ASC">Discipline (A → Z)</option>
+              </select>
+            </div>
           </div>
         </div>
+      </div>
+
+      {/* Bulk Selection Bar */}
+      <div className="flex items-center justify-between text-xs px-1">
+        <label className="flex items-center gap-2 cursor-pointer font-medium text-[#696E82] hover:text-[#1F1F1F] select-none">
+          <input
+            type="checkbox"
+            checked={
+              filteredConsultants.length > 0 &&
+              filteredConsultants.every((c) => selectedConsultantIds.includes(c.id))
+            }
+            onChange={() => {
+              if (
+                filteredConsultants.length > 0 &&
+                filteredConsultants.every((c) => selectedConsultantIds.includes(c.id))
+              ) {
+                setSelectedConsultantIds((prev) =>
+                  prev.filter((id) => !filteredConsultants.some((c) => c.id === id))
+                );
+              } else {
+                const toAdd = filteredConsultants.map((c) => c.id);
+                setSelectedConsultantIds((prev) => Array.from(new Set([...prev, ...toAdd])));
+              }
+            }}
+            className="rounded text-[#5A81FA] focus:ring-[#5A81FA] cursor-pointer"
+          />
+          <span>Select all visible ({filteredConsultants.length})</span>
+        </label>
+
+        {selectedConsultantIds.length > 0 && (
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-[#2C308D] bg-[#F2F4FF] px-2.5 py-1 rounded-lg border border-[#CEDEFF]">
+              {selectedConsultantIds.length} selected
+            </span>
+            <button
+              type="button"
+              onClick={handleShareBulk}
+              className="px-3 py-1 bg-[#5A81FA] hover:bg-[#426EE8] text-white rounded-lg font-bold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+            >
+              <Share2 className="w-3.5 h-3.5" />
+              <span>Share to Client</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedConsultantIds([])}
+              className="text-[#696E82] hover:text-red-600 font-semibold cursor-pointer"
+            >
+              Clear
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Consultant Cards Grid */}
@@ -608,29 +771,44 @@ export default function ConsultantsClientView({
             <p className="text-xs text-[#696E82] mt-1">Try adjusting your search terms or active status tabs.</p>
           </div>
         ) : (
-          filteredConsultants.map((consultant) => (
-            <div
-              key={consultant.id}
-              className={`bg-white border rounded-2xl p-5 shadow-2xs flex flex-col justify-between transition-all hover:border-[#5A81FA]/40 ${
-                consultant.isActive ? "border-[#E2E6F0]" : "border-gray-200 bg-gray-50/50 opacity-80"
-              }`}
-            >
-              <div className="space-y-3">
-                {/* Header */}
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <h3 className="text-sm font-bold text-[#1F1F1F] tracking-tight">{consultant.name}</h3>
-                    {consultant.firmName && (
-                      <div className="text-xs text-[#696E82] font-medium flex items-center gap-1 mt-0.5">
-                        <Building2 className="w-3 h-3 text-[#696E82]" />
-                        <span>{consultant.firmName}</span>
+          filteredConsultants.map((consultant) => {
+            const isSelected = selectedConsultantIds.includes(consultant.id);
+            return (
+              <div
+                key={consultant.id}
+                className={`bg-white border rounded-2xl p-5 shadow-2xs flex flex-col justify-between transition-all hover:border-[#5A81FA]/40 ${
+                  isSelected
+                    ? "border-[#5A81FA] ring-2 ring-[#5A81FA]/20 bg-[#F2F4FF]/20"
+                    : consultant.isActive
+                    ? "border-[#E2E6F0]"
+                    : "border-gray-200 bg-gray-50/50 opacity-80"
+                }`}
+              >
+                <div className="space-y-3">
+                  {/* Header with Selection Checkbox */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleSelectConsultant(consultant.id)}
+                        className="mt-1 w-4 h-4 rounded text-[#5A81FA] border-[#E2E6F0] focus:ring-[#5A81FA] cursor-pointer shrink-0"
+                        title="Select consultant to share"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <h3 className="text-sm font-bold text-[#1F1F1F] tracking-tight truncate">{consultant.name}</h3>
+                        {consultant.firmName && (
+                          <div className="text-xs text-[#696E82] font-medium flex items-center gap-1 mt-0.5 truncate">
+                            <Building2 className="w-3 h-3 text-[#696E82] shrink-0" />
+                            <span className="truncate">{consultant.firmName}</span>
+                          </div>
+                        )}
                       </div>
-                    )}
+                    </div>
+                    <span className="font-mono text-[10px] font-bold text-[#5A81FA] bg-[#F2F4FF] px-2 py-0.5 rounded border border-[#CEDEFF] shrink-0">
+                      {consultant.discipline}
+                    </span>
                   </div>
-                  <span className="font-mono text-[10px] font-bold text-[#5A81FA] bg-[#F2F4FF] px-2 py-0.5 rounded border border-[#CEDEFF] shrink-0">
-                    {consultant.discipline}
-                  </span>
-                </div>
 
                 {/* Contact Info */}
                 <div className="space-y-1 text-xs text-[#696E82] pt-1">
@@ -712,12 +890,25 @@ export default function ConsultantsClientView({
 
               {/* Bottom Actions */}
               <div className="pt-4 mt-3 border-t border-[#E2E6F0] flex items-center justify-between gap-2">
-                <button
-                  onClick={() => setDetailConsultant(consultant)}
-                  className="text-xs font-semibold text-[#5A81FA] hover:underline cursor-pointer"
-                >
-                  View Details →
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setDetailConsultant(consultant)}
+                    className="text-xs font-semibold text-[#5A81FA] hover:underline cursor-pointer"
+                  >
+                    View Details →
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleShareSingle(consultant)}
+                    className="px-2.5 py-1 bg-[#F2F4FF] hover:bg-[#5A81FA] text-[#2C308D] hover:text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors border border-[#CEDEFF] cursor-pointer shadow-2xs group"
+                    title="Share contact details with client (WhatsApp / Email)"
+                  >
+                    <Share2 className="w-3.5 h-3.5 text-[#5A81FA] group-hover:text-white" />
+                    <span>Share</span>
+                  </button>
+                </div>
 
                 {isPrivileged && (
                   <div className="flex items-center gap-1.5">
@@ -743,8 +934,9 @@ export default function ConsultantsClientView({
                 )}
               </div>
             </div>
-          ))
-        )}
+          );
+        })
+      )}
       </div>
 
       {/* ==================================================== */}
@@ -1259,17 +1451,29 @@ export default function ConsultantsClientView({
 
             {/* Bottom Actions */}
             <div className="p-4 border-t border-[#E2E6F0] bg-[#F8F9FD] flex items-center justify-between">
-              {detailConsultant.contact ? (
-                <a
-                  href={`tel:${detailConsultant.contact}`}
-                  className="px-4 py-2 bg-[#5A81FA] text-white text-xs font-semibold rounded-xl hover:bg-[#426EE8] transition-colors flex items-center gap-1.5"
+              <div className="flex items-center gap-2">
+                {detailConsultant.contact ? (
+                  <a
+                    href={`tel:${detailConsultant.contact}`}
+                    className="px-4 py-2 bg-[#5A81FA] text-white text-xs font-semibold rounded-xl hover:bg-[#426EE8] transition-colors flex items-center gap-1.5"
+                  >
+                    <Phone className="w-3.5 h-3.5" />
+                    <span>Call {detailConsultant.name}</span>
+                  </a>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const toShare = detailConsultant;
+                    setDetailConsultant(null);
+                    handleShareSingle(toShare);
+                  }}
+                  className="px-3.5 py-2 bg-[#F2F4FF] hover:bg-[#5A81FA] text-[#2C308D] hover:text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors border border-[#CEDEFF] cursor-pointer"
                 >
-                  <Phone className="w-3.5 h-3.5" />
-                  <span>Call {detailConsultant.name}</span>
-                </a>
-              ) : (
-                <div />
-              )}
+                  <Share2 className="w-3.5 h-3.5" />
+                  <span>Share Contact</span>
+                </button>
+              </div>
               {isPrivileged && (
                 <button
                   onClick={() => {
@@ -1308,6 +1512,50 @@ export default function ConsultantsClientView({
         initialEntity="CONSULTANT"
         onFieldsUpdated={refreshCustomFields}
       />
+
+      {/* Floating Bottom Selection Bar (when 1+ consultants selected) */}
+      {selectedConsultantIds.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-[#1F1F1F] text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-4 border border-white/10 animate-in slide-in-from-bottom-4">
+          <div className="flex items-center gap-2">
+            <span className="w-6 h-6 rounded-full bg-[#5A81FA] text-white flex items-center justify-center text-xs font-bold">
+              {selectedConsultantIds.length}
+            </span>
+            <span className="text-xs font-semibold whitespace-nowrap">
+              {selectedConsultantIds.length === 1
+                ? "1 consultant selected"
+                : `${selectedConsultantIds.length} consultants selected`}
+            </span>
+          </div>
+          <div className="h-4 w-px bg-white/20" />
+          <button
+            type="button"
+            onClick={handleShareBulk}
+            className="px-4 py-2 bg-[#5A81FA] hover:bg-[#426EE8] text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-xs transition-colors cursor-pointer whitespace-nowrap"
+          >
+            <Share2 className="w-4 h-4" />
+            <span>Share to Client (WhatsApp / Email)</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedConsultantIds([])}
+            className="text-xs text-white/70 hover:text-white cursor-pointer px-2 py-1"
+          >
+            Clear
+          </button>
+        </div>
+      )}
+
+      {/* Contact Share Modal */}
+      <ContactShareModal
+        isOpen={shareModalOpen}
+        onClose={() => setShareModalOpen(false)}
+        contacts={shareContactsList}
+        clients={clients}
+        projects={projects}
+        workspaceName={workspaceName}
+        contactTypeLabel="Consultant"
+      />
     </div>
   );
 }
+

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   CheckCircle2,
@@ -34,11 +34,13 @@ import {
   AlertTriangle,
   FolderGit2,
   SlidersHorizontal,
+  ArrowUpDown,
 } from "lucide-react";
 import { CustomFieldsManagerModal } from "@/components/custom-fields/CustomFieldsManagerModal";
 import { DynamicFormFields } from "@/components/custom-fields/DynamicFormFields";
 import { DynamicCardFields } from "@/components/custom-fields/DynamicCardFields";
 import { CustomFieldDefinition } from "@/server/modules/custom-fields/repository";
+import { SearchableSelect, STUDIO_TYPOLOGIES, isTypologyMatch } from "@/components/ui/SearchableSelect";
 
 export interface TaskItem {
   id: string;
@@ -87,6 +89,7 @@ export interface ProjectOption {
   id: string;
   code: string;
   name: string;
+  projectType?: string | null;
   phases: Array<{ id: string; phaseName: string; sortOrder: number }>;
 }
 
@@ -147,6 +150,12 @@ export default function TasksClientView({
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, any>>({});
   const [customFieldsModalOpen, setCustomFieldsModalOpen] = useState(false);
 
+  // Mounting state to prevent browser extension hydration attribute mismatches (e.g. fdprocessedid)
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   const refreshCustomFields = async () => {
     try {
       const [fRes, vRes] = await Promise.all([
@@ -188,6 +197,7 @@ export default function TasksClientView({
   const [selectedStatusCategory, setSelectedStatusCategory] = useState<string>(
     ["IN_PROGRESS", "WAITING_REVIEW", "COMPLETED"].includes(activeFilter) ? activeFilter : "ALL"
   );
+  const [taskSortBy, setTaskSortBy] = useState<string>("DUE_DATE_ASC");
 
   // Detail Drawer state
   const [drawerTask, setDrawerTask] = useState<TaskItem | null>(null);
@@ -219,14 +229,20 @@ export default function TasksClientView({
   // Create Task Modal state
   const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false);
   const [creatingTask, setCreatingTask] = useState(false);
+  const [taskTypology, setTaskTypology] = useState<string>("");
+  const [otherTypology, setOtherTypology] = useState<string>("");
   const [selectedProjectId, setSelectedProjectId] = useState<string>(projects[0]?.id || "");
+  const [otherProjectName, setOtherProjectName] = useState<string>("");
   const [selectedPhaseId, setSelectedPhaseId] = useState<string>("");
+  const [otherPhaseName, setOtherPhaseName] = useState<string>("");
   const [taskTitle, setTaskTitle] = useState("");
   const [taskDescription, setTaskDescription] = useState("");
   const [taskAssigneeId, setTaskAssigneeId] = useState<string>(
     userRole === "OWNER" || userRole === "ADMIN" ? "" : currentMembershipId
   );
-  const [taskPriority, setTaskPriority] = useState<"LOW" | "MEDIUM" | "HIGH" | "URGENT">("MEDIUM");
+  const [otherAssigneeName, setOtherAssigneeName] = useState<string>("");
+  const [taskPriority, setTaskPriority] = useState<string>("MEDIUM");
+  const [otherPriorityName, setOtherPriorityName] = useState<string>("");
   const [taskDueDate, setTaskDueDate] = useState("");
   const [taskEstimatedHours, setTaskEstimatedHours] = useState("");
   const [checklistItems, setChecklistItems] = useState<string[]>([""]);
@@ -274,6 +290,10 @@ export default function TasksClientView({
 
   // Filter tasks based on search, project, priority, due-date category, and status category
   const filteredTasks = useMemo(() => {
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+    const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+
     return tasks.filter((task) => {
       // 1. Search Query
       if (searchQuery.trim()) {
@@ -300,11 +320,7 @@ export default function TasksClientView({
       // 4. Due Date Category Filter
       if (selectedDueDateCategory !== "ALL") {
         if (!task.dueDate) return false;
-        const now = new Date();
-        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
-        const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
         const due = new Date(task.dueDate);
-
         const isFinished = task.status === "COMPLETED" || task.status === "CANCELLED";
 
         if (selectedDueDateCategory === "TODAY") {
@@ -325,6 +341,33 @@ export default function TasksClientView({
       }
 
       return true;
+    }).sort((a, b) => {
+      switch (taskSortBy) {
+        case "DUE_DATE_ASC": {
+          if (!a.dueDate && !b.dueDate) return 0;
+          if (!a.dueDate) return 1;
+          if (!b.dueDate) return -1;
+          return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+        }
+        case "DUE_DATE_DESC": {
+          if (!a.dueDate && !b.dueDate) return 0;
+          if (!a.dueDate) return 1;
+          if (!b.dueDate) return -1;
+          return new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime();
+        }
+        case "CREATED_DESC":
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        case "CREATED_ASC":
+          return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        case "ALPHA_ASC":
+          return a.title.localeCompare(b.title);
+        case "ALPHA_DESC":
+          return b.title.localeCompare(a.title);
+        case "PROJ_ALPHA_ASC":
+          return a.project.code.localeCompare(b.project.code);
+        default:
+          return 0;
+      }
     });
   }, [
     tasks,
@@ -333,6 +376,7 @@ export default function TasksClientView({
     selectedPriorityFilter,
     selectedDueDateCategory,
     selectedStatusCategory,
+    taskSortBy,
   ]);
 
   const handleScopeChange = (newScope: string) => {
@@ -354,7 +398,18 @@ export default function TasksClientView({
     setSelectedPriorityFilter("ALL");
     setSelectedDueDateCategory("ALL");
     setSelectedStatusCategory("ALL");
+    setTaskSortBy("DUE_DATE_ASC");
   };
+
+  // Filter projects for task assign modal by selected architectural typology
+  const effectiveTypology = useMemo(() => {
+    return taskTypology === "OTHER" ? otherTypology.trim() : taskTypology.trim();
+  }, [taskTypology, otherTypology]);
+
+  const filteredProjectsForAssign = useMemo(() => {
+    if (!effectiveTypology) return projects;
+    return projects.filter((p) => isTypologyMatch(p.projectType, effectiveTypology));
+  }, [projects, effectiveTypology]);
 
   // Find phases for currently selected project in task creation modal
   const currentProject = projects.find((p) => p.id === selectedProjectId);
@@ -377,25 +432,69 @@ export default function TasksClientView({
   // Create Task
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedProjectId || !taskTitle.trim()) {
-      setErrorMessage("Please select a project and enter a task title.");
+    if (!selectedProjectId) {
+      setErrorMessage("Please select a project or specify a custom project.");
+      return;
+    }
+    if (selectedProjectId === "OTHER" && !otherProjectName.trim()) {
+      setErrorMessage("Please enter a custom project name.");
+      return;
+    }
+    if (!taskTitle.trim()) {
+      setErrorMessage("Please enter a deliverable title.");
       return;
     }
 
     setCreatingTask(true);
     setErrorMessage(null);
 
+    const effectiveTypology = taskTypology === "OTHER" ? (otherTypology.trim() || "Other") : taskTypology.trim();
+    const effectiveProjectName = selectedProjectId === "OTHER" ? (otherProjectName.trim() || "Ad-Hoc Project") : null;
+    const effectivePhaseName = selectedPhaseId === "OTHER" ? (otherPhaseName.trim() || "Custom Phase") : null;
+    const effectiveAssigneeName = taskAssigneeId === "OTHER" ? (otherAssigneeName.trim() || "External Specialist") : null;
+    const effectivePriority = taskPriority === "OTHER" ? "HIGH" : (taskPriority as "LOW" | "MEDIUM" | "HIGH" | "URGENT");
+
+    // Project ID for DB foreign key
+    const actualProjectId = selectedProjectId === "OTHER" ? (projects[0]?.id || "") : selectedProjectId;
+
+    // Build title and description with any custom metadata
+    let fullTitle = taskTitle.trim();
+    if (effectiveProjectName) {
+      fullTitle = `[${effectiveProjectName}] ${fullTitle}`;
+    }
+
+    let fullDescription = taskDescription.trim();
+    const metaNotes: string[] = [];
+    if (effectiveTypology) metaNotes.push(`Typology: ${effectiveTypology}`);
+    if (effectiveAssigneeName) metaNotes.push(`Assigned Specialist: ${effectiveAssigneeName}`);
+    if (effectivePhaseName) metaNotes.push(`Phase: ${effectivePhaseName}`);
+    if (taskPriority === "OTHER" && otherPriorityName.trim()) metaNotes.push(`Priority: ${otherPriorityName.trim()}`);
+    if (metaNotes.length > 0) {
+      fullDescription = fullDescription
+        ? `${fullDescription}\n\n---\n${metaNotes.join(" • ")}`
+        : metaNotes.join(" • ");
+    }
+
+    const payloadCustomValues: Record<string, any> = {
+      ...customFieldValues,
+      ...(effectiveTypology ? { typology: effectiveTypology } : {}),
+      ...(effectiveProjectName ? { customProject: effectiveProjectName } : {}),
+      ...(effectivePhaseName ? { customPhase: effectivePhaseName } : {}),
+      ...(effectiveAssigneeName ? { externalAssignee: effectiveAssigneeName } : {}),
+      ...(taskPriority === "OTHER" ? { customPriority: otherPriorityName.trim() || "Custom Priority" } : {}),
+    };
+
     try {
       const res = await fetch(`/api/tasks/create?workspaceSlug=${workspaceSlug}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          projectId: selectedProjectId,
-          phaseId: selectedPhaseId || undefined,
-          title: taskTitle.trim(),
-          description: taskDescription.trim() || undefined,
-          assigneeId: taskAssigneeId || undefined,
-          priority: taskPriority,
+          projectId: actualProjectId,
+          phaseId: selectedPhaseId === "OTHER" ? undefined : (selectedPhaseId || undefined),
+          title: fullTitle,
+          description: fullDescription || undefined,
+          assigneeId: taskAssigneeId === "OTHER" ? undefined : (taskAssigneeId || undefined),
+          priority: effectivePriority,
           dueDate: taskDueDate || undefined,
           estimatedHours: taskEstimatedHours ? Number(taskEstimatedHours) : undefined,
           checklist: checklistItems.filter((item) => item.trim().length > 0),
@@ -407,10 +506,12 @@ export default function TasksClientView({
         setErrorMessage(data.error || "Failed to create task");
       } else {
         const assignedMember = members.find((m) => m.id === taskAssigneeId);
-        const assigneeName = assignedMember?.user.fullName || "colleague";
-        setSuccessMessage(`Task "${taskTitle}" assigned successfully to ${assigneeName}!`);
+        const assigneeName = taskAssigneeId === "OTHER"
+          ? (effectiveAssigneeName || "External Specialist")
+          : (assignedMember?.user.fullName || "colleague");
+        setSuccessMessage(`Deliverable "${taskTitle}" assigned successfully to ${assigneeName}!`);
 
-        if (data.task?.id && Object.keys(customFieldValues).length > 0) {
+        if (data.task?.id && Object.keys(payloadCustomValues).length > 0) {
           try {
             await fetch(`/api/custom-fields/values?workspaceSlug=${workspaceSlug}`, {
               method: "POST",
@@ -418,12 +519,12 @@ export default function TasksClientView({
               body: JSON.stringify({
                 entity: "TASK",
                 recordId: data.task.id,
-                values: customFieldValues,
+                values: payloadCustomValues,
               }),
             });
             setCustomValuesByTask((prev) => ({
               ...prev,
-              [data.task.id]: customFieldValues,
+              [data.task.id]: payloadCustomValues,
             }));
           } catch (err) {
             console.error("Failed to save task custom fields", err);
@@ -431,6 +532,12 @@ export default function TasksClientView({
         }
 
         // Reset form
+        setTaskTypology("");
+        setOtherTypology("");
+        setOtherProjectName("");
+        setOtherPhaseName("");
+        setOtherAssigneeName("");
+        setOtherPriorityName("");
         setTaskTitle("");
         setTaskDescription("");
         setTaskDueDate("");
@@ -820,7 +927,38 @@ export default function TasksClientView({
     selectedProjectFilter !== "ALL" ||
     selectedPriorityFilter !== "ALL" ||
     selectedDueDateCategory !== "ALL" ||
-    selectedStatusCategory !== "ALL";
+    selectedStatusCategory !== "ALL" ||
+    taskSortBy !== "DUE_DATE_ASC";
+
+  if (!isMounted) {
+    return (
+      <div className="space-y-6 animate-pulse" suppressHydrationWarning>
+        {/* Banner Skeleton */}
+        <div className="bg-white border border-[#E2E6F0] rounded-2xl p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-2">
+            <div className="h-4 w-48 bg-gray-200 rounded" />
+            <div className="h-7 w-64 bg-gray-200 rounded" />
+            <div className="h-3 w-96 bg-gray-100 rounded" />
+          </div>
+          <div className="h-10 w-48 bg-gray-100 rounded-xl" />
+        </div>
+        {/* Metric Cards Skeleton */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="p-4 rounded-2xl border border-[#E2E6F0] bg-white h-24" />
+          ))}
+        </div>
+        {/* Filter bar Skeleton */}
+        <div className="bg-white border border-[#E2E6F0] rounded-2xl p-4 h-14" />
+        {/* Task List Skeleton */}
+        <div className="bg-white border border-[#E2E6F0] rounded-2xl p-6 space-y-4">
+          <div className="h-16 bg-gray-50 rounded-xl" />
+          <div className="h-16 bg-gray-50 rounded-xl" />
+          <div className="h-16 bg-gray-50 rounded-xl" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6" suppressHydrationWarning>
@@ -833,7 +971,7 @@ export default function TasksClientView({
             <span>•</span>
             <span suppressHydrationWarning>{formattedTodayDate}</span>
           </div>
-          <h2 className="text-xl font-bold tracking-tight text-[#1F1F1F] mt-1">
+          <h2 className="text-xl font-bold tracking-tight text-[#1F1F1F] mt-1" suppressHydrationWarning>
             {greeting}, {contextUserFullName || "Architect"}
           </h2>
           <p className="text-xs text-[#696E82] mt-0.5">
@@ -849,24 +987,28 @@ export default function TasksClientView({
         {isPrivileged && (
           <div className="flex items-center gap-1.5 bg-[#F8F9FD] p-1.5 rounded-xl border border-[#E2E6F0] shrink-0">
             <span className="text-xs font-semibold text-[#696E82] px-2 flex items-center gap-1.5">
-              <Users className="w-3.5 h-3.5 text-[#4B5320]" />
+              <Users className="w-3.5 h-3.5 text-[#5A81FA]" />
               <span className="hidden sm:inline">Scope:</span>
             </span>
             <button
+              type="button"
+              suppressHydrationWarning
               onClick={() => handleScopeChange("all")}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 currentScope === "all"
-                  ? "bg-[#4B5320] text-white shadow-2xs"
+                  ? "bg-[#5A81FA] text-white shadow-2xs"
                   : "text-[#696E82] hover:text-[#1F1F1F]"
               }`}
             >
               All Studio Tasks
             </button>
             <button
+              type="button"
+              suppressHydrationWarning
               onClick={() => handleScopeChange("my")}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 currentScope === "my"
-                  ? "bg-[#4B5320] text-white shadow-2xs"
+                  ? "bg-[#5A81FA] text-white shadow-2xs"
                   : "text-[#696E82] hover:text-[#1F1F1F]"
               }`}
             >
@@ -882,6 +1024,7 @@ export default function TasksClientView({
           {/* Card 1: Due Today */}
           <button
             type="button"
+            suppressHydrationWarning
             onClick={() => handleMetricCardClick("TODAY")}
             className={`p-4 rounded-2xl border text-left transition-all cursor-pointer shadow-2xs ${
               selectedDueDateCategory === "TODAY"
@@ -902,6 +1045,7 @@ export default function TasksClientView({
           {/* Card 2: Overdue */}
           <button
             type="button"
+            suppressHydrationWarning
             onClick={() => handleMetricCardClick("OVERDUE")}
             className={`p-4 rounded-2xl border text-left transition-all cursor-pointer shadow-2xs ${
               selectedDueDateCategory === "OVERDUE"
@@ -922,6 +1066,7 @@ export default function TasksClientView({
           {/* Card 3: In Progress */}
           <button
             type="button"
+            suppressHydrationWarning
             onClick={() => handleMetricCardClick("IN_PROGRESS")}
             className={`p-4 rounded-2xl border text-left transition-all cursor-pointer shadow-2xs ${
               selectedStatusCategory === "IN_PROGRESS"
@@ -942,6 +1087,7 @@ export default function TasksClientView({
           {/* Card 4: Waiting for Review */}
           <button
             type="button"
+            suppressHydrationWarning
             onClick={() => handleMetricCardClick("WAITING_REVIEW")}
             className={`p-4 rounded-2xl border text-left transition-all cursor-pointer shadow-2xs ${
               selectedStatusCategory === "WAITING_REVIEW"
@@ -962,6 +1108,7 @@ export default function TasksClientView({
           {/* Card 5: Completed */}
           <button
             type="button"
+            suppressHydrationWarning
             onClick={() => handleMetricCardClick("COMPLETED")}
             className={`p-4 rounded-2xl border text-left transition-all cursor-pointer shadow-2xs ${
               selectedStatusCategory === "COMPLETED"
@@ -988,7 +1135,7 @@ export default function TasksClientView({
             <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
             <span className="font-medium">{successMessage}</span>
           </div>
-          <button onClick={() => setSuccessMessage(null)} className="text-emerald-700 font-bold hover:underline cursor-pointer">
+          <button suppressHydrationWarning onClick={() => setSuccessMessage(null)} className="text-emerald-700 font-bold hover:underline cursor-pointer">
             Dismiss
           </button>
         </div>
@@ -1000,7 +1147,7 @@ export default function TasksClientView({
             <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
             <span className="font-medium">{errorMessage}</span>
           </div>
-          <button onClick={() => setErrorMessage(null)} className="text-red-600 font-bold hover:underline cursor-pointer">
+          <button suppressHydrationWarning onClick={() => setErrorMessage(null)} className="text-red-600 font-bold hover:underline cursor-pointer">
             Dismiss
           </button>
         </div>
@@ -1014,6 +1161,7 @@ export default function TasksClientView({
             <Search className="w-4 h-4 text-[#696E82] absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
+              suppressHydrationWarning
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search deliverables by title, project code, or description..."
@@ -1021,6 +1169,7 @@ export default function TasksClientView({
             />
             {searchQuery && (
               <button
+                suppressHydrationWarning
                 onClick={() => setSearchQuery("")}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-[#696E82] hover:text-[#1F1F1F]"
               >
@@ -1034,6 +1183,7 @@ export default function TasksClientView({
             {(userRole === "OWNER" || userRole === "ADMIN") && (
               <button
                 type="button"
+                suppressHydrationWarning
                 onClick={() => setCustomFieldsModalOpen(true)}
                 className="px-3.5 py-2 bg-white border border-[#E2E6F0] hover:bg-[#F8F9FD] text-slate-700 text-xs font-semibold rounded-xl shadow-2xs transition-colors flex items-center gap-1.5 cursor-pointer shrink-0"
                 title="Configure dynamic task & deliverable fields without code"
@@ -1043,6 +1193,7 @@ export default function TasksClientView({
               </button>
             )}
             <button
+              suppressHydrationWarning
               onClick={() => {
                 setCustomFieldValues({});
                 setIsCreateTaskModalOpen(true);
@@ -1056,6 +1207,7 @@ export default function TasksClientView({
             {/* View Switcher */}
             <div className="flex items-center gap-1 bg-[#F2F4FF] border border-[#E2E6F0] p-1 rounded-xl shrink-0">
               <button
+                suppressHydrationWarning
                 onClick={() => setView("list")}
                 className={`px-2.5 py-1 rounded-lg text-xs font-medium flex items-center gap-1 cursor-pointer transition-colors ${
                   view === "list" ? "bg-white text-[#1F1F1F] font-semibold shadow-2xs" : "text-[#696E82] hover:text-[#1F1F1F]"
@@ -1065,6 +1217,7 @@ export default function TasksClientView({
                 <span>List</span>
               </button>
               <button
+                suppressHydrationWarning
                 onClick={() => setView("kanban")}
                 className={`px-2.5 py-1 rounded-lg text-xs font-medium flex items-center gap-1 cursor-pointer transition-colors ${
                   view === "kanban" ? "bg-white text-[#1F1F1F] font-semibold shadow-2xs" : "text-[#696E82] hover:text-[#1F1F1F]"
@@ -1086,6 +1239,7 @@ export default function TasksClientView({
 
           {/* Due Date Category */}
           <select
+            suppressHydrationWarning
             value={selectedDueDateCategory}
             onChange={(e) => setSelectedDueDateCategory(e.target.value)}
             className="p-1.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-lg text-xs font-medium text-[#1F1F1F] focus:outline-none focus:ring-1 focus:ring-[#5A81FA]"
@@ -1098,6 +1252,7 @@ export default function TasksClientView({
 
           {/* Status Category */}
           <select
+            suppressHydrationWarning
             value={selectedStatusCategory}
             onChange={(e) => setSelectedStatusCategory(e.target.value)}
             className="p-1.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-lg text-xs font-medium text-[#1F1F1F] focus:outline-none focus:ring-1 focus:ring-[#5A81FA]"
@@ -1111,6 +1266,7 @@ export default function TasksClientView({
 
           {/* Priority */}
           <select
+            suppressHydrationWarning
             value={selectedPriorityFilter}
             onChange={(e) => setSelectedPriorityFilter(e.target.value)}
             className="p-1.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-lg text-xs font-medium text-[#1F1F1F] focus:outline-none focus:ring-1 focus:ring-[#5A81FA]"
@@ -1124,6 +1280,7 @@ export default function TasksClientView({
 
           {/* Project */}
           <select
+            suppressHydrationWarning
             value={selectedProjectFilter}
             onChange={(e) => setSelectedProjectFilter(e.target.value)}
             className="p-1.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-lg text-xs font-medium text-[#1F1F1F] focus:outline-none focus:ring-1 focus:ring-[#5A81FA] max-w-[200px]"
@@ -1136,9 +1293,30 @@ export default function TasksClientView({
             ))}
           </select>
 
+          {/* Sort By Filter (Date, Day, Alphabetical) */}
+          <div className="flex items-center gap-1.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-lg px-2 py-1 text-xs">
+            <ArrowUpDown className="w-3.5 h-3.5 text-[#5A81FA] shrink-0" />
+            <select
+              suppressHydrationWarning
+              value={taskSortBy}
+              onChange={(e) => setTaskSortBy(e.target.value)}
+              className="bg-transparent font-medium text-[#1F1F1F] focus:outline-none cursor-pointer"
+              title="Sort tasks by date day or alphabetical order"
+            >
+              <option value="DUE_DATE_ASC">Sort: Due Date (Closest First)</option>
+              <option value="DUE_DATE_DESC">Sort: Due Date (Furthest First)</option>
+              <option value="CREATED_DESC">Sort: Date Created (Newest First)</option>
+              <option value="CREATED_ASC">Sort: Date Created (Oldest First)</option>
+              <option value="ALPHA_ASC">Sort: Alphabetical (A → Z)</option>
+              <option value="ALPHA_DESC">Sort: Alphabetical (Z → A)</option>
+              <option value="PROJ_ALPHA_ASC">Sort: Project Code (A → Z)</option>
+            </select>
+          </div>
+
           {/* Clear Filters */}
           {isFilterActive && (
             <button
+              suppressHydrationWarning
               onClick={handleClearFilters}
               className="text-[#696E82] hover:text-red-700 font-semibold text-xs ml-auto flex items-center gap-1 cursor-pointer"
             >
@@ -1880,26 +2058,26 @@ export default function TasksClientView({
 
             <form onSubmit={handleReassignTask} className="space-y-4 text-xs">
               <div>
-                <label className="block font-semibold text-[#1F1F1F] mb-1">
-                  Reassign / Delegate To <span className="text-red-600">*</span>
-                </label>
-                <select
-                  value={reassignTargetMemberId}
-                  onChange={(e) => setReassignTargetMemberId(e.target.value)}
-                  required
-                  className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] font-medium focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
-                >
-                  {members.map((m) => {
-                    const empCode = m.employee?.employeeId ? `[${m.employee.employeeId}]` : `[${m.role}]`;
-                    const desig = m.employee?.designation ? `(${m.employee.designation})` : "";
+                <SearchableSelect
+                  id="reassign-member"
+                  label="Reassign / Delegate To"
+                  required={true}
+                  placeholder="Select team member to delegate..."
+                  searchPlaceholder="Search team members by name or ID..."
+                  options={members.map((m) => {
+                    const desig = m.employee?.designation ? `(${m.employee.designation})` : `(${m.role})`;
                     const isSelf = m.id === currentMembershipId ? " — (You)" : "";
-                    return (
-                      <option key={m.id} value={m.id}>
-                        {m.user.fullName} {empCode} {desig} {isSelf}
-                      </option>
-                    );
+                    return {
+                      value: m.id,
+                      label: `${m.user.fullName}${isSelf}`,
+                      subLabel: desig,
+                      badge: m.employee?.employeeId || undefined,
+                    };
                   })}
-                </select>
+                  value={reassignTargetMemberId}
+                  onChange={setReassignTargetMemberId}
+                  allowOther={false}
+                />
               </div>
 
               <div>
@@ -2139,47 +2317,125 @@ export default function TasksClientView({
             </div>
 
             <form onSubmit={handleCreateTask} className="space-y-4 text-xs">
-              {/* Project & Phase Selector */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-[#1F1F1F] mb-1">
-                    Select Project <span className="text-red-600">*</span>
-                  </label>
-                  <select
-                    value={selectedProjectId}
-                    onChange={(e) => {
-                      setSelectedProjectId(e.target.value);
-                      setSelectedPhaseId("");
-                    }}
-                    required
-                    className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
-                  >
-                    {projects.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.code} — {p.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-[#1F1F1F] mb-1">Architectural Phase</label>
-                  <select
-                    value={selectedPhaseId}
-                    onChange={(e) => setSelectedPhaseId(e.target.value)}
-                    className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
-                  >
-                    <option value="">General Project Deliverable</option>
-                    {availablePhases.map((ph) => (
-                      <option key={ph.id} value={ph.id}>
-                        {ph.sortOrder}. {ph.phaseName}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              {/* 1. ARCHITECTURAL TYPOLOGY (AT VERY FIRST!) */}
+              <div className="bg-[#FAFBFD] p-3 rounded-xl border border-[#E2E6F0] space-y-1">
+                <SearchableSelect
+                  id="task-typology"
+                  label="Architectural Typology"
+                  required={false}
+                  placeholder="Select typology (e.g. Commercial, Hospital, Residential)..."
+                  searchPlaceholder="Search typology (e.g. Commercial, Hospital, Villa)..."
+                  options={[
+                    { value: "", label: "All Typologies (Show all projects)" },
+                    ...STUDIO_TYPOLOGIES.map((typ) => ({
+                      value: typ,
+                      label: typ,
+                    })),
+                  ]}
+                  value={taskTypology}
+                  onChange={(val) => {
+                    setTaskTypology(val);
+                    const eff = val === "OTHER" ? otherTypology.trim() : val.trim();
+                    if (eff) {
+                      const match = projects.filter((p) => isTypologyMatch(p.projectType, eff));
+                      if (match.length > 0) {
+                        if (!match.some((p) => p.id === selectedProjectId)) {
+                          setSelectedProjectId(match[0].id);
+                          setSelectedPhaseId("");
+                        }
+                      } else {
+                        setSelectedProjectId("");
+                        setSelectedPhaseId("");
+                      }
+                    }
+                  }}
+                  allowOther={true}
+                  otherOptionLabel="+ Other Architectural Typology..."
+                  otherValue={otherTypology}
+                  onOtherValueChange={(val) => {
+                    setOtherTypology(val);
+                    const eff = val.trim();
+                    if (eff) {
+                      const match = projects.filter((p) => isTypologyMatch(p.projectType, eff));
+                      if (match.length > 0) {
+                        if (!match.some((p) => p.id === selectedProjectId)) {
+                          setSelectedProjectId(match[0].id);
+                          setSelectedPhaseId("");
+                        }
+                      }
+                    }
+                  }}
+                  otherInputPlaceholder="Specify custom typology (e.g. Airport, Cultural Pavilion, Data Center)..."
+                  helperText={
+                    effectiveTypology
+                      ? `Showing only ${effectiveTypology} projects below (${filteredProjectsForAssign.length} found).`
+                      : "Classifies deliverable requirements and filters projects by architectural typology."
+                  }
+                />
               </div>
 
-              {/* Task Title */}
+              {/* 2. PROJECT & PHASE SELECTOR */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <SearchableSelect
+                  id="select-project"
+                  label="Select Project"
+                  required={true}
+                  placeholder={
+                    filteredProjectsForAssign.length > 0
+                      ? "Select project..."
+                      : effectiveTypology
+                      ? `No ${effectiveTypology} projects found`
+                      : "Select project..."
+                  }
+                  searchPlaceholder="Search projects by code, title, or typology..."
+                  options={filteredProjectsForAssign.map((p) => ({
+                    value: p.id,
+                    label: `${p.code} — ${p.name}`,
+                    subLabel: p.projectType || undefined,
+                    badge: p.code,
+                  }))}
+                  value={selectedProjectId}
+                  onChange={(val) => {
+                    setSelectedProjectId(val);
+                    setSelectedPhaseId("");
+                    if (val && val !== "OTHER") {
+                      const found = projects.find((p) => p.id === val);
+                      if (found?.projectType && !taskTypology) {
+                        setTaskTypology(found.projectType);
+                      }
+                    }
+                  }}
+                  allowOther={true}
+                  otherOptionLabel="+ Other / Custom Project Reference..."
+                  otherValue={otherProjectName}
+                  onOtherValueChange={setOtherProjectName}
+                  otherInputPlaceholder="Specify custom project code or client reference..."
+                />
+
+                <SearchableSelect
+                  id="select-phase"
+                  label="Architectural Phase"
+                  required={false}
+                  placeholder="Select phase..."
+                  searchPlaceholder="Search phases..."
+                  options={[
+                    { value: "", label: "General Project Deliverable", subLabel: "Not phase-specific" },
+                    ...availablePhases.map((ph) => ({
+                      value: ph.id,
+                      label: `${ph.sortOrder}. ${ph.phaseName}`,
+                    })),
+                  ]}
+                  value={selectedPhaseId}
+                  onChange={setSelectedPhaseId}
+                  allowOther={true}
+                  otherOptionLabel="+ Other / Custom Phase..."
+                  otherValue={otherPhaseName}
+                  onOtherValueChange={setOtherPhaseName}
+                  otherInputPlaceholder="Specify custom phase (e.g. Façade Mockup, Commissioning)..."
+                />
+              </div>
+
+              {/* 3. TASK TITLE */}
               <div>
                 <label className="block font-semibold text-[#1F1F1F] mb-1">
                   Deliverable Title <span className="text-red-600">*</span>
@@ -2194,7 +2450,7 @@ export default function TasksClientView({
                 />
               </div>
 
-              {/* Description */}
+              {/* 4. DESCRIPTION */}
               <div>
                 <label className="block font-semibold text-[#1F1F1F] mb-1">Architectural Brief & Instructions</label>
                 <textarea
@@ -2206,43 +2462,52 @@ export default function TasksClientView({
                 />
               </div>
 
-              {/* Assignee & Priority */}
+              {/* 5. ASSIGNEE & PRIORITY */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-[#1F1F1F] mb-1">
-                    Assignee <span className="text-red-600">*</span>
-                  </label>
-                  <select
-                    value={taskAssigneeId}
-                    onChange={(e) => setTaskAssigneeId(e.target.value)}
-                    required
-                    className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] font-medium focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
-                  >
-                    {members.map((m) => {
-                      const empId = m.employee?.employeeId ? `[${m.employee.employeeId}]` : "";
-                      const designation = m.employee?.designation ? `(${m.employee.designation})` : `(${m.role})`;
-                      return (
-                        <option key={m.id} value={m.id}>
-                          {m.user.fullName} {empId} {designation}
-                        </option>
-                      );
-                    })}
-                  </select>
-                </div>
+                <SearchableSelect
+                  id="task-assignee"
+                  label="Assignee"
+                  required={true}
+                  placeholder="Select team member..."
+                  searchPlaceholder="Search team by name, ID or role..."
+                  options={members.map((m) => {
+                    const designation = m.employee?.designation ? `${m.employee.designation} (${m.role})` : m.role;
+                    return {
+                      value: m.id,
+                      label: m.user.fullName,
+                      subLabel: designation,
+                      badge: m.employee?.employeeId || undefined,
+                    };
+                  })}
+                  value={taskAssigneeId}
+                  onChange={setTaskAssigneeId}
+                  allowOther={true}
+                  otherOptionLabel="+ Other / External Specialist or Freelancer..."
+                  otherValue={otherAssigneeName}
+                  onOtherValueChange={setOtherAssigneeName}
+                  otherInputPlaceholder="Specify external specialist or consultant name..."
+                />
 
-                <div>
-                  <label className="block font-semibold text-[#1F1F1F] mb-1">Priority</label>
-                  <select
-                    value={taskPriority}
-                    onChange={(e) => setTaskPriority(e.target.value as any)}
-                    className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
-                  >
-                    <option value="LOW">Low</option>
-                    <option value="MEDIUM">Medium</option>
-                    <option value="HIGH">High Priority</option>
-                    <option value="URGENT">Urgent (Monitored)</option>
-                  </select>
-                </div>
+                <SearchableSelect
+                  id="task-priority"
+                  label="Priority"
+                  required={false}
+                  placeholder="Select priority..."
+                  searchPlaceholder="Search priority level..."
+                  options={[
+                    { value: "LOW", label: "Low Priority", subLabel: "Routine drafting / non-blocking" },
+                    { value: "MEDIUM", label: "Medium", subLabel: "Standard milestone deliverable" },
+                    { value: "HIGH", label: "High Priority", subLabel: "Client deadline or review gate" },
+                    { value: "URGENT", label: "Urgent (Monitored)", subLabel: "Critical path / Immediate escalation" },
+                  ]}
+                  value={taskPriority}
+                  onChange={setTaskPriority}
+                  allowOther={true}
+                  otherOptionLabel="+ Other / Custom Priority Level..."
+                  otherValue={otherPriorityName}
+                  onOtherValueChange={setOtherPriorityName}
+                  otherInputPlaceholder="Specify custom priority descriptor..."
+                />
               </div>
 
               {/* Due Date & Estimated Hours */}

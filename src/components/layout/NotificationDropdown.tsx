@@ -139,7 +139,7 @@ export function NotificationDropdown({ context }: NotificationDropdownProps) {
     }
   };
 
-  // Background polling every 8 seconds + immediate check on tab focus
+  // Background polling every 45 seconds + immediate check on tab focus
   useEffect(() => {
     fetchNotifications(true);
 
@@ -147,7 +147,7 @@ export function NotificationDropdown({ context }: NotificationDropdownProps) {
       if (document.visibilityState === "visible") {
         fetchNotifications(false);
       }
-    }, 8000);
+    }, 45000);
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
@@ -454,14 +454,14 @@ export function NotificationDropdown({ context }: NotificationDropdownProps) {
 
       {/* Real-Time Live Floating Toast Alert */}
       {activeToast && (
-        <div className="fixed top-16 right-6 z-[9999] max-w-sm w-full bg-white/95 backdrop-blur-md border border-[#4B5320]/30 shadow-2xl rounded-2xl p-4 animate-in slide-in-from-top-4 duration-300">
+        <div className="fixed top-16 right-6 z-[9999] max-w-sm w-full bg-white/95 backdrop-blur-md border border-[#CEDEFF] shadow-2xl rounded-2xl p-4 animate-in slide-in-from-top-4 duration-300">
           <div className="flex items-start gap-3">
-            <div className="w-9 h-9 rounded-xl bg-[#4B5320] text-white flex items-center justify-center shrink-0 shadow-sm animate-bounce">
-              <Bell className="w-4 h-4 text-[#D4AF37]" />
+            <div className="w-9 h-9 rounded-xl bg-[#5A81FA] text-white flex items-center justify-center shrink-0 shadow-sm animate-bounce">
+              <Bell className="w-4 h-4 text-white" />
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-[#4B5320] flex items-center gap-1.5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[#5A81FA] flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping inline-block" />
                   Live Notification
                 </span>
@@ -488,7 +488,7 @@ export function NotificationDropdown({ context }: NotificationDropdownProps) {
                       markAsRead(activeToast.id);
                       setActiveToast(null);
                     }}
-                    className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#4B5320] hover:bg-[#3d441a] text-white text-[10px] font-bold rounded-lg shadow-xs transition-colors cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#5A81FA] hover:bg-[#426EE8] text-white text-[10px] font-bold rounded-lg shadow-xs transition-colors cursor-pointer"
                   >
                     <span>View Task Details</span>
                     <ExternalLink className="w-2.5 h-2.5" />

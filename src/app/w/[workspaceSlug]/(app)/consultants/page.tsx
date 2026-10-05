@@ -23,7 +23,7 @@ export default async function ConsultantsPage({ params, searchParams }: Consulta
 
   const isPrivileged = ctx.role === "OWNER" || ctx.role === "ADMIN";
 
-  const [consultants, projects, customFieldDefinitions, customFieldValues] = await Promise.all([
+  const [consultants, projects, customFieldDefinitions, customFieldValues, clients] = await Promise.all([
     findConsultants(ctx, {
       search,
       isActive: status === "archived" ? false : status === "active" ? true : undefined,
@@ -35,6 +35,11 @@ export default async function ConsultantsPage({ params, searchParams }: Consulta
     }),
     getCustomFieldDefinitions(ctx, "CONSULTANT"),
     getCustomFieldValues(ctx, "CONSULTANT"),
+    prisma.client.findMany({
+      where: { tenantId: ctx.tenantId, isActive: true },
+      select: { id: true, name: true, contact: true, email: true, company: true },
+      orderBy: { name: "asc" },
+    }),
   ]);
 
   const serializedConsultants = consultants.map((c) => ({
@@ -61,6 +66,8 @@ export default async function ConsultantsPage({ params, searchParams }: Consulta
       <ConsultantsClientView
         initialConsultants={serializeForClient(serializedConsultants) as any}
         projects={serializeForClient(projects)}
+        clients={serializeForClient(clients)}
+        workspaceName={ctx.tenantName}
         workspaceSlug={ctx.tenantSlug}
         userRole={ctx.role}
         initialCustomFields={serializeForClient(customFieldDefinitions) as any}

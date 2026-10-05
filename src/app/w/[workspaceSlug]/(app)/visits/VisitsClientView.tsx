@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   MapPin,
@@ -33,7 +33,12 @@ import {
   History,
   Pause,
   Play,
+  ArrowUpDown,
+  Search,
+  Filter,
+  SlidersHorizontal,
 } from "lucide-react";
+import { SearchableSelect, STUDIO_TYPOLOGIES, isTypologyMatch } from "@/components/ui/SearchableSelect";
 
 interface SiteVisitItem {
   id: string;
@@ -90,7 +95,7 @@ interface VisitsClientViewProps {
   scheduledVisits: SiteVisitItem[];
   allVisits: SiteVisitItem[];
   availableSites: Array<{ id: string; name: string; address?: string; project: { code: string; name: string } }>;
-  availableProjects?: Array<{ id: string; code: string; name: string }>;
+  availableProjects?: Array<{ id: string; code: string; name: string; projectType?: string | null }>;
   teamMembers?: TeamMember[];
 }
 
@@ -106,6 +111,7 @@ export default function VisitsClientView({
   teamMembers = [],
 }: VisitsClientViewProps) {
   const router = useRouter();
+
   const [activeVisit, setActiveVisit] = useState<SiteVisitItem | null>(initialActiveVisit);
   const [allVisits, setAllVisits] = useState<SiteVisitItem[]>(initialAllVisits);
 
@@ -122,6 +128,8 @@ export default function VisitsClientView({
 
   // Owner/Admin "Assign Site Visit" modal state
   const [assignModalOpen, setAssignModalOpen] = useState(false);
+  const [assignTypology, setAssignTypology] = useState<string>("");
+  const [assignOtherTypology, setAssignOtherTypology] = useState<string>("");
   const [assignProjectId, setAssignProjectId] = useState(availableProjects[0]?.id || "");
   const [assignSiteMode, setAssignSiteMode] = useState<"EXISTING" | "CUSTOM">("EXISTING");
   const [assignSiteId, setAssignSiteId] = useState(availableSites[0]?.id || "");
@@ -133,6 +141,89 @@ export default function VisitsClientView({
   const [assignPurpose, setAssignPurpose] = useState("");
   const [assignScheduledDate, setAssignScheduledDate] = useState(new Date().toISOString().split("T")[0]);
   const [assignScheduledTime, setAssignScheduledTime] = useState("10:00");
+
+  // Filters & Sorting for Section 3: Recent Studio Site Inspection Log
+  const [visitSearch, setVisitSearch] = useState("");
+  const [visitStateFilter, setVisitStateFilter] = useState("ALL");
+  const [visitProjectFilter, setVisitProjectFilter] = useState("ALL");
+  const [visitReviewFilter, setVisitReviewFilter] = useState("ALL");
+  const [visitSortBy, setVisitSortBy] = useState<string>("DATE_DESC");
+
+  // Filter available projects for assignment according to architectural typology
+  const effectiveAssignTypology = useMemo(() => {
+    return assignTypology === "OTHER" ? assignOtherTypology.trim() : assignTypology.trim();
+  }, [assignTypology, assignOtherTypology]);
+
+  const filteredAssignProjects = useMemo(() => {
+    if (!effectiveAssignTypology) return availableProjects;
+    return availableProjects.filter((p) => isTypologyMatch(p.projectType, effectiveAssignTypology));
+  }, [availableProjects, effectiveAssignTypology]);
+
+  // Filtered and sorted visits for Recent Studio Site Inspection Log
+  const filteredAndSortedVisits = useMemo(() => {
+    return allVisits
+      .filter((v) => {
+        if (visitStateFilter !== "ALL" && v.operationalState !== visitStateFilter) {
+          return false;
+        }
+        if (visitProjectFilter !== "ALL" && v.project.id !== visitProjectFilter) {
+          return false;
+        }
+        if (visitReviewFilter !== "ALL" && v.reviewDecision !== visitReviewFilter) {
+          return false;
+        }
+        if (visitSearch.trim()) {
+          const q = visitSearch.toLowerCase();
+          const matchEmployee = v.employee?.user?.fullName?.toLowerCase().includes(q);
+          const matchEmpId = v.employee?.employee?.employeeId?.toLowerCase().includes(q);
+          const matchProj = v.project.code.toLowerCase().includes(q) || v.project.name.toLowerCase().includes(q);
+          const matchSite = v.site.name.toLowerCase().includes(q) || (v.site.address && v.site.address.toLowerCase().includes(q));
+          const matchPurpose = v.purpose.toLowerCase().includes(q);
+          const matchFindings = v.findings?.toLowerCase().includes(q);
+          if (!matchEmployee && !matchEmpId && !matchProj && !matchSite && !matchPurpose && !matchFindings) {
+            return false;
+          }
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        switch (visitSortBy) {
+          case "DATE_DESC":
+            return new Date(b.scheduledTime).getTime() - new Date(a.scheduledTime).getTime();
+          case "DATE_ASC":
+            return new Date(a.scheduledTime).getTime() - new Date(b.scheduledTime).getTime();
+          case "ALPHA_EMPLOYEE_ASC":
+            return (a.employee?.user?.fullName || "").localeCompare(b.employee?.user?.fullName || "");
+          case "ALPHA_EMPLOYEE_DESC":
+            return (b.employee?.user?.fullName || "").localeCompare(a.employee?.user?.fullName || "");
+          case "ALPHA_PROJECT_ASC":
+            return a.project.code.localeCompare(b.project.code);
+          case "ALPHA_PROJECT_DESC":
+            return b.project.code.localeCompare(a.project.code);
+          case "ALPHA_PURPOSE_ASC":
+            return a.purpose.localeCompare(b.purpose);
+          case "ALPHA_PURPOSE_DESC":
+            return b.purpose.localeCompare(a.purpose);
+          default:
+            return 0;
+        }
+      });
+  }, [allVisits, visitStateFilter, visitProjectFilter, visitReviewFilter, visitSearch, visitSortBy]);
+
+  const isVisitFilterActive =
+    visitSearch.trim().length > 0 ||
+    visitStateFilter !== "ALL" ||
+    visitProjectFilter !== "ALL" ||
+    visitReviewFilter !== "ALL" ||
+    visitSortBy !== "DATE_DESC";
+
+  const handleClearVisitFilters = () => {
+    setVisitSearch("");
+    setVisitStateFilter("ALL");
+    setVisitProjectFilter("ALL");
+    setVisitReviewFilter("ALL");
+    setVisitSortBy("DATE_DESC");
+  };
 
   // Detail View modal state
   const [detailModalVisit, setDetailModalVisit] = useState<SiteVisitItem | null>(null);
@@ -148,13 +239,13 @@ export default function VisitsClientView({
 
   const isPrivileged = userRole === "OWNER" || userRole === "ADMIN" || userRole === "PROJECT_MANAGER";
 
-  // Auto-refresh timer every 30 seconds
+  // Mounting state to prevent browser extension hydration attribute mismatches
+  const [isMounted, setIsMounted] = useState(false);
   useEffect(() => {
-    const timer = setInterval(() => {
-      router.refresh();
-    }, 30000);
-    return () => clearInterval(timer);
-  }, [router]);
+    setIsMounted(true);
+  }, []);
+
+
 
   // Update local state if prop changes
   useEffect(() => {
@@ -762,8 +853,22 @@ export default function VisitsClientView({
     }`;
   };
 
+  if (!isMounted) {
+    return (
+      <div className="space-y-6 animate-pulse" suppressHydrationWarning>
+        <div className="bg-white p-4 rounded-2xl border border-[#E2E6F0] h-20" />
+        <div className="bg-white border border-[#E2E6F0] rounded-2xl p-4 h-14" />
+        <div className="bg-white border border-[#E2E6F0] rounded-2xl p-6 space-y-4">
+          <div className="h-16 bg-gray-50 rounded-xl" />
+          <div className="h-16 bg-gray-50 rounded-xl" />
+          <div className="h-16 bg-gray-50 rounded-xl" />
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" suppressHydrationWarning>
       {/* Top Banner Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-[#E2E6F0] shadow-2xs">
         <div className="flex items-center gap-3">
@@ -874,7 +979,7 @@ export default function VisitsClientView({
                   type="button"
                   onClick={handleCalibrateSiteToCurrentLocation}
                   disabled={loading}
-                  className="px-3.5 py-2 bg-[#4B5320] hover:bg-[#3D441A] text-white font-bold rounded-xl transition-all flex items-center gap-1.5 shrink-0 cursor-pointer shadow-xs disabled:opacity-50"
+                  className="px-3.5 py-2 bg-[#5A81FA] hover:bg-[#426EE8] text-white font-bold rounded-xl transition-all flex items-center gap-1.5 shrink-0 cursor-pointer shadow-xs disabled:opacity-50"
                 >
                   <LocateFixed className="w-3.5 h-3.5" />
                   <span>Set Site to Trimurti Nagar, Nagpur</span>
@@ -1261,22 +1366,147 @@ export default function VisitsClientView({
           </span>
         </div>
 
+        {/* Inspection Log Filter & Sort Bar */}
+        <div className="bg-[#FAFBFD] p-3 rounded-xl border border-[#E2E6F0] space-y-2.5">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-2.5">
+            {/* Search */}
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="w-3.5 h-3.5 text-[#696E82] absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={visitSearch}
+                onChange={(e) => setVisitSearch(e.target.value)}
+                placeholder="Search visits by employee, project, site, or purpose..."
+                className="w-full pl-8 pr-7 py-1.5 bg-white border border-[#E2E6F0] rounded-lg text-xs text-[#1F1F1F] placeholder-[#696E82] focus:outline-none focus:ring-1 focus:ring-[#5A81FA]"
+              />
+              {visitSearch && (
+                <button
+                  type="button"
+                  onClick={() => setVisitSearch("")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#696E82] hover:text-[#1F1F1F]"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+
+            {/* Quick stats / summary */}
+            <div className="text-[11px] text-[#696E82] self-end md:self-auto font-medium">
+              Showing {filteredAndSortedVisits.length} of {allVisits.length} site visits
+            </div>
+          </div>
+
+          {/* Filter selects row */}
+          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-[#E2E6F0]/60 text-xs">
+            <div className="flex items-center gap-1 text-[#696E82] font-semibold text-xs">
+              <Filter className="w-3.5 h-3.5" />
+              <span>Filters:</span>
+            </div>
+
+            {/* State Filter */}
+            <select
+              value={visitStateFilter}
+              onChange={(e) => setVisitStateFilter(e.target.value)}
+              className="p-1.5 bg-white border border-[#E2E6F0] rounded-lg text-xs font-medium text-[#1F1F1F] focus:outline-none focus:ring-1 focus:ring-[#5A81FA]"
+            >
+              <option value="ALL">All States</option>
+              <option value="ACTIVE">Active On-Site</option>
+              <option value="CHECKED_OUT">Checked Out</option>
+              <option value="SCHEDULED">Scheduled</option>
+              <option value="CANCELLED">Cancelled</option>
+            </select>
+
+            {/* Project Filter */}
+            <select
+              value={visitProjectFilter}
+              onChange={(e) => setVisitProjectFilter(e.target.value)}
+              className="p-1.5 bg-white border border-[#E2E6F0] rounded-lg text-xs font-medium text-[#1F1F1F] focus:outline-none focus:ring-1 focus:ring-[#5A81FA] max-w-[180px]"
+            >
+              <option value="ALL">All Projects</option>
+              {availableProjects.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.code} — {p.name}
+                </option>
+              ))}
+            </select>
+
+            {/* Review Decision Filter */}
+            <select
+              value={visitReviewFilter}
+              onChange={(e) => setVisitReviewFilter(e.target.value)}
+              className="p-1.5 bg-white border border-[#E2E6F0] rounded-lg text-xs font-medium text-[#1F1F1F] focus:outline-none focus:ring-1 focus:ring-[#5A81FA]"
+            >
+              <option value="ALL">All Reviews</option>
+              <option value="PENDING">Pending Review</option>
+              <option value="ACCEPTED">Accepted</option>
+              <option value="NEEDS_CLARIFICATION">Needs Clarification</option>
+              <option value="REJECTED">Rejected</option>
+            </select>
+
+            {/* Sort Filter: Date Day & Alphabetical Order */}
+            <div className="flex items-center gap-1.5 bg-white border border-[#E2E6F0] rounded-lg px-2 py-1">
+              <ArrowUpDown className="w-3.5 h-3.5 text-[#5A81FA] shrink-0" />
+              <select
+                value={visitSortBy}
+                onChange={(e) => setVisitSortBy(e.target.value)}
+                className="bg-transparent text-xs font-medium text-[#1F1F1F] focus:outline-none cursor-pointer"
+                title="Sort site visits by date day or alphabetical order"
+              >
+                <option value="DATE_DESC">Sort: Date (Newest First)</option>
+                <option value="DATE_ASC">Sort: Date (Oldest First)</option>
+                <option value="ALPHA_EMPLOYEE_ASC">Sort: Alphabetical Employee (A → Z)</option>
+                <option value="ALPHA_EMPLOYEE_DESC">Sort: Alphabetical Employee (Z → A)</option>
+                <option value="ALPHA_PROJECT_ASC">Sort: Alphabetical Project (A → Z)</option>
+                <option value="ALPHA_PURPOSE_ASC">Sort: Alphabetical Purpose (A → Z)</option>
+              </select>
+            </div>
+
+            {/* Clear filters */}
+            {isVisitFilterActive && (
+              <button
+                type="button"
+                onClick={handleClearVisitFilters}
+                className="text-[#696E82] hover:text-red-700 font-semibold text-xs ml-auto flex items-center gap-1 cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+                <span>Clear filters</span>
+              </button>
+            )}
+          </div>
+        </div>
+
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-[#F8F9FD] text-[#696E82] font-semibold border-b border-[#E2E6F0]">
-              <tr>
-                <th className="py-2.5 px-3">Employee</th>
-                <th className="py-2.5 px-3">Project & Site</th>
-                <th className="py-2.5 px-3">Purpose & Minutes</th>
-                <th className="py-2.5 px-3">State</th>
-                <th className="py-2.5 px-3">Enter / Exit Times</th>
-                <th className="py-2.5 px-3">GPS Tracking & Geofence</th>
-                <th className="py-2.5 px-3">Review</th>
-                <th className="py-2.5 px-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#E2E6F0]">
-              {allVisits.map((v) => {
+          {filteredAndSortedVisits.length === 0 ? (
+            <div className="p-8 text-center text-[#696E82] space-y-1">
+              <Calendar className="w-8 h-8 text-[#A8B1CE] mx-auto mb-1" />
+              <p className="font-semibold text-[#1F1F1F] text-xs">No inspection logs match this filter criteria</p>
+              <p className="text-[11px]">Try adjusting your search query, status, project, or review filters.</p>
+              {isVisitFilterActive && (
+                <button
+                  type="button"
+                  onClick={handleClearVisitFilters}
+                  className="mt-2 text-xs font-semibold text-[#5A81FA] hover:underline cursor-pointer"
+                >
+                  Clear all filters
+                </button>
+              )}
+            </div>
+          ) : (
+            <table className="w-full text-left text-xs">
+              <thead className="bg-[#F8F9FD] text-[#696E82] font-semibold border-b border-[#E2E6F0]">
+                <tr>
+                  <th className="py-2.5 px-3">Employee</th>
+                  <th className="py-2.5 px-3">Project & Site</th>
+                  <th className="py-2.5 px-3">Purpose & Minutes</th>
+                  <th className="py-2.5 px-3">State</th>
+                  <th className="py-2.5 px-3">Enter / Exit Times</th>
+                  <th className="py-2.5 px-3">GPS Tracking & Geofence</th>
+                  <th className="py-2.5 px-3">Review</th>
+                  <th className="py-2.5 px-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#E2E6F0]">
+                {filteredAndSortedVisits.map((v) => {
                 const checkIn = v.events?.find((e) => e.eventType === "CHECK_IN");
                 const checkOut = v.events?.find((e) => e.eventType === "CHECK_OUT");
                 const mapLink =
@@ -1431,23 +1661,24 @@ export default function VisitsClientView({
               })}
             </tbody>
           </table>
-        </div>
+        )}
       </div>
+    </div>
 
       {/* ======================================================== */}
       {/* MODAL 1: OWNER & ADMIN ASSIGN SITE VISIT MODAL */}
       {/* ======================================================== */}
       {assignModalOpen && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in-0">
-          <div className="bg-white rounded-2xl border border-[#E2E6F0] shadow-2xl max-w-lg w-full p-6 space-y-4">
-            <div className="flex items-center justify-between border-b border-[#E2E6F0] pb-3">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-[#5A81FA] text-white flex items-center justify-center">
+          <div className="bg-white rounded-2xl border border-[#E2E6F0] shadow-2xl max-w-lg w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center pb-3 border-b border-[#E2E6F0]">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-[#5A81FA] text-white flex items-center justify-center shrink-0 shadow-xs">
                   <Calendar className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-[#1F1F1F]">Schedule & Assign Site Visit</h3>
-                  <p className="text-[11px] text-[#696E82]">
+                  <h3 className="text-base font-bold text-[#1F1F1F]">Schedule & Assign Site Visit</h3>
+                  <p className="text-xs text-[#696E82]">
                     Assign studio architect/employee with location and meeting agenda
                   </p>
                 </div>
@@ -1455,58 +1686,127 @@ export default function VisitsClientView({
               <button
                 type="button"
                 onClick={() => setAssignModalOpen(false)}
-                className="p-1 text-[#696E82] hover:text-[#1F1F1F] rounded-lg cursor-pointer"
+                className="text-[#696E82] hover:text-[#1F1F1F] p-1 rounded-lg transition-colors cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleAssignVisitSubmit} className="space-y-3.5 text-xs">
-              {/* Project Selection */}
-              <div>
-                <label className="block font-semibold text-[#1F1F1F] mb-1">Select Project *</label>
-                <select
-                  required
-                  value={assignProjectId}
-                  onChange={(e) => setAssignProjectId(e.target.value)}
-                  className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] font-medium"
-                >
-                  {availableProjects.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.code} — {p.name}
-                    </option>
-                  ))}
-                </select>
+            <form onSubmit={handleAssignVisitSubmit} className="space-y-4 text-xs">
+              {/* 1. Architectural Typology (Filter projects) */}
+              <div className="bg-[#FAFBFD] p-3 rounded-xl border border-[#E2E6F0] space-y-1">
+                <SearchableSelect
+                  id="assign-typology"
+                  label="Architectural Typology"
+                  required={false}
+                  placeholder="Select typology (e.g. Healthcare & Hospital, Commercial)..."
+                  searchPlaceholder="Search typology (e.g. Hospital, Commercial, Villa)..."
+                  options={[
+                    { value: "", label: "All Typologies (Show all projects)" },
+                    ...STUDIO_TYPOLOGIES.map((typ) => ({
+                      value: typ,
+                      label: typ,
+                    })),
+                  ]}
+                  value={assignTypology}
+                  onChange={(val) => {
+                    setAssignTypology(val);
+                    const eff = val === "OTHER" ? assignOtherTypology.trim() : val.trim();
+                    if (eff) {
+                      const match = availableProjects.filter((p) => isTypologyMatch(p.projectType, eff));
+                      if (match.length > 0) {
+                        if (!match.some((p) => p.id === assignProjectId)) {
+                          setAssignProjectId(match[0].id);
+                        }
+                      } else {
+                        setAssignProjectId("");
+                      }
+                    }
+                  }}
+                  allowOther={true}
+                  otherOptionLabel="+ Other Architectural Typology..."
+                  otherValue={assignOtherTypology}
+                  onOtherValueChange={(val) => {
+                    setAssignOtherTypology(val);
+                    const eff = val.trim();
+                    if (eff) {
+                      const match = availableProjects.filter((p) => isTypologyMatch(p.projectType, eff));
+                      if (match.length > 0) {
+                        if (!match.some((p) => p.id === assignProjectId)) {
+                          setAssignProjectId(match[0].id);
+                        }
+                      }
+                    }
+                  }}
+                  otherInputPlaceholder="Specify custom typology (e.g. Airport, Cultural Pavilion, Data Center)..."
+                  helperText={
+                    effectiveAssignTypology
+                      ? `Showing only ${effectiveAssignTypology} projects below (${filteredAssignProjects.length} found).`
+                      : "Filters available projects according to architectural typology."
+                  }
+                />
               </div>
 
+              {/* 2. Project Selection */}
+              <SearchableSelect
+                id="assign-project"
+                label="Select Project"
+                required
+                placeholder={
+                  filteredAssignProjects.length > 0
+                    ? "Select project..."
+                    : effectiveAssignTypology
+                    ? `No ${effectiveAssignTypology} projects found`
+                    : "Select project..."
+                }
+                searchPlaceholder="Search project by code, name, or typology..."
+                options={filteredAssignProjects.map((p) => ({
+                  value: p.id,
+                  label: `${p.code} — ${p.name}`,
+                  subLabel: p.projectType || undefined,
+                  badge: p.code,
+                }))}
+                value={assignProjectId}
+                onChange={(val) => {
+                  setAssignProjectId(val);
+                  if (val) {
+                    const found = availableProjects.find((p) => p.id === val);
+                    if (found?.projectType && !assignTypology) {
+                      setAssignTypology(found.projectType);
+                    }
+                  }
+                }}
+                allowOther={false}
+              />
+
               {/* Assign to Employee */}
-              <div>
-                <label className="block font-semibold text-[#1F1F1F] mb-1">
-                  Assign To Studio Employee / Architect *
-                </label>
-                <select
-                  required
-                  value={assignEmployeeId}
-                  onChange={(e) => setAssignEmployeeId(e.target.value)}
-                  className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] font-medium"
-                >
-                  {teamMembers.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.user.fullName} ({m.employee?.employeeId ?? "STAFF"} • {m.employee?.designation ?? m.role})
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <SearchableSelect
+                id="assign-employee"
+                label="Assign To Studio Employee / Architect"
+                required
+                placeholder="Select employee..."
+                searchPlaceholder="Search employee by name..."
+                options={teamMembers.map((m) => ({
+                  value: m.id,
+                  label: m.user.fullName,
+                  subLabel: `${m.employee?.employeeId ?? "STAFF"} • ${m.employee?.designation ?? m.role}`,
+                }))}
+                value={assignEmployeeId}
+                onChange={setAssignEmployeeId}
+                allowOther={false}
+              />
 
               {/* Site Location Mode */}
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <label className="font-semibold text-[#1F1F1F]">Site Location *</label>
-                  <div className="flex items-center gap-2">
+                  <label className="text-xs font-semibold text-[#1F1F1F]">
+                    Site Location <span className="text-red-600">*</span>
+                  </label>
+                  <div className="flex items-center gap-1.5">
                     <button
                       type="button"
                       onClick={() => setAssignSiteMode("EXISTING")}
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded cursor-pointer ${
+                      className={`text-[10px] font-semibold px-2 py-0.5 rounded-lg cursor-pointer transition-colors ${
                         assignSiteMode === "EXISTING"
                           ? "bg-[#5A81FA] text-white"
                           : "text-[#696E82] hover:bg-[#F2F4FF]"
@@ -1517,7 +1817,7 @@ export default function VisitsClientView({
                     <button
                       type="button"
                       onClick={() => setAssignSiteMode("CUSTOM")}
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded cursor-pointer ${
+                      className={`text-[10px] font-semibold px-2 py-0.5 rounded-lg cursor-pointer transition-colors ${
                         assignSiteMode === "CUSTOM"
                           ? "bg-[#5A81FA] text-white"
                           : "text-[#696E82] hover:bg-[#F2F4FF]"
@@ -1529,19 +1829,22 @@ export default function VisitsClientView({
                 </div>
 
                 {assignSiteMode === "EXISTING" ? (
-                  <select
+                  <SearchableSelect
+                    id="assign-site"
+                    label=""
+                    placeholder="Select site location..."
+                    searchPlaceholder="Search site by name or address..."
+                    options={availableSites.map((s) => ({
+                      value: s.id,
+                      label: `${s.name} (${s.project?.code})`,
+                      subLabel: s.address || "Main Site",
+                    }))}
                     value={assignSiteId}
-                    onChange={(e) => setAssignSiteId(e.target.value)}
-                    className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] font-medium"
-                  >
-                    {availableSites.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name} ({s.project?.code}) — {s.address || "Main Site"}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={setAssignSiteId}
+                    allowOther={false}
+                  />
                 ) : (
-                  <div className="space-y-2 p-3 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl">
+                  <div className="space-y-2.5 p-3.5 bg-[#FAFBFD] border border-[#E2E6F0] rounded-xl">
                     <div>
                       <input
                         type="text"
@@ -1549,7 +1852,7 @@ export default function VisitsClientView({
                         placeholder="Site Name (e.g. Horizon Towers - Block B)"
                         value={customSiteName}
                         onChange={(e) => setCustomSiteName(e.target.value)}
-                        className="w-full p-2 bg-white border border-[#E2E6F0] rounded-lg text-xs"
+                        className="w-full p-2.5 bg-white border border-[#E2E6F0] rounded-xl text-[#1F1F1F] text-xs focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
                       />
                     </div>
                     <div>
@@ -1558,7 +1861,7 @@ export default function VisitsClientView({
                         placeholder="Address / Plot Details"
                         value={customSiteAddress}
                         onChange={(e) => setCustomSiteAddress(e.target.value)}
-                        className="w-full p-2 bg-white border border-[#E2E6F0] rounded-lg text-xs"
+                        className="w-full p-2.5 bg-white border border-[#E2E6F0] rounded-xl text-[#1F1F1F] text-xs focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
                       />
                     </div>
                     <div className="grid grid-cols-2 gap-2">
@@ -1568,7 +1871,7 @@ export default function VisitsClientView({
                         placeholder="Latitude (optional)"
                         value={customSiteLat}
                         onChange={(e) => setCustomSiteLat(e.target.value)}
-                        className="w-full p-2 bg-white border border-[#E2E6F0] rounded-lg text-xs font-mono"
+                        className="w-full p-2 bg-white border border-[#E2E6F0] rounded-xl text-[#1F1F1F] text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
                       />
                       <input
                         type="number"
@@ -1576,7 +1879,7 @@ export default function VisitsClientView({
                         placeholder="Longitude (optional)"
                         value={customSiteLng}
                         onChange={(e) => setCustomSiteLng(e.target.value)}
-                        className="w-full p-2 bg-white border border-[#E2E6F0] rounded-lg text-xs font-mono"
+                        className="w-full p-2 bg-white border border-[#E2E6F0] rounded-xl text-[#1F1F1F] text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
                       />
                     </div>
                   </div>
@@ -1585,8 +1888,8 @@ export default function VisitsClientView({
 
               {/* Purpose / Agenda */}
               <div>
-                <label className="block font-semibold text-[#1F1F1F] mb-1">
-                  Meeting Purpose / Inspection Agenda *
+                <label className="text-xs font-semibold text-[#1F1F1F] block mb-1">
+                  Meeting Purpose / Inspection Agenda <span className="text-red-600">*</span>
                 </label>
                 <input
                   type="text"
@@ -1594,49 +1897,53 @@ export default function VisitsClientView({
                   placeholder="e.g. Slab casting inspection & structural consultant walkthrough"
                   value={assignPurpose}
                   onChange={(e) => setAssignPurpose(e.target.value)}
-                  className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F]"
+                  className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] text-xs focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
                 />
               </div>
 
               {/* Scheduled Date & Time */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold text-[#1F1F1F] mb-1">Date *</label>
+                  <label className="text-xs font-semibold text-[#1F1F1F] block mb-1">
+                    Date <span className="text-red-600">*</span>
+                  </label>
                   <input
                     type="date"
                     required
                     value={assignScheduledDate}
                     onChange={(e) => setAssignScheduledDate(e.target.value)}
-                    className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F]"
+                    className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] text-xs focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
                   />
                 </div>
                 <div>
-                  <label className="block font-semibold text-[#1F1F1F] mb-1">Time *</label>
+                  <label className="text-xs font-semibold text-[#1F1F1F] block mb-1">
+                    Time <span className="text-red-600">*</span>
+                  </label>
                   <input
                     type="time"
                     required
                     value={assignScheduledTime}
                     onChange={(e) => setAssignScheduledTime(e.target.value)}
-                    className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F]"
+                    className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] text-xs focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
                   />
                 </div>
               </div>
 
-              <div className="pt-3 border-t border-[#E2E6F0] flex items-center justify-end gap-2">
+              <div className="pt-4 border-t border-[#E2E6F0] flex items-center justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setAssignModalOpen(false)}
-                  className="px-4 py-2 border border-[#E2E6F0] text-[#696E82] hover:bg-[#F2F4FF] rounded-xl font-semibold cursor-pointer"
+                  className="px-4 py-2 bg-[#F2F4FF] hover:bg-[#E5EAFF] text-[#696E82] hover:text-[#1F1F1F] font-semibold rounded-xl text-xs cursor-pointer transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="px-5 py-2 bg-[#5A81FA] hover:bg-[#426EE8] text-white font-bold rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  className="px-5 py-2 bg-[#5A81FA] hover:bg-[#426EE8] text-white font-semibold rounded-xl text-xs shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
                   <CheckCheck className="w-4 h-4" />
-                  <span>Confirm & Assign Visit</span>
+                  <span>{loading ? "Assigning..." : "Confirm & Assign Visit"}</span>
                 </button>
               </div>
             </form>
@@ -1889,11 +2196,11 @@ export default function VisitsClientView({
               </div>
             )}
 
-            <div className="pt-3 border-t border-[#E2E6F0] flex justify-end">
+            <div className="pt-4 border-t border-[#E2E6F0] flex justify-end">
               <button
                 type="button"
                 onClick={() => setDetailModalVisit(null)}
-                className="px-4 py-2 bg-[#F2F4FF] hover:bg-[#EAE8E0] text-[#1F1F1F] font-semibold text-xs rounded-xl cursor-pointer"
+                className="px-4 py-2 bg-[#F2F4FF] hover:bg-[#E5EAFF] text-[#696E82] hover:text-[#1F1F1F] font-semibold text-xs rounded-xl cursor-pointer transition-colors"
               >
                 Close Dossier
               </button>
@@ -1907,28 +2214,50 @@ export default function VisitsClientView({
       {/* ======================================================== */}
       {exceptionModal && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in-0">
-          <div className="bg-white rounded-2xl border border-[#E2E6F0] shadow-xl max-w-md w-full p-6 space-y-4">
-            <div className="flex items-center gap-2 text-rose-800">
-              <AlertTriangle className="w-5 h-5 text-rose-600" />
-              <h3 className="text-base font-bold">Location-Unavailable Exception</h3>
+          <div className="bg-white rounded-2xl border border-[#E2E6F0] shadow-2xl max-w-md w-full p-6 space-y-4">
+            <div className="flex justify-between items-center pb-3 border-b border-[#E2E6F0]">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-rose-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                  <AlertTriangle className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-[#1F1F1F]">Location Exception</h3>
+                  <p className="text-xs text-[#696E82]">Record manual location verification</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setExceptionModal(null)}
+                className="text-[#696E82] hover:text-[#1F1F1F] p-1 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
+
             <p className="text-xs text-[#696E82]">
               If you are in an underground basement or your device cannot get a GPS fix, specify the reason. This will be
               recorded in the immutable audit trail for Partner review.
             </p>
-            <textarea
-              required
-              rows={3}
-              value={exceptionReason}
-              onChange={(e) => setExceptionReason(e.target.value)}
-              placeholder="e.g. Inspecting basement B2 parking raft reinforcement — zero satellite/cellular GPS fix."
-              className="w-full text-xs p-3 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] focus:ring-2 focus:ring-[#5A81FA] focus:outline-none"
-            />
-            <div className="flex justify-end gap-2 pt-2 border-t border-[#E2E6F0]">
+
+            <div>
+              <label className="text-xs font-semibold text-[#1F1F1F] block mb-1">
+                Exception Reason <span className="text-red-600">*</span>
+              </label>
+              <textarea
+                required
+                rows={3}
+                value={exceptionReason}
+                onChange={(e) => setExceptionReason(e.target.value)}
+                placeholder="e.g. Inspecting basement B2 parking raft reinforcement — zero satellite/cellular GPS fix."
+                className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] text-xs focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-4 border-t border-[#E2E6F0]">
               <button
                 type="button"
                 onClick={() => setExceptionModal(null)}
-                className="px-3 py-1.5 border border-[#E2E6F0] text-xs font-semibold rounded-lg text-[#696E82] hover:bg-[#F2F4FF] cursor-pointer"
+                className="px-4 py-2 bg-[#F2F4FF] hover:bg-[#E5EAFF] text-[#696E82] hover:text-[#1F1F1F] font-semibold rounded-xl text-xs cursor-pointer transition-colors"
               >
                 Cancel
               </button>
@@ -1941,7 +2270,7 @@ export default function VisitsClientView({
                     reason: exceptionReason.trim(),
                   })
                 }
-                className="px-4 py-1.5 bg-rose-700 hover:bg-rose-800 text-white text-xs font-semibold rounded-lg shadow-xs cursor-pointer disabled:opacity-50"
+                className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white font-semibold rounded-xl text-xs shadow-xs cursor-pointer disabled:opacity-50 transition-colors"
               >
                 Submit Exception Check-In
               </button>
@@ -1965,14 +2294,27 @@ export default function VisitsClientView({
 
         return (
           <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in-0">
-            <div className="bg-white rounded-2xl border border-[#E2E6F0] shadow-xl max-w-lg w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
-              <div className="flex items-center gap-2 text-[#5A81FA]">
-                <ShieldCheck className="w-5 h-5" />
-                <h3 className="text-base font-bold text-[#1F1F1F]">Architectural Review Decision</h3>
+            <div className="bg-white rounded-2xl border border-[#E2E6F0] shadow-2xl max-w-lg w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+              <div className="flex justify-between items-center pb-3 border-b border-[#E2E6F0]">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-[#5A81FA] text-white flex items-center justify-center shrink-0 shadow-xs">
+                    <ShieldCheck className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-[#1F1F1F]">Architectural Review Decision</h3>
+                    <p className="text-xs text-[#696E82]">
+                      Review site timestamps, GPS trail, and observations
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setReviewModal(null)}
+                  className="text-[#696E82] hover:text-[#1F1F1F] p-1 rounded-lg transition-colors cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
-              <p className="text-xs text-[#696E82]">
-                Review the employee's on-site timestamps, GPS movement trail, and observations before issuing approval.
-              </p>
 
               {/* Location Trail & GPS Evidence Summary for Owner/Admin */}
               {targetVisit && (
@@ -2025,53 +2367,58 @@ export default function VisitsClientView({
                 </div>
               )}
 
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-xs font-semibold text-[#1F1F1F] mb-1">Review Decision *</label>
-                  <select
-                    value={reviewDecision}
-                    onChange={(e) => setReviewDecision(e.target.value as any)}
-                    className="w-full text-xs p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] font-semibold"
-                  >
-                    <option value="ACCEPTED">✔ ACCEPTED (Inspection Verified)</option>
-                    <option value="NEEDS_CLARIFICATION">⚠ NEEDS CLARIFICATION (Additional Photos Needed)</option>
-                    <option value="REJECTED">✖ REJECTED (Outside Perimeter / Inaccurate)</option>
-                  </select>
-                </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-[#1F1F1F] mb-1">Architect Comment (Optional)</label>
-                <textarea
-                  rows={3}
-                  value={reviewComment}
-                  onChange={(e) => setReviewComment(e.target.value)}
-                  placeholder="e.g. Rebar verified against drawing R1; billable inspection certified."
-                  className="w-full text-xs p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] focus:ring-2 focus:ring-[#5A81FA] focus:outline-none"
+              <div className="space-y-4">
+                <SearchableSelect
+                  id="review-decision"
+                  label="Review Decision"
+                  required
+                  placeholder="Select decision..."
+                  searchPlaceholder="Search decision..."
+                  options={[
+                    { value: "ACCEPTED", label: "ACCEPTED", subLabel: "Inspection Verified" },
+                    { value: "NEEDS_CLARIFICATION", label: "NEEDS CLARIFICATION", subLabel: "Additional Photos Needed" },
+                    { value: "REJECTED", label: "REJECTED", subLabel: "Outside Perimeter / Inaccurate" },
+                  ]}
+                  value={reviewDecision}
+                  onChange={(val) => setReviewDecision(val as any)}
+                  allowOther={false}
                 />
+
+                <div>
+                  <label className="text-xs font-semibold text-[#1F1F1F] block mb-1">
+                    Architect Comment (Optional)
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={reviewComment}
+                    onChange={(e) => setReviewComment(e.target.value)}
+                    placeholder="e.g. Rebar verified against drawing R1; billable inspection certified."
+                    className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] text-xs focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-4 border-t border-[#E2E6F0]">
+                <button
+                  type="button"
+                  onClick={() => setReviewModal(null)}
+                  className="px-4 py-2 bg-[#F2F4FF] hover:bg-[#E5EAFF] text-[#696E82] hover:text-[#1F1F1F] font-semibold rounded-xl text-xs cursor-pointer transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={submitReview}
+                  className="px-5 py-2 bg-[#5A81FA] hover:bg-[#426EE8] text-white font-semibold rounded-xl text-xs shadow-xs cursor-pointer disabled:opacity-50 transition-colors"
+                >
+                  {loading ? "Submitting..." : "Submit Decision"}
+                </button>
               </div>
             </div>
-
-            <div className="flex justify-end gap-2 pt-2 border-t border-[#E2E6F0]">
-              <button
-                type="button"
-                onClick={() => setReviewModal(null)}
-                className="px-3 py-1.5 border border-[#E2E6F0] text-xs font-semibold rounded-lg text-[#696E82] hover:bg-[#F2F4FF] cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={loading}
-                onClick={submitReview}
-                className="px-4 py-1.5 bg-[#5A81FA] hover:bg-[#426EE8] text-white text-xs font-bold rounded-lg shadow-xs cursor-pointer disabled:opacity-50"
-              >
-                Submit Decision
-              </button>
-            </div>
           </div>
-        </div>
-      );
-    })()}
+        );
+      })()}
   </div>
 );
 }

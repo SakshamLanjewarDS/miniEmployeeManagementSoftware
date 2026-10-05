@@ -275,6 +275,29 @@ const DEFAULT_DEFINITIONS_BY_ENTITY: Record<string, CustomFieldDefinition[]> = {
   CONSULTANT: DEFAULT_CONSULTANT_CUSTOM_FIELDS,
 };
 
+// In-memory cache for tenant settings (avoids multiple remote DB queries on every page load)
+const tenantSettingsCache = new Map<string, { settings: any; cachedAt: number }>();
+const SETTINGS_CACHE_TTL_MS = 60 * 1000;
+
+async function getCachedTenantSettings(tenantId: string) {
+  const now = Date.now();
+  const cached = tenantSettingsCache.get(tenantId);
+  if (cached && now - cached.cachedAt < SETTINGS_CACHE_TTL_MS) {
+    return cached.settings;
+  }
+  const tenant = await prisma.tenant.findUnique({
+    where: { id: tenantId },
+    select: { settings: true },
+  });
+  const settings = (tenant?.settings as any) || {};
+  tenantSettingsCache.set(tenantId, { settings, cachedAt: now });
+  return settings;
+}
+
+function invalidateTenantSettingsCache(tenantId: string) {
+  tenantSettingsCache.delete(tenantId);
+}
+
 /**
  * Retrieve custom field definitions for a tenant and specific entity
  */
@@ -282,12 +305,7 @@ export async function getCustomFieldDefinitions(
   ctx: TenantContext,
   entity: string = "PROJECT"
 ): Promise<CustomFieldDefinition[]> {
-  const tenant = await prisma.tenant.findUnique({
-    where: { id: ctx.tenantId },
-    select: { settings: true },
-  });
-
-  const settings = (tenant?.settings as any) || {};
+  const settings = await getCachedTenantSettings(ctx.tenantId);
   const definitions = settings.customFieldDefinitions?.[entity];
 
   if (!definitions || !Array.isArray(definitions) || definitions.length === 0) {
@@ -311,6 +329,7 @@ export async function saveCustomFieldDefinitions(
   entity: string,
   definitions: CustomFieldDefinition[]
 ): Promise<CustomFieldDefinition[]> {
+  invalidateTenantSettingsCache(ctx.tenantId);
   const tenant = await prisma.tenant.findUnique({
     where: { id: ctx.tenantId },
     select: { settings: true },
@@ -331,6 +350,7 @@ export async function saveCustomFieldDefinitions(
     where: { id: ctx.tenantId },
     data: { settings: updatedSettings },
   });
+  invalidateTenantSettingsCache(ctx.tenantId);
 
   return definitions;
 }
@@ -410,12 +430,7 @@ export async function getCustomFieldValues(
   entity: string = "PROJECT",
   recordId?: string
 ): Promise<Record<string, any>> {
-  const tenant = await prisma.tenant.findUnique({
-    where: { id: ctx.tenantId },
-    select: { settings: true },
-  });
-
-  const settings = (tenant?.settings as any) || {};
+  const settings = await getCachedTenantSettings(ctx.tenantId);
   const allValues = settings.customFieldValues?.[entity] || {};
 
   if (recordId) {
@@ -434,6 +449,7 @@ export async function saveCustomFieldValues(
   recordId: string,
   values: Record<string, any>
 ): Promise<Record<string, any>> {
+  invalidateTenantSettingsCache(ctx.tenantId);
   const tenant = await prisma.tenant.findUnique({
     where: { id: ctx.tenantId },
     select: { settings: true },
@@ -463,6 +479,7 @@ export async function saveCustomFieldValues(
     where: { id: ctx.tenantId },
     data: { settings: updatedSettings },
   });
+  invalidateTenantSettingsCache(ctx.tenantId);
 
   return updatedRecordValues;
 }

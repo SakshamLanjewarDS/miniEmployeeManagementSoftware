@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import {
   Receipt,
@@ -35,6 +35,8 @@ import {
   Clock,
   CheckCircle2,
   X,
+  Search,
+  ArrowUpDown,
 } from "lucide-react";
 
 export interface FeeMilestoneItem {
@@ -184,8 +186,73 @@ export default function FinanceClientView({
     return samplePopulatedData.milestones;
   }, [dataMode, initialMilestones, samplePopulatedData]);
 
+  // Milestone filter and sorting states
+  const [milestoneSearch, setMilestoneSearch] = useState("");
+  const [milestoneStatusFilter, setMilestoneStatusFilter] = useState<string>("ALL");
+  const [milestoneSortBy, setMilestoneSortBy] = useState<string>("DATE_ASC");
+
+  // Mounting state to prevent browser extension hydration attribute mismatches (e.g. fdprocessedid)
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  const filteredAndSortedMilestones = useMemo(() => {
+    const list = activeMilestones.filter((m) => {
+      if (milestoneStatusFilter !== "ALL" && m.status !== milestoneStatusFilter) {
+        return false;
+      }
+      if (milestoneSearch.trim()) {
+        const q = milestoneSearch.toLowerCase();
+        const matchTitle = m.title.toLowerCase().includes(q);
+        const matchCode = m.project.code.toLowerCase().includes(q);
+        const matchName = m.project.name.toLowerCase().includes(q);
+        if (!matchTitle && !matchCode && !matchName) return false;
+      }
+      return true;
+    });
+
+    return [...list].sort((a, b) => {
+      switch (milestoneSortBy) {
+        case "DATE_ASC":
+          return new Date(a.milestoneDate).getTime() - new Date(b.milestoneDate).getTime();
+        case "DATE_DESC":
+          return new Date(b.milestoneDate).getTime() - new Date(a.milestoneDate).getTime();
+        case "ALPHA_TITLE_ASC":
+          return a.title.localeCompare(b.title);
+        case "ALPHA_TITLE_DESC":
+          return b.title.localeCompare(a.title);
+        case "ALPHA_PROJECT_ASC":
+          return a.project.code.localeCompare(b.project.code);
+        case "ALPHA_PROJECT_DESC":
+          return b.project.code.localeCompare(a.project.code);
+        case "AMOUNT_DESC":
+          return Number(b.amount) - Number(a.amount);
+        case "AMOUNT_ASC":
+          return Number(a.amount) - Number(b.amount);
+        default:
+          return 0;
+      }
+    });
+  }, [activeMilestones, milestoneStatusFilter, milestoneSearch, milestoneSortBy]);
+
+  if (!isMounted) {
+    return (
+      <div className="w-full bg-[#F8F9FD] min-h-screen text-[#0F172A] p-4 sm:p-6 space-y-4 animate-pulse" suppressHydrationWarning>
+        <div className="bg-white border border-[#E2E6F0] rounded-2xl p-4 h-16" />
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="bg-white border border-[#E2E6F0] rounded-2xl p-4 h-24" />
+          <div className="bg-white border border-[#E2E6F0] rounded-2xl p-4 h-24" />
+          <div className="bg-white border border-[#E2E6F0] rounded-2xl p-4 h-24" />
+          <div className="bg-white border border-[#E2E6F0] rounded-2xl p-4 h-24" />
+        </div>
+        <div className="bg-white border border-[#E2E6F0] rounded-2xl p-6 h-64" />
+      </div>
+    );
+  }
+
   return (
-    <div className="w-full bg-[#F8F9FD] min-h-screen text-[#0F172A] font-sans antialiased pb-24 md:pb-12">
+    <div className="w-full bg-[#F8F9FD] min-h-screen text-[#0F172A] font-sans antialiased pb-24 md:pb-12" suppressHydrationWarning>
       {/* ==================================================== */}
       {/* TOP EXECUTIVE DESIGN TOOLBAR                         */}
       {/* Viewport switcher, state toggles, interactive mocks  */}
@@ -199,7 +266,7 @@ export default function FinanceClientView({
               onClick={() => setViewportMode("mobile")}
               className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md font-medium transition-all ${
                 viewportMode === "mobile"
-                  ? "bg-[#4865F6] text-white shadow-xs"
+                  ? "bg-[#5A81FA] text-white shadow-xs"
                   : "text-slate-400 hover:text-white"
               }`}
             >
@@ -211,7 +278,7 @@ export default function FinanceClientView({
               onClick={() => setViewportMode("tablet")}
               className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md font-medium transition-all ${
                 viewportMode === "tablet"
-                  ? "bg-[#4865F6] text-white shadow-xs"
+                  ? "bg-[#5A81FA] text-white shadow-xs"
                   : "text-slate-400 hover:text-white"
               }`}
             >
@@ -223,7 +290,7 @@ export default function FinanceClientView({
               onClick={() => setViewportMode("desktop")}
               className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md font-medium transition-all ${
                 viewportMode === "desktop"
-                  ? "bg-[#4865F6] text-white shadow-xs"
+                  ? "bg-[#5A81FA] text-white shadow-xs"
                   : "text-slate-400 hover:text-white"
               }`}
             >
@@ -334,7 +401,7 @@ export default function FinanceClientView({
             <Link
               href={`/w/${workspaceSlug}/visits`}
               title="Site Visits & GPS Check-In"
-              className="w-8 h-8 rounded-lg bg-[#F8F9FD] border border-[#E2E6F0] text-slate-600 hover:text-[#4865F6] flex items-center justify-center transition-colors"
+              className="w-8 h-8 rounded-lg bg-[#F8F9FD] border border-[#E2E6F0] text-slate-600 hover:text-[#5A81FA] flex items-center justify-center transition-colors"
             >
               <MapPin className="w-4 h-4" />
             </Link>
@@ -353,7 +420,7 @@ export default function FinanceClientView({
             <button
               type="button"
               onClick={() => setIsProfileOpen(true)}
-              className="w-8 h-8 rounded-full bg-[#4865F6] text-white font-bold text-xs flex items-center justify-center shadow-xs cursor-pointer"
+              className="w-8 h-8 rounded-full bg-[#5A81FA] text-white font-bold text-xs flex items-center justify-center shadow-xs cursor-pointer"
             >
               SL
             </button>
@@ -393,7 +460,7 @@ export default function FinanceClientView({
           {/* 2 & 3. PAGE HEADING & SHORT DESCRIPTION */}
           <div className="space-y-1">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5 text-[10px] font-bold text-[#4865F6] uppercase tracking-wider">
+              <div className="flex items-center gap-1.5 text-[10px] font-bold text-[#5A81FA] uppercase tracking-wider">
                 <Receipt className="w-3 h-3" />
                 <span>STUDIO FINANCE & ACCOUNTS</span>
                 <span>•</span>
@@ -468,7 +535,7 @@ export default function FinanceClientView({
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
                   Received Client Fees
                 </span>
-                <span className="text-lg sm:text-xl font-black text-[#4865F6] tracking-tight block">
+                <span className="text-lg sm:text-xl font-black text-[#5A81FA] tracking-tight block">
                   {formatINR(activeSummary.totalReceivedPayments)}
                 </span>
                 <span className="text-[10px] font-semibold text-emerald-700 block leading-tight">
@@ -514,7 +581,7 @@ export default function FinanceClientView({
           <div className="bg-white border border-[#E2E6F0] rounded-2xl p-4 shadow-2xs space-y-2">
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-start gap-2.5 min-w-0">
-                <div className="w-8 h-8 rounded-xl bg-[#F2F4FF] text-[#4865F6] border border-[#D5DFFC] flex items-center justify-center shrink-0 mt-0.5">
+                <div className="w-8 h-8 rounded-xl bg-[#F2F4FF] text-[#5A81FA] border border-[#CEDEFF] flex items-center justify-center shrink-0 mt-0.5">
                   <Receipt className="w-4 h-4" />
                 </div>
                 <div className="min-w-0">
@@ -551,7 +618,7 @@ export default function FinanceClientView({
             {isQuotationExpanded && (
               <div className="p-3 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-xs text-slate-600 leading-relaxed space-y-1.5 animate-in fade-in duration-150">
                 <div className="flex items-center gap-1.5 font-bold text-slate-800 text-[11px]">
-                  <Info className="w-3.5 h-3.5 text-[#4865F6]" />
+                  <Info className="w-3.5 h-3.5 text-[#5A81FA]" />
                   <span>Separation Principle in Cash Flow Accounting</span>
                 </div>
                 <p>
@@ -569,7 +636,7 @@ export default function FinanceClientView({
           {/* Stacked mobile cards on phone, table on desktop      */}
           {/* ==================================================== */}
           <div className="bg-white border border-[#E2E6F0] rounded-2xl p-4 sm:p-5 shadow-2xs space-y-3.5">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
                 <h3 className="text-sm font-bold text-[#0F172A] tracking-tight">
                   Client Fee Milestones Schedule
@@ -580,7 +647,14 @@ export default function FinanceClientView({
               </div>
 
               <div className="text-[11px] font-medium text-slate-500">
-                {activeMilestones.length} {activeMilestones.length === 1 ? "Milestone" : "Milestones"}
+                {activeMilestones.length > 0 ? (
+                  <span>
+                    Showing {filteredAndSortedMilestones.length} of {activeMilestones.length}{" "}
+                    {activeMilestones.length === 1 ? "milestone" : "milestones"}
+                  </span>
+                ) : (
+                  <span>0 Milestones</span>
+                )}
               </div>
             </div>
 
@@ -611,81 +685,111 @@ export default function FinanceClientView({
               </div>
             ) : (
               /* SCREEN 3: Populated Milestone State */
-              <div>
-                {/* Mobile View: Stacked Cards (Visible on phones/tablets) */}
-                <div className="space-y-2.5 md:hidden">
-                  {activeMilestones.map((m) => (
-                    <div
-                      key={m.id}
-                      className="p-3.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl space-y-2 hover:border-[#4865F6]/40 transition-all"
-                    >
-                      {/* Top: Milestone Title & Status */}
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="space-y-0.5 min-w-0">
-                          <h4 className="text-xs sm:text-sm font-bold text-[#0F172A] leading-snug">
-                            {m.title}
-                          </h4>
-                          <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
-                            <span className="font-mono font-bold text-[#4865F6] bg-white px-1.5 py-0.5 rounded border border-[#CEDEFF]">
-                              {m.project.code}
-                            </span>
-                            <span className="truncate">{m.project.name}</span>
-                          </div>
-                        </div>
+              <div className="space-y-3">
+                {/* Search, Filter, and Sort Toolbar */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-2.5 p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-xs">
+                  {/* Search Box */}
+                  <div className="relative flex-1 max-w-sm">
+                    <Search className="w-3.5 h-3.5 text-[#64748B] absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={milestoneSearch}
+                      onChange={(e) => setMilestoneSearch(e.target.value)}
+                      placeholder="Search milestone or project..."
+                      className="w-full pl-8 pr-7 py-1.5 bg-white border border-[#E2E6F0] rounded-lg text-xs text-[#0F172A] placeholder-[#64748B] focus:outline-none focus:ring-1 focus:ring-[#5A81FA]"
+                    />
+                    {milestoneSearch && (
+                      <button
+                        onClick={() => setMilestoneSearch("")}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
 
-                        {/* Status Badge */}
-                        <span
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider shrink-0 border ${
-                            m.status === "PAID"
-                              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                              : m.status === "INVOICED"
-                              ? "bg-blue-50 text-blue-700 border-blue-200"
-                              : "bg-amber-50 text-amber-700 border-amber-200"
-                          }`}
-                        >
-                          {m.status}
-                        </span>
-                      </div>
-
-                      {/* Bottom Row: Amount & Target Date */}
-                      <div className="flex items-center justify-between pt-1.5 border-t border-slate-200/60 text-xs">
-                        <div className="text-slate-500 text-[11px]">
-                          Target: <strong className="text-slate-700 font-medium">{new Date(m.milestoneDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</strong>
-                        </div>
-                        <div className="font-bold text-[#0F172A] font-mono text-xs sm:text-sm">
-                          {m.currency} {Number(m.amount).toLocaleString("en-IN")}
-                        </div>
-                      </div>
+                  {/* Filter and Sort Selectors */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    {/* Status Filter */}
+                    <div className="flex items-center gap-1.5 bg-white border border-[#E2E6F0] px-2 py-1 rounded-lg">
+                      <span className="text-slate-500 font-medium text-[11px]">Status:</span>
+                      <select
+                        value={milestoneStatusFilter}
+                        onChange={(e) => setMilestoneStatusFilter(e.target.value)}
+                        className="bg-transparent text-xs text-[#0F172A] font-semibold focus:outline-none cursor-pointer"
+                      >
+                        <option value="ALL">All Statuses</option>
+                        <option value="PENDING">Pending</option>
+                        <option value="INVOICED">Invoiced</option>
+                        <option value="PAID">Paid</option>
+                      </select>
                     </div>
-                  ))}
+
+                    {/* Sort Filter */}
+                    <div className="flex items-center gap-1.5 bg-white border border-[#E2E6F0] px-2 py-1 rounded-lg">
+                      <ArrowUpDown className="w-3.5 h-3.5 text-slate-500" />
+                      <span className="text-slate-500 font-medium text-[11px]">Sort:</span>
+                      <select
+                        value={milestoneSortBy}
+                        onChange={(e) => setMilestoneSortBy(e.target.value)}
+                        className="bg-transparent text-xs text-[#0F172A] font-semibold focus:outline-none cursor-pointer"
+                      >
+                        <option value="DATE_ASC">Target Date (Earliest First)</option>
+                        <option value="DATE_DESC">Target Date (Latest First)</option>
+                        <option value="ALPHA_TITLE_ASC">Title (A → Z)</option>
+                        <option value="ALPHA_TITLE_DESC">Title (Z → A)</option>
+                        <option value="ALPHA_PROJECT_ASC">Project Code (A → Z)</option>
+                        <option value="AMOUNT_DESC">Amount (Highest First)</option>
+                        <option value="AMOUNT_ASC">Amount (Lowest First)</option>
+                      </select>
+                    </div>
+
+                    {(milestoneSearch || milestoneStatusFilter !== "ALL" || milestoneSortBy !== "DATE_ASC") && (
+                      <button
+                        onClick={() => {
+                          setMilestoneSearch("");
+                          setMilestoneStatusFilter("ALL");
+                          setMilestoneSortBy("DATE_ASC");
+                        }}
+                        className="text-[11px] text-[#5A81FA] hover:underline font-semibold px-1 cursor-pointer"
+                      >
+                        Reset
+                      </button>
+                    )}
+                  </div>
                 </div>
 
-                {/* Desktop View: Preserved Table Layout (Visible on desktop screens md+) */}
-                <div className="hidden md:block overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-[#F8F9FD] text-[#64748B] font-semibold border-b border-[#E2E6F0]">
-                      <tr>
-                        <th className="py-2.5 px-3">Project</th>
-                        <th className="py-2.5 px-3">Milestone Title</th>
-                        <th className="py-2.5 px-3">Target Date</th>
-                        <th className="py-2.5 px-3">Amount</th>
-                        <th className="py-2.5 px-3">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#E2E6F0]">
-                      {activeMilestones.map((m) => (
-                        <tr key={m.id} className="hover:bg-[#F8F9FD] transition-colors">
-                          <td className="py-3 px-3 font-mono font-bold text-[#4865F6]">{m.project.code}</td>
-                          <td className="py-3 px-3 font-medium text-[#0F172A]">{m.title}</td>
-                          <td className="py-3 px-3 text-[#64748B]">
-                            {new Date(m.milestoneDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
-                          </td>
-                          <td className="py-3 px-3 font-bold text-[#0F172A] font-mono">
-                            {m.currency} {Number(m.amount).toLocaleString("en-IN")}
-                          </td>
-                          <td className="py-3 px-3">
+                {filteredAndSortedMilestones.length === 0 ? (
+                  <div className="p-6 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-center space-y-1 text-slate-500 text-xs">
+                    <p className="font-semibold text-slate-700">No milestones match your current filters</p>
+                    <p className="text-[11px]">Try clearing search keywords or status selection.</p>
+                  </div>
+                ) : (
+                  <>
+                    {/* Mobile View: Stacked Cards (Visible on phones/tablets) */}
+                    <div className="space-y-2.5 md:hidden">
+                      {filteredAndSortedMilestones.map((m) => (
+                        <div
+                          key={m.id}
+                          className="p-3.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl space-y-2 hover:border-[#5A81FA]/40 transition-all"
+                        >
+                          {/* Top: Milestone Title & Status */}
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="space-y-0.5 min-w-0">
+                              <h4 className="text-xs sm:text-sm font-bold text-[#0F172A] leading-snug">
+                                {m.title}
+                              </h4>
+                              <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
+                                <span className="font-mono font-bold text-[#2C308D] bg-[#F2F4FF] px-1.5 py-0.5 rounded border border-[#CEDEFF]">
+                                  {m.project.code}
+                                </span>
+                                <span className="truncate">{m.project.name}</span>
+                              </div>
+                            </div>
+
+                            {/* Status Badge */}
                             <span
-                              className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider shrink-0 border ${
                                 m.status === "PAID"
                                   ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                                   : m.status === "INVOICED"
@@ -695,12 +799,64 @@ export default function FinanceClientView({
                             >
                               {m.status}
                             </span>
-                          </td>
-                        </tr>
+                          </div>
+
+                          {/* Bottom Row: Amount & Target Date */}
+                          <div className="flex items-center justify-between pt-1.5 border-t border-slate-200/60 text-xs">
+                            <div className="text-slate-500 text-[11px]">
+                              Target: <strong className="text-slate-700 font-medium">{new Date(m.milestoneDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</strong>
+                            </div>
+                            <div className="font-bold text-[#0F172A] font-mono text-xs sm:text-sm">
+                              {m.currency} {Number(m.amount).toLocaleString("en-IN")}
+                            </div>
+                          </div>
+                        </div>
                       ))}
-                    </tbody>
-                  </table>
-                </div>
+                    </div>
+
+                    {/* Desktop View: Preserved Table Layout (Visible on desktop screens md+) */}
+                    <div className="hidden md:block overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-[#F8F9FD] text-[#64748B] font-semibold border-b border-[#E2E6F0]">
+                          <tr>
+                            <th className="py-2.5 px-3">Project</th>
+                            <th className="py-2.5 px-3">Milestone Title</th>
+                            <th className="py-2.5 px-3">Target Date</th>
+                            <th className="py-2.5 px-3">Amount</th>
+                            <th className="py-2.5 px-3">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[#E2E6F0]">
+                          {filteredAndSortedMilestones.map((m) => (
+                            <tr key={m.id} className="hover:bg-[#F8F9FD] transition-colors">
+                              <td className="py-3 px-3 font-mono font-bold text-[#2C308D]">{m.project.code}</td>
+                              <td className="py-3 px-3 font-medium text-[#0F172A]">{m.title}</td>
+                              <td className="py-3 px-3 text-[#64748B]">
+                                {new Date(m.milestoneDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                              </td>
+                              <td className="py-3 px-3 font-bold text-[#0F172A] font-mono">
+                                {m.currency} {Number(m.amount).toLocaleString("en-IN")}
+                              </td>
+                              <td className="py-3 px-3">
+                                <span
+                                  className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${
+                                    m.status === "PAID"
+                                      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                      : m.status === "INVOICED"
+                                      ? "bg-blue-50 text-blue-700 border-blue-200"
+                                      : "bg-amber-50 text-amber-700 border-amber-200"
+                                  }`}
+                                >
+                                  {m.status}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -712,7 +868,7 @@ export default function FinanceClientView({
         <nav aria-label="Mobile Navigation" className="sticky bottom-0 z-30 bg-white/95 backdrop-blur-md border-t border-[#E2E6F0] px-4 py-2 flex items-center justify-around text-[10px] text-slate-500 md:hidden">
           <Link
             href={`/w/${workspaceSlug}/tasks`}
-            className="flex flex-col items-center gap-1 py-1 hover:text-[#4865F6]"
+            className="flex flex-col items-center gap-1 py-1 hover:text-[#5A81FA]"
           >
             <CheckSquare className="w-4 h-4" />
             <span>Tasks</span>
@@ -720,7 +876,7 @@ export default function FinanceClientView({
 
           <Link
             href={`/w/${workspaceSlug}/projects`}
-            className="flex flex-col items-center gap-1 py-1 hover:text-[#4865F6]"
+            className="flex flex-col items-center gap-1 py-1 hover:text-[#5A81FA]"
           >
             <FolderKanban className="w-4 h-4" />
             <span>Projects</span>
@@ -728,7 +884,7 @@ export default function FinanceClientView({
 
           <Link
             href={`/w/${workspaceSlug}/visits`}
-            className="flex flex-col items-center gap-1 py-1 hover:text-[#4865F6]"
+            className="flex flex-col items-center gap-1 py-1 hover:text-[#5A81FA]"
           >
             <MapPin className="w-4 h-4" />
             <span>Site Visits</span>
@@ -736,7 +892,7 @@ export default function FinanceClientView({
 
           <Link
             href={`/w/${workspaceSlug}/drawings`}
-            className="flex flex-col items-center gap-1 py-1 hover:text-[#4865F6]"
+            className="flex flex-col items-center gap-1 py-1 hover:text-[#5A81FA]"
           >
             <FileCheck2 className="w-4 h-4" />
             <span>Drawings</span>
@@ -744,11 +900,11 @@ export default function FinanceClientView({
 
           <Link
             href={`/w/${workspaceSlug}/finance`}
-            className="flex flex-col items-center gap-1 py-1 text-[#4865F6] font-bold"
+            className="flex flex-col items-center gap-1 py-1 text-[#5A81FA] font-bold"
           >
             <Receipt className="w-4 h-4 stroke-[2.5]" />
             <span>Finance</span>
-            <span className="w-1 h-1 rounded-full bg-[#4865F6]"></span>
+            <span className="w-1 h-1 rounded-full bg-[#5A81FA]"></span>
           </Link>
         </nav>
       </div>
@@ -822,7 +978,7 @@ export default function FinanceClientView({
               <Link
                 href={`/w/${workspaceSlug}/finance`}
                 onClick={() => setIsNavDrawerOpen(false)}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-xl font-bold bg-[#4865F6] text-white shadow-xs"
+                className="flex items-center gap-3 px-3 py-2.5 rounded-xl font-bold bg-[#5A81FA] text-white shadow-xs"
               >
                 <Receipt className="w-4 h-4" />
                 <span>Project Finance</span>
@@ -872,13 +1028,13 @@ export default function FinanceClientView({
                 onClick={() => alert("PWA Installation prompt ready for offline field work.")}
                 className="w-full py-2 bg-white border border-[#E2E6F0] rounded-xl text-xs font-semibold text-slate-700 flex items-center justify-center gap-1.5 shadow-2xs"
               >
-                <Smartphone className="w-3.5 h-3.5 text-[#4865F6]" />
+                <Smartphone className="w-3.5 h-3.5 text-[#5A81FA]" />
                 <span>Install Mobile PWA</span>
               </button>
 
               <div className="flex items-center justify-between pt-1 text-xs">
                 <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-full bg-[#4865F6] text-white font-bold text-[10px] flex items-center justify-center">
+                  <div className="w-7 h-7 rounded-full bg-[#5A81FA] text-white font-bold text-[10px] flex items-center justify-center">
                     SL
                   </div>
                   <div>
@@ -912,13 +1068,13 @@ export default function FinanceClientView({
           <div className="bg-white border border-[#E2E6F0] rounded-2xl w-full max-w-sm p-5 shadow-2xl space-y-4 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-full bg-[#4865F6] text-white font-bold text-sm flex items-center justify-center">
+                <div className="w-10 h-10 rounded-full bg-[#5A81FA] text-white font-bold text-sm flex items-center justify-center">
                   SL
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-slate-900">{userFullName || "Saksham Lanjewar"}</h3>
                   <div className="flex items-center gap-1.5 text-[10px] text-slate-500">
-                    <span className="font-mono font-bold text-[#4865F6]">EMP-001</span>
+                    <span className="font-mono font-bold text-[#5A81FA]">EMP-001</span>
                     <span>•</span>
                     <span className="font-bold text-emerald-700 uppercase">{userRole || "ADMIN / OWNER"}</span>
                   </div>

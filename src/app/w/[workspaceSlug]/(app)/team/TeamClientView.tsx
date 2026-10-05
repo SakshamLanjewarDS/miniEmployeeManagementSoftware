@@ -31,8 +31,9 @@ import {
   Sparkles,
   ExternalLink,
   MessageSquare,
-  Share2,
+  UserPlus,
   SlidersHorizontal,
+  ArrowUpDown,
 } from "lucide-react";
 import { CsvImportExportModal } from "@/components/csv/CsvImportExportModal";
 import BulkMailModal from "@/components/team/BulkMailModal";
@@ -40,6 +41,16 @@ import { CustomFieldsManagerModal } from "@/components/custom-fields/CustomField
 import { DynamicFormFields } from "@/components/custom-fields/DynamicFormFields";
 import { DynamicCardFields } from "@/components/custom-fields/DynamicCardFields";
 import { CustomFieldDefinition } from "@/server/modules/custom-fields/repository";
+import { SearchableSelect } from "@/components/ui/SearchableSelect";
+
+const DEPARTMENT_OPTIONS = [
+  { value: "Architecture", label: "Architecture", subLabel: "Design & Masterplanning" },
+  { value: "Interior Design", label: "Interior Design", subLabel: "Fitout & FF&E" },
+  { value: "Landscape", label: "Landscape Architecture", subLabel: "Site Planning & Ecology" },
+  { value: "3D Visualization", label: "3D Visualization & VR", subLabel: "CGI & Renders" },
+  { value: "Site Supervision", label: "Site Supervision & MEP", subLabel: "Field Engineering" },
+  { value: "Studio Operations", label: "Studio Operations", subLabel: "Admin & Operations" },
+];
 
 interface ProjectOption {
   id: string;
@@ -124,6 +135,7 @@ export default function TeamClientView({
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState<"ALL" | "ACTIVE" | "INACTIVE">("ALL");
+  const [teamSortBy, setTeamSortBy] = useState<string>("JOIN_DATE_DESC");
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
 
@@ -208,18 +220,16 @@ export default function TeamClientView({
     }
   };
 
-  // Real-time dynamic background polling (every 4s) and window focus sync
+  // Real-time synchronization on tab focus (user returns to page)
   React.useEffect(() => {
     const handleFocus = () => {
       fetchFreshEmployees();
     };
 
     window.addEventListener("focus", handleFocus);
-    const interval = setInterval(fetchFreshEmployees, 4000);
 
     return () => {
       window.removeEventListener("focus", handleFocus);
-      clearInterval(interval);
     };
   }, [workspaceSlug]);
 
@@ -298,8 +308,25 @@ export default function TeamClientView({
         return matchesName || matchesEmail || matchesId || matchesDept || matchesDesig;
       }
       return true;
+    }).sort((a, b) => {
+      switch (teamSortBy) {
+        case "JOIN_DATE_DESC":
+          return new Date(b.joinedAt || 0).getTime() - new Date(a.joinedAt || 0).getTime();
+        case "JOIN_DATE_ASC":
+          return new Date(a.joinedAt || 0).getTime() - new Date(b.joinedAt || 0).getTime();
+        case "ALPHA_NAME_ASC":
+          return a.fullName.localeCompare(b.fullName);
+        case "ALPHA_NAME_DESC":
+          return b.fullName.localeCompare(a.fullName);
+        case "ALPHA_EMP_ID_ASC":
+          return a.employeeId.localeCompare(b.employeeId);
+        case "ALPHA_EMP_ID_DESC":
+          return b.employeeId.localeCompare(a.employeeId);
+        default:
+          return 0;
+      }
     });
-  }, [employees, statusFilter, roleFilter, search]);
+  }, [employees, statusFilter, roleFilter, search, teamSortBy]);
 
   const totalPages = Math.ceil(filteredEmployees.length / pageSize) || 1;
   const paginatedEmployees = useMemo(() => {
@@ -920,7 +947,7 @@ export default function TeamClientView({
         </div>
 
         {/* Search & Filters */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-[#E2E6F0]">
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-3 border-t border-[#E2E6F0]">
           <div className="sm:col-span-2 relative">
             <Search className="w-4 h-4 absolute left-3 top-2.5 text-[#696E82]" />
             <input
@@ -951,6 +978,27 @@ export default function TeamClientView({
               <option value="ADMIN">Administrator</option>
               <option value="PROJECT_MANAGER">Project Manager</option>
               <option value="EMPLOYEE">Employee</option>
+            </select>
+          </div>
+
+          <div className="flex items-center gap-1.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl px-2.5 py-1.5">
+            <ArrowUpDown className="w-3.5 h-3.5 text-[#5A81FA] shrink-0" />
+            <select
+              suppressHydrationWarning
+              value={teamSortBy}
+              onChange={(e) => {
+                setTeamSortBy(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full bg-transparent text-xs text-[#1F1F1F] font-semibold focus:outline-none cursor-pointer"
+              title="Sort team members by date day or alphabetical order"
+            >
+              <option value="JOIN_DATE_DESC">Sort: Date (Newest First)</option>
+              <option value="JOIN_DATE_ASC">Sort: Date (Oldest First)</option>
+              <option value="ALPHA_NAME_ASC">Sort: Name (A → Z)</option>
+              <option value="ALPHA_NAME_DESC">Sort: Name (Z → A)</option>
+              <option value="ALPHA_EMP_ID_ASC">Sort: Employee ID (A → Z)</option>
+              <option value="ALPHA_EMP_ID_DESC">Sort: Employee ID (Z → A)</option>
             </select>
           </div>
         </div>
@@ -1238,21 +1286,27 @@ export default function TeamClientView({
       {/* 1. Add Employee Modal */}
       {isAddModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white border border-[#E2E6F0] rounded-2xl w-full max-w-lg shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-            <div className="p-5 border-b border-[#E2E6F0] flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-bold text-[#1F1F1F]">Add New Studio Employee</h3>
-                <p className="text-xs text-[#696E82]">Create staff identity, role, credentials, and project assignments</p>
+          <div className="bg-white border border-[#E2E6F0] rounded-2xl w-full max-w-xl p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-[#E2E6F0] pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-[#5A81FA] text-white flex items-center justify-center shrink-0 shadow-xs">
+                  <UserPlus className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-[#1F1F1F]">Add New Studio Employee</h3>
+                  <p className="text-xs text-[#696E82]">Create staff identity, role, credentials, and project assignments</p>
+                </div>
               </div>
               <button
+                type="button"
                 onClick={() => setIsAddModalOpen(false)}
-                className="text-[#696E82] hover:text-[#1F1F1F] p-1 rounded-lg"
+                className="text-[#696E82] hover:text-[#1F1F1F] p-1 rounded-lg hover:bg-[#F2F4FF] cursor-pointer"
               >
-                <X className="w-4 h-4" />
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateEmployee} className="p-5 space-y-4 max-h-[80vh] overflow-y-auto">
+            <form onSubmit={handleCreateEmployee} className="space-y-4 text-xs">
               {modalError && (
                 <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 flex items-start justify-between gap-2 animate-in fade-in">
                   <div className="flex items-start gap-2">
@@ -1262,17 +1316,19 @@ export default function TeamClientView({
                   <button
                     type="button"
                     onClick={() => setModalError(null)}
-                    className="text-red-500 hover:text-red-800 p-0.5"
+                    className="text-red-500 hover:text-red-800 p-0.5 cursor-pointer"
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <label className="text-xs font-semibold text-[#1F1F1F]">Employee ID *</label>
+                    <label className="text-xs font-semibold text-[#1F1F1F]">
+                      Employee ID <span className="text-red-600">*</span>
+                    </label>
                     <button
                       type="button"
                       onClick={async () => {
@@ -1300,32 +1356,36 @@ export default function TeamClientView({
                     placeholder="e.g. EMP-013"
                     value={employeeId}
                     onChange={(e) => setEmployeeId(e.target.value)}
-                    className="w-full px-3 py-2 text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl uppercase font-mono font-bold text-[#5A81FA]"
+                    className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl uppercase font-mono font-bold text-[#5A81FA] text-xs focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-[#1F1F1F] block mb-1">Full Name *</label>
+                  <label className="text-xs font-semibold text-[#1F1F1F] block mb-1">
+                    Full Name <span className="text-red-600">*</span>
+                  </label>
                   <input
                     type="text"
                     required
                     placeholder="e.g. Kavita Rao"
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
-                    className="w-full px-3 py-2 text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F]"
+                    className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] text-xs focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-semibold text-[#1F1F1F] block mb-1">Work Email *</label>
+                  <label className="text-xs font-semibold text-[#1F1F1F] block mb-1">
+                    Work Email <span className="text-red-600">*</span>
+                  </label>
                   <input
                     type="email"
                     required
                     placeholder="kavita@100percentdesign.in"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full px-3 py-2 text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F]"
+                    className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] text-xs focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
                   />
                 </div>
                 <div>
@@ -1335,27 +1395,24 @@ export default function TeamClientView({
                     placeholder="+91 98765 43210"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    className="w-full px-3 py-2 text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F]"
+                    className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] text-xs focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-semibold text-[#1F1F1F] block mb-1">Department</label>
-                  <select
-                    value={department}
-                    onChange={(e) => setDepartment(e.target.value)}
-                    className="w-full px-3 py-2 text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F]"
-                  >
-                    <option value="Architecture">Architecture</option>
-                    <option value="Interior Design">Interior Design</option>
-                    <option value="Landscape">Landscape Architecture</option>
-                    <option value="3D Visualization">3D Visualization & VR</option>
-                    <option value="Site Supervision">Site Supervision & MEP</option>
-                    <option value="Studio Operations">Studio Operations</option>
-                  </select>
-                </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <SearchableSelect
+                  id="add-department"
+                  label="Department"
+                  required={false}
+                  placeholder="Select department..."
+                  searchPlaceholder="Search departments..."
+                  options={DEPARTMENT_OPTIONS}
+                  value={department}
+                  onChange={setDepartment}
+                  allowOther={true}
+                  otherOptionLabel="+ Other Department..."
+                />
                 <div>
                   <label className="text-xs font-semibold text-[#1F1F1F] block mb-1">Designation</label>
                   <input
@@ -1363,30 +1420,35 @@ export default function TeamClientView({
                     placeholder="e.g. Senior Project Architect"
                     value={designation}
                     onChange={(e) => setDesignation(e.target.value)}
-                    className="w-full px-3 py-2 text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F]"
+                    className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] text-xs focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-semibold text-[#1F1F1F] block mb-1">System Role *</label>
-                  <select
-                    value={role}
-                    onChange={(e) => setRole(e.target.value)}
-                    className="w-full px-3 py-2 text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F]"
-                  >
-                    <option value="EMPLOYEE">Employee (Tasks, Drawings, Visits)</option>
-                    <option value="PROJECT_MANAGER">Project Manager</option>
-                    <option value="ADMIN">Administrator (Operations & Staff)</option>
-                    {(userRole === "OWNER" || userRole === "ADMIN") && (
-                      <option value="OWNER">Owner / Boss (Leadership & Governance)</option>
-                    )}
-                  </select>
-                </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <SearchableSelect
+                  id="add-role"
+                  label="System Role"
+                  required={true}
+                  placeholder="Select system role..."
+                  searchPlaceholder="Search roles..."
+                  options={[
+                    { value: "EMPLOYEE", label: "Employee", subLabel: "Tasks, Drawings, Visits" },
+                    { value: "PROJECT_MANAGER", label: "Project Manager", subLabel: "Project Leadership" },
+                    { value: "ADMIN", label: "Administrator", subLabel: "Operations & Staff" },
+                    ...((userRole === "OWNER" || userRole === "ADMIN")
+                      ? [{ value: "OWNER", label: "Owner / Boss", subLabel: "Leadership & Governance" }]
+                      : []),
+                  ]}
+                  value={role}
+                  onChange={setRole}
+                  allowOther={false}
+                />
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <label className="text-xs font-semibold text-[#1F1F1F]">Initial Password *</label>
+                    <label className="text-xs font-semibold text-[#1F1F1F]">
+                      Initial Password <span className="text-red-600">*</span>
+                    </label>
                     <div className="flex gap-1.5 text-[10px]">
                       <button
                         type="button"
@@ -1394,7 +1456,7 @@ export default function TeamClientView({
                           const gen = "Studio#" + Math.random().toString(36).substring(2, 8).toUpperCase() + "!";
                           setTemporaryPassword(gen);
                         }}
-                        className="text-[#5A81FA] hover:underline flex items-center gap-0.5 font-medium"
+                        className="text-[#5A81FA] hover:underline flex items-center gap-0.5 font-medium cursor-pointer"
                       >
                         <Sparkles className="w-2.5 h-2.5" />
                         <span>Generate</span>
@@ -1402,7 +1464,7 @@ export default function TeamClientView({
                       <button
                         type="button"
                         onClick={() => setTemporaryPassword("StudioPassword2026!")}
-                        className="text-[#696E82] hover:underline"
+                        className="text-[#696E82] hover:underline cursor-pointer"
                       >
                         Default
                       </button>
@@ -1414,12 +1476,12 @@ export default function TeamClientView({
                       required
                       value={temporaryPassword}
                       onChange={(e) => setTemporaryPassword(e.target.value)}
-                      className="w-full px-3 py-2 pr-9 text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl font-mono text-[#1F1F1F]"
+                      className="w-full p-2.5 pr-9 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl font-mono text-[#1F1F1F] text-xs focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
                     />
                     <button
                       type="button"
                       onClick={() => setShowAddPassword(!showAddPassword)}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#696E82] hover:text-[#1F1F1F]"
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#696E82] hover:text-[#1F1F1F] cursor-pointer"
                     >
                       {showAddPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                     </button>
@@ -1428,7 +1490,7 @@ export default function TeamClientView({
               </div>
 
               {/* Credential Notification Toggle & Custom Message */}
-              <div className="bg-[#F8F9FD] border border-[#CEDEFF] rounded-xl p-3 space-y-2.5">
+              <div className="bg-[#FAFBFD] border border-[#E2E6F0] rounded-xl p-3.5 space-y-2.5">
                 <div className="flex items-center gap-2">
                   <input
                     type="checkbox"
@@ -1451,7 +1513,7 @@ export default function TeamClientView({
                     value={addCustomMessage}
                     onChange={(e) => setAddCustomMessage(e.target.value)}
                     placeholder="Message from Administrator..."
-                    className="w-full px-3 py-1.5 text-xs bg-white border border-[#E2E6F0] rounded-lg text-[#1F1F1F]"
+                    className="w-full p-2.5 text-xs bg-white border border-[#E2E6F0] rounded-xl text-[#1F1F1F] focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
                   />
                 </div>
               </div>
@@ -1474,32 +1536,24 @@ export default function TeamClientView({
 
               {/* Project Assignments */}
               {availableProjects.length > 0 && (
-                <div className="space-y-1.5 pt-2 border-t border-[#E2E6F0]">
-                  <label className="text-xs font-semibold text-[#1F1F1F] block">Assign to Projects</label>
-                  <div className="grid grid-cols-2 gap-2 max-h-36 overflow-y-auto p-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl">
-                    {availableProjects.map((p) => {
-                      const isAssigned = selectedProjectIds.includes(p.id);
-                      return (
-                        <label
-                          key={p.id}
-                          className="flex items-center gap-2 text-xs text-[#1F1F1F] hover:bg-white p-1 rounded cursor-pointer"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isAssigned}
-                            onChange={() => {
-                              setSelectedProjectIds((prev) =>
-                                isAssigned ? prev.filter((id) => id !== p.id) : [...prev, p.id]
-                              );
-                            }}
-                            className="rounded border-[#E2E6F0] text-[#5A81FA] focus:ring-[#5A81FA]"
-                          />
-                          <span className="font-mono font-bold text-[10px] text-[#5A81FA]">{p.code}</span>
-                          <span className="truncate text-[11px]">{p.name}</span>
-                        </label>
-                      );
-                    })}
-                  </div>
+                <div className="pt-2 border-t border-[#E2E6F0] space-y-1.5">
+                  <SearchableSelect
+                    id="add-projects"
+                    label="Assign to Projects"
+                    required={false}
+                    multiSelect={true}
+                    placeholder="Select projects to assign..."
+                    searchPlaceholder="Search projects by code or name..."
+                    options={availableProjects.map((p) => ({
+                      value: p.id,
+                      label: `${p.code} — ${p.name}`,
+                      badge: p.code,
+                    }))}
+                    values={selectedProjectIds}
+                    onMultiChange={setSelectedProjectIds}
+                    allowOther={false}
+                    helperText="Assigned staff will be granted workspace access to these project deliverables and sheets."
+                  />
                 </div>
               )}
 
@@ -1515,16 +1569,23 @@ export default function TeamClientView({
                 <button
                   type="button"
                   onClick={() => setIsAddModalOpen(false)}
-                  className="px-4 py-2 border border-[#E2E6F0] rounded-xl text-xs font-semibold text-[#696E82] hover:bg-[#F2F4FF]"
+                  className="px-4 py-2 bg-[#F2F4FF] hover:bg-[#E5EAFF] text-[#696E82] hover:text-[#1F1F1F] font-semibold rounded-xl text-xs cursor-pointer transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="bg-[#5A81FA] text-white px-4 py-2 rounded-xl text-xs font-semibold hover:bg-[#3d441a] transition-all disabled:opacity-50"
+                  className="px-5 py-2 bg-[#5A81FA] hover:bg-[#426EE8] text-white font-semibold rounded-xl text-xs shadow-xs cursor-pointer disabled:opacity-50 flex items-center gap-1.5 transition-colors"
                 >
-                  {loading ? "Creating..." : "Save Employee"}
+                  {loading ? (
+                    <span>Creating...</span>
+                  ) : (
+                    <>
+                      <UserPlus className="w-4 h-4" />
+                      <span>Save Employee</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>
@@ -1535,23 +1596,30 @@ export default function TeamClientView({
       {/* 2. Edit Employee Modal */}
       {editingEmployee && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white border border-[#E2E6F0] rounded-2xl w-full max-w-lg shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-            <div className="p-5 border-b border-[#E2E6F0] flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-bold text-[#1F1F1F]">Edit Studio Employee</h3>
-                <p className="text-xs text-[#696E82]">
-                  Editing details for <span className="font-semibold text-[#5A81FA]">{editingEmployee.employeeId}</span>
-                </p>
+          <div className="bg-white border border-[#E2E6F0] rounded-2xl w-full max-w-xl p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
+            {/* Modal Header */}
+            <div className="flex justify-between items-center pb-3 border-b border-[#E2E6F0]">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-[#5A81FA] text-white flex items-center justify-center shrink-0 shadow-xs">
+                  <Edit className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-[#1F1F1F]">Edit Studio Employee</h3>
+                  <p className="text-xs text-[#696E82]">
+                    Editing details for <span className="font-semibold text-[#5A81FA]">{editingEmployee.employeeId}</span>
+                  </p>
+                </div>
               </div>
               <button
+                type="button"
                 onClick={() => setEditingEmployee(null)}
-                className="text-[#696E82] hover:text-[#1F1F1F] p-1 rounded-lg"
+                className="text-[#696E82] hover:text-[#1F1F1F] p-1 rounded-lg transition-colors cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleUpdateEmployee} className="p-5 space-y-4 max-h-[80vh] overflow-y-auto">
+            <form onSubmit={handleUpdateEmployee} className="space-y-4">
               {editModalError && (
                 <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 flex items-start justify-between gap-2 animate-in fade-in">
                   <div className="flex items-start gap-2">
@@ -1568,79 +1636,82 @@ export default function TeamClientView({
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-semibold text-[#1F1F1F] block mb-1">Full Name *</label>
+                  <label className="text-xs font-semibold text-[#1F1F1F] block mb-1">
+                    Full Name <span className="text-red-600">*</span>
+                  </label>
                   <input
                     type="text"
                     required
                     value={editFullName}
                     onChange={(e) => setEditFullName(e.target.value)}
-                    className="w-full px-3 py-2 text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F]"
+                    className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] text-xs focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-[#1F1F1F] block mb-1">Work Email *</label>
+                  <label className="text-xs font-semibold text-[#1F1F1F] block mb-1">
+                    Work Email <span className="text-red-600">*</span>
+                  </label>
                   <input
                     type="email"
                     required
                     value={editEmail}
                     onChange={(e) => setEditEmail(e.target.value)}
-                    className="w-full px-3 py-2 text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F]"
+                    className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] text-xs focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-semibold text-[#1F1F1F] block mb-1">Contact Phone</label>
                   <input
                     type="text"
                     value={editPhone}
                     onChange={(e) => setEditPhone(e.target.value)}
-                    className="w-full px-3 py-2 text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F]"
+                    className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] text-xs focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
                   />
                 </div>
-                <div>
-                  <label className="text-xs font-semibold text-[#1F1F1F] block mb-1">System Role *</label>
-                  <select
-                    value={editRole}
-                    onChange={(e) => setEditRole(e.target.value)}
-                    className="w-full px-3 py-2 text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F]"
-                  >
-                    <option value="EMPLOYEE">Employee</option>
-                    <option value="PROJECT_MANAGER">Project Manager</option>
-                    <option value="ADMIN">Administrator</option>
-                    {(userRole === "OWNER" || userRole === "ADMIN") && (
-                      <option value="OWNER">Owner / Boss (Leadership & Governance)</option>
-                    )}
-                  </select>
-                </div>
+                <SearchableSelect
+                  id="edit-role"
+                  label="System Role"
+                  required
+                  placeholder="Select system role..."
+                  searchPlaceholder="Search role..."
+                  options={[
+                    { value: "EMPLOYEE", label: "Employee", subLabel: "Core Studio Member" },
+                    { value: "PROJECT_MANAGER", label: "Project Manager", subLabel: "Project Lead" },
+                    { value: "ADMIN", label: "Administrator", subLabel: "Operations & Staff" },
+                    ...((userRole === "OWNER" || userRole === "ADMIN")
+                      ? [{ value: "OWNER", label: "Owner / Boss", subLabel: "Leadership & Governance" }]
+                      : []),
+                  ]}
+                  value={editRole}
+                  onChange={setEditRole}
+                  allowOther={false}
+                />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-semibold text-[#1F1F1F] block mb-1">Department</label>
-                  <select
-                    value={editDepartment}
-                    onChange={(e) => setEditDepartment(e.target.value)}
-                    className="w-full px-3 py-2 text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F]"
-                  >
-                    <option value="Architecture">Architecture</option>
-                    <option value="Interior Design">Interior Design</option>
-                    <option value="Landscape">Landscape Architecture</option>
-                    <option value="3D Visualization">3D Visualization & VR</option>
-                    <option value="Site Supervision">Site Supervision & MEP</option>
-                    <option value="Studio Operations">Studio Operations</option>
-                  </select>
-                </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <SearchableSelect
+                  id="edit-department"
+                  label="Department"
+                  placeholder="Select department..."
+                  searchPlaceholder="Search department..."
+                  options={DEPARTMENT_OPTIONS}
+                  value={editDepartment}
+                  onChange={setEditDepartment}
+                  allowOther={true}
+                />
                 <div>
                   <label className="text-xs font-semibold text-[#1F1F1F] block mb-1">Designation</label>
                   <input
                     type="text"
                     value={editDesignation}
                     onChange={(e) => setEditDesignation(e.target.value)}
-                    className="w-full px-3 py-2 text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F]"
+                    placeholder="e.g. Senior Project Architect"
+                    className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] text-xs focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
                   />
                 </div>
               </div>
@@ -1663,32 +1734,24 @@ export default function TeamClientView({
 
               {/* Project Assignments */}
               {availableProjects.length > 0 && (
-                <div className="space-y-1.5 pt-2 border-t border-[#E2E6F0]">
-                  <label className="text-xs font-semibold text-[#1F1F1F] block">Assigned Projects</label>
-                  <div className="grid grid-cols-2 gap-2 max-h-36 overflow-y-auto p-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl">
-                    {availableProjects.map((p) => {
-                      const isAssigned = editProjectIds.includes(p.id);
-                      return (
-                        <label
-                          key={p.id}
-                          className="flex items-center gap-2 text-xs text-[#1F1F1F] hover:bg-white p-1 rounded cursor-pointer"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isAssigned}
-                            onChange={() => {
-                              setEditProjectIds((prev) =>
-                                isAssigned ? prev.filter((id) => id !== p.id) : [...prev, p.id]
-                              );
-                            }}
-                            className="rounded border-[#E2E6F0] text-[#5A81FA] focus:ring-[#5A81FA]"
-                          />
-                          <span className="font-mono font-bold text-[10px] text-[#5A81FA]">{p.code}</span>
-                          <span className="truncate text-[11px]">{p.name}</span>
-                        </label>
-                      );
-                    })}
-                  </div>
+                <div className="pt-2 border-t border-[#E2E6F0] space-y-1.5">
+                  <SearchableSelect
+                    id="edit-projects"
+                    label="Assigned Projects"
+                    required={false}
+                    multiSelect={true}
+                    placeholder="Select projects to assign..."
+                    searchPlaceholder="Search projects by code or name..."
+                    options={availableProjects.map((p) => ({
+                      value: p.id,
+                      label: `${p.code} — ${p.name}`,
+                      badge: p.code,
+                    }))}
+                    values={editProjectIds}
+                    onMultiChange={setEditProjectIds}
+                    allowOther={false}
+                    helperText="Assigned staff will be granted workspace access to these project deliverables and sheets."
+                  />
                 </div>
               )}
 
@@ -1704,14 +1767,14 @@ export default function TeamClientView({
                 <button
                   type="button"
                   onClick={() => setEditingEmployee(null)}
-                  className="px-4 py-2 border border-[#E2E6F0] rounded-xl text-xs font-semibold text-[#696E82] hover:bg-[#F2F4FF]"
+                  className="px-4 py-2 bg-[#F2F4FF] hover:bg-[#E5EAFF] text-[#696E82] hover:text-[#1F1F1F] font-semibold rounded-xl text-xs cursor-pointer transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="bg-[#5A81FA] text-white px-4 py-2 rounded-xl text-xs font-semibold hover:bg-[#3d441a] transition-all disabled:opacity-50"
+                  className="px-5 py-2 bg-[#5A81FA] hover:bg-[#426EE8] text-white font-semibold rounded-xl text-xs shadow-xs cursor-pointer disabled:opacity-50 flex items-center gap-1.5 transition-colors"
                 >
                   {loading ? "Saving Changes..." : "Save Changes"}
                 </button>
@@ -1724,23 +1787,30 @@ export default function TeamClientView({
       {/* 3. Manage Credentials & Reset Password Modal */}
       {resetPasswordEmployee && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white border border-[#E2E6F0] rounded-2xl w-full max-w-lg shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-            <div className="p-5 border-b border-[#E2E6F0] flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-bold text-[#1F1F1F]">Manage Employee Credentials & Password</h3>
-                <p className="text-xs text-[#696E82]">
-                  Update password and send login credentials directly to staff member
-                </p>
+          <div className="bg-white border border-[#E2E6F0] rounded-2xl w-full max-w-lg p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
+            {/* Modal Header */}
+            <div className="flex justify-between items-center pb-3 border-b border-[#E2E6F0]">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-[#5A81FA] text-white flex items-center justify-center shrink-0 shadow-xs">
+                  <KeyRound className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-[#1F1F1F]">Manage Employee Credentials</h3>
+                  <p className="text-xs text-[#696E82]">
+                    Update password and revoke active sessions for this user
+                  </p>
+                </div>
               </div>
               <button
+                type="button"
                 onClick={() => setResetPasswordEmployee(null)}
-                className="text-[#696E82] hover:text-[#1F1F1F] p-1 rounded-lg"
+                className="text-[#696E82] hover:text-[#1F1F1F] p-1 rounded-lg transition-colors cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleResetPassword} className="p-5 space-y-4">
+            <form onSubmit={handleResetPassword} className="space-y-4">
               {resetModalError && (
                 <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 flex items-start justify-between gap-2 animate-in fade-in">
                   <div className="flex items-start gap-2">
@@ -1758,7 +1828,7 @@ export default function TeamClientView({
               )}
 
               {/* Employee Summary Card */}
-              <div className="p-3 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl flex items-center justify-between">
+              <div className="p-3.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl flex items-center justify-between">
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="font-mono font-bold text-xs text-[#5A81FA]">
@@ -1792,7 +1862,7 @@ export default function TeamClientView({
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="text-xs font-semibold text-[#1F1F1F]">
-                    New Password for Employee *
+                    New Password for Employee <span className="text-red-600">*</span>
                   </label>
                   <div className="flex items-center gap-2 text-[10px]">
                     <button
@@ -1801,7 +1871,7 @@ export default function TeamClientView({
                         const gen = "Studio#" + Math.random().toString(36).substring(2, 8).toUpperCase() + "!";
                         setNewTemporaryPassword(gen);
                       }}
-                      className="text-[#5A81FA] hover:underline flex items-center gap-0.5 font-medium"
+                      className="text-[#5A81FA] hover:underline flex items-center gap-0.5 font-medium cursor-pointer"
                     >
                       <Sparkles className="w-2.5 h-2.5" />
                       <span>Generate Strong</span>
@@ -1809,7 +1879,7 @@ export default function TeamClientView({
                     <button
                       type="button"
                       onClick={() => setNewTemporaryPassword("StudioPassword2026!")}
-                      className="text-[#696E82] hover:underline"
+                      className="text-[#696E82] hover:underline cursor-pointer"
                     >
                       Studio Default
                     </button>
@@ -1822,12 +1892,12 @@ export default function TeamClientView({
                     required
                     value={newTemporaryPassword}
                     onChange={(e) => setNewTemporaryPassword(e.target.value)}
-                    className="w-full px-3 py-2 pr-9 text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl font-mono text-[#1F1F1F]"
+                    className="w-full p-2.5 pr-9 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl font-mono text-[#1F1F1F] text-xs focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
                   />
                   <button
                     type="button"
                     onClick={() => setShowResetPassword(!showResetPassword)}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#696E82] hover:text-[#1F1F1F]"
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#696E82] hover:text-[#1F1F1F] cursor-pointer"
                   >
                     {showResetPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                   </button>
@@ -1835,7 +1905,7 @@ export default function TeamClientView({
               </div>
 
               {/* Notification & Custom Message */}
-              <div className="bg-[#F8F9FD] border border-[#CEDEFF] rounded-xl p-3 space-y-2.5">
+              <div className="bg-[#FAFBFD] border border-[#E2E6F0] rounded-xl p-3.5 space-y-2.5">
                 <div className="flex items-center gap-2">
                   <input
                     type="checkbox"
@@ -1858,25 +1928,26 @@ export default function TeamClientView({
                     value={resetCustomMessage}
                     onChange={(e) => setResetCustomMessage(e.target.value)}
                     placeholder="Enter message for employee..."
-                    className="w-full px-3 py-1.5 text-xs bg-white border border-[#E2E6F0] rounded-lg text-[#1F1F1F]"
+                    className="w-full p-2.5 text-xs bg-white border border-[#E2E6F0] rounded-xl text-[#1F1F1F] focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
                   />
                 </div>
               </div>
 
-              <div className="pt-3 border-t border-[#E2E6F0] flex justify-end gap-2">
+              <div className="pt-4 border-t border-[#E2E6F0] flex justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setResetPasswordEmployee(null)}
-                  className="px-4 py-2 border border-[#E2E6F0] rounded-xl text-xs font-semibold text-[#696E82] hover:bg-[#F2F4FF]"
+                  className="px-4 py-2 bg-[#F2F4FF] hover:bg-[#E5EAFF] text-[#696E82] hover:text-[#1F1F1F] font-semibold rounded-xl text-xs cursor-pointer transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="bg-amber-700 text-white px-4 py-2 rounded-xl text-xs font-semibold hover:bg-amber-800 transition-all disabled:opacity-50"
+                  className="px-5 py-2 bg-[#5A81FA] hover:bg-[#426EE8] text-white font-semibold rounded-xl text-xs shadow-xs cursor-pointer disabled:opacity-50 flex items-center gap-1.5 transition-colors"
                 >
-                  {loading ? "Updating Password..." : "Update Password & Revoke Sessions"}
+                  <KeyRound className="w-4 h-4" />
+                  <span>{loading ? "Updating..." : "Update Password & Revoke Sessions"}</span>
                 </button>
               </div>
             </form>

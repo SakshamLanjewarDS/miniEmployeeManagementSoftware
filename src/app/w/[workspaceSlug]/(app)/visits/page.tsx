@@ -81,7 +81,7 @@ export default async function VisitsPage({ params }: VisitsPageProps) {
     // Available projects for assignment
     prisma.project.findMany({
       where: { tenantId: ctx.tenantId, isArchived: false },
-      select: { id: true, code: true, name: true },
+      select: { id: true, code: true, name: true, projectType: true },
       orderBy: { code: "asc" },
     }),
     // Active team members for assignment

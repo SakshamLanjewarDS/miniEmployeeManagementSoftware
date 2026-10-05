@@ -52,7 +52,7 @@ async function runBootstrap(): Promise<void> {
           currency: "INR",
           lifecycleState: TenantLifecycleState.ACTIVE,
           branding: {
-            primaryColor: "#4B5320",
+            primaryColor: "#5A81FA",
             accentColor: "#D4AF37",
             logoUrl: "/brand/100percentdesign-logo.svg",
           },

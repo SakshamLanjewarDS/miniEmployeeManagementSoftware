@@ -100,7 +100,7 @@ function buildStudioAnnouncementHtml(params: {
     .map((p) => `<p style="margin: 0 0 14px 0; line-height: 1.6; color: #2D3748;">${p.replace(/\n/g, "<br/>")}</p>`)
     .join("");
 
-  let badgeColor = "#4B5320"; // Studio olive
+  let badgeColor = "#5A81FA"; // Studio primary brand
   let badgeLabel = "OFFICIAL STUDIO NOTICE";
   if (templateType === "LEAVE_NOTICE") {
     badgeColor = "#D97706";

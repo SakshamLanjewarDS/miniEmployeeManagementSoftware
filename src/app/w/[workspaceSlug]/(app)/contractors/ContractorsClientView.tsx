@@ -23,12 +23,15 @@ import {
   ShieldCheck,
   ShieldAlert,
   SlidersHorizontal,
+  ArrowUpDown,
+  Share2,
 } from "lucide-react";
 import { CsvImportExportModal } from "@/components/csv/CsvImportExportModal";
 import { CustomFieldsManagerModal } from "@/components/custom-fields/CustomFieldsManagerModal";
 import { DynamicFormFields } from "@/components/custom-fields/DynamicFormFields";
 import { DynamicCardFields } from "@/components/custom-fields/DynamicCardFields";
 import { CustomFieldDefinition } from "@/server/modules/custom-fields/repository";
+import { ContactShareModal, ShareableContact, ClientOption } from "@/components/share/ContactShareModal";
 
 export interface ProjectContractorItem {
   id: string;
@@ -75,6 +78,8 @@ export interface ContractorItem {
 export interface ContractorsClientViewProps {
   initialContractors: ContractorItem[];
   projects: Array<{ id: string; code: string; name: string }>;
+  clients?: ClientOption[];
+  workspaceName?: string;
   workspaceSlug: string;
   userRole: string;
   hasFinanceAccess: boolean;
@@ -85,6 +90,8 @@ export interface ContractorsClientViewProps {
 export default function ContractorsClientView({
   initialContractors,
   projects,
+  clients = [],
+  workspaceName = "100% DESIGN Studio",
   workspaceSlug,
   userRole,
   hasFinanceAccess,
@@ -97,6 +104,50 @@ export default function ContractorsClientView({
   const [customValuesByContractor, setCustomValuesByContractor] = useState<Record<string, Record<string, any>>>(initialCustomValues);
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, any>>({});
   const [customFieldsModalOpen, setCustomFieldsModalOpen] = useState(false);
+
+  // Bulk Selection & Client Contact Sharing States
+  const [selectedContractorIds, setSelectedContractorIds] = useState<string[]>([]);
+  const [shareModalOpen, setShareModalOpen] = useState(false);
+  const [shareContactsList, setShareContactsList] = useState<ShareableContact[]>([]);
+
+  const handleShareSingle = (contractor: ContractorItem) => {
+    setShareContactsList([
+      {
+        id: contractor.id,
+        name: contractor.name,
+        category: contractor.trade,
+        firmName: contractor.firmName,
+        contact: contractor.contact,
+        email: contractor.email,
+        address: contractor.address,
+      },
+    ]);
+    setShareModalOpen(true);
+  };
+
+  const handleShareBulk = () => {
+    const list = contractors
+      .filter((c) => selectedContractorIds.includes(c.id))
+      .map((c) => ({
+        id: c.id,
+        name: c.name,
+        category: c.trade,
+        firmName: c.firmName,
+        contact: c.contact,
+        email: c.email,
+        address: c.address,
+      }));
+    if (list.length > 0) {
+      setShareContactsList(list);
+      setShareModalOpen(true);
+    }
+  };
+
+  const toggleSelectContractor = (id: string) => {
+    setSelectedContractorIds((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+    );
+  };
 
   const refreshCustomFields = async () => {
     try {
@@ -124,6 +175,11 @@ export default function ContractorsClientView({
     }));
   };
 
+  const [isMounted, setIsMounted] = useState(false);
+  React.useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   // Synchronize state dynamically whenever server component re-renders
   React.useEffect(() => {
     if (initialContractors) {
@@ -149,6 +205,7 @@ export default function ContractorsClientView({
   const [searchQuery, setSearchQuery] = useState("");
   const [statusTab, setStatusTab] = useState<"all" | "active" | "archived">("active");
   const [selectedTrade, setSelectedTrade] = useState<string>("ALL");
+  const [contractorSortBy, setContractorSortBy] = useState<string>("DATE_DESC");
 
   // Messages
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -198,7 +255,7 @@ export default function ContractorsClientView({
 
   // Filtered Contractors
   const filteredContractors = useMemo(() => {
-    return contractors.filter((c) => {
+    const list = contractors.filter((c) => {
       if (statusTab === "active" && !c.isActive) return false;
       if (statusTab === "archived" && c.isActive) return false;
 
@@ -218,7 +275,28 @@ export default function ContractorsClientView({
 
       return true;
     });
-  }, [contractors, statusTab, selectedTrade, searchQuery]);
+
+    return [...list].sort((a, b) => {
+      switch (contractorSortBy) {
+        case "DATE_DESC":
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        case "DATE_ASC":
+          return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        case "ALPHA_NAME_ASC":
+          return a.name.localeCompare(b.name);
+        case "ALPHA_NAME_DESC":
+          return b.name.localeCompare(a.name);
+        case "ALPHA_FIRM_ASC":
+          return (a.firmName || a.name).localeCompare(b.firmName || b.name);
+        case "ALPHA_FIRM_DESC":
+          return (b.firmName || b.name).localeCompare(a.firmName || a.name);
+        case "TRADE_ASC":
+          return a.trade.localeCompare(b.trade);
+        default:
+          return 0;
+      }
+    });
+  }, [contractors, statusTab, selectedTrade, searchQuery, contractorSortBy]);
 
   // Open Edit Modal
   const openEditModal = (contractor: ContractorItem) => {
@@ -464,6 +542,20 @@ export default function ContractorsClientView({
     }
   };
 
+  if (!isMounted) {
+    return (
+      <div className="space-y-6 animate-pulse" suppressHydrationWarning>
+        <div className="bg-white border border-[#E2E6F0] rounded-2xl p-5 h-20" />
+        <div className="bg-white border border-[#E2E6F0] rounded-2xl p-4 h-14" />
+        <div className="bg-white border border-[#E2E6F0] rounded-2xl p-6 space-y-4">
+          <div className="h-16 bg-gray-50 rounded-xl" />
+          <div className="h-16 bg-gray-50 rounded-xl" />
+          <div className="h-16 bg-gray-50 rounded-xl" />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6" suppressHydrationWarning>
       {/* Alert Banners */}
@@ -584,23 +676,94 @@ export default function ContractorsClientView({
             </button>
           </div>
 
-          {/* Trade Filter Dropdown */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-[#696E82]">Filter Trade:</span>
-            <select
-              value={selectedTrade}
-              onChange={(e) => setSelectedTrade(e.target.value)}
-              className="p-1.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-lg text-xs text-[#1F1F1F] focus:outline-none focus:ring-1 focus:ring-[#5A81FA]"
-            >
-              <option value="ALL">All Trade Disciplines</option>
-              {availableTrades.map((trade) => (
-                <option key={trade} value={trade}>
-                  {trade}
-                </option>
-              ))}
-            </select>
+          {/* Filter Trade & Sort Dropdown */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-[#696E82]">Filter Trade:</span>
+              <select
+                value={selectedTrade}
+                onChange={(e) => setSelectedTrade(e.target.value)}
+                className="p-1.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-lg text-xs text-[#1F1F1F] focus:outline-none focus:ring-1 focus:ring-[#5A81FA]"
+              >
+                <option value="ALL">All Trade Disciplines</option>
+                {availableTrades.map((trade) => (
+                  <option key={trade} value={trade}>
+                    {trade}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex items-center gap-1.5 bg-[#F8F9FD] border border-[#E2E6F0] px-2.5 py-1 rounded-lg">
+              <ArrowUpDown className="w-3.5 h-3.5 text-[#696E82]" />
+              <span className="text-xs text-[#696E82] font-medium">Sort:</span>
+              <select
+                value={contractorSortBy}
+                onChange={(e) => setContractorSortBy(e.target.value)}
+                className="bg-transparent text-xs text-[#1F1F1F] font-semibold focus:outline-none cursor-pointer"
+              >
+                <option value="DATE_DESC">Date Created (Newest First)</option>
+                <option value="DATE_ASC">Date Created (Oldest First)</option>
+                <option value="ALPHA_NAME_ASC">Contact Name (A → Z)</option>
+                <option value="ALPHA_NAME_DESC">Contact Name (Z → A)</option>
+                <option value="ALPHA_FIRM_ASC">Firm Name (A → Z)</option>
+                <option value="ALPHA_FIRM_DESC">Firm Name (Z → A)</option>
+                <option value="TRADE_ASC">Trade Discipline (A → Z)</option>
+              </select>
+            </div>
           </div>
         </div>
+      </div>
+
+      {/* Bulk Selection Bar */}
+      <div className="flex items-center justify-between text-xs px-1">
+        <label className="flex items-center gap-2 cursor-pointer font-medium text-[#696E82] hover:text-[#1F1F1F] select-none">
+          <input
+            type="checkbox"
+            checked={
+              filteredContractors.length > 0 &&
+              filteredContractors.every((c) => selectedContractorIds.includes(c.id))
+            }
+            onChange={() => {
+              if (
+                filteredContractors.length > 0 &&
+                filteredContractors.every((c) => selectedContractorIds.includes(c.id))
+              ) {
+                setSelectedContractorIds((prev) =>
+                  prev.filter((id) => !filteredContractors.some((c) => c.id === id))
+                );
+              } else {
+                const toAdd = filteredContractors.map((c) => c.id);
+                setSelectedContractorIds((prev) => Array.from(new Set([...prev, ...toAdd])));
+              }
+            }}
+            className="rounded text-[#5A81FA] focus:ring-[#5A81FA] cursor-pointer"
+          />
+          <span>Select all visible ({filteredContractors.length})</span>
+        </label>
+
+        {selectedContractorIds.length > 0 && (
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-[#2C308D] bg-[#F2F4FF] px-2.5 py-1 rounded-lg border border-[#CEDEFF]">
+              {selectedContractorIds.length} selected
+            </span>
+            <button
+              type="button"
+              onClick={handleShareBulk}
+              className="px-3 py-1 bg-[#5A81FA] hover:bg-[#426EE8] text-white rounded-lg font-bold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+            >
+              <Share2 className="w-3.5 h-3.5" />
+              <span>Share to Client</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedContractorIds([])}
+              className="text-[#696E82] hover:text-red-600 font-semibold cursor-pointer"
+            >
+              Clear
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Contractor Cards Grid */}
@@ -612,29 +775,44 @@ export default function ContractorsClientView({
             <p className="text-xs text-[#696E82] mt-1">Try adjusting your search terms or active status tabs.</p>
           </div>
         ) : (
-          filteredContractors.map((contractor) => (
-            <div
-              key={contractor.id}
-              className={`bg-white border rounded-2xl p-5 shadow-2xs flex flex-col justify-between transition-all hover:border-[#5A81FA]/40 ${
-                contractor.isActive ? "border-[#E2E6F0]" : "border-gray-200 bg-gray-50/50 opacity-80"
-              }`}
-            >
-              <div className="space-y-3">
-                {/* Header */}
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <h3 className="text-sm font-bold text-[#1F1F1F] tracking-tight">{contractor.name}</h3>
-                    {contractor.firmName && (
-                      <div className="text-xs text-[#696E82] font-medium flex items-center gap-1 mt-0.5">
-                        <Building2 className="w-3 h-3 text-[#696E82]" />
-                        <span>{contractor.firmName}</span>
+          filteredContractors.map((contractor) => {
+            const isSelected = selectedContractorIds.includes(contractor.id);
+            return (
+              <div
+                key={contractor.id}
+                className={`bg-white border rounded-2xl p-5 shadow-2xs flex flex-col justify-between transition-all hover:border-[#5A81FA]/40 ${
+                  isSelected
+                    ? "border-[#5A81FA] ring-2 ring-[#5A81FA]/20 bg-[#F2F4FF]/20"
+                    : contractor.isActive
+                    ? "border-[#E2E6F0]"
+                    : "border-gray-200 bg-gray-50/50 opacity-80"
+                }`}
+              >
+                <div className="space-y-3">
+                  {/* Header with Selection Checkbox */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleSelectContractor(contractor.id)}
+                        className="mt-1 w-4 h-4 rounded text-[#5A81FA] border-[#E2E6F0] focus:ring-[#5A81FA] cursor-pointer shrink-0"
+                        title="Select contractor to share"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <h3 className="text-sm font-bold text-[#1F1F1F] tracking-tight truncate">{contractor.name}</h3>
+                        {contractor.firmName && (
+                          <div className="text-xs text-[#696E82] font-medium flex items-center gap-1 mt-0.5 truncate">
+                            <Building2 className="w-3 h-3 text-[#696E82] shrink-0" />
+                            <span className="truncate">{contractor.firmName}</span>
+                          </div>
+                        )}
                       </div>
-                    )}
+                    </div>
+                    <span className="font-mono text-[10px] font-bold text-[#5A81FA] bg-[#F2F4FF] px-2 py-0.5 rounded border border-[#CEDEFF] shrink-0">
+                      {contractor.trade}
+                    </span>
                   </div>
-                  <span className="font-mono text-[10px] font-bold text-[#5A81FA] bg-[#F2F4FF] px-2 py-0.5 rounded border border-[#CEDEFF] shrink-0">
-                    {contractor.trade}
-                  </span>
-                </div>
 
                 {/* Contact Info */}
                 <div className="space-y-1 text-xs text-[#696E82] pt-1">
@@ -729,12 +907,25 @@ export default function ContractorsClientView({
 
               {/* Bottom Actions */}
               <div className="pt-4 mt-3 border-t border-[#E2E6F0] flex items-center justify-between gap-2">
-                <button
-                  onClick={() => setDetailContractor(contractor)}
-                  className="text-xs font-semibold text-[#5A81FA] hover:underline cursor-pointer"
-                >
-                  View Details →
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setDetailContractor(contractor)}
+                    className="text-xs font-semibold text-[#5A81FA] hover:underline cursor-pointer"
+                  >
+                    View Details →
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleShareSingle(contractor)}
+                    className="px-2.5 py-1 bg-[#F2F4FF] hover:bg-[#5A81FA] text-[#2C308D] hover:text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors border border-[#CEDEFF] cursor-pointer shadow-2xs"
+                    title="Share contact details with client (WhatsApp / Email)"
+                  >
+                    <Share2 className="w-3.5 h-3.5 text-[#5A81FA] group-hover:text-white" />
+                    <span>Share</span>
+                  </button>
+                </div>
 
                 {isPrivileged && (
                   <div className="flex items-center gap-1.5">
@@ -760,8 +951,9 @@ export default function ContractorsClientView({
                 )}
               </div>
             </div>
-          ))
-        )}
+          );
+        })
+      )}
       </div>
 
       {/* ==================================================== */}
@@ -1264,17 +1456,29 @@ export default function ContractorsClientView({
 
             {/* Bottom Actions */}
             <div className="p-4 border-t border-[#E2E6F0] bg-[#F8F9FD] flex items-center justify-between">
-              {detailContractor.contact ? (
-                <a
-                  href={`tel:${detailContractor.contact}`}
-                  className="px-4 py-2 bg-[#5A81FA] text-white text-xs font-semibold rounded-xl hover:bg-[#426EE8] transition-colors flex items-center gap-1.5"
+              <div className="flex items-center gap-2">
+                {detailContractor.contact ? (
+                  <a
+                    href={`tel:${detailContractor.contact}`}
+                    className="px-4 py-2 bg-[#5A81FA] text-white text-xs font-semibold rounded-xl hover:bg-[#426EE8] transition-colors flex items-center gap-1.5"
+                  >
+                    <Phone className="w-3.5 h-3.5" />
+                    <span>Call {detailContractor.name}</span>
+                  </a>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const toShare = detailContractor;
+                    setDetailContractor(null);
+                    handleShareSingle(toShare);
+                  }}
+                  className="px-3.5 py-2 bg-[#F2F4FF] hover:bg-[#5A81FA] text-[#2C308D] hover:text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors border border-[#CEDEFF] cursor-pointer"
                 >
-                  <Phone className="w-3.5 h-3.5" />
-                  <span>Call {detailContractor.name}</span>
-                </a>
-              ) : (
-                <div />
-              )}
+                  <Share2 className="w-3.5 h-3.5" />
+                  <span>Share Contact</span>
+                </button>
+              </div>
               {isPrivileged && (
                 <button
                   onClick={() => {
@@ -1312,6 +1516,49 @@ export default function ContractorsClientView({
         workspaceSlug={workspaceSlug}
         initialEntity="CONTRACTOR"
         onFieldsUpdated={refreshCustomFields}
+      />
+
+      {/* Floating Bottom Selection Bar (when 1+ contractors selected) */}
+      {selectedContractorIds.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-[#1F1F1F] text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-4 border border-white/10 animate-in slide-in-from-bottom-4">
+          <div className="flex items-center gap-2">
+            <span className="w-6 h-6 rounded-full bg-[#5A81FA] text-white flex items-center justify-center text-xs font-bold">
+              {selectedContractorIds.length}
+            </span>
+            <span className="text-xs font-semibold whitespace-nowrap">
+              {selectedContractorIds.length === 1
+                ? "1 contractor selected"
+                : `${selectedContractorIds.length} contractors selected`}
+            </span>
+          </div>
+          <div className="h-4 w-px bg-white/20" />
+          <button
+            type="button"
+            onClick={handleShareBulk}
+            className="px-4 py-2 bg-[#5A81FA] hover:bg-[#426EE8] text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-xs transition-colors cursor-pointer whitespace-nowrap"
+          >
+            <Share2 className="w-4 h-4" />
+            <span>Share to Client (WhatsApp / Email)</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedContractorIds([])}
+            className="text-xs text-white/70 hover:text-white cursor-pointer px-2 py-1"
+          >
+            Clear
+          </button>
+        </div>
+      )}
+
+      {/* Contact Share Modal */}
+      <ContactShareModal
+        isOpen={shareModalOpen}
+        onClose={() => setShareModalOpen(false)}
+        contacts={shareContactsList}
+        clients={clients}
+        projects={projects}
+        workspaceName={workspaceName}
+        contactTypeLabel="Contractor"
       />
     </div>
   );

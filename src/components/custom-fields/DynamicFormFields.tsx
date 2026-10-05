@@ -2,6 +2,7 @@
 
 import React from "react";
 import { CustomFieldDefinition } from "@/server/modules/custom-fields/repository";
+import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { Sparkles, Calendar, Hash, Type, ListFilter, ToggleLeft, FileText, Link as LinkIcon } from "lucide-react";
 
 interface DynamicFormFieldsProps {
@@ -25,7 +26,7 @@ export function DynamicFormFields({
   return (
     <div className="space-y-4 pt-3 border-t border-[#E2E6F0]">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1.5 text-xs font-bold text-[#4865F6] uppercase tracking-wider">
+        <div className="flex items-center gap-1.5 text-xs font-bold text-[#5A81FA] uppercase tracking-wider">
           <Sparkles className="w-3.5 h-3.5" />
           <span>Configured Studio Attributes ({fields.length})</span>
         </div>
@@ -39,24 +40,22 @@ export function DynamicFormFields({
           switch (field.type) {
             case "select":
               return (
-                <div key={field.id} className="space-y-1">
-                  <label className="block font-bold text-slate-700">
-                    {field.label} {field.required && <span className="text-red-500">*</span>}
-                  </label>
-                  <select
-                    disabled={disabled}
+                <div key={field.id}>
+                  <SearchableSelect
+                    id={field.id}
+                    label={field.label}
                     required={field.required}
+                    disabled={disabled}
                     value={val}
-                    onChange={(e) => onChange(field.key, e.target.value)}
-                    className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#4865F6] disabled:opacity-60"
-                  >
-                    <option value="">{field.placeholder || `Select ${field.label}...`}</option>
-                    {(field.options || []).map((opt) => (
-                      <option key={opt} value={opt}>
-                        {opt}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(newVal) => onChange(field.key, newVal)}
+                    placeholder={field.placeholder || `Select ${field.label}...`}
+                    searchPlaceholder={`Search ${field.label}...`}
+                    allowOther={true}
+                    options={(field.options || []).map((opt) => ({
+                      value: opt,
+                      label: opt,
+                    }))}
+                  />
                 </div>
               );
 
@@ -74,7 +73,7 @@ export function DynamicFormFields({
                       onChange={(e) => onChange(field.key, e.target.checked)}
                       className="sr-only peer"
                     />
-                    <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#4865F6]"></div>
+                    <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#5A81FA]"></div>
                   </label>
                 </div>
               );
@@ -92,7 +91,7 @@ export function DynamicFormFields({
                     value={val}
                     onChange={(e) => onChange(field.key, e.target.value)}
                     placeholder={field.placeholder || `Enter ${field.label}...`}
-                    className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#4865F6] disabled:opacity-60"
+                    className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#5A81FA] disabled:opacity-60"
                   />
                 </div>
               );
@@ -109,7 +108,7 @@ export function DynamicFormFields({
                     required={field.required}
                     value={val ? String(val).split("T")[0] : ""}
                     onChange={(e) => onChange(field.key, e.target.value)}
-                    className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#4865F6] disabled:opacity-60"
+                    className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#5A81FA] disabled:opacity-60"
                   />
                 </div>
               );
@@ -128,7 +127,7 @@ export function DynamicFormFields({
                     value={val}
                     placeholder={field.placeholder || "0"}
                     onChange={(e) => onChange(field.key, e.target.value === "" ? "" : Number(e.target.value))}
-                    className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#4865F6] disabled:opacity-60"
+                    className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#5A81FA] disabled:opacity-60"
                   />
                 </div>
               );
@@ -146,7 +145,7 @@ export function DynamicFormFields({
                     value={val}
                     placeholder={field.placeholder || "https://..."}
                     onChange={(e) => onChange(field.key, e.target.value)}
-                    className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#4865F6] disabled:opacity-60"
+                    className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#5A81FA] disabled:opacity-60"
                   />
                 </div>
               );
@@ -165,7 +164,7 @@ export function DynamicFormFields({
                     value={val}
                     placeholder={field.placeholder || `Enter ${field.label}...`}
                     onChange={(e) => onChange(field.key, e.target.value)}
-                    className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#4865F6] disabled:opacity-60"
+                    className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#5A81FA] disabled:opacity-60"
                   />
                 </div>
               );

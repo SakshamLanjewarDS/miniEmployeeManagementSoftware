@@ -254,13 +254,13 @@ export function CustomFieldsManagerModal({
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[#E2E6F0] pb-3">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-[#4865F6] text-white flex items-center justify-center shadow-xs">
+            <div className="w-9 h-9 rounded-xl bg-[#5A81FA] text-white flex items-center justify-center shadow-xs">
               <SlidersHorizontal className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-base font-bold text-[#0F172A]">Custom Form Fields Manager</h3>
-                <span className="text-[10px] font-bold bg-[#F2F4FF] text-[#4865F6] px-2 py-0.5 rounded-full border border-[#CEDEFF]">
+                <span className="text-[10px] font-bold bg-[#F2F4FF] text-[#2C308D] px-2 py-0.5 rounded-full border border-[#CEDEFF]">
                   Zero-Code Studio Engine
                 </span>
               </div>
@@ -288,7 +288,7 @@ export function CustomFieldsManagerModal({
                 setEntity(e.target.value);
                 resetForm();
               }}
-              className="p-1.5 bg-white border border-[#E2E6F0] rounded-lg font-semibold text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#4865F6]"
+              className="p-1.5 bg-white border border-[#E2E6F0] rounded-lg font-semibold text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#5A81FA]"
             >
               <option value="PROJECT">Projects Form & Cards</option>
               <option value="TASK">Tasks & Deliverables Form</option>
@@ -303,7 +303,7 @@ export function CustomFieldsManagerModal({
               type="button"
               onClick={() => setActiveTab("list")}
               className={`px-3 py-1 rounded-md font-bold transition-all cursor-pointer ${
-                activeTab === "list" ? "bg-[#4865F6] text-white shadow-2xs" : "text-slate-600 hover:text-black"
+                activeTab === "list" ? "bg-[#5A81FA] text-white shadow-2xs" : "text-slate-600 hover:text-black"
               }`}
             >
               Active Fields ({fields.length})
@@ -315,7 +315,7 @@ export function CustomFieldsManagerModal({
                 setActiveTab("create");
               }}
               className={`px-3 py-1 rounded-md font-bold transition-all cursor-pointer flex items-center gap-1 ${
-                activeTab === "create" ? "bg-[#4865F6] text-white shadow-2xs" : "text-slate-600 hover:text-black"
+                activeTab === "create" ? "bg-[#5A81FA] text-white shadow-2xs" : "text-slate-600 hover:text-black"
               }`}
             >
               <Plus className="w-3.5 h-3.5" />
@@ -358,7 +358,7 @@ export function CustomFieldsManagerModal({
               <div className="py-8 text-center text-xs text-slate-400">Loading custom fields configuration...</div>
             ) : fields.length === 0 ? (
               <div className="p-8 border-2 border-dashed border-[#E2E6F0] rounded-2xl text-center space-y-2">
-                <Sparkles className="w-8 h-8 text-[#4865F6] mx-auto opacity-50" />
+                <Sparkles className="w-8 h-8 text-[#5A81FA] mx-auto opacity-50" />
                 <h4 className="text-sm font-bold text-slate-800">No custom fields created yet for {entity}</h4>
                 <p className="text-xs text-slate-500 max-w-sm mx-auto">
                   Click "+ Add Field" above to introduce custom project attributes that automatically show up in forms and cards.
@@ -366,7 +366,7 @@ export function CustomFieldsManagerModal({
                 <button
                   type="button"
                   onClick={() => setActiveTab("create")}
-                  className="px-4 py-2 bg-[#4865F6] text-white text-xs font-bold rounded-xl shadow-xs hover:bg-[#3851D6] cursor-pointer mt-2"
+                  className="px-4 py-2 bg-[#5A81FA] text-white text-xs font-bold rounded-xl shadow-xs hover:bg-[#426EE8] cursor-pointer mt-2"
                 >
                   Create Your First Field
                 </button>
@@ -435,7 +435,7 @@ export function CustomFieldsManagerModal({
                       <button
                         type="button"
                         onClick={() => handleEditField(f)}
-                        className="p-1.5 text-slate-500 hover:text-[#4865F6] hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                        className="p-1.5 text-slate-500 hover:text-[#5A81FA] hover:bg-[#F2F4FF] rounded-lg transition-colors cursor-pointer"
                         title="Edit Field Configuration"
                       >
                         <Edit2 className="w-4 h-4" />
@@ -481,7 +481,7 @@ export function CustomFieldsManagerModal({
                   value={label}
                   onChange={(e) => handleLabelChange(e.target.value)}
                   placeholder="e.g. Plot Area (sq.ft) or Sanction Date"
-                  className="w-full p-2.5 bg-white border border-[#E2E6F0] rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#4865F6]"
+                  className="w-full p-2.5 bg-white border border-[#E2E6F0] rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
                 />
               </div>
 
@@ -495,7 +495,7 @@ export function CustomFieldsManagerModal({
                   value={key}
                   onChange={(e) => setKey(e.target.value.replace(/[^a-zA-Z0-9_]/g, ""))}
                   placeholder="e.g. plotAreaSqft"
-                  className="w-full p-2.5 bg-white border border-[#E2E6F0] rounded-xl font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#4865F6]"
+                  className="w-full p-2.5 bg-white border border-[#E2E6F0] rounded-xl font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
                 />
               </div>
             </div>
@@ -508,7 +508,7 @@ export function CustomFieldsManagerModal({
                 <select
                   value={type}
                   onChange={(e) => setType(e.target.value as CustomFieldType)}
-                  className="w-full p-2.5 bg-white border border-[#E2E6F0] rounded-xl text-slate-800 font-semibold focus:outline-none focus:ring-2 focus:ring-[#4865F6]"
+                  className="w-full p-2.5 bg-white border border-[#E2E6F0] rounded-xl text-slate-800 font-semibold focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
                 >
                   <option value="text">🔤 Short Text (Single line)</option>
                   <option value="number">🔢 Number (Numeric / Sqft / Amount)</option>
@@ -527,7 +527,7 @@ export function CustomFieldsManagerModal({
                   value={category}
                   onChange={(e) => setCategory(e.target.value)}
                   placeholder="e.g. Site & Zoning, Approvals, Financial"
-                  className="w-full p-2.5 bg-white border border-[#E2E6F0] rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#4865F6]"
+                  className="w-full p-2.5 bg-white border border-[#E2E6F0] rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
                 />
               </div>
             </div>
@@ -553,7 +553,7 @@ export function CustomFieldsManagerModal({
                   <button
                     type="button"
                     onClick={handleAddOption}
-                    className="px-3 py-2 bg-[#4865F6] text-white font-bold rounded-lg cursor-pointer text-xs"
+                    className="px-3 py-2 bg-[#5A81FA] text-white font-bold rounded-lg cursor-pointer text-xs hover:bg-[#426EE8]"
                   >
                     Add Option
                   </button>
@@ -566,7 +566,7 @@ export function CustomFieldsManagerModal({
                     options.map((opt) => (
                       <span
                         key={opt}
-                        className="inline-flex items-center gap-1 bg-white border border-[#CEDEFF] text-[#4865F6] px-2 py-1 rounded-lg text-xs font-semibold"
+                        className="inline-flex items-center gap-1 bg-[#F2F4FF] border border-[#CEDEFF] text-[#2C308D] px-2 py-1 rounded-lg text-xs font-semibold"
                       >
                         <span>{opt}</span>
                         <button
@@ -590,7 +590,7 @@ export function CustomFieldsManagerModal({
                 value={placeholder}
                 onChange={(e) => setPlaceholder(e.target.value)}
                 placeholder="e.g. Enter area in square feet..."
-                className="w-full p-2.5 bg-white border border-[#E2E6F0] rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#4865F6]"
+                className="w-full p-2.5 bg-white border border-[#E2E6F0] rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
               />
             </div>
 
@@ -601,7 +601,7 @@ export function CustomFieldsManagerModal({
                   type="checkbox"
                   checked={required}
                   onChange={(e) => setRequired(e.target.checked)}
-                  className="rounded text-[#4865F6] focus:ring-[#4865F6] w-4 h-4"
+                  className="rounded text-[#5A81FA] focus:ring-[#5A81FA] w-4 h-4"
                 />
                 <span>Required Field</span>
               </label>
@@ -611,7 +611,7 @@ export function CustomFieldsManagerModal({
                   type="checkbox"
                   checked={showOnCard}
                   onChange={(e) => setShowOnCard(e.target.checked)}
-                  className="rounded text-[#4865F6] focus:ring-[#4865F6] w-4 h-4"
+                  className="rounded text-[#5A81FA] focus:ring-[#5A81FA] w-4 h-4"
                 />
                 <span>Show on Card</span>
               </label>
@@ -621,15 +621,15 @@ export function CustomFieldsManagerModal({
                   type="checkbox"
                   checked={showInFilters}
                   onChange={(e) => setShowInFilters(e.target.checked)}
-                  className="rounded text-[#4865F6] focus:ring-[#4865F6] w-4 h-4"
+                  className="rounded text-[#5A81FA] focus:ring-[#5A81FA] w-4 h-4"
                 />
                 <span>Show in Filters</span>
               </label>
             </div>
 
             {/* LIVE PREVIEW BOX */}
-            <div className="p-3 bg-blue-50/50 border border-blue-200 rounded-xl space-y-1.5">
-              <div className="flex items-center gap-1.5 text-[11px] font-bold text-[#4865F6] uppercase">
+            <div className="p-3 bg-[#F2F4FF]/50 border border-[#CEDEFF] rounded-xl space-y-1.5">
+              <div className="flex items-center gap-1.5 text-[11px] font-bold text-[#5A81FA] uppercase">
                 <Eye className="w-3.5 h-3.5" />
                 <span>Live Interactive Form Preview</span>
               </div>
@@ -647,7 +647,7 @@ export function CustomFieldsManagerModal({
                   </select>
                 ) : type === "boolean" ? (
                   <label className="flex items-center gap-2 text-xs font-medium text-slate-700">
-                    <input type="checkbox" className="w-4 h-4 rounded text-[#4865F6]" disabled />
+                    <input type="checkbox" className="w-4 h-4 rounded text-[#5A81FA]" disabled />
                     <span>Yes / Active</span>
                   </label>
                 ) : type === "textarea" ? (
@@ -680,7 +680,7 @@ export function CustomFieldsManagerModal({
               <button
                 type="submit"
                 disabled={saving || !label.trim()}
-                className="px-5 py-2 bg-[#4865F6] hover:bg-[#3851D6] text-white font-bold rounded-xl shadow-xs cursor-pointer disabled:opacity-50"
+                className="px-5 py-2 bg-[#5A81FA] hover:bg-[#426EE8] text-white font-bold rounded-xl shadow-xs cursor-pointer disabled:opacity-50"
               >
                 {saving ? "Saving..." : editingFieldId ? "Update Field" : "Create & Activate Field"}
               </button>

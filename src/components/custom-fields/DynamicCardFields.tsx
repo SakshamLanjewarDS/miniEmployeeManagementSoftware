@@ -49,7 +49,7 @@ export function DynamicCardFields({ fields, values }: DynamicCardFieldsProps) {
                     href={String(val)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-[#4865F6] hover:underline inline-flex items-center gap-1"
+                    className="text-[#5A81FA] hover:text-[#426EE8] hover:underline inline-flex items-center gap-1"
                   >
                     <span>View Link</span>
                     <ExternalLink className="w-2.5 h-2.5" />

@@ -62,10 +62,32 @@ export async function clearSessionCookie() {
   cookieStore.delete(SESSION_COOKIE_NAME);
 }
 
+interface CachedSessionEntry {
+  context: TenantContext;
+  cachedAt: number;
+}
+
+// In-memory cache for ultra-fast route transitions (skips 2 remote DB roundtrips on every navigation)
+const sessionContextCache = new Map<string, CachedSessionEntry>();
+const SESSION_CACHE_TTL_MS = 60 * 1000; // 60 seconds
+
+export function clearSessionCache(token?: string) {
+  if (token) {
+    for (const key of sessionContextCache.keys()) {
+      if (key.startsWith(token + ":")) {
+        sessionContextCache.delete(key);
+      }
+    }
+  } else {
+    sessionContextCache.clear();
+  }
+}
+
 /**
  * Revoke a specific session
  */
 export async function revokeSession(token: string): Promise<void> {
+  clearSessionCache(token);
   await prisma.session.updateMany({
     where: { token, revokedAt: null },
     data: { revokedAt: new Date() },
@@ -76,6 +98,7 @@ export async function revokeSession(token: string): Promise<void> {
  * Revoke all sessions for a user (e.g., upon password reset or account disablement)
  */
 export async function revokeAllUserSessions(userId: string): Promise<void> {
+  clearSessionCache();
   await prisma.session.updateMany({
     where: { userId, revokedAt: null },
     data: { revokedAt: new Date() },
@@ -92,6 +115,14 @@ export async function resolveSessionAndTenant(
 ): Promise<TenantContext> {
   if (!token) {
     throw new UnauthorizedException("No session token provided");
+  }
+
+  const normalizedSlug = workspaceSlug.toLowerCase().trim();
+  const cacheKey = `${token}:${normalizedSlug}`;
+  const now = Date.now();
+  const cached = sessionContextCache.get(cacheKey);
+  if (cached && now - cached.cachedAt < SESSION_CACHE_TTL_MS) {
+    return cached.context;
   }
 
   const session = await prisma.session.findUnique({
@@ -114,7 +145,6 @@ export async function resolveSessionAndTenant(
   }
 
   // Resolve target tenant by slug
-  const normalizedSlug = workspaceSlug.toLowerCase().trim();
   const tenant = await prisma.tenant.findUnique({
     where: { slug: normalizedSlug },
     include: {
@@ -140,7 +170,7 @@ export async function resolveSessionAndTenant(
     throw new UnauthorizedException(`User is not an active member of workspace '${workspaceSlug}'`);
   }
 
-  return {
+  const result: TenantContext = {
     tenantId: tenant.id,
     tenantSlug: tenant.slug,
     tenantName: tenant.name,
@@ -157,6 +187,13 @@ export async function resolveSessionAndTenant(
     timezone: tenant.timezone,
     currency: tenant.currency,
   };
+
+  sessionContextCache.set(cacheKey, {
+    context: result,
+    cachedAt: now,
+  });
+
+  return result;
 }
 
 import { cache } from "react";

@@ -39,6 +39,7 @@ export default async function TasksPage({ params, searchParams }: TasksPageProps
         id: true,
         code: true,
         name: true,
+        projectType: true,
         phases: {
           select: {
             id: true,
@@ -90,6 +91,8 @@ export default async function TasksPage({ params, searchParams }: TasksPageProps
       },
       orderBy: { scheduledTime: "asc" },
     }),
+    getCustomFieldDefinitions(ctx, "TASK"),
+    getCustomFieldValues(ctx, "TASK"),
   ]);
 
   // Serialize tasks to plain objects (convert Decimal estimatedHours and Dates to JSON-safe values)
@@ -127,7 +130,7 @@ export default async function TasksPage({ params, searchParams }: TasksPageProps
       reason: ah.reason,
       createdAt: ah.createdAt.toISOString(),
     })) || [],
-    customFields: customFieldValues[t.id] || {},
+    customFields: (customFieldValues && (customFieldValues as Record<string, any>)[t.id]) || {},
   }));
 
   return (
@@ -197,8 +200,8 @@ export default async function TasksPage({ params, searchParams }: TasksPageProps
         metrics={metrics}
         contextUserFullName={ctx.userFullName}
         workspaceTimezone={ctx.timezone}
-        initialCustomFields={customFieldDefinitions as any}
-        initialCustomValues={customFieldValues as any}
+        initialCustomFields={(customFieldDefinitions || []) as any}
+        initialCustomValues={(customFieldValues || {}) as any}
       />
     </div>
   );

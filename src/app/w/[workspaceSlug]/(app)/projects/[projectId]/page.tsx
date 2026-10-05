@@ -65,7 +65,7 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <span className="font-mono text-xs font-bold text-[#4B5320] bg-[#4B5320]/10 px-2.5 py-1 rounded border border-[#4B5320]/20">
+              <span className="font-mono text-xs font-bold text-[#5A81FA] bg-[#F2F4FF] px-2.5 py-1 rounded border border-[#CEDEFF]">
                 {project.code}
               </span>
               <span className="text-xs font-semibold text-[#696E82] bg-[#F8F9FD] px-2.5 py-1 rounded border border-[#E2E6F0]">
@@ -77,10 +77,10 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
               {ctx.role === "OWNER" || ctx.role === "ADMIN" ? (
                 <Link
                   href={`/w/${ctx.tenantSlug}/projects`}
-                  className="text-[10px] font-bold text-[#4B5320] bg-[#4B5320]/10 hover:bg-[#4B5320]/20 px-2 py-0.5 rounded border border-[#4B5320]/20 inline-flex items-center gap-1 transition-colors cursor-pointer"
+                  className="text-[10px] font-bold text-[#5A81FA] bg-[#F2F4FF] hover:bg-[#E5EAFF] px-2 py-0.5 rounded border border-[#CEDEFF] inline-flex items-center gap-1 transition-colors cursor-pointer"
                   title="Click to edit project from portfolio manager"
                 >
-                  <ShieldAlert className="w-3 h-3 text-[#D4AF37]" />
+                  <ShieldAlert className="w-3 h-3 text-[#5A81FA]" />
                   <span>Admin / Owner Edit Mode</span>
                 </Link>
               ) : (
@@ -102,7 +102,7 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
             {project.budget && (
               <div className="border-l border-[#E2E6F0] pl-4">
                 <span className="text-[10px] text-[#696E82] uppercase font-semibold block">Budget</span>
-                <span className="text-sm font-bold text-[#4B5320]">
+                <span className="text-sm font-bold text-[#5A81FA]">
                   {project.currency} {Number(project.budget).toLocaleString("en-IN")}
                 </span>
               </div>
@@ -118,7 +118,7 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
               href={`/w/${ctx.tenantSlug}/projects/${project.id}?tab=${t.key}`}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
                 tab === t.key
-                  ? "bg-[#4B5320] text-white font-semibold shadow-2xs"
+                  ? "bg-[#5A81FA] text-white font-semibold shadow-2xs"
                   : "text-[#696E82] hover:bg-[#F2F4FF] hover:text-[#1F1F1F]"
               }`}
             >
@@ -139,15 +139,15 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
               <div>
                 <h3 className="text-sm font-bold text-[#1F1F1F]">Architectural Phases Sequence</h3>
                 <p className="text-xs text-[#696E82]">
-                  {project.phaseProgress.label} • Current: <strong className="text-[#4B5320]">{project.currentPhase || "Brief"}</strong>
+                  {project.phaseProgress.label} • Current: <strong className="text-[#5A81FA]">{project.currentPhase || "Brief"}</strong>
                 </p>
               </div>
               {ctx.role === "OWNER" || ctx.role === "ADMIN" ? (
                 <Link
                   href={`/w/${ctx.tenantSlug}/projects`}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#4B5320]/10 hover:bg-[#4B5320]/20 text-[#4B5320] text-xs font-bold transition-colors cursor-pointer border border-[#4B5320]/20 self-start sm:self-auto"
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#F2F4FF] hover:bg-[#E5EAFF] text-[#5A81FA] text-xs font-bold transition-colors cursor-pointer border border-[#CEDEFF] self-start sm:self-auto"
                 >
-                  <TrendingUp className="w-3.5 h-3.5 text-[#D4AF37]" />
+                  <TrendingUp className="w-3.5 h-3.5 text-[#5A81FA]" />
                   <span>Manipulate Phase & Progress →</span>
                 </Link>
               ) : (
@@ -160,7 +160,7 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
             {/* Progress bar */}
             <div className="w-full bg-[#F2F4FF] h-2 rounded-full overflow-hidden">
               <div
-                className="bg-[#4B5320] h-full rounded-full transition-all duration-500"
+                className="bg-[#5A81FA] h-full rounded-full transition-all duration-500"
                 style={{ width: `${project.phaseProgress.percentage}%` }}
               />
             </div>
@@ -177,7 +177,7 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
                       isCompleted
                         ? "bg-emerald-50 border-emerald-200 text-emerald-900"
                         : isCurrent
-                        ? "bg-[#4B5320]/10 border-[#4B5320] ring-1 ring-[#4B5320] text-[#1F1F1F] font-bold shadow-2xs"
+                        ? "bg-[#F2F4FF] border-[#5A81FA] ring-1 ring-[#5A81FA] text-[#1F1F1F] font-bold shadow-2xs"
                         : isDelayed
                         ? "bg-amber-50 border-amber-200 text-amber-900"
                         : "bg-[#F8F9FD] border-[#E2E6F0] text-[#696E82]"
@@ -220,7 +220,7 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
                       href={project.googleMapLocation.startsWith("http") ? project.googleMapLocation : `https://maps.google.com/?q=${encodeURIComponent(project.googleMapLocation)}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-[#5A81FA] underline font-medium break-all hover:text-[#4B5320] transition-colors"
+                      className="text-[#5A81FA] underline font-medium break-all hover:text-[#426EE8] transition-colors"
                     >
                       View on Google Maps →
                     </a>
@@ -276,7 +276,7 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
                 </div>
                 <div>
                   <span className="text-[#696E82] block text-[10px]">Budget</span>
-                  <span className="font-semibold text-[#4B5320]">
+                  <span className="font-semibold text-[#5A81FA]">
                     {project.budget ? `${project.currency || "INR"} ${Number(project.budget).toLocaleString("en-IN")}` : "Not Disclosed / Open"}
                   </span>
                 </div>

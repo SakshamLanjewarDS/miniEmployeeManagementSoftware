@@ -1,8 +1,9 @@
-import React from "react";
+import React, { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { getCurrentTenantContext } from "@/server/auth/session";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { AppTopbar } from "@/components/layout/AppTopbar";
+import { NavigationProgressBar } from "@/components/layout/NavigationProgressBar";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -19,6 +20,11 @@ export default async function AppLayout({ children, params }: AppLayoutProps) {
 
   return (
     <div className="min-h-screen bg-[#F8F9FD] flex">
+      {/* Top Instant Navigation Progress Bar */}
+      <Suspense fallback={null}>
+        <NavigationProgressBar />
+      </Suspense>
+
       {/* Sidebar */}
       <AppSidebar context={ctx} />
 

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { TenantContext } from "@/server/tenancy/context";
@@ -39,12 +39,14 @@ import {
   RotateCcw,
   CheckSquare,
   Square,
+  ArrowUpDown,
 } from "lucide-react";
 import { CsvImportExportModal } from "@/components/csv/CsvImportExportModal";
 import { CustomFieldDefinition } from "@/server/modules/custom-fields/repository";
 import { CustomFieldsManagerModal } from "@/components/custom-fields/CustomFieldsManagerModal";
 import { DynamicFormFields } from "@/components/custom-fields/DynamicFormFields";
 import { DynamicCardFields } from "@/components/custom-fields/DynamicCardFields";
+import { SearchableSelect } from "@/components/ui/SearchableSelect";
 
 interface ProjectItem {
   id: string;
@@ -116,12 +118,14 @@ const PROJECT_TYPOLOGIES = [
   "Residential Architecture",
   "Luxury Villa & Penthouse",
   "Commercial & Corporate Office",
+  "Healthcare & Hospital",
   "Hospitality & Boutique Resort",
   "Interior Architecture & Fitout",
   "High-Rise Residential",
   "Retail & Showroom",
   "Landscape & Urban Design",
   "Institutional & Cultural",
+  "Industrial & Warehousing",
 ];
 
 const ARCHITECTURAL_PHASES = [
@@ -190,6 +194,7 @@ export function ProjectsClientView({
   const [contractorFilter, setContractorFilter] = useState<string>("ALL");
   const [consultantFilter, setConsultantFilter] = useState<string>("ALL");
   const [clientFilter, setClientFilter] = useState<string>("ALL");
+  const [projectSortBy, setProjectSortBy] = useState<string>("CREATED_DESC");
 
   // Selection & Bulk Delete states
   const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
@@ -209,28 +214,45 @@ export function ProjectsClientView({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  // Distinct cities from initialProjects
-  const availableCities = Array.from(
-    new Set(
-      initialProjects
-        .map((p) => p.siteCity?.trim())
-        .filter((c): c is string => Boolean(c && c.length > 0))
-    )
-  ).sort();
+  // Distinct cities from initialProjects (memoized)
+  const availableCities = useMemo(() => {
+    return Array.from(
+      new Set(
+        initialProjects
+          .map((p) => p.siteCity?.trim())
+          .filter((c): c is string => Boolean(c && c.length > 0))
+      )
+    ).sort();
+  }, [initialProjects]);
 
-  // Active filters count
-  const activeFiltersCount = [
-    statusFilter !== "ALL",
-    phaseFilter !== "ALL",
-    typologyFilter !== "ALL",
-    architectFilter !== "ALL",
-    managerFilter !== "ALL",
-    coordinatorFilter !== "ALL",
-    cityFilter !== "ALL",
-    contractorFilter !== "ALL",
-    consultantFilter !== "ALL",
-    clientFilter !== "ALL",
-  ].filter(Boolean).length;
+  // Active filters count (memoized)
+  const activeFiltersCount = useMemo(() => {
+    return [
+      statusFilter !== "ALL",
+      phaseFilter !== "ALL",
+      typologyFilter !== "ALL",
+      architectFilter !== "ALL",
+      managerFilter !== "ALL",
+      coordinatorFilter !== "ALL",
+      cityFilter !== "ALL",
+      contractorFilter !== "ALL",
+      consultantFilter !== "ALL",
+      clientFilter !== "ALL",
+      projectSortBy !== "CREATED_DESC",
+    ].filter(Boolean).length;
+  }, [
+    statusFilter,
+    phaseFilter,
+    typologyFilter,
+    architectFilter,
+    managerFilter,
+    coordinatorFilter,
+    cityFilter,
+    contractorFilter,
+    consultantFilter,
+    clientFilter,
+    projectSortBy,
+  ]);
 
   const handleResetFilters = () => {
     setSearchQuery("");
@@ -244,6 +266,7 @@ export function ProjectsClientView({
     setContractorFilter("ALL");
     setConsultantFilter("ALL");
     setClientFilter("ALL");
+    setProjectSortBy("CREATED_DESC");
   };
 
   // Create Project Form State (Supports all 18 fields + Dynamic Custom Fields)
@@ -296,48 +319,93 @@ export function ProjectsClientView({
     customValues: {} as Record<string, any>,
   });
 
-  // Filter projects with advanced multi-facet filtering
-  const filteredProjects = initialProjects.filter((p) => {
-    const q = searchQuery.toLowerCase().trim();
-    const matchesSearch =
-      !q ||
-      p.name.toLowerCase().includes(q) ||
-      p.code.toLowerCase().includes(q) ||
-      (p.siteCity || "").toLowerCase().includes(q) ||
-      (p.siteAddress || "").toLowerCase().includes(q) ||
-      (p.projectCoordinator?.user?.fullName || "").toLowerCase().includes(q) ||
-      (p.projectManager?.user?.fullName || "").toLowerCase().includes(q) ||
-      (p.projectArchitect?.user?.fullName || "").toLowerCase().includes(q) ||
-      (p.primaryClient?.name || "").toLowerCase().includes(q) ||
-      (p.contractor?.firmName || p.contractor?.name || "").toLowerCase().includes(q) ||
-      (p.consultant?.firmName || p.consultant?.name || "").toLowerCase().includes(q) ||
-      (p.description || "").toLowerCase().includes(q);
+  // Filter projects with advanced multi-facet filtering (memoized for instantaneous UI response)
+  const filteredProjects = useMemo(() => {
+    return initialProjects.filter((p) => {
+      const q = searchQuery.toLowerCase().trim();
+      const matchesSearch =
+        !q ||
+        p.name.toLowerCase().includes(q) ||
+        p.code.toLowerCase().includes(q) ||
+        (p.siteCity || "").toLowerCase().includes(q) ||
+        (p.siteAddress || "").toLowerCase().includes(q) ||
+        (p.projectCoordinator?.user?.fullName || "").toLowerCase().includes(q) ||
+        (p.projectManager?.user?.fullName || "").toLowerCase().includes(q) ||
+        (p.projectArchitect?.user?.fullName || "").toLowerCase().includes(q) ||
+        (p.primaryClient?.name || "").toLowerCase().includes(q) ||
+        (p.contractor?.firmName || p.contractor?.name || "").toLowerCase().includes(q) ||
+        (p.consultant?.firmName || p.consultant?.name || "").toLowerCase().includes(q) ||
+        (p.description || "").toLowerCase().includes(q);
 
-    const matchesStatus = statusFilter === "ALL" || p.status === statusFilter;
-    const matchesPhase = phaseFilter === "ALL" || p.currentPhase === phaseFilter;
-    const matchesTypology = typologyFilter === "ALL" || p.projectType === typologyFilter;
-    const matchesArchitect = architectFilter === "ALL" || p.projectArchitectId === architectFilter;
-    const matchesManager = managerFilter === "ALL" || p.projectManagerId === managerFilter;
-    const matchesCoordinator = coordinatorFilter === "ALL" || p.projectCoordinatorId === coordinatorFilter;
-    const matchesCity = cityFilter === "ALL" || (p.siteCity || "").toLowerCase() === cityFilter.toLowerCase();
-    const matchesContractor = contractorFilter === "ALL" || p.contractorId === contractorFilter;
-    const matchesConsultant = consultantFilter === "ALL" || p.consultantId === consultantFilter;
-    const matchesClient = clientFilter === "ALL" || p.primaryClientId === clientFilter;
+      const matchesStatus = statusFilter === "ALL" || p.status === statusFilter;
+      const matchesPhase = phaseFilter === "ALL" || p.currentPhase === phaseFilter;
+      const matchesTypology = typologyFilter === "ALL" || p.projectType === typologyFilter;
+      const matchesArchitect = architectFilter === "ALL" || p.projectArchitectId === architectFilter;
+      const matchesManager = managerFilter === "ALL" || p.projectManagerId === managerFilter;
+      const matchesCoordinator = coordinatorFilter === "ALL" || p.projectCoordinatorId === coordinatorFilter;
+      const matchesCity = cityFilter === "ALL" || (p.siteCity || "").toLowerCase() === cityFilter.toLowerCase();
+      const matchesContractor = contractorFilter === "ALL" || p.contractorId === contractorFilter;
+      const matchesConsultant = consultantFilter === "ALL" || p.consultantId === consultantFilter;
+      const matchesClient = clientFilter === "ALL" || p.primaryClientId === clientFilter;
 
-    return (
-      matchesSearch &&
-      matchesStatus &&
-      matchesPhase &&
-      matchesTypology &&
-      matchesArchitect &&
-      matchesManager &&
-      matchesCoordinator &&
-      matchesCity &&
-      matchesContractor &&
-      matchesConsultant &&
-      matchesClient
-    );
-  });
+      return (
+        matchesSearch &&
+        matchesStatus &&
+        matchesPhase &&
+        matchesTypology &&
+        matchesArchitect &&
+        matchesManager &&
+        matchesCoordinator &&
+        matchesCity &&
+        matchesContractor &&
+        matchesConsultant &&
+        matchesClient
+      );
+    }).sort((a, b) => {
+      switch (projectSortBy) {
+        case "CREATED_DESC":
+          return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+        case "CREATED_ASC":
+          return new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime();
+        case "TARGET_DATE_ASC": {
+          if (!a.targetDate && !b.targetDate) return 0;
+          if (!a.targetDate) return 1;
+          if (!b.targetDate) return -1;
+          return new Date(a.targetDate).getTime() - new Date(b.targetDate).getTime();
+        }
+        case "TARGET_DATE_DESC": {
+          if (!a.targetDate && !b.targetDate) return 0;
+          if (!a.targetDate) return 1;
+          if (!b.targetDate) return -1;
+          return new Date(b.targetDate).getTime() - new Date(a.targetDate).getTime();
+        }
+        case "ALPHA_NAME_ASC":
+          return a.name.localeCompare(b.name);
+        case "ALPHA_NAME_DESC":
+          return b.name.localeCompare(a.name);
+        case "ALPHA_CODE_ASC":
+          return a.code.localeCompare(b.code);
+        case "ALPHA_CODE_DESC":
+          return b.code.localeCompare(a.code);
+        default:
+          return 0;
+      }
+    });
+  }, [
+    initialProjects,
+    searchQuery,
+    statusFilter,
+    phaseFilter,
+    typologyFilter,
+    architectFilter,
+    managerFilter,
+    coordinatorFilter,
+    cityFilter,
+    contractorFilter,
+    consultantFilter,
+    clientFilter,
+    projectSortBy,
+  ]);
 
   const handleToggleSelect = (id: string) => {
     setSelectedProjectIds((prev) =>
@@ -670,7 +738,7 @@ export function ProjectsClientView({
     switch (status) {
       case "ACTIVE":
         return (
-          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#4B5320]/15 text-[#4B5320] border border-[#4B5320]/30">
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#F2F4FF] text-[#5A81FA] border border-[#CEDEFF]">
             Active Commission
           </span>
         );
@@ -757,14 +825,14 @@ export function ProjectsClientView({
       {/* Page Header */}
       <div className="border-b border-[#E2E6F0] pb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 text-xs font-bold text-[#4B5320] uppercase tracking-wider">
+          <div className="flex items-center gap-2 text-xs font-bold text-[#5A81FA] uppercase tracking-wider">
             <span>Architectural Portfolio</span>
             <span>•</span>
             <span>Commissions & Sites</span>
             <span>•</span>
             {canManage ? (
-              <span className="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded bg-[#4B5320]/10 text-[#4B5320] font-semibold border border-[#4B5320]/20">
-                <ShieldCheck className="w-3 h-3 text-[#D4AF37]" />
+              <span className="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded bg-[#F2F4FF] text-[#5A81FA] font-semibold border border-[#CEDEFF]">
+                <ShieldCheck className="w-3 h-3 text-[#5A81FA]" />
                 {context.role === "OWNER" ? "Owner Authority" : "Admin Authority"}
               </span>
             ) : (
@@ -792,7 +860,7 @@ export function ProjectsClientView({
               className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-white hover:bg-[#F8F9FD] border border-[#E2E6F0] text-[#1F1F1F] text-xs font-semibold shadow-2xs hover:shadow-xs transition-all cursor-pointer shrink-0"
               title="Add or remove form fields without writing code"
             >
-              <SlidersHorizontal className="w-4 h-4 text-[#4865F6]" />
+              <SlidersHorizontal className="w-4 h-4 text-[#5A81FA]" />
               <span>Form Fields</span>
             </button>
 
@@ -814,9 +882,9 @@ export function ProjectsClientView({
                 setErrorMessage(null);
                 setIsCreateModalOpen(true);
               }}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#4B5320] hover:bg-[#3d441a] text-white text-xs font-bold shadow-md hover:shadow-lg transition-all cursor-pointer shrink-0"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#5A81FA] hover:bg-[#426EE8] text-white text-xs font-bold shadow-md hover:shadow-lg transition-all cursor-pointer shrink-0"
             >
-              <Plus className="w-4 h-4 text-[#D4AF37]" />
+              <Plus className="w-4 h-4 text-white" />
               <span>Create New Project</span>
             </button>
           </div>
@@ -841,7 +909,7 @@ export function ProjectsClientView({
               placeholder="Search by project name, code (e.g. PRJ-001), client, or site..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:outline-none focus:border-[#4B5320] focus:ring-1 focus:ring-[#4B5320] transition-colors"
+              className="w-full pl-9 pr-4 py-2 text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:outline-none focus:border-[#5A81FA] focus:ring-1 focus:ring-[#5A81FA] transition-colors"
             />
           </div>
 
@@ -852,7 +920,7 @@ export function ProjectsClientView({
               suppressHydrationWarning
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl px-3 py-2 text-[#1F1F1F] focus:outline-none focus:border-[#4B5320]"
+              className="text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl px-3 py-2 text-[#1F1F1F] focus:outline-none focus:border-[#5A81FA]"
             >
               <option value="ALL">All Statuses ({initialProjects.length})</option>
               <option value="ACTIVE">Active</option>
@@ -869,7 +937,7 @@ export function ProjectsClientView({
               suppressHydrationWarning
               value={phaseFilter}
               onChange={(e) => setPhaseFilter(e.target.value)}
-              className="text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl px-3 py-2 text-[#1F1F1F] focus:outline-none focus:border-[#4B5320]"
+              className="text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl px-3 py-2 text-[#1F1F1F] focus:outline-none focus:border-[#5A81FA]"
             >
               <option value="ALL">All Phases</option>
               {ARCHITECTURAL_PHASES.map((ph) => (
@@ -880,6 +948,27 @@ export function ProjectsClientView({
             </select>
           </div>
 
+          {/* Sort By Filter (Date, Day & Alphabetical Order) */}
+          <div className="flex items-center gap-1.5 shrink-0 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl px-2.5 py-1.5">
+            <ArrowUpDown className="w-3.5 h-3.5 text-[#5A81FA] shrink-0" />
+            <select
+              suppressHydrationWarning
+              value={projectSortBy}
+              onChange={(e) => setProjectSortBy(e.target.value)}
+              className="text-xs bg-transparent text-[#1F1F1F] font-semibold focus:outline-none cursor-pointer"
+              title="Sort projects by date day or alphabetical order"
+            >
+              <option value="CREATED_DESC">Sort: Date (Newest First)</option>
+              <option value="CREATED_ASC">Sort: Date (Oldest First)</option>
+              <option value="TARGET_DATE_ASC">Sort: Target Date (Earliest Day)</option>
+              <option value="TARGET_DATE_DESC">Sort: Target Date (Latest Day)</option>
+              <option value="ALPHA_NAME_ASC">Sort: Name (A → Z)</option>
+              <option value="ALPHA_NAME_DESC">Sort: Name (Z → A)</option>
+              <option value="ALPHA_CODE_ASC">Sort: Code (A → Z)</option>
+              <option value="ALPHA_CODE_DESC">Sort: Code (Z → A)</option>
+            </select>
+          </div>
+
           {/* Advanced Filters Toggle Button */}
           <button
             type="button"
@@ -887,14 +976,14 @@ export function ProjectsClientView({
             onClick={() => setIsAdvancedFilterOpen(!isAdvancedFilterOpen)}
             className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer shrink-0 ${
               isAdvancedFilterOpen || activeFiltersCount > 0
-                ? "bg-[#4B5320] text-white border-[#4B5320] shadow-2xs"
+                ? "bg-[#5A81FA] text-white border-[#5A81FA] shadow-2xs"
                 : "bg-[#F8F9FD] text-[#1F1F1F] border-[#E2E6F0] hover:bg-white"
             }`}
           >
             <SlidersHorizontal className="w-3.5 h-3.5" />
             <span>Filters</span>
             {activeFiltersCount > 0 && (
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-[#D4AF37] text-[#1F1F1F]">
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-[#CEDEFF] text-[#2C308D]">
                 {activeFiltersCount}
               </span>
             )}
@@ -923,7 +1012,7 @@ export function ProjectsClientView({
         {/* Collapsible Advanced Filter Panel */}
         {isAdvancedFilterOpen && (
           <div className="pt-3 border-t border-[#E2E6F0] animate-in fade-in duration-150">
-            <div className="text-[11px] font-bold text-[#4B5320] uppercase tracking-wider mb-2.5 flex items-center justify-between">
+            <div className="text-[11px] font-bold text-[#5A81FA] uppercase tracking-wider mb-2.5 flex items-center justify-between">
               <span>Multi-Facet Studio Filters</span>
               <button
                 type="button"
@@ -942,7 +1031,7 @@ export function ProjectsClientView({
                 <select
                   value={typologyFilter}
                   onChange={(e) => setTypologyFilter(e.target.value)}
-                  className="w-full bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl px-2.5 py-1.5 text-xs text-[#1F1F1F] focus:outline-none focus:border-[#4B5320]"
+                  className="w-full bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl px-2.5 py-1.5 text-xs text-[#1F1F1F] focus:outline-none focus:border-[#5A81FA]"
                 >
                   <option value="ALL">All Typologies</option>
                   {PROJECT_TYPOLOGIES.map((t) => (
@@ -961,7 +1050,7 @@ export function ProjectsClientView({
                 <select
                   value={architectFilter}
                   onChange={(e) => setArchitectFilter(e.target.value)}
-                  className="w-full bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl px-2.5 py-1.5 text-xs text-[#1F1F1F] focus:outline-none focus:border-[#4B5320]"
+                  className="w-full bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl px-2.5 py-1.5 text-xs text-[#1F1F1F] focus:outline-none focus:border-[#5A81FA]"
                 >
                   <option value="ALL">All Architects</option>
                   {members.map((m) => (
@@ -980,7 +1069,7 @@ export function ProjectsClientView({
                 <select
                   value={managerFilter}
                   onChange={(e) => setManagerFilter(e.target.value)}
-                  className="w-full bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl px-2.5 py-1.5 text-xs text-[#1F1F1F] focus:outline-none focus:border-[#4B5320]"
+                  className="w-full bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl px-2.5 py-1.5 text-xs text-[#1F1F1F] focus:outline-none focus:border-[#5A81FA]"
                 >
                   <option value="ALL">All Managers</option>
                   {members.map((m) => (
@@ -999,7 +1088,7 @@ export function ProjectsClientView({
                 <select
                   value={coordinatorFilter}
                   onChange={(e) => setCoordinatorFilter(e.target.value)}
-                  className="w-full bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl px-2.5 py-1.5 text-xs text-[#1F1F1F] focus:outline-none focus:border-[#4B5320]"
+                  className="w-full bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl px-2.5 py-1.5 text-xs text-[#1F1F1F] focus:outline-none focus:border-[#5A81FA]"
                 >
                   <option value="ALL">All Coordinators</option>
                   {members.map((m) => (
@@ -1018,7 +1107,7 @@ export function ProjectsClientView({
                 <select
                   value={cityFilter}
                   onChange={(e) => setCityFilter(e.target.value)}
-                  className="w-full bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl px-2.5 py-1.5 text-xs text-[#1F1F1F] focus:outline-none focus:border-[#4B5320]"
+                  className="w-full bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl px-2.5 py-1.5 text-xs text-[#1F1F1F] focus:outline-none focus:border-[#5A81FA]"
                 >
                   <option value="ALL">All Cities</option>
                   {availableCities.map((city) => (
@@ -1037,7 +1126,7 @@ export function ProjectsClientView({
                 <select
                   value={contractorFilter}
                   onChange={(e) => setContractorFilter(e.target.value)}
-                  className="w-full bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl px-2.5 py-1.5 text-xs text-[#1F1F1F] focus:outline-none focus:border-[#4B5320]"
+                  className="w-full bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl px-2.5 py-1.5 text-xs text-[#1F1F1F] focus:outline-none focus:border-[#5A81FA]"
                 >
                   <option value="ALL">All Contractors</option>
                   {contractors.map((c) => (
@@ -1056,7 +1145,7 @@ export function ProjectsClientView({
                 <select
                   value={consultantFilter}
                   onChange={(e) => setConsultantFilter(e.target.value)}
-                  className="w-full bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl px-2.5 py-1.5 text-xs text-[#1F1F1F] focus:outline-none focus:border-[#4B5320]"
+                  className="w-full bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl px-2.5 py-1.5 text-xs text-[#1F1F1F] focus:outline-none focus:border-[#5A81FA]"
                 >
                   <option value="ALL">All Consultants</option>
                   {consultants.map((c) => (
@@ -1075,7 +1164,7 @@ export function ProjectsClientView({
                 <select
                   value={clientFilter}
                   onChange={(e) => setClientFilter(e.target.value)}
-                  className="w-full bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl px-2.5 py-1.5 text-xs text-[#1F1F1F] focus:outline-none focus:border-[#4B5320]"
+                  className="w-full bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl px-2.5 py-1.5 text-xs text-[#1F1F1F] focus:outline-none focus:border-[#5A81FA]"
                 >
                   <option value="ALL">All Clients</option>
                   {clients.map((cl) => (
@@ -1094,7 +1183,7 @@ export function ProjectsClientView({
           <div className="pt-2 border-t border-[#E2E6F0]/60 flex flex-wrap items-center gap-1.5 text-xs">
             <span className="text-[10px] uppercase font-bold text-[#696E82] mr-1">Active:</span>
             {statusFilter !== "ALL" && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#4B5320]/10 text-[#4B5320] border border-[#4B5320]/20 text-[11px] font-medium">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#F2F4FF] text-[#5A81FA] border border-[#CEDEFF] text-[11px] font-medium">
                 Status: {statusFilter}
                 <button onClick={() => setStatusFilter("ALL")} className="hover:text-rose-600 cursor-pointer">
                   <X className="w-3 h-3" />
@@ -1102,7 +1191,7 @@ export function ProjectsClientView({
               </span>
             )}
             {phaseFilter !== "ALL" && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#4B5320]/10 text-[#4B5320] border border-[#4B5320]/20 text-[11px] font-medium">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#F2F4FF] text-[#5A81FA] border border-[#CEDEFF] text-[11px] font-medium">
                 Phase: {phaseFilter}
                 <button onClick={() => setPhaseFilter("ALL")} className="hover:text-rose-600 cursor-pointer">
                   <X className="w-3 h-3" />
@@ -1110,7 +1199,7 @@ export function ProjectsClientView({
               </span>
             )}
             {typologyFilter !== "ALL" && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#4B5320]/10 text-[#4B5320] border border-[#4B5320]/20 text-[11px] font-medium">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#F2F4FF] text-[#5A81FA] border border-[#CEDEFF] text-[11px] font-medium">
                 Typology: {typologyFilter}
                 <button onClick={() => setTypologyFilter("ALL")} className="hover:text-rose-600 cursor-pointer">
                   <X className="w-3 h-3" />
@@ -1118,7 +1207,7 @@ export function ProjectsClientView({
               </span>
             )}
             {cityFilter !== "ALL" && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#4B5320]/10 text-[#4B5320] border border-[#4B5320]/20 text-[11px] font-medium">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#F2F4FF] text-[#5A81FA] border border-[#CEDEFF] text-[11px] font-medium">
                 City: {cityFilter}
                 <button onClick={() => setCityFilter("ALL")} className="hover:text-rose-600 cursor-pointer">
                   <X className="w-3 h-3" />
@@ -1126,7 +1215,7 @@ export function ProjectsClientView({
               </span>
             )}
             {architectFilter !== "ALL" && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#4B5320]/10 text-[#4B5320] border border-[#4B5320]/20 text-[11px] font-medium">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#F2F4FF] text-[#5A81FA] border border-[#CEDEFF] text-[11px] font-medium">
                 Architect: {members.find((m) => m.id === architectFilter)?.user.fullName || "Selected"}
                 <button onClick={() => setArchitectFilter("ALL")} className="hover:text-rose-600 cursor-pointer">
                   <X className="w-3 h-3" />
@@ -1134,7 +1223,7 @@ export function ProjectsClientView({
               </span>
             )}
             {managerFilter !== "ALL" && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#4B5320]/10 text-[#4B5320] border border-[#4B5320]/20 text-[11px] font-medium">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#F2F4FF] text-[#5A81FA] border border-[#CEDEFF] text-[11px] font-medium">
                 Manager: {members.find((m) => m.id === managerFilter)?.user.fullName || "Selected"}
                 <button onClick={() => setManagerFilter("ALL")} className="hover:text-rose-600 cursor-pointer">
                   <X className="w-3 h-3" />
@@ -1142,7 +1231,7 @@ export function ProjectsClientView({
               </span>
             )}
             {coordinatorFilter !== "ALL" && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#4B5320]/10 text-[#4B5320] border border-[#4B5320]/20 text-[11px] font-medium">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#F2F4FF] text-[#5A81FA] border border-[#CEDEFF] text-[11px] font-medium">
                 Coordinator: {members.find((m) => m.id === coordinatorFilter)?.user.fullName || "Selected"}
                 <button onClick={() => setCoordinatorFilter("ALL")} className="hover:text-rose-600 cursor-pointer">
                   <X className="w-3 h-3" />
@@ -1150,7 +1239,7 @@ export function ProjectsClientView({
               </span>
             )}
             {contractorFilter !== "ALL" && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#4B5320]/10 text-[#4B5320] border border-[#4B5320]/20 text-[11px] font-medium">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#F2F4FF] text-[#5A81FA] border border-[#CEDEFF] text-[11px] font-medium">
                 Contractor: {contractors.find((c) => c.id === contractorFilter)?.firmName || contractors.find((c) => c.id === contractorFilter)?.name || "Selected"}
                 <button onClick={() => setContractorFilter("ALL")} className="hover:text-rose-600 cursor-pointer">
                   <X className="w-3 h-3" />
@@ -1158,7 +1247,7 @@ export function ProjectsClientView({
               </span>
             )}
             {consultantFilter !== "ALL" && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#4B5320]/10 text-[#4B5320] border border-[#4B5320]/20 text-[11px] font-medium">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#F2F4FF] text-[#5A81FA] border border-[#CEDEFF] text-[11px] font-medium">
                 Consultant: {consultants.find((c) => c.id === consultantFilter)?.firmName || consultants.find((c) => c.id === consultantFilter)?.name || "Selected"}
                 <button onClick={() => setConsultantFilter("ALL")} className="hover:text-rose-600 cursor-pointer">
                   <X className="w-3 h-3" />
@@ -1166,7 +1255,7 @@ export function ProjectsClientView({
               </span>
             )}
             {clientFilter !== "ALL" && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#4B5320]/10 text-[#4B5320] border border-[#4B5320]/20 text-[11px] font-medium">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#F2F4FF] text-[#5A81FA] border border-[#CEDEFF] text-[11px] font-medium">
                 Client: {clients.find((cl) => cl.id === clientFilter)?.name || "Selected"}
                 <button onClick={() => setClientFilter("ALL")} className="hover:text-rose-600 cursor-pointer">
                   <X className="w-3 h-3" />
@@ -1191,10 +1280,10 @@ export function ProjectsClientView({
               type="button"
               suppressHydrationWarning
               onClick={handleToggleSelectAll}
-              className="inline-flex items-center gap-2 text-xs font-semibold text-[#1F1F1F] hover:text-[#4B5320] cursor-pointer"
+              className="inline-flex items-center gap-2 text-xs font-semibold text-[#1F1F1F] hover:text-[#5A81FA] cursor-pointer"
             >
               {isAllSelected ? (
-                <CheckSquare className="w-4 h-4 text-[#4B5320]" />
+                <CheckSquare className="w-4 h-4 text-[#5A81FA]" />
               ) : (
                 <Square className="w-4 h-4 text-[#696E82]" />
               )}
@@ -1204,7 +1293,7 @@ export function ProjectsClientView({
               Showing <span className="font-bold text-[#1F1F1F]">{filteredProjects.length}</span>{" "}
               {filteredProjects.length === 1 ? "project" : "projects"}
               {selectedProjectIds.length > 0 && (
-                <span className="ml-1 text-[#4B5320] font-bold">
+                <span className="ml-1 text-[#5A81FA] font-bold">
                   ({selectedProjectIds.length} selected)
                 </span>
               )}
@@ -1246,9 +1335,9 @@ export function ProjectsClientView({
           {canManage && (
             <button
               onClick={() => setIsCreateModalOpen(true)}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#4B5320] text-white text-xs font-bold shadow-xs hover:bg-[#3d441a] transition-all cursor-pointer mt-2"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#5A81FA] text-white text-xs font-bold shadow-xs hover:bg-[#426EE8] transition-all cursor-pointer mt-2"
             >
-              <Plus className="w-4 h-4 text-[#D4AF37]" />
+              <Plus className="w-4 h-4 text-white" />
               <span>Create First Project</span>
             </button>
           )}
@@ -1262,8 +1351,8 @@ export function ProjectsClientView({
                 key={p.id}
                 className={`bg-white border rounded-2xl p-6 shadow-2xs hover:shadow-md transition-all flex flex-col justify-between space-y-4 group relative ${
                   isSelected
-                    ? "border-[#4B5320] ring-2 ring-[#4B5320]/25 bg-[#4B5320]/[0.02]"
-                    : "border-[#E2E6F0] hover:border-[#4B5320]/50"
+                    ? "border-[#5A81FA] ring-2 ring-[#5A81FA]/25 bg-[#F2F4FF]/30"
+                    : "border-[#E2E6F0] hover:border-[#5A81FA]/50"
                 }`}
               >
                 <div className="space-y-4">
@@ -1277,24 +1366,24 @@ export function ProjectsClientView({
                           e.stopPropagation();
                           handleToggleSelect(p.id);
                         }}
-                        className="text-[#4B5320] hover:text-[#3d441a] transition-colors cursor-pointer p-0.5"
+                        className="text-[#5A81FA] hover:text-[#426EE8] transition-colors cursor-pointer p-0.5"
                         title={isSelected ? "Deselect project" : "Select project"}
                       >
                         {isSelected ? (
-                          <CheckSquare className="w-4 h-4 text-[#4B5320]" />
+                          <CheckSquare className="w-4 h-4 text-[#5A81FA]" />
                         ) : (
-                          <Square className="w-4 h-4 text-[#A8B1CE] hover:text-[#4B5320]" />
+                          <Square className="w-4 h-4 text-[#A8B1CE] hover:text-[#5A81FA]" />
                         )}
                       </button>
 
                       {/* 1. Project Code */}
-                      <span className="font-mono text-xs font-bold text-[#4B5320] bg-[#4B5320]/10 px-2.5 py-1 rounded-md border border-[#4B5320]/20">
+                      <span className="font-mono text-xs font-bold text-[#2C308D] bg-[#F2F4FF] px-2.5 py-1 rounded-md border border-[#CEDEFF]">
                         {p.code}
                       </span>
 
                       {/* 4. Typology Badge */}
                       <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#696E82] bg-gray-100 px-2 py-0.5 rounded-full border border-gray-200">
-                        <Building2 className="w-3 h-3 text-[#4B5320]" />
+                        <Building2 className="w-3 h-3 text-[#5A81FA]" />
                         <span>{p.projectType || "Architecture"}</span>
                       </span>
 
@@ -1307,16 +1396,16 @@ export function ProjectsClientView({
                         <button
                           type="button"
                           onClick={() => handleOpenProgressModal(p)}
-                          className="px-2 py-1 rounded-lg border border-[#4B5320]/30 bg-[#4B5320]/10 text-[#4B5320] hover:bg-[#4B5320] hover:text-white transition-all text-[11px] font-bold flex items-center gap-1 cursor-pointer shadow-2xs"
+                          className="px-2 py-1 rounded-lg border border-[#CEDEFF] bg-[#F2F4FF] text-[#2C308D] hover:bg-[#5A81FA] hover:text-white transition-all text-[11px] font-bold flex items-center gap-1 cursor-pointer shadow-2xs"
                           title="Manipulate Project Progress & Phases"
                         >
-                          <TrendingUp className="w-3.5 h-3.5 text-[#D4AF37]" />
+                          <TrendingUp className="w-3.5 h-3.5 text-[#5A81FA] group-hover:text-white" />
                           <span>Progress</span>
                         </button>
                         <button
                           type="button"
                           onClick={() => handleOpenEdit(p)}
-                          className="p-1.5 rounded-lg border border-[#E2E6F0] bg-white text-[#696E82] hover:text-[#4B5320] hover:border-[#4B5320] hover:bg-[#4B5320]/5 transition-colors cursor-pointer shadow-2xs"
+                          className="p-1.5 rounded-lg border border-[#E2E6F0] bg-white text-[#696E82] hover:text-[#5A81FA] hover:border-[#5A81FA] hover:bg-[#F2F4FF] transition-colors cursor-pointer shadow-2xs"
                           title="Edit Project Details"
                         >
                           <Pencil className="w-3.5 h-3.5" />
@@ -1335,13 +1424,13 @@ export function ProjectsClientView({
 
                   {/* 2. Project Name */}
                   <div>
-                    <h3 className="text-lg font-bold text-[#1F1F1F] tracking-tight group-hover:text-[#4B5320] transition-colors">
+                    <h3 className="text-lg font-bold text-[#1F1F1F] tracking-tight group-hover:text-[#5A81FA] transition-colors">
                       {p.name}
                     </h3>
                     {/* 18. Brief / Project Brief */}
                     {p.description ? (
                       <div className="mt-1.5 p-2 rounded-xl bg-[#F8F9FD] border border-[#E2E6F0]/80 text-xs text-[#696E82] flex items-start gap-1.5">
-                        <FileText className="w-3.5 h-3.5 text-[#4B5320] shrink-0 mt-0.5" />
+                        <FileText className="w-3.5 h-3.5 text-[#5A81FA] shrink-0 mt-0.5" />
                         <p className="line-clamp-2">{p.description}</p>
                       </div>
                     ) : (
@@ -1355,11 +1444,11 @@ export function ProjectsClientView({
                   <div className="pt-1">
                     <div className="flex justify-between items-center text-xs mb-1">
                       <span className="text-[#696E82] font-medium flex items-center gap-1">
-                        <Layers className="w-3.5 h-3.5 text-[#4B5320]" />
+                        <Layers className="w-3.5 h-3.5 text-[#5A81FA]" />
                         <span>Phase Progress</span>
                         <span className="font-semibold text-[#1F1F1F]">({p.currentPhase || "Brief"})</span>
                       </span>
-                      <span className="font-bold text-[#4B5320]">
+                      <span className="font-bold text-[#5A81FA]">
                         {p.phaseProgress?.percentage ??
                           Math.round(
                             ((ARCHITECTURAL_PHASES.indexOf(p.currentPhase || "Brief") + 1) /
@@ -1371,7 +1460,7 @@ export function ProjectsClientView({
                     </div>
                     <div className="w-full bg-[#F2F4FF] h-2 rounded-full overflow-hidden">
                       <div
-                        className="bg-[#4B5320] h-full rounded-full transition-all duration-500"
+                        className="bg-[#5A81FA] h-full rounded-full transition-all duration-500"
                         style={{
                           width: `${
                             p.phaseProgress?.percentage ??
@@ -1393,7 +1482,7 @@ export function ProjectsClientView({
                         <button
                           type="button"
                           onClick={() => handleOpenProgressModal(p)}
-                          className="text-[10px] font-bold text-[#4B5320] hover:underline cursor-pointer"
+                          className="text-[10px] font-bold text-[#5A81FA] hover:underline cursor-pointer"
                         >
                           Adjust Phase →
                         </button>
@@ -1428,7 +1517,7 @@ export function ProjectsClientView({
 
                   {/* Team & Leadership Grid (Client, Architect, Manager, Coordinator, Contractor, Consultant) */}
                   <div className="pt-3 border-t border-[#E2E6F0] space-y-2">
-                    <span className="text-[10px] font-bold text-[#4B5320] uppercase tracking-wider block">
+                    <span className="text-[10px] font-bold text-[#5A81FA] uppercase tracking-wider block">
                       Team & Stakeholders
                     </span>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs">
@@ -1496,14 +1585,14 @@ export function ProjectsClientView({
 
                   {/* Site, Spatial & Financial Grid (10, 11, 12, 15, 16, 17) */}
                   <div className="pt-3 border-t border-[#E2E6F0] space-y-2">
-                    <span className="text-[10px] font-bold text-[#4B5320] uppercase tracking-wider block">
+                    <span className="text-[10px] font-bold text-[#5A81FA] uppercase tracking-wider block">
                       Site & Specifications
                     </span>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs">
                       {/* 10 & 11. Site Address & City */}
                       <div className="sm:col-span-2">
                         <span className="text-[#696E82] block text-[10px] uppercase font-semibold flex items-center gap-0.5">
-                          <MapPin className="w-2.5 h-2.5 text-[#4B5320]" />
+                          <MapPin className="w-2.5 h-2.5 text-[#5A81FA]" />
                           <span>Site Address & City</span>
                         </span>
                         <span className="text-[#1F1F1F] font-medium truncate block" title={`${p.siteAddress || ""} ${p.siteCity ? `(${p.siteCity})` : ""}`}>
@@ -1525,10 +1614,10 @@ export function ProjectsClientView({
                             }
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-[#4B5320] hover:text-[#3d441a] font-semibold hover:underline"
+                            className="inline-flex items-center gap-1 text-[#5A81FA] hover:text-[#426EE8] font-semibold hover:underline"
                             title={p.googleMapLocation}
                           >
-                            <ExternalLink className="w-3 h-3 text-[#D4AF37]" />
+                            <ExternalLink className="w-3 h-3 text-[#5A81FA]" />
                             <span className="truncate max-w-[100px]">View Map</span>
                           </a>
                         ) : (
@@ -1551,7 +1640,7 @@ export function ProjectsClientView({
                         <span className="text-[#696E82] block text-[10px] uppercase font-semibold">
                           Total Construction
                         </span>
-                        <span className="font-semibold text-[#4B5320] truncate block">
+                        <span className="font-semibold text-[#5A81FA] truncate block">
                           {p.constructionArea || "—"}
                         </span>
                       </div>
@@ -1579,7 +1668,7 @@ export function ProjectsClientView({
                 <div className="pt-3 border-t border-[#E2E6F0] flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div className="flex items-center gap-3 text-[11px] text-[#696E82]">
                     <span className="flex items-center gap-1" title="Start Date">
-                      <Calendar className="w-3 h-3 text-[#4B5320]" />
+                      <Calendar className="w-3 h-3 text-[#5A81FA]" />
                       <span>Start: {p.startDate ? new Date(p.startDate).toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" }) : "—"}</span>
                     </span>
                     <span>•</span>
@@ -1591,7 +1680,7 @@ export function ProjectsClientView({
 
                   <Link
                     href={`/w/${context.tenantSlug}/projects/${p.id}`}
-                    className="inline-flex items-center gap-1.5 text-xs font-bold text-[#4B5320] hover:text-[#3d441a] hover:underline cursor-pointer ml-auto sm:ml-0"
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-[#5A81FA] hover:text-[#426EE8] hover:underline cursor-pointer ml-auto sm:ml-0"
                   >
                     <span>Open Project Dashboard</span>
                     <ArrowRight className="w-3.5 h-3.5" />
@@ -1607,19 +1696,19 @@ export function ProjectsClientView({
       {/* MODAL 1: CREATE PROJECT (Owner & Admin Only)                   */}
       {/* ============================================================== */}
       {isCreateModalOpen && canManage && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl border border-[#E2E6F0] shadow-2xl max-w-2xl w-full overflow-hidden max-h-[90vh] flex flex-col">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl border border-[#E2E6F0] shadow-2xl max-w-2xl w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
             {/* Modal Header */}
-            <div className="p-5 border-b border-[#E2E6F0] bg-[#F8F9FD] flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-[#4B5320] text-white flex items-center justify-center shadow-xs">
-                  <Plus className="w-5 h-5 text-[#D4AF37]" />
+            <div className="flex justify-between items-center pb-3 border-b border-[#E2E6F0]">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-[#5A81FA] text-white flex items-center justify-center shrink-0 shadow-xs">
+                  <Plus className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-[#1F1F1F]">
+                  <h3 className="text-base font-bold text-[#1F1F1F]">
                     Commission New Architectural Project
                   </h3>
-                  <p className="text-[11px] text-[#696E82]">
+                  <p className="text-xs text-[#696E82]">
                     Sets up project code, typology, manager, coordinator, site, and default 11 design phases
                   </p>
                 </div>
@@ -1627,19 +1716,19 @@ export function ProjectsClientView({
               <button
                 type="button"
                 onClick={() => setIsCreateModalOpen(false)}
-                className="text-[#696E82] hover:text-[#1F1F1F] p-1 rounded-lg hover:bg-black/5 cursor-pointer"
+                className="text-[#696E82] hover:text-[#1F1F1F] p-1 rounded-lg transition-colors cursor-pointer"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
             {/* Modal Form */}
-            <form onSubmit={handleCreateSubmit} className="p-6 overflow-y-auto space-y-4 text-xs">
+            <form onSubmit={handleCreateSubmit} className="space-y-4 text-xs">
               {/* Row 1: Project Code & Project Name */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
-                    Project Code <span className="text-rose-500">*</span>
+                  <label className="text-xs font-semibold text-[#1F1F1F] block mb-1">
+                    Project Code <span className="text-red-600">*</span>
                   </label>
                   <input
                     type="text"
@@ -1647,7 +1736,7 @@ export function ProjectsClientView({
                     placeholder="e.g. HZ-2026, PRJ-101"
                     value={formData.code}
                     onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                    className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none uppercase font-mono font-bold"
+                    className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] text-xs focus:outline-none focus:ring-2 focus:ring-[#5A81FA] uppercase font-mono font-bold"
                   />
                   <span className="text-[10px] text-[#696E82] mt-0.5 block">
                     Unique identifier used across drawings & site visits
@@ -1655,8 +1744,8 @@ export function ProjectsClientView({
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
-                    Project Name <span className="text-rose-500">*</span>
+                  <label className="text-xs font-semibold text-[#1F1F1F] block mb-1">
+                    Project Name <span className="text-red-600">*</span>
                   </label>
                   <input
                     type="text"
@@ -1664,116 +1753,95 @@ export function ProjectsClientView({
                     placeholder="e.g. Horizon Towers Luxury Residence"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none font-semibold"
+                    className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] text-xs focus:outline-none focus:ring-2 focus:ring-[#5A81FA] font-semibold"
                   />
                 </div>
               </div>
 
               {/* Row 2: Client Name & Typology */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
-                    Client Name
-                  </label>
-                  <select
-                    value={formData.primaryClientId}
-                    onChange={(e) => setFormData({ ...formData, primaryClientId: e.target.value })}
-                    className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
-                  >
-                    <option value="">Select Primary Client...</option>
-                    {clients.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name} {c.company ? `(${c.company})` : ""}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <SearchableSelect
+                  id="create-client"
+                  label="Client Name"
+                  placeholder="Select Primary Client..."
+                  searchPlaceholder="Search client..."
+                  options={clients.map((c) => ({
+                    value: c.id,
+                    label: `${c.name}${c.company ? ` (${c.company})` : ""}`,
+                    subLabel: c.company || undefined,
+                  }))}
+                  value={formData.primaryClientId}
+                  onChange={(val) => setFormData({ ...formData, primaryClientId: val })}
+                  allowOther={false}
+                />
 
-                <div>
-                  <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
-                    Typology
-                  </label>
-                  <select
-                    value={formData.projectType}
-                    onChange={(e) => setFormData({ ...formData, projectType: e.target.value })}
-                    className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
-                  >
-                    {PROJECT_TYPOLOGIES.map((typ) => (
-                      <option key={typ} value={typ}>
-                        {typ}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <SearchableSelect
+                  id="create-typology"
+                  label="Typology"
+                  placeholder="Select Typology..."
+                  searchPlaceholder="Search typology..."
+                  options={PROJECT_TYPOLOGIES.map((typ) => ({
+                    value: typ,
+                    label: typ,
+                  }))}
+                  value={formData.projectType}
+                  onChange={(val) => setFormData({ ...formData, projectType: val })}
+                  allowOther={true}
+                />
               </div>
 
               {/* Row 3: Project Architect & Project Manager */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
-                    Project Architect
-                  </label>
-                  <select
-                    value={formData.projectArchitectId}
-                    onChange={(e) =>
-                      setFormData({ ...formData, projectArchitectId: e.target.value })
-                    }
-                    className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
-                  >
-                    <option value="">Select Project Architect...</option>
-                    {members.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.user.fullName} ({m.employee?.designation || "Studio Staff"})
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <SearchableSelect
+                  id="create-architect"
+                  label="Project Architect"
+                  placeholder="Select Project Architect..."
+                  searchPlaceholder="Search architect..."
+                  options={members.map((m) => ({
+                    value: m.id,
+                    label: m.user.fullName,
+                    subLabel: m.employee?.designation || "Studio Staff",
+                  }))}
+                  value={formData.projectArchitectId}
+                  onChange={(val) => setFormData({ ...formData, projectArchitectId: val })}
+                  allowOther={false}
+                />
 
-                <div>
-                  <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
-                    Project Manager
-                  </label>
-                  <select
-                    value={formData.projectManagerId}
-                    onChange={(e) =>
-                      setFormData({ ...formData, projectManagerId: e.target.value })
-                    }
-                    className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
-                  >
-                    <option value="">Select Project Manager...</option>
-                    {members.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.user.fullName} ({m.employee?.designation || "Studio Staff"})
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <SearchableSelect
+                  id="create-manager"
+                  label="Project Manager"
+                  placeholder="Select Project Manager..."
+                  searchPlaceholder="Search project manager..."
+                  options={members.map((m) => ({
+                    value: m.id,
+                    label: m.user.fullName,
+                    subLabel: m.employee?.designation || "Studio Staff",
+                  }))}
+                  value={formData.projectManagerId}
+                  onChange={(val) => setFormData({ ...formData, projectManagerId: val })}
+                  allowOther={false}
+                />
               </div>
 
               {/* Row 4: Project Coordinator & Site City */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
-                    Project Coordinator
-                  </label>
-                  <select
-                    value={formData.projectCoordinatorId}
-                    onChange={(e) =>
-                      setFormData({ ...formData, projectCoordinatorId: e.target.value })
-                    }
-                    className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
-                  >
-                    <option value="">Select Project Coordinator...</option>
-                    {members.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.user.fullName} ({m.employee?.designation || "Studio Staff"})
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <SearchableSelect
+                  id="create-coordinator"
+                  label="Project Coordinator"
+                  placeholder="Select Project Coordinator..."
+                  searchPlaceholder="Search coordinator..."
+                  options={members.map((m) => ({
+                    value: m.id,
+                    label: m.user.fullName,
+                    subLabel: m.employee?.designation || "Studio Staff",
+                  }))}
+                  value={formData.projectCoordinatorId}
+                  onChange={(val) => setFormData({ ...formData, projectCoordinatorId: val })}
+                  allowOther={false}
+                />
 
                 <div>
-                  <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
+                  <label className="text-xs font-semibold text-[#1F1F1F] block mb-1">
                     Site City
                   </label>
                   <input
@@ -1781,53 +1849,47 @@ export function ProjectsClientView({
                     placeholder="e.g. Gurugram, Delhi, Mumbai"
                     value={formData.siteCity}
                     onChange={(e) => setFormData({ ...formData, siteCity: e.target.value })}
-                    className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
+                    className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] text-xs focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
                   />
                 </div>
               </div>
 
               {/* Row 5: Project Contractor & Project Consultant */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
-                    Project Contractor
-                  </label>
-                  <select
-                    value={formData.contractorId}
-                    onChange={(e) => setFormData({ ...formData, contractorId: e.target.value })}
-                    className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
-                  >
-                    <option value="">Select Contractor / Vendor...</option>
-                    {contractors.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name} {c.firmName ? `(${c.firmName})` : ""} {c.trade ? `• ${c.trade}` : ""}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <SearchableSelect
+                  id="create-contractor"
+                  label="Project Contractor"
+                  placeholder="Select Contractor / Vendor..."
+                  searchPlaceholder="Search contractor..."
+                  options={contractors.map((c) => ({
+                    value: c.id,
+                    label: `${c.name}${c.firmName ? ` (${c.firmName})` : ""}`,
+                    subLabel: c.trade || c.firmName || undefined,
+                  }))}
+                  value={formData.contractorId}
+                  onChange={(val) => setFormData({ ...formData, contractorId: val })}
+                  allowOther={false}
+                />
 
-                <div>
-                  <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
-                    Project Consultant
-                  </label>
-                  <select
-                    value={formData.consultantId}
-                    onChange={(e) => setFormData({ ...formData, consultantId: e.target.value })}
-                    className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
-                  >
-                    <option value="">Select Consultant...</option>
-                    {consultants.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name} {c.firmName ? `(${c.firmName})` : ""} {c.discipline ? `• ${c.discipline}` : ""}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <SearchableSelect
+                  id="create-consultant"
+                  label="Project Consultant"
+                  placeholder="Select Consultant..."
+                  searchPlaceholder="Search consultant..."
+                  options={consultants.map((c) => ({
+                    value: c.id,
+                    label: `${c.name}${c.firmName ? ` (${c.firmName})` : ""}`,
+                    subLabel: c.discipline || c.firmName || undefined,
+                  }))}
+                  value={formData.consultantId}
+                  onChange={(val) => setFormData({ ...formData, consultantId: val })}
+                  allowOther={false}
+                />
               </div>
 
               {/* Row 6: Site Address */}
               <div>
-                <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
+                <label className="text-xs font-semibold text-[#1F1F1F] block mb-1">
                   Site Address
                 </label>
                 <input
@@ -1835,13 +1897,13 @@ export function ProjectsClientView({
                   placeholder="e.g. Plot 42, Sector 15, Golf Course Extension Road, Gurugram"
                   value={formData.siteAddress}
                   onChange={(e) => setFormData({ ...formData, siteAddress: e.target.value })}
-                  className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
+                  className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] text-xs focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
                 />
               </div>
 
               {/* Row 7: Google map location */}
               <div>
-                <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
+                <label className="text-xs font-semibold text-[#1F1F1F] block mb-1">
                   Google map location
                 </label>
                 <input
@@ -1849,40 +1911,40 @@ export function ProjectsClientView({
                   placeholder="e.g. https://maps.google.com/?q=... or Plus Code"
                   value={formData.googleMapLocation}
                   onChange={(e) => setFormData({ ...formData, googleMapLocation: e.target.value })}
-                  className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
+                  className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] text-xs focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
                 />
               </div>
 
               {/* Row 8: Start Date & End Date */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
+                  <label className="text-xs font-semibold text-[#1F1F1F] block mb-1">
                     Start Date
                   </label>
                   <input
                     type="date"
                     value={formData.startDate}
                     onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                    className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
+                    className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] text-xs focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
+                  <label className="text-xs font-semibold text-[#1F1F1F] block mb-1">
                     End Date
                   </label>
                   <input
                     type="date"
                     value={formData.targetDate}
                     onChange={(e) => setFormData({ ...formData, targetDate: e.target.value })}
-                    className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
+                    className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] text-xs focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
                   />
                 </div>
               </div>
 
               {/* Row 9: Plot Area & Total Construction */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
+                  <label className="text-xs font-semibold text-[#1F1F1F] block mb-1">
                     Plot Area
                   </label>
                   <input
@@ -1890,12 +1952,12 @@ export function ProjectsClientView({
                     placeholder="e.g. 5,000 sq.ft / 555 sq.yd"
                     value={formData.plotArea}
                     onChange={(e) => setFormData({ ...formData, plotArea: e.target.value })}
-                    className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
+                    className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] text-xs focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
+                  <label className="text-xs font-semibold text-[#1F1F1F] block mb-1">
                     Total Construction
                   </label>
                   <input
@@ -1903,21 +1965,21 @@ export function ProjectsClientView({
                     placeholder="e.g. 12,500 sq.ft"
                     value={formData.constructionArea}
                     onChange={(e) => setFormData({ ...formData, constructionArea: e.target.value })}
-                    className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
+                    className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] text-xs focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
                   />
                 </div>
               </div>
 
               {/* Row 10: Budget */}
               <div>
-                <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
+                <label className="text-xs font-semibold text-[#1F1F1F] block mb-1">
                   Budget
                 </label>
                 <div className="flex gap-2">
                   <select
                     value={formData.currency}
                     onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
-                    className="w-24 px-2 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none font-semibold text-xs"
+                    className="w-24 p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
                   >
                     <option value="INR">INR (₹)</option>
                     <option value="USD">USD ($)</option>
@@ -1931,14 +1993,14 @@ export function ProjectsClientView({
                     placeholder="e.g. 5000000"
                     value={formData.budget}
                     onChange={(e) => setFormData({ ...formData, budget: e.target.value })}
-                    className="flex-1 px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none font-mono"
+                    className="flex-1 p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] text-xs focus:outline-none focus:ring-2 focus:ring-[#5A81FA] font-mono"
                   />
                 </div>
               </div>
 
               {/* Row 11: Brief / Project Brief */}
               <div>
-                <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
+                <label className="text-xs font-semibold text-[#1F1F1F] block mb-1">
                   Brief / Project Brief
                 </label>
                 <textarea
@@ -1946,7 +2008,7 @@ export function ProjectsClientView({
                   placeholder="Describe the architectural program, client objectives, site parameters, and deliverable expectations..."
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
+                  className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] text-xs focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
                 />
               </div>
 
@@ -1963,20 +2025,21 @@ export function ProjectsClientView({
               />
 
               {/* Form Buttons */}
-              <div className="pt-3 border-t border-[#E2E6F0] flex justify-end gap-2">
+              <div className="pt-4 border-t border-[#E2E6F0] flex justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setIsCreateModalOpen(false)}
-                  className="px-4 py-2 rounded-xl border border-[#E2E6F0] text-xs font-semibold text-[#696E82] hover:bg-[#F2F4FF] cursor-pointer"
+                  className="px-4 py-2 bg-[#F2F4FF] hover:bg-[#E5EAFF] text-[#696E82] hover:text-[#1F1F1F] font-semibold rounded-xl text-xs cursor-pointer transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-5 py-2 rounded-xl bg-[#4B5320] hover:bg-[#3d441a] text-white text-xs font-bold shadow-sm transition-all cursor-pointer disabled:opacity-50"
+                  className="px-5 py-2 bg-[#5A81FA] hover:bg-[#426EE8] text-white font-semibold rounded-xl text-xs shadow-xs cursor-pointer disabled:opacity-50 flex items-center gap-1.5 transition-colors"
                 >
-                  {isSubmitting ? "Creating Project..." : "Commission Project"}
+                  <Plus className="w-4 h-4" />
+                  <span>{isSubmitting ? "Creating Project..." : "Commission Project"}</span>
                 </button>
               </div>
             </form>
@@ -1988,19 +2051,19 @@ export function ProjectsClientView({
       {/* MODAL 2: EDIT PROJECT (Owner & Admin Only)                     */}
       {/* ============================================================== */}
       {editingProject && canManage && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl border border-[#E2E6F0] shadow-2xl max-w-2xl w-full overflow-hidden max-h-[90vh] flex flex-col">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl border border-[#E2E6F0] shadow-2xl max-w-2xl w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
             {/* Modal Header */}
-            <div className="p-5 border-b border-[#E2E6F0] bg-[#F8F9FD] flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-[#4B5320] text-white flex items-center justify-center shadow-xs">
-                  <Pencil className="w-4 h-4 text-[#D4AF37]" />
+            <div className="flex justify-between items-center pb-3 border-b border-[#E2E6F0]">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-[#5A81FA] text-white flex items-center justify-center shrink-0 shadow-xs">
+                  <Pencil className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-[#1F1F1F]">
+                  <h3 className="text-base font-bold text-[#1F1F1F]">
                     Modify Project: {editingProject.name}
                   </h3>
-                  <p className="text-[11px] text-[#696E82]">
+                  <p className="text-xs text-[#696E82]">
                     Update project details, current phase, status, and assignment
                   </p>
                 </div>
@@ -2008,194 +2071,176 @@ export function ProjectsClientView({
               <button
                 type="button"
                 onClick={() => setEditingProject(null)}
-                className="text-[#696E82] hover:text-[#1F1F1F] p-1 rounded-lg hover:bg-black/5 cursor-pointer"
+                className="text-[#696E82] hover:text-[#1F1F1F] p-1 rounded-lg transition-colors cursor-pointer"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
             {/* Modal Form */}
-            <form onSubmit={handleEditSubmit} className="p-6 overflow-y-auto space-y-4 text-xs">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <form onSubmit={handleEditSubmit} className="space-y-4 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
-                    Project Code <span className="text-rose-500">*</span>
+                  <label className="text-xs font-semibold text-[#1F1F1F] block mb-1">
+                    Project Code <span className="text-red-600">*</span>
                   </label>
                   <input
                     type="text"
                     required
                     value={editFormData.code}
                     onChange={(e) => setEditFormData({ ...editFormData, code: e.target.value })}
-                    className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none uppercase font-mono font-bold"
+                    className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] text-xs focus:outline-none focus:ring-2 focus:ring-[#5A81FA] uppercase font-mono font-bold"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
-                    Project Name <span className="text-rose-500">*</span>
+                  <label className="text-xs font-semibold text-[#1F1F1F] block mb-1">
+                    Project Name <span className="text-red-600">*</span>
                   </label>
                   <input
                     type="text"
                     required
                     value={editFormData.name}
                     onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
-                    className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none font-semibold"
+                    className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] text-xs focus:outline-none focus:ring-2 focus:ring-[#5A81FA] font-semibold"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
-                    Status
-                  </label>
-                  <select
-                    value={editFormData.status}
-                    onChange={(e) =>
-                      setEditFormData({
-                        ...editFormData,
-                        status: e.target.value as ProjectItem["status"],
-                      })
-                    }
-                    className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none font-semibold"
-                  >
-                    <option value="ACTIVE">ACTIVE (In Progress)</option>
-                    <option value="PLANNING">PLANNING (Concept / Pre-design)</option>
-                    <option value="ON_HOLD">ON_HOLD (Paused)</option>
-                    <option value="COMPLETED">COMPLETED (Handed Over)</option>
-                    <option value="ARCHIVED">ARCHIVED</option>
-                  </select>
-                </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <SearchableSelect
+                  id="edit-status"
+                  label="Status"
+                  placeholder="Select status..."
+                  searchPlaceholder="Search status..."
+                  options={[
+                    { value: "ACTIVE", label: "ACTIVE", subLabel: "In Progress" },
+                    { value: "PLANNING", label: "PLANNING", subLabel: "Concept / Pre-design" },
+                    { value: "ON_HOLD", label: "ON_HOLD", subLabel: "Paused" },
+                    { value: "COMPLETED", label: "COMPLETED", subLabel: "Handed Over" },
+                    { value: "ARCHIVED", label: "ARCHIVED" },
+                  ]}
+                  value={editFormData.status}
+                  onChange={(val) =>
+                    setEditFormData({
+                      ...editFormData,
+                      status: val as ProjectItem["status"],
+                    })
+                  }
+                  allowOther={false}
+                />
 
-                <div>
-                  <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
-                    Current Architectural Phase
-                  </label>
-                  <select
-                    value={editFormData.currentPhase}
-                    onChange={(e) =>
-                      setEditFormData({ ...editFormData, currentPhase: e.target.value })
-                    }
-                    className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none font-semibold"
-                  >
-                    {ARCHITECTURAL_PHASES.map((ph) => (
-                      <option key={ph} value={ph}>
-                        {ph}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <SearchableSelect
+                  id="edit-phase"
+                  label="Current Architectural Phase"
+                  placeholder="Select phase..."
+                  searchPlaceholder="Search phase..."
+                  options={ARCHITECTURAL_PHASES.map((ph) => ({
+                    value: ph,
+                    label: ph,
+                  }))}
+                  value={editFormData.currentPhase}
+                  onChange={(val) =>
+                    setEditFormData({ ...editFormData, currentPhase: val })
+                  }
+                  allowOther={false}
+                />
               </div>
 
               {/* Row 3: Client Name & Typology */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
-                    Client Name
-                  </label>
-                  <select
-                    value={editFormData.primaryClientId}
-                    onChange={(e) =>
-                      setEditFormData({ ...editFormData, primaryClientId: e.target.value })
-                    }
-                    className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
-                  >
-                    <option value="">Select Primary Client...</option>
-                    {clients.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name} {c.company ? `(${c.company})` : ""}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <SearchableSelect
+                  id="edit-client"
+                  label="Client Name"
+                  placeholder="Select Primary Client..."
+                  searchPlaceholder="Search client..."
+                  options={clients.map((c) => ({
+                    value: c.id,
+                    label: `${c.name}${c.company ? ` (${c.company})` : ""}`,
+                    subLabel: c.company || undefined,
+                  }))}
+                  value={editFormData.primaryClientId}
+                  onChange={(val) =>
+                    setEditFormData({ ...editFormData, primaryClientId: val })
+                  }
+                  allowOther={false}
+                />
 
-                <div>
-                  <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
-                    Typology
-                  </label>
-                  <select
-                    value={editFormData.projectType}
-                    onChange={(e) =>
-                      setEditFormData({ ...editFormData, projectType: e.target.value })
-                    }
-                    className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
-                  >
-                    {PROJECT_TYPOLOGIES.map((typ) => (
-                      <option key={typ} value={typ}>
-                        {typ}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <SearchableSelect
+                  id="edit-typology"
+                  label="Typology"
+                  placeholder="Select Typology..."
+                  searchPlaceholder="Search typology..."
+                  options={PROJECT_TYPOLOGIES.map((typ) => ({
+                    value: typ,
+                    label: typ,
+                  }))}
+                  value={editFormData.projectType}
+                  onChange={(val) =>
+                    setEditFormData({ ...editFormData, projectType: val })
+                  }
+                  allowOther={true}
+                />
               </div>
 
               {/* Row 4: Project Architect & Project Manager */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
-                    Project Architect
-                  </label>
-                  <select
-                    value={editFormData.projectArchitectId}
-                    onChange={(e) =>
-                      setEditFormData({ ...editFormData, projectArchitectId: e.target.value })
-                    }
-                    className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
-                  >
-                    <option value="">Select Project Architect...</option>
-                    {members.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.user.fullName} ({m.employee?.designation || "Studio Staff"})
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <SearchableSelect
+                  id="edit-architect"
+                  label="Project Architect"
+                  placeholder="Select Project Architect..."
+                  searchPlaceholder="Search architect..."
+                  options={members.map((m) => ({
+                    value: m.id,
+                    label: m.user.fullName,
+                    subLabel: m.employee?.designation || "Studio Staff",
+                  }))}
+                  value={editFormData.projectArchitectId}
+                  onChange={(val) =>
+                    setEditFormData({ ...editFormData, projectArchitectId: val })
+                  }
+                  allowOther={false}
+                />
 
-                <div>
-                  <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
-                    Project Manager
-                  </label>
-                  <select
-                    value={editFormData.projectManagerId}
-                    onChange={(e) =>
-                      setEditFormData({ ...editFormData, projectManagerId: e.target.value })
-                    }
-                    className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
-                  >
-                    <option value="">Select Project Manager...</option>
-                    {members.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.user.fullName} ({m.employee?.designation || "Studio Staff"})
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <SearchableSelect
+                  id="edit-manager"
+                  label="Project Manager"
+                  placeholder="Select Project Manager..."
+                  searchPlaceholder="Search manager..."
+                  options={members.map((m) => ({
+                    value: m.id,
+                    label: m.user.fullName,
+                    subLabel: m.employee?.designation || "Studio Staff",
+                  }))}
+                  value={editFormData.projectManagerId}
+                  onChange={(val) =>
+                    setEditFormData({ ...editFormData, projectManagerId: val })
+                  }
+                  allowOther={false}
+                />
               </div>
 
               {/* Row 5: Project Coordinator & Site City */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
-                    Project Coordinator
-                  </label>
-                  <select
-                    value={editFormData.projectCoordinatorId}
-                    onChange={(e) =>
-                      setEditFormData({ ...editFormData, projectCoordinatorId: e.target.value })
-                    }
-                    className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
-                  >
-                    <option value="">Select Project Coordinator...</option>
-                    {members.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.user.fullName} ({m.employee?.designation || "Studio Staff"})
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <SearchableSelect
+                  id="edit-coordinator"
+                  label="Project Coordinator"
+                  placeholder="Select Project Coordinator..."
+                  searchPlaceholder="Search coordinator..."
+                  options={members.map((m) => ({
+                    value: m.id,
+                    label: m.user.fullName,
+                    subLabel: m.employee?.designation || "Studio Staff",
+                  }))}
+                  value={editFormData.projectCoordinatorId}
+                  onChange={(val) =>
+                    setEditFormData({ ...editFormData, projectCoordinatorId: val })
+                  }
+                  allowOther={false}
+                />
 
                 <div>
-                  <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
+                  <label className="text-xs font-semibold text-[#1F1F1F] block mb-1">
                     Site City
                   </label>
                   <input
@@ -2205,57 +2250,51 @@ export function ProjectsClientView({
                     onChange={(e) =>
                       setEditFormData({ ...editFormData, siteCity: e.target.value })
                     }
-                    className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
+                    className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] text-xs focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
                   />
                 </div>
               </div>
 
               {/* Row 6: Project Contractor & Project Consultant */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
-                    Project Contractor
-                  </label>
-                  <select
-                    value={editFormData.contractorId}
-                    onChange={(e) =>
-                      setEditFormData({ ...editFormData, contractorId: e.target.value })
-                    }
-                    className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
-                  >
-                    <option value="">Select Contractor / Vendor...</option>
-                    {contractors.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name} {c.firmName ? `(${c.firmName})` : ""} {c.trade ? `• ${c.trade}` : ""}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <SearchableSelect
+                  id="edit-contractor"
+                  label="Project Contractor"
+                  placeholder="Select Contractor / Vendor..."
+                  searchPlaceholder="Search contractor..."
+                  options={contractors.map((c) => ({
+                    value: c.id,
+                    label: `${c.name}${c.firmName ? ` (${c.firmName})` : ""}`,
+                    subLabel: c.trade || c.firmName || undefined,
+                  }))}
+                  value={editFormData.contractorId}
+                  onChange={(val) =>
+                    setEditFormData({ ...editFormData, contractorId: val })
+                  }
+                  allowOther={false}
+                />
 
-                <div>
-                  <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
-                    Project Consultant
-                  </label>
-                  <select
-                    value={editFormData.consultantId}
-                    onChange={(e) =>
-                      setEditFormData({ ...editFormData, consultantId: e.target.value })
-                    }
-                    className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
-                  >
-                    <option value="">Select Consultant...</option>
-                    {consultants.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name} {c.firmName ? `(${c.firmName})` : ""} {c.discipline ? `• ${c.discipline}` : ""}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <SearchableSelect
+                  id="edit-consultant"
+                  label="Project Consultant"
+                  placeholder="Select Consultant..."
+                  searchPlaceholder="Search consultant..."
+                  options={consultants.map((c) => ({
+                    value: c.id,
+                    label: `${c.name}${c.firmName ? ` (${c.firmName})` : ""}`,
+                    subLabel: c.discipline || c.firmName || undefined,
+                  }))}
+                  value={editFormData.consultantId}
+                  onChange={(val) =>
+                    setEditFormData({ ...editFormData, consultantId: val })
+                  }
+                  allowOther={false}
+                />
               </div>
 
               {/* Row 7: Site Address */}
               <div>
-                <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
+                <label className="text-xs font-semibold text-[#1F1F1F] block mb-1">
                   Site Address
                 </label>
                 <input
@@ -2265,13 +2304,13 @@ export function ProjectsClientView({
                   onChange={(e) =>
                     setEditFormData({ ...editFormData, siteAddress: e.target.value })
                   }
-                  className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
+                  className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] text-xs focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
                 />
               </div>
 
               {/* Row 8: Google map location */}
               <div>
-                <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
+                <label className="text-xs font-semibold text-[#1F1F1F] block mb-1">
                   Google map location
                 </label>
                 <input
@@ -2281,14 +2320,14 @@ export function ProjectsClientView({
                   onChange={(e) =>
                     setEditFormData({ ...editFormData, googleMapLocation: e.target.value })
                   }
-                  className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
+                  className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] text-xs focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
                 />
               </div>
 
               {/* Row 9: Start Date & End Date */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
+                  <label className="text-xs font-semibold text-[#1F1F1F] block mb-1">
                     Start Date
                   </label>
                   <input
@@ -2297,11 +2336,11 @@ export function ProjectsClientView({
                     onChange={(e) =>
                       setEditFormData({ ...editFormData, startDate: e.target.value })
                     }
-                    className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
+                    className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] text-xs focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
+                  <label className="text-xs font-semibold text-[#1F1F1F] block mb-1">
                     End Date
                   </label>
                   <input
@@ -2310,15 +2349,15 @@ export function ProjectsClientView({
                     onChange={(e) =>
                       setEditFormData({ ...editFormData, targetDate: e.target.value })
                     }
-                    className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
+                    className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] text-xs focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
                   />
                 </div>
               </div>
 
               {/* Row 10: Plot Area & Total Construction */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
+                  <label className="text-xs font-semibold text-[#1F1F1F] block mb-1">
                     Plot Area
                   </label>
                   <input
@@ -2328,12 +2367,12 @@ export function ProjectsClientView({
                     onChange={(e) =>
                       setEditFormData({ ...editFormData, plotArea: e.target.value })
                     }
-                    className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
+                    className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] text-xs focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
+                  <label className="text-xs font-semibold text-[#1F1F1F] block mb-1">
                     Total Construction
                   </label>
                   <input
@@ -2343,21 +2382,21 @@ export function ProjectsClientView({
                     onChange={(e) =>
                       setEditFormData({ ...editFormData, constructionArea: e.target.value })
                     }
-                    className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
+                    className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] text-xs focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
                   />
                 </div>
               </div>
 
               {/* Row 11: Budget */}
               <div>
-                <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
+                <label className="text-xs font-semibold text-[#1F1F1F] block mb-1">
                   Budget
                 </label>
                 <div className="flex gap-2">
                   <select
                     value={editFormData.currency}
                     onChange={(e) => setEditFormData({ ...editFormData, currency: e.target.value })}
-                    className="w-24 px-2 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none font-semibold text-xs"
+                    className="w-24 p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
                   >
                     <option value="INR">INR (₹)</option>
                     <option value="USD">USD ($)</option>
@@ -2371,14 +2410,14 @@ export function ProjectsClientView({
                     placeholder="e.g. 5000000"
                     value={editFormData.budget}
                     onChange={(e) => setEditFormData({ ...editFormData, budget: e.target.value })}
-                    className="flex-1 px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none font-mono"
+                    className="flex-1 p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] text-xs focus:outline-none focus:ring-2 focus:ring-[#5A81FA] font-mono"
                   />
                 </div>
               </div>
 
               {/* Row 12: Brief / Project Brief */}
               <div>
-                <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
+                <label className="text-xs font-semibold text-[#1F1F1F] block mb-1">
                   Brief / Project Brief
                 </label>
                 <textarea
@@ -2387,7 +2426,7 @@ export function ProjectsClientView({
                   onChange={(e) =>
                     setEditFormData({ ...editFormData, description: e.target.value })
                   }
-                  className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none"
+                  className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] text-xs focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
                 />
               </div>
 
@@ -2404,20 +2443,21 @@ export function ProjectsClientView({
               />
 
               {/* Form Buttons */}
-              <div className="pt-3 border-t border-[#E2E6F0] flex justify-end gap-2">
+              <div className="pt-4 border-t border-[#E2E6F0] flex justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setEditingProject(null)}
-                  className="px-4 py-2 rounded-xl border border-[#E2E6F0] text-xs font-semibold text-[#696E82] hover:bg-[#F2F4FF] cursor-pointer"
+                  className="px-4 py-2 bg-[#F2F4FF] hover:bg-[#E5EAFF] text-[#696E82] hover:text-[#1F1F1F] font-semibold rounded-xl text-xs cursor-pointer transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-5 py-2 rounded-xl bg-[#4B5320] hover:bg-[#3d441a] text-white text-xs font-bold shadow-sm transition-all cursor-pointer disabled:opacity-50"
+                  className="px-5 py-2 bg-[#5A81FA] hover:bg-[#426EE8] text-white font-semibold rounded-xl text-xs shadow-xs cursor-pointer disabled:opacity-50 flex items-center gap-1.5 transition-colors"
                 >
-                  {isSubmitting ? "Saving..." : "Save Changes"}
+                  <Pencil className="w-4 h-4" />
+                  <span>{isSubmitting ? "Saving..." : "Save Changes"}</span>
                 </button>
               </div>
             </form>
@@ -2451,7 +2491,7 @@ export function ProjectsClientView({
               <button
                 type="button"
                 onClick={() => setDeletingProject(null)}
-                className="px-4 py-2 rounded-xl border border-[#E2E6F0] text-xs font-semibold text-[#696E82] hover:bg-[#F2F4FF] cursor-pointer"
+                className="px-4 py-2 bg-[#F2F4FF] hover:bg-[#E5EAFF] text-[#696E82] hover:text-[#1F1F1F] font-semibold rounded-xl text-xs cursor-pointer transition-colors"
               >
                 Cancel
               </button>
@@ -2503,7 +2543,7 @@ export function ProjectsClientView({
                     className="flex items-center justify-between text-xs py-1.5 px-2.5 rounded-lg bg-white border border-[#E2E6F0]"
                   >
                     <div className="flex items-center gap-2 truncate">
-                      <span className="font-mono text-[11px] font-bold text-[#4B5320] bg-[#4B5320]/10 px-1.5 py-0.5 rounded">
+                      <span className="font-mono text-[11px] font-bold text-[#5A81FA] bg-[#5A81FA]/10 px-1.5 py-0.5 rounded">
                         {p.code}
                       </span>
                       <span className="font-medium text-[#1F1F1F] truncate">{p.name}</span>
@@ -2519,7 +2559,7 @@ export function ProjectsClientView({
               <button
                 type="button"
                 onClick={() => setIsBulkDeleteModalOpen(false)}
-                className="px-4 py-2 rounded-xl border border-[#E2E6F0] text-xs font-semibold text-[#696E82] hover:bg-[#F2F4FF] cursor-pointer"
+                className="px-4 py-2 bg-[#F2F4FF] hover:bg-[#E5EAFF] text-[#696E82] hover:text-[#1F1F1F] font-semibold rounded-xl text-xs cursor-pointer transition-colors"
               >
                 Cancel
               </button>
@@ -2540,43 +2580,43 @@ export function ProjectsClientView({
       {/* MODAL 4: MANIPULATE PROGRESS & PHASES (Owner & Admin Only)     */}
       {/* ============================================================== */}
       {progressProject && canManage && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl border border-[#E2E6F0] shadow-2xl max-w-2xl w-full overflow-hidden max-h-[90vh] flex flex-col">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl border border-[#E2E6F0] shadow-2xl max-w-2xl w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
             {/* Modal Header */}
-            <div className="p-5 border-b border-[#E2E6F0] bg-[#F8F9FD] flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-[#4B5320] text-white flex items-center justify-center shadow-xs">
-                  <TrendingUp className="w-5 h-5 text-[#D4AF37]" />
+            <div className="flex justify-between items-center pb-3 border-b border-[#E2E6F0]">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-[#5A81FA] text-white flex items-center justify-center shrink-0 shadow-xs">
+                  <TrendingUp className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-[#1F1F1F]">
+                  <h3 className="text-base font-bold text-[#1F1F1F]">
                     Manipulate Project Progress: {progressProject.name}
                   </h3>
-                  <p className="text-[11px] text-[#696E82]">
-                    Code: <span className="font-mono font-bold text-[#4B5320]">{progressProject.code}</span> • Advance phases, mark milestones completed, or set progress
+                  <p className="text-xs text-[#696E82]">
+                    Code: <span className="font-mono font-bold text-[#5A81FA]">{progressProject.code}</span> • Advance phases, mark milestones completed, or set progress
                   </p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setProgressProject(null)}
-                className="text-[#696E82] hover:text-[#1F1F1F] p-1 rounded-lg hover:bg-black/5 cursor-pointer"
+                className="text-[#696E82] hover:text-[#1F1F1F] p-1 rounded-lg transition-colors cursor-pointer"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
             {/* Modal Body */}
-            <form onSubmit={handleProgressSubmit} className="p-6 overflow-y-auto space-y-5 text-xs">
+            <form onSubmit={handleProgressSubmit} className="space-y-4 text-xs">
               {/* Live Progress Preview Banner */}
               <div className="p-4 rounded-xl bg-[#F8F9FD] border border-[#E2E6F0] space-y-2">
                 <div className="flex justify-between items-center text-xs">
                   <span className="font-bold text-[#1F1F1F] flex items-center gap-1.5">
-                    <Sparkles className="w-4 h-4 text-[#D4AF37]" />
+                    <Sparkles className="w-4 h-4 text-[#5A81FA]" />
                     <span>Selected Phase:</span>
-                    <span className="text-[#4B5320] font-bold">{selectedPhaseForProgress}</span>
+                    <span className="text-[#5A81FA] font-bold">{selectedPhaseForProgress}</span>
                   </span>
-                  <span className="text-sm font-bold text-[#4B5320]">
+                  <span className="text-sm font-bold text-[#5A81FA]">
                     {Math.round(
                       ((ARCHITECTURAL_PHASES.indexOf(selectedPhaseForProgress) + 1) /
                         ARCHITECTURAL_PHASES.length) *
@@ -2588,7 +2628,7 @@ export function ProjectsClientView({
 
                 <div className="w-full bg-[#E2E6F0] h-3 rounded-full overflow-hidden">
                   <div
-                    className="bg-[#4B5320] h-full rounded-full transition-all duration-300"
+                    className="bg-[#5A81FA] h-full rounded-full transition-all duration-300"
                     style={{
                       width: `${Math.round(
                         ((ARCHITECTURAL_PHASES.indexOf(selectedPhaseForProgress) + 1) /
@@ -2624,7 +2664,7 @@ export function ProjectsClientView({
                     ARCHITECTURAL_PHASES.indexOf(selectedPhaseForProgress) >=
                     ARCHITECTURAL_PHASES.length - 1
                   }
-                  className="px-3 py-1.5 rounded-lg bg-[#4B5320] hover:bg-[#3d441a] text-white text-[11px] font-bold flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-40"
+                  className="px-3 py-1.5 rounded-xl bg-[#5A81FA] hover:bg-[#426EE8] text-white text-[11px] font-semibold flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-40 shadow-xs"
                 >
                   <span>Advance to Next Phase</span>
                   <ArrowRight className="w-3.5 h-3.5" />
@@ -2636,7 +2676,7 @@ export function ProjectsClientView({
                     setSelectedPhaseForProgress("Handover");
                     setSelectedStatusForProgress("COMPLETED");
                   }}
-                  className="px-3 py-1.5 rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-[11px] font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                  className="px-3 py-1.5 rounded-xl border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-[11px] font-semibold flex items-center gap-1 transition-colors cursor-pointer"
                 >
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                   <span>Mark All 100% Completed</span>
@@ -2648,7 +2688,7 @@ export function ProjectsClientView({
                     setSelectedPhaseForProgress("Brief");
                     setSelectedStatusForProgress("PLANNING");
                   }}
-                  className="px-3 py-1.5 rounded-lg border border-[#E2E6F0] bg-white hover:bg-gray-50 text-[#696E82] text-[11px] font-medium transition-colors cursor-pointer ml-auto"
+                  className="px-3 py-1.5 rounded-xl bg-[#F2F4FF] hover:bg-[#E5EAFF] text-[#696E82] text-[11px] font-semibold transition-colors cursor-pointer ml-auto"
                 >
                   Reset to Brief
                 </button>
@@ -2656,7 +2696,7 @@ export function ProjectsClientView({
 
               {/* Interactive 11-Phase Grid */}
               <div className="space-y-2">
-                <label className="block text-[11px] font-bold text-[#1F1F1F]">
+                <label className="text-xs font-semibold text-[#1F1F1F] block">
                   Click on Any Architectural Phase to Set Progress:
                 </label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -2672,7 +2712,7 @@ export function ProjectsClientView({
                         onClick={() => setSelectedPhaseForProgress(ph)}
                         className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between ${
                           isSelected
-                            ? "border-[#4B5320] bg-[#4B5320]/15 ring-2 ring-[#4B5320] shadow-xs"
+                            ? "border-[#5A81FA] bg-[#F2F4FF] ring-2 ring-[#5A81FA] shadow-xs"
                             : isPrior
                             ? "border-emerald-200 bg-emerald-50/70 hover:bg-emerald-50 text-[#1F1F1F]"
                             : "border-[#E2E6F0] bg-[#F8F9FD] hover:bg-white text-[#696E82]"
@@ -2682,7 +2722,7 @@ export function ProjectsClientView({
                           <span
                             className={`w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center shrink-0 ${
                               isSelected
-                                ? "bg-[#4B5320] text-white"
+                                ? "bg-[#5A81FA] text-white"
                                 : isPrior
                                 ? "bg-emerald-600 text-white"
                                 : "bg-[#E2E6F0] text-[#696E82]"
@@ -2704,7 +2744,7 @@ export function ProjectsClientView({
                         </div>
 
                         {isSelected ? (
-                          <span className="text-[9px] font-bold uppercase tracking-wider text-[#4B5320] px-1.5 py-0.5 rounded bg-white border border-[#4B5320]/30 shrink-0">
+                          <span className="text-[9px] font-bold uppercase tracking-wider text-[#5A81FA] px-1.5 py-0.5 rounded bg-white border border-[#5A81FA]/30 shrink-0">
                             Current
                           </span>
                         ) : isPrior ? (
@@ -2723,39 +2763,40 @@ export function ProjectsClientView({
               </div>
 
               {/* Status Update Option */}
-              <div>
-                <label className="block text-[11px] font-bold text-[#1F1F1F] mb-1">
-                  Project Commission Status
-                </label>
-                <select
-                  value={selectedStatusForProgress}
-                  onChange={(e) =>
-                    setSelectedStatusForProgress(e.target.value as ProjectItem["status"])
-                  }
-                  className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:border-[#4B5320] focus:outline-none font-semibold text-xs"
-                >
-                  <option value="ACTIVE">ACTIVE (In Progress)</option>
-                  <option value="PLANNING">PLANNING (Brief & Concept)</option>
-                  <option value="ON_HOLD">ON_HOLD (Paused)</option>
-                  <option value="COMPLETED">COMPLETED (Handover Complete)</option>
-                </select>
-              </div>
+              <SearchableSelect
+                id="progress-status"
+                label="Project Commission Status"
+                placeholder="Select status..."
+                searchPlaceholder="Search status..."
+                options={[
+                  { value: "ACTIVE", label: "ACTIVE", subLabel: "In Progress" },
+                  { value: "PLANNING", label: "PLANNING", subLabel: "Brief & Concept" },
+                  { value: "ON_HOLD", label: "ON_HOLD", subLabel: "Paused" },
+                  { value: "COMPLETED", label: "COMPLETED", subLabel: "Handover Complete" },
+                ]}
+                value={selectedStatusForProgress}
+                onChange={(val) =>
+                  setSelectedStatusForProgress(val as ProjectItem["status"])
+                }
+                allowOther={false}
+              />
 
               {/* Form Buttons */}
-              <div className="pt-3 border-t border-[#E2E6F0] flex justify-end gap-2">
+              <div className="pt-4 border-t border-[#E2E6F0] flex justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setProgressProject(null)}
-                  className="px-4 py-2 rounded-xl border border-[#E2E6F0] text-xs font-semibold text-[#696E82] hover:bg-[#F2F4FF] cursor-pointer"
+                  className="px-4 py-2 bg-[#F2F4FF] hover:bg-[#E5EAFF] text-[#696E82] hover:text-[#1F1F1F] font-semibold rounded-xl text-xs cursor-pointer transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-5 py-2 rounded-xl bg-[#4B5320] hover:bg-[#3d441a] text-white text-xs font-bold shadow-sm transition-all cursor-pointer disabled:opacity-50"
+                  className="px-5 py-2 bg-[#5A81FA] hover:bg-[#426EE8] text-white font-semibold rounded-xl text-xs shadow-xs cursor-pointer disabled:opacity-50 flex items-center gap-1.5 transition-colors"
                 >
-                  {isSubmitting ? "Updating Progress..." : "Save Progress & Phases"}
+                  <TrendingUp className="w-4 h-4" />
+                  <span>{isSubmitting ? "Updating Progress..." : "Save Progress & Phases"}</span>
                 </button>
               </div>
             </form>

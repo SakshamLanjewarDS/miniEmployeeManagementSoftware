@@ -34,6 +34,17 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* Eliminate 300ms tap delay and touch lag across all interactive controls */
+a, button, input, select, textarea {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 /* Custom architectural scrollbars */
