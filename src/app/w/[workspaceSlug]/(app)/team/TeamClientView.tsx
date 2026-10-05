@@ -42,6 +42,7 @@ import { DynamicFormFields } from "@/components/custom-fields/DynamicFormFields"
 import { DynamicCardFields } from "@/components/custom-fields/DynamicCardFields";
 import { CustomFieldDefinition } from "@/server/modules/custom-fields/repository";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
+import { correctGrammar } from "@/lib/grammar/grammarEngine";
 
 const DEPARTMENT_OPTIONS = [
   { value: "Architecture", label: "Architecture", subLabel: "Design & Masterplanning" },
@@ -1505,14 +1506,28 @@ export default function TeamClientView({
                 </div>
 
                 <div>
-                  <label className="text-[11px] font-semibold text-[#696E82] block mb-1">
-                    Welcome Note / Custom Message
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[11px] font-semibold text-[#696E82] block">
+                      Welcome Note / Custom Message
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const { correctedText } = correctGrammar(addCustomMessage);
+                        setAddCustomMessage(correctedText);
+                      }}
+                      className="text-[10px] text-[#5A81FA] hover:text-[#426EE8] font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+                      title="Auto-correct grammar & spelling (or Ctrl+Shift+G)"
+                    >
+                      <Sparkles className="w-2.5 h-2.5" />
+                      <span>Fix Grammar</span>
+                    </button>
+                  </div>
                   <textarea
                     rows={2}
                     value={addCustomMessage}
                     onChange={(e) => setAddCustomMessage(e.target.value)}
-                    placeholder="Message from Administrator..."
+                    placeholder="Message from Administrator (Voice dictation supported via Ctrl+Shift+V)..."
                     className="w-full p-2.5 text-xs bg-white border border-[#E2E6F0] rounded-xl text-[#1F1F1F] focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
                   />
                 </div>

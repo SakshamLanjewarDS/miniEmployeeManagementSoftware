@@ -4,6 +4,7 @@ import { getCurrentTenantContext } from "@/server/auth/session";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { AppTopbar } from "@/components/layout/AppTopbar";
 import { NavigationProgressBar } from "@/components/layout/NavigationProgressBar";
+import { GlobalInputAssistant } from "@/components/speech/GlobalInputAssistant";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -24,6 +25,9 @@ export default async function AppLayout({ children, params }: AppLayoutProps) {
       <Suspense fallback={null}>
         <NavigationProgressBar />
       </Suspense>
+
+      {/* Global Universal Voice & Grammar Assistant for All Text Fields */}
+      <GlobalInputAssistant />
 
       {/* Sidebar */}
       <AppSidebar context={ctx} />

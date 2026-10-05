@@ -27,6 +27,15 @@ export function AppTopbar({ context }: AppTopbarProps) {
 
       {/* Right Action Bar */}
       <div className="flex items-center gap-3">
+        {/* Voice & Grammar Status Indicator */}
+        <div 
+          className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 bg-[#F8F9FD] border border-[#E2E6F0] rounded-lg text-[11px] font-semibold text-[#696E82]"
+          title="Voice-to-Text (Ctrl+Shift+V) & Grammar Auto-Correct (Ctrl+Shift+G) active across all text fields"
+        >
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+          <span>Voice & Grammar Active</span>
+        </div>
+
         {/* Quick App Install Button */}
         <PwaInstallButton variant="compact" />
 

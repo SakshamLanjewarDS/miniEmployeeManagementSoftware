@@ -118,17 +118,20 @@ export const FormField: React.FC<FormFieldProps> = ({
 };
 
 /* ==========================================================================
-   3. STANDARD FORM INPUT & TEXTAREA
+   3. STANDARD FORM INPUT & TEXTAREA WITH VOICE & GRAMMAR ENHANCEMENT
    ========================================================================== */
 export interface FormInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   error?: boolean;
+  enableVoice?: boolean;
+  enableGrammar?: boolean;
 }
 
 export const FormInput = React.forwardRef<HTMLInputElement, FormInputProps>(
-  ({ className = "", error, ...props }, ref) => {
+  ({ className = "", error, type = "text", enableVoice, enableGrammar, ...props }, ref) => {
     return (
       <input
         ref={ref}
+        type={type}
         className={`w-full p-2.5 bg-[#F8F9FD] border ${
           error ? "border-red-500 ring-1 ring-red-500" : "border-[#E2E6F0]"
         } rounded-xl text-[#1F1F1F] text-xs focus:outline-none focus:ring-2 focus:ring-[#5A81FA] placeholder-[#696E82] transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
@@ -141,10 +144,13 @@ FormInput.displayName = "FormInput";
 
 export interface FormTextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
   error?: boolean;
+  enableVoice?: boolean;
+  enableGrammar?: boolean;
+  helperAction?: React.ReactNode;
 }
 
 export const FormTextarea = React.forwardRef<HTMLTextAreaElement, FormTextareaProps>(
-  ({ className = "", error, rows = 2, ...props }, ref) => {
+  ({ className = "", error, rows = 3, ...props }, ref) => {
     return (
       <textarea
         ref={ref}

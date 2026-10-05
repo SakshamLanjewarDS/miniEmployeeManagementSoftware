@@ -17,8 +17,10 @@ import {
   Filter,
   Eye,
   RefreshCw,
+  Mic,
 } from "lucide-react";
 import { EmployeeItem } from "@/app/w/[workspaceSlug]/(app)/team/TeamClientView";
+import { correctGrammar } from "@/lib/grammar/grammarEngine";
 
 interface BulkMailModalProps {
   isOpen: boolean;
@@ -595,9 +597,23 @@ export default function BulkMailModal({
                 <div className="space-y-4">
                   {/* Subject line */}
                   <div>
-                    <label className="block text-xs font-bold text-[#1F1F1F] mb-1.5">
-                      Email Subject
-                    </label>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-xs font-bold text-[#1F1F1F]">
+                        Email Subject
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const { correctedText } = correctGrammar(subject);
+                          setSubject(correctedText);
+                        }}
+                        className="text-[11px] text-[#5A81FA] hover:text-[#426EE8] font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+                        title="Auto-correct grammar & spelling in subject (or Ctrl+Shift+G)"
+                      >
+                        <Sparkles className="w-3 h-3" />
+                        <span>Fix Grammar</span>
+                      </button>
+                    </div>
                     <input
                       type="text"
                       value={subject}
@@ -634,14 +650,28 @@ export default function BulkMailModal({
 
                   {/* Email Body */}
                   <div>
-                    <label className="block text-xs font-bold text-[#1F1F1F] mb-1.5">
-                      Email Body Content
-                    </label>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-xs font-bold text-[#1F1F1F]">
+                        Email Body Content
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const { correctedText } = correctGrammar(bodyText);
+                          setBodyText(correctedText);
+                        }}
+                        className="text-[11px] text-[#5A81FA] hover:text-[#426EE8] font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+                        title="Auto-correct grammar & spelling in body text (or Ctrl+Shift+G)"
+                      >
+                        <Sparkles className="w-3 h-3" />
+                        <span>Fix Grammar</span>
+                      </button>
+                    </div>
                     <textarea
                       rows={11}
                       value={bodyText}
                       onChange={(e) => setBodyText(e.target.value)}
-                      placeholder="Type your message content here..."
+                      placeholder="Type your message content here (Voice dictation supported via Ctrl+Shift+V)..."
                       className="w-full p-3.5 text-xs bg-white border border-[#E2E6F0] rounded-xl text-[#1F1F1F] focus:outline-none focus:ring-2 focus:ring-[#EA4335] focus:border-transparent font-mono leading-relaxed"
                     />
                   </div>
