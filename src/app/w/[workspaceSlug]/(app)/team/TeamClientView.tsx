@@ -312,9 +312,9 @@ export default function TeamClientView({
     }).sort((a, b) => {
       switch (teamSortBy) {
         case "JOIN_DATE_DESC":
-          return new Date(b.joinedAt || 0).getTime() - new Date(a.joinedAt || 0).getTime();
+          return new Date(b.joinDate || 0).getTime() - new Date(a.joinDate || 0).getTime();
         case "JOIN_DATE_ASC":
-          return new Date(a.joinedAt || 0).getTime() - new Date(b.joinedAt || 0).getTime();
+          return new Date(a.joinDate || 0).getTime() - new Date(b.joinDate || 0).getTime();
         case "ALPHA_NAME_ASC":
           return a.fullName.localeCompare(b.fullName);
         case "ALPHA_NAME_DESC":

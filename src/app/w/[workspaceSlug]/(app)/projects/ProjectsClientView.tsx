@@ -61,6 +61,7 @@ interface ProjectItem {
   currency: string;
   startDate?: string | Date | null;
   targetDate?: string | Date | null;
+  createdAt?: string | Date | null;
   primaryClientId?: string | null;
   projectArchitectId?: string | null;
   projectManagerId?: string | null;

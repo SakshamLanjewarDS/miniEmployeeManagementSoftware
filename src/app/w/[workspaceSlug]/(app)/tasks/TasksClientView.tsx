@@ -48,7 +48,18 @@ export interface TaskItem {
   title: string;
   description: string | null;
   priority: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
-  status: "NOT_STARTED" | "IN_PROGRESS" | "IN_REVIEW" | "COMPLETED" | "BLOCKED" | "CANCELLED";
+  status:
+    | "NOT_STARTED"
+    | "TODO"
+    | "STARTED"
+    | "ONGOING"
+    | "IN_PROGRESS"
+    | "CHECKING"
+    | "IN_REVIEW"
+    | "COMPLETED"
+    | "BLOCKED"
+    | "CANCELLED";
+  createdAt?: string | null;
   dueDate: string | null;
   estimatedHours: any;
   customFields?: Record<string, any>;
@@ -57,6 +68,7 @@ export interface TaskItem {
     id: string;
     code: string;
     name: string;
+    projectType?: string | null;
   };
   phaseId?: string | null;
   phase: {
@@ -64,10 +76,11 @@ export interface TaskItem {
     phaseName: string;
   } | null;
   assigneeId?: string | null;
+  assignedMemberIds?: string[] | null;
   assignee: {
     id?: string;
     user: { fullName: string; email: string };
-    employee: { employeeId: string; designation: string | null } | null;
+    employee: { employeeId: string; designation: string | null; department?: string | null } | null;
   } | null;
   creatorId?: string | null;
   creator?: {
@@ -218,14 +231,24 @@ export default function TasksClientView({
   const [reassignReason, setReassignReason] = useState<string>("");
   const [reassigning, setReassigning] = useState<boolean>(false);
 
-  // Edit Task Modal state
+  // Edit Task Modal state (Full-fidelity matching assign modal)
   const [editModal, setEditModal] = useState<{ task: TaskItem } | null>(null);
+  const [editTypology, setEditTypology] = useState<string>("");
+  const [editOtherTypology, setEditOtherTypology] = useState<string>("");
+  const [editProjectId, setEditProjectId] = useState<string>("");
+  const [editOtherProjectName, setEditOtherProjectName] = useState<string>("");
+  const [editPhaseId, setEditPhaseId] = useState<string>("");
+  const [editOtherPhaseName, setEditOtherPhaseName] = useState<string>("");
   const [editTitle, setEditTitle] = useState("");
   const [editDescription, setEditDescription] = useState("");
-  const [editPriority, setEditPriority] = useState<"LOW" | "MEDIUM" | "HIGH" | "URGENT">("MEDIUM");
+  const [editAssigneeIds, setEditAssigneeIds] = useState<string[]>([]);
+  const [editOtherAssigneeName, setEditOtherAssigneeName] = useState<string>("");
+  const [editPriority, setEditPriority] = useState<string>("MEDIUM");
+  const [editOtherPriorityName, setEditOtherPriorityName] = useState<string>("");
   const [editDueDate, setEditDueDate] = useState("");
   const [editEstimatedHours, setEditEstimatedHours] = useState("");
-  const [editPhaseId, setEditPhaseId] = useState("");
+  const [editChecklistItems, setEditChecklistItems] = useState<string[]>([""]);
+  const [editCustomFieldValues, setEditCustomFieldValues] = useState<Record<string, any>>({});
   const [editing, setEditing] = useState(false);
 
   // Delete Task state
@@ -243,6 +266,9 @@ export default function TasksClientView({
   const [otherPhaseName, setOtherPhaseName] = useState<string>("");
   const [taskTitle, setTaskTitle] = useState("");
   const [taskDescription, setTaskDescription] = useState("");
+  const [taskAssigneeIds, setTaskAssigneeIds] = useState<string[]>(
+    userRole === "OWNER" || userRole === "ADMIN" ? [] : [currentMembershipId]
+  );
   const [taskAssigneeId, setTaskAssigneeId] = useState<string>(
     userRole === "OWNER" || userRole === "ADMIN" ? "" : currentMembershipId
   );
@@ -362,9 +388,9 @@ export default function TasksClientView({
           return new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime();
         }
         case "CREATED_DESC":
-          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+          return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
         case "CREATED_ASC":
-          return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+          return new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime();
         case "ALPHA_ASC":
           return a.title.localeCompare(b.title);
         case "ALPHA_DESC":
@@ -407,6 +433,41 @@ export default function TasksClientView({
     setTaskSortBy("DUE_DATE_ASC");
   };
 
+  // Multi-Assignee Resolution Helper
+  const getTaskAssignees = (task: TaskItem): MemberOption[] => {
+    if (Array.isArray(task.assignedMemberIds) && task.assignedMemberIds.length > 0) {
+      const found = members.filter((m) => task.assignedMemberIds!.includes(m.id));
+      if (found.length > 0) return found;
+    }
+    if (task.assigneeId) {
+      const primary = members.find((m) => m.id === task.assigneeId);
+      if (primary) return [primary];
+    }
+    if (task.assignee) {
+      return [
+        {
+          id: task.assignee.id || task.assigneeId || "",
+          role: "",
+          user: task.assignee.user,
+          employee: task.assignee.employee
+            ? {
+                employeeId: task.assignee.employee.employeeId,
+                designation: task.assignee.employee.designation,
+                department: task.assignee.employee.department ?? null,
+              }
+            : null,
+        },
+      ];
+    }
+    return [];
+  };
+
+  const isTaskAssignedToMe = (task: TaskItem): boolean => {
+    if (task.assigneeId === currentMembershipId) return true;
+    if (Array.isArray(task.assignedMemberIds) && task.assignedMemberIds.includes(currentMembershipId)) return true;
+    return false;
+  };
+
   // Filter projects for task assign modal by selected architectural typology
   const effectiveTypology = useMemo(() => {
     return taskTypology === "OTHER" ? otherTypology.trim() : taskTypology.trim();
@@ -433,6 +494,40 @@ export default function TasksClientView({
 
   const handleRemoveChecklistItem = (index: number) => {
     setChecklistItems(checklistItems.filter((_, i) => i !== index));
+  };
+
+  // Edit Modal Typology, Project, and Phase helpers
+  const effectiveEditTypology = useMemo(() => {
+    return editTypology === "OTHER" ? editOtherTypology.trim() : editTypology.trim();
+  }, [editTypology, editOtherTypology]);
+
+  const filteredProjectsForEdit = useMemo(() => {
+    if (!effectiveEditTypology) return projects;
+    return projects.filter((p) => isTypologyMatch(p.projectType, effectiveEditTypology));
+  }, [projects, effectiveEditTypology]);
+
+  const currentEditProject = projects.find((p) => p.id === editProjectId);
+  const availableEditPhases = currentEditProject?.phases || [];
+
+  const handleAddEditChecklistField = () => {
+    setEditChecklistItems([...editChecklistItems, ""]);
+  };
+
+  const handleUpdateEditChecklistItem = (index: number, val: string) => {
+    const updated = [...editChecklistItems];
+    updated[index] = val;
+    setEditChecklistItems(updated);
+  };
+
+  const handleRemoveEditChecklistItem = (index: number) => {
+    setEditChecklistItems(editChecklistItems.filter((_, i) => i !== index));
+  };
+
+  const handleEditCustomFieldChange = (key: string, value: any) => {
+    setEditCustomFieldValues((prev) => ({
+      ...prev,
+      [key]: value,
+    }));
   };
 
   // Create Task
@@ -499,7 +594,8 @@ export default function TasksClientView({
           phaseId: selectedPhaseId === "OTHER" ? undefined : (selectedPhaseId || undefined),
           title: fullTitle,
           description: fullDescription || undefined,
-          assigneeId: taskAssigneeId === "OTHER" ? undefined : (taskAssigneeId || undefined),
+          assigneeId: taskAssigneeIds[0] || (taskAssigneeId === "OTHER" ? undefined : (taskAssigneeId || undefined)),
+          assigneeIds: taskAssigneeIds.length > 0 ? taskAssigneeIds : undefined,
           priority: effectivePriority,
           dueDate: taskDueDate || undefined,
           estimatedHours: taskEstimatedHours ? Number(taskEstimatedHours) : undefined,
@@ -511,11 +607,10 @@ export default function TasksClientView({
       if (!res.ok) {
         setErrorMessage(data.error || "Failed to create task");
       } else {
-        const assignedMember = members.find((m) => m.id === taskAssigneeId);
-        const assigneeName = taskAssigneeId === "OTHER"
-          ? (effectiveAssigneeName || "External Specialist")
-          : (assignedMember?.user.fullName || "colleague");
-        setSuccessMessage(`Deliverable "${taskTitle}" assigned successfully to ${assigneeName}!`);
+        const assignedNames = taskAssigneeIds.length > 0
+          ? members.filter((m) => taskAssigneeIds.includes(m.id)).map((m) => m.user.fullName).join(", ")
+          : (effectiveAssigneeName || "colleague");
+        setSuccessMessage(`Deliverable "${taskTitle}" assigned successfully to ${assignedNames}!`);
 
         if (data.task?.id && Object.keys(payloadCustomValues).length > 0) {
           try {
@@ -544,6 +639,7 @@ export default function TasksClientView({
         setOtherPhaseName("");
         setOtherAssigneeName("");
         setOtherPriorityName("");
+        setTaskAssigneeIds(userRole === "OWNER" || userRole === "ADMIN" ? [] : [currentMembershipId]);
         setTaskTitle("");
         setTaskDescription("");
         setTaskDueDate("");
@@ -620,44 +716,6 @@ export default function TasksClientView({
     setDraggedTaskId(null);
     if (!task || task.status === targetStatus) return;
 
-    const isMyTask = task.assigneeId === currentMembershipId;
-
-    // Rule 1: Moving to COMPLETED
-    if (targetStatus === "COMPLETED") {
-      if (!isPrivileged) {
-        setErrorMessage("Self-approval blocked. Architecture deliverables must be reviewed and approved by an Owner or Admin.");
-        return;
-      }
-      if (task.status !== "IN_REVIEW") {
-        // Direct override required
-        setOverrideModal({ taskId: task.id, title: task.title });
-        return;
-      }
-      updateStatus(task.id, "COMPLETED");
-      return;
-    }
-
-    // Rule 2: Reverting from IN_REVIEW to IN_PROGRESS (Change request)
-    if (task.status === "IN_REVIEW" && targetStatus === "IN_PROGRESS") {
-      setChangeRequestModal({ taskId: task.id, title: task.title });
-      return;
-    }
-
-    // Rule 3: Moving to IN_PROGRESS
-    if (targetStatus === "IN_PROGRESS") {
-      if (task.status === "NOT_STARTED") {
-        updateStatus(task.id, "IN_PROGRESS");
-        return;
-      }
-    }
-
-    // Rule 4: Submitting to IN_REVIEW
-    if (targetStatus === "IN_REVIEW") {
-      updateStatus(task.id, "IN_REVIEW");
-      return;
-    }
-
-    // Default fallback: execute requested transition
     updateStatus(task.id, targetStatus);
   };
 
@@ -725,15 +783,49 @@ export default function TasksClientView({
     }
   };
 
-  // Open Edit Modal
+  // Open Edit Modal (full-fidelity with all fields)
   const openEditModal = (task: TaskItem) => {
     setEditModal({ task });
+    const existingCustom = customValuesByTask[task.id] || (task as any).customFields || {};
+
+    // 1. Typology
+    const typ = existingCustom.typology || task.project?.projectType || "";
+    setEditTypology(typ);
+    setEditOtherTypology("");
+
+    // 2. Project & Phase
+    setEditProjectId(task.projectId || task.project?.id || "");
+    setEditOtherProjectName(existingCustom.customProject || "");
+    setEditPhaseId(task.phaseId || task.phase?.id || "");
+    setEditOtherPhaseName(existingCustom.customPhase || "");
+
+    // 3. Title & Description
     setEditTitle(task.title);
     setEditDescription(task.description || "");
+
+    // 4. Assignees (Multi-select)
+    const assignees = getTaskAssignees(task);
+    const initialAssigneeIds = assignees.map((a) => a.id).filter(Boolean);
+    setEditAssigneeIds(initialAssigneeIds);
+    setEditOtherAssigneeName(existingCustom.externalAssignee || "");
+
+    // 5. Priority
     setEditPriority(task.priority);
+    setEditOtherPriorityName(existingCustom.customPriority || "");
+
+    // 6. Schedule & Effort
     setEditDueDate(task.dueDate ? new Date(task.dueDate).toISOString().split("T")[0] : "");
     setEditEstimatedHours(task.estimatedHours ? String(task.estimatedHours) : "");
-    setEditPhaseId(task.phase?.id || "");
+
+    // 7. Checklist
+    if (task.checklistItems && task.checklistItems.length > 0) {
+      setEditChecklistItems(task.checklistItems.map((ci) => ci.title));
+    } else {
+      setEditChecklistItems([""]);
+    }
+
+    // 8. Custom fields
+    setEditCustomFieldValues(existingCustom);
   };
 
   // Submit Edit Task
@@ -744,19 +836,24 @@ export default function TasksClientView({
     setEditing(true);
     setErrorMessage(null);
 
+    const isCreator = editModal.task.creatorId === currentMembershipId || editModal.task.creator?.id === currentMembershipId;
+    const canEditFull = isPrivileged || isCreator;
+
     try {
-      // If employee, only send description to comply with field-level restrictions
       const payload: any = {
         taskId: editModal.task.id,
         description: editDescription.trim() || null,
+        estimatedHours: editEstimatedHours ? Number(editEstimatedHours) : null,
+        checklist: editChecklistItems.filter((item) => item.trim().length > 0),
       };
 
-      if (isPrivileged) {
+      if (canEditFull) {
         payload.title = editTitle.trim();
-        payload.priority = editPriority;
+        payload.priority = editPriority === "OTHER" ? "MEDIUM" : editPriority;
         payload.dueDate = editDueDate || null;
-        payload.estimatedHours = editEstimatedHours ? Number(editEstimatedHours) : null;
-        payload.phaseId = editPhaseId || null;
+        payload.projectId = editProjectId === "OTHER" ? undefined : (editProjectId || undefined);
+        payload.phaseId = editPhaseId === "OTHER" ? null : (editPhaseId || null);
+        payload.assigneeIds = editAssigneeIds;
       }
 
       const res = await fetch(`/api/tasks/update?workspaceSlug=${workspaceSlug}`, {
@@ -769,23 +866,72 @@ export default function TasksClientView({
       if (!res.ok) {
         setErrorMessage(data.error || "Failed to update task");
       } else {
-        setSuccessMessage(`Task updated successfully!`);
+        setSuccessMessage(`Deliverable "${editTitle}" updated successfully!`);
+
+        // Save custom fields if any
+        const payloadCustomValues: Record<string, any> = {
+          ...editCustomFieldValues,
+          ...(editTypology ? { typology: editTypology === "OTHER" ? editOtherTypology.trim() : editTypology.trim() } : {}),
+          ...(editOtherProjectName ? { customProject: editOtherProjectName.trim() } : {}),
+          ...(editOtherPhaseName ? { customPhase: editOtherPhaseName.trim() } : {}),
+          ...(editOtherAssigneeName ? { externalAssignee: editOtherAssigneeName.trim() } : {}),
+          ...(editPriority === "OTHER" && editOtherPriorityName ? { customPriority: editOtherPriorityName.trim() } : {}),
+        };
+
+        if (Object.keys(payloadCustomValues).length > 0) {
+          try {
+            await fetch(`/api/custom-fields/values?workspaceSlug=${workspaceSlug}`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                entity: "TASK",
+                recordId: editModal.task.id,
+                values: payloadCustomValues,
+              }),
+            });
+            setCustomValuesByTask((prev) => ({
+              ...prev,
+              [editModal.task.id]: payloadCustomValues,
+            }));
+          } catch (err) {
+            console.error("Failed to save custom fields in edit", err);
+          }
+        }
+
+        const targetProj = projects.find((p) => p.id === editProjectId);
         const targetPhase = projects.flatMap((p) => p.phases).find((ph) => ph.id === editPhaseId);
+        const targetAssignee = members.find((m) => m.id === editAssigneeIds[0]);
 
         setTasks((prev) =>
           prev.map((t) =>
             t.id === editModal.task.id
               ? {
                   ...t,
+                  title: editTitle.trim(),
                   description: editDescription.trim() || null,
-                  ...(isPrivileged
+                  estimatedHours: editEstimatedHours ? Number(editEstimatedHours) : null,
+                  checklistItems: editChecklistItems
+                    .filter((item) => item.trim().length > 0)
+                    .map((item, idx) => ({
+                      id: `chk-${idx}`,
+                      title: item.trim(),
+                      isCompleted: false,
+                    })),
+                  ...(canEditFull
                     ? {
-                        title: editTitle.trim(),
-                        priority: editPriority,
+                        priority: (editPriority === "OTHER" ? "MEDIUM" : editPriority) as any,
                         dueDate: editDueDate || null,
-                        estimatedHours: editEstimatedHours ? Number(editEstimatedHours) : null,
+                        projectId: editProjectId || t.projectId,
+                        project: targetProj
+                          ? { id: targetProj.id, code: targetProj.code, name: targetProj.name, projectType: targetProj.projectType }
+                          : t.project,
                         phaseId: editPhaseId || null,
-                        phase: targetPhase ? { id: targetPhase.id, phaseName: targetPhase.phaseName } : t.phase,
+                        phase: targetPhase ? { id: targetPhase.id, phaseName: targetPhase.phaseName } : null,
+                        assignedMemberIds: editAssigneeIds,
+                        assigneeId: editAssigneeIds[0] || null,
+                        assignee: targetAssignee
+                          ? { id: targetAssignee.id, user: targetAssignee.user, employee: targetAssignee.employee }
+                          : t.assignee,
                       }
                     : {}),
                 }
@@ -794,7 +940,34 @@ export default function TasksClientView({
         );
 
         if (drawerTask && drawerTask.id === editModal.task.id) {
-          setDrawerTask((prev) => (prev ? { ...prev, description: editDescription.trim() || null } : null));
+          setDrawerTask((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  title: editTitle.trim(),
+                  description: editDescription.trim() || null,
+                  estimatedHours: editEstimatedHours ? Number(editEstimatedHours) : null,
+                  checklistItems: editChecklistItems
+                    .filter((item) => item.trim().length > 0)
+                    .map((item, idx) => ({
+                      id: `chk-${idx}`,
+                      title: item.trim(),
+                      isCompleted: false,
+                    })),
+                  ...(canEditFull
+                    ? {
+                        priority: (editPriority === "OTHER" ? "MEDIUM" : editPriority) as any,
+                        dueDate: editDueDate || null,
+                        assignedMemberIds: editAssigneeIds,
+                        assigneeId: editAssigneeIds[0] || null,
+                        assignee: targetAssignee
+                          ? { id: targetAssignee.id, user: targetAssignee.user, employee: targetAssignee.employee }
+                          : prev.assignee,
+                      }
+                    : {}),
+                }
+              : null
+          );
         }
 
         setEditModal(null);
@@ -952,15 +1125,50 @@ export default function TasksClientView({
   const getStatusBadge = (s: string) => {
     switch (s) {
       case "COMPLETED":
-        return <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">✔ Completed</span>;
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+            ✔ Completed
+          </span>
+        );
+      case "CHECKING":
       case "IN_REVIEW":
-        return <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200">⏳ In Review</span>;
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200">
+            🔍 Checking
+          </span>
+        );
+      case "ONGOING":
       case "IN_PROGRESS":
-        return <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">▶ In Progress</span>;
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+            ⚡ Ongoing
+          </span>
+        );
+      case "STARTED":
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-sky-50 text-sky-700 border border-sky-200">
+            ▶ Started
+          </span>
+        );
+      case "TODO":
+      case "NOT_STARTED":
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#F2F4FF] text-[#696E82] border border-[#E2E6F0]">
+            📋 Todo
+          </span>
+        );
       case "BLOCKED":
-        return <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">⛔ Blocked</span>;
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+            ⛔ Blocked
+          </span>
+        );
       default:
-        return <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#F2F4FF] text-[#696E82] border border-[#E2E6F0]">Not Started</span>;
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#F2F4FF] text-[#696E82] border border-[#E2E6F0]">
+            {s}
+          </span>
+        );
     }
   };
 
@@ -1300,10 +1508,11 @@ export default function TasksClientView({
             className="p-1.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-lg text-xs font-medium text-[#1F1F1F] focus:outline-none focus:ring-1 focus:ring-[#5A81FA]"
           >
             <option value="ALL">All Statuses</option>
-            <option value="NOT_STARTED">Not Started</option>
-            <option value="IN_PROGRESS">In Progress</option>
-            <option value="WAITING_REVIEW">Waiting for Review</option>
-            <option value="COMPLETED">Completed</option>
+            <option value="NOT_STARTED">📋 Todo</option>
+            <option value="STARTED">▶ Started</option>
+            <option value="ONGOING">⚡ Ongoing</option>
+            <option value="CHECKING">🔍 Checking</option>
+            <option value="COMPLETED">✔ Completed</option>
           </select>
 
           {/* Priority */}
@@ -1397,8 +1606,10 @@ export default function TasksClientView({
               {filteredTasks.map((task) => {
                 const isOverdue =
                   task.dueDate && new Date(task.dueDate) < new Date() && task.status !== "COMPLETED";
-                const isMyTask = task.assigneeId === currentMembershipId;
-                const canEditOrReassign = isPrivileged || isMyTask;
+                const isMyTask = isTaskAssignedToMe(task);
+                const isCreator = task.creatorId === currentMembershipId || task.creator?.id === currentMembershipId;
+                const canEditOrReassign = isPrivileged || isMyTask || isCreator;
+                const assignees = getTaskAssignees(task);
 
                 return (
                   <div
@@ -1437,22 +1648,32 @@ export default function TasksClientView({
 
                       {/* Metadata Row */}
                       <div className="flex flex-wrap items-center gap-3 text-xs pt-1">
-                        {/* Assignee highlight */}
-                        <div className="inline-flex items-center gap-1.5 bg-[#F2F4FF] px-2.5 py-1 rounded-lg border border-[#E2E6F0]">
-                          <User className="w-3.5 h-3.5 text-[#5A81FA]" />
-                          <span className="text-[11px] text-[#696E82]">Assignee:</span>
-                          <span className="font-bold text-[#1F1F1F] text-xs">
-                            {task.assignee ? task.assignee.user.fullName : "Unassigned"}
-                          </span>
-                          {task.assignee?.employee?.employeeId && (
-                            <span className="font-mono text-[10px] font-bold text-[#5A81FA] bg-white px-1.5 py-0.2 rounded border border-[#CEDEFF]">
-                              {task.assignee.employee.employeeId}
-                            </span>
-                          )}
-                          {isMyTask && (
-                            <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-100 px-1 rounded">
-                              YOU
-                            </span>
+                        {/* Assignees highlight */}
+                        <div className="inline-flex items-center gap-1.5 bg-[#F2F4FF] px-2.5 py-1 rounded-lg border border-[#E2E6F0] flex-wrap">
+                          <Users className="w-3.5 h-3.5 text-[#5A81FA] shrink-0" />
+                          <span className="text-[11px] text-[#696E82]">Assignees:</span>
+                          {assignees.length > 0 ? (
+                            assignees.map((assignee, idx) => {
+                              const isMe = assignee.id === currentMembershipId;
+                              return (
+                                <span key={assignee.id || idx} className="inline-flex items-center gap-1 text-xs font-semibold text-[#1F1F1F]">
+                                  <span>{assignee.user.fullName}</span>
+                                  {assignee.employee?.employeeId && (
+                                    <span className="font-mono text-[10px] font-bold text-[#5A81FA] bg-white px-1.5 py-0.2 rounded border border-[#CEDEFF]">
+                                      {assignee.employee.employeeId}
+                                    </span>
+                                  )}
+                                  {isMe && (
+                                    <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-100 px-1 rounded">
+                                      YOU
+                                    </span>
+                                  )}
+                                  {idx < assignees.length - 1 && <span className="text-[#A0AEC0] mr-1">,</span>}
+                                </span>
+                              );
+                            })
+                          ) : (
+                            <span className="font-semibold text-[#696E82] text-xs">Unassigned</span>
                           )}
                         </div>
 
@@ -1588,66 +1809,37 @@ export default function TasksClientView({
                         )}
                       </div>
 
-                      {/* Workflow Status Progression Buttons */}
-                      <div className="flex items-center gap-1.5 mt-1">
-                        {task.status === "NOT_STARTED" && (
+                      {/* Workflow Status Quick Selector (5 Statuses) */}
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-[11px] text-[#696E82] font-semibold hidden sm:inline">Status:</span>
+                        <select
+                          value={
+                            task.status === "NOT_STARTED" ? "TODO" :
+                            task.status === "IN_PROGRESS" ? "ONGOING" :
+                            task.status === "IN_REVIEW" ? "CHECKING" :
+                            task.status
+                          }
+                          onChange={(e) => updateStatus(task.id, e.target.value)}
+                          disabled={loadingTaskId === task.id}
+                          className="text-xs font-semibold bg-white border border-[#CEDEFF] text-[#1F1F1F] rounded-lg px-2.5 py-1.5 shadow-2xs hover:border-[#5A81FA] focus:outline-none focus:ring-2 focus:ring-[#5A81FA] cursor-pointer"
+                        >
+                          <option value="TODO">📋 Todo</option>
+                          <option value="STARTED">▶ Started</option>
+                          <option value="ONGOING">⚡ Ongoing</option>
+                          <option value="CHECKING">🔍 Checking</option>
+                          <option value="COMPLETED">✔ Completed</option>
+                        </select>
+
+                        {isPrivileged && (task.status === "IN_REVIEW" || task.status === "CHECKING") && (
                           <button
                             disabled={loadingTaskId === task.id}
-                            onClick={() => updateStatus(task.id, "IN_PROGRESS")}
-                            className="px-3 py-1.5 bg-[#5A81FA] hover:bg-[#426EE8] text-white text-xs font-semibold rounded-lg shadow-2xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                            onClick={() => setChangeRequestModal({ taskId: task.id, title: task.title })}
+                            className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                            title="Request deliverable revisions"
                           >
-                            <Play className="w-3 h-3 fill-current" />
-                            <span>Start Work</span>
+                            <RotateCcw className="w-3 h-3 text-amber-700" />
+                            <span>Changes</span>
                           </button>
-                        )}
-
-                        {task.status === "IN_PROGRESS" && (
-                          <button
-                            disabled={loadingTaskId === task.id}
-                            onClick={() => updateStatus(task.id, "IN_REVIEW")}
-                            className="px-3 py-1.5 bg-[#5A81FA] hover:bg-[#426EE8] text-white text-xs font-semibold rounded-lg shadow-2xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                          >
-                            <Clock className="w-3 h-3" />
-                            <span>Submit for Review</span>
-                          </button>
-                        )}
-
-                        {task.status === "IN_REVIEW" && (
-                          <>
-                            {isPrivileged ? (
-                              <div className="flex items-center gap-1">
-                                <button
-                                  disabled={loadingTaskId === task.id}
-                                  onClick={() => updateStatus(task.id, "COMPLETED")}
-                                  className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold rounded-lg shadow-2xs transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
-                                >
-                                  <CheckCheck className="w-3.5 h-3.5" />
-                                  <span>Approve</span>
-                                </button>
-
-                                <button
-                                  disabled={loadingTaskId === task.id}
-                                  onClick={() => setChangeRequestModal({ taskId: task.id, title: task.title })}
-                                  className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
-                                >
-                                  <RotateCcw className="w-3 h-3 text-amber-700" />
-                                  <span>Changes</span>
-                                </button>
-                              </div>
-                            ) : (
-                              <div className="flex items-center gap-1 text-[11px] text-[#696E82] bg-[#F2F4FF] px-2.5 py-1 rounded-lg border border-[#E2E6F0]">
-                                <ShieldAlert className="w-3 h-3 text-amber-600" />
-                                <span>Awaiting Studio Lead Review</span>
-                              </div>
-                            )}
-                          </>
-                        )}
-
-                        {task.status === "COMPLETED" && (
-                          <div className="flex items-center gap-1 text-xs text-emerald-700 font-semibold px-2 py-1 bg-emerald-50 rounded-lg border border-emerald-200">
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            <span>Approved</span>
-                          </div>
                         )}
                       </div>
                     </div>
@@ -1659,22 +1851,53 @@ export default function TasksClientView({
         </div>
       )}
 
-      {/* 5. KANBAN BOARD WITH DRAG AND DROP */}
+      {/* 5. KANBAN BOARD WITH DRAG AND DROP (5 STATUS COLUMNS) */}
       {view === "kanban" && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           {[
-            { status: "NOT_STARTED", title: "Not Started", color: "border-gray-300", bg: "bg-gray-50/50" },
-            { status: "IN_PROGRESS", title: "In Progress", color: "border-blue-400", bg: "bg-blue-50/30" },
-            { status: "IN_REVIEW", title: "In Review", color: "border-purple-400", bg: "bg-purple-50/30" },
-            { status: "COMPLETED", title: "Completed", color: "border-emerald-500", bg: "bg-emerald-50/30" },
+            {
+              statuses: ["TODO", "NOT_STARTED"],
+              dropStatus: "TODO",
+              title: "Todo",
+              color: "border-slate-300",
+              bg: "bg-slate-50/50",
+            },
+            {
+              statuses: ["STARTED"],
+              dropStatus: "STARTED",
+              title: "Started",
+              color: "border-sky-400",
+              bg: "bg-sky-50/30",
+            },
+            {
+              statuses: ["ONGOING", "IN_PROGRESS"],
+              dropStatus: "ONGOING",
+              title: "Ongoing",
+              color: "border-blue-500",
+              bg: "bg-blue-50/30",
+            },
+            {
+              statuses: ["CHECKING", "IN_REVIEW"],
+              dropStatus: "CHECKING",
+              title: "Checking",
+              color: "border-purple-400",
+              bg: "bg-purple-50/30",
+            },
+            {
+              statuses: ["COMPLETED"],
+              dropStatus: "COMPLETED",
+              title: "Completed",
+              color: "border-emerald-500",
+              bg: "bg-emerald-50/30",
+            },
           ].map((col) => {
-            const colTasks = filteredTasks.filter((t) => t.status === col.status);
+            const colTasks = filteredTasks.filter((t) => col.statuses.includes(t.status as any));
             return (
               <div
-                key={col.status}
+                key={col.title}
                 onDragOver={handleDragOver}
-                onDrop={() => handleDropOnColumn(col.status as any)}
-                className={`bg-white border border-[#E2E6F0] rounded-2xl p-4 flex flex-col min-h-[500px] transition-colors ${col.bg}`}
+                onDrop={() => handleDropOnColumn(col.dropStatus as any)}
+                className={`bg-white border border-[#E2E6F0] rounded-2xl p-3.5 flex flex-col min-h-[500px] transition-colors ${col.bg}`}
               >
                 <div className={`flex items-center justify-between pb-3 border-b-2 ${col.color} mb-3`}>
                   <div className="flex items-center gap-2">
@@ -1687,17 +1910,19 @@ export default function TasksClientView({
 
                 <div className="space-y-3 flex-1 overflow-y-auto pr-1">
                   {colTasks.map((task) => {
-                    const isMyTask = task.assigneeId === currentMembershipId;
-                    const canEditOrReassign = isPrivileged || isMyTask;
+                    const isMyTask = isTaskAssignedToMe(task);
+                    const isCreator = task.creatorId === currentMembershipId || task.creator?.id === currentMembershipId;
+                    const canEditOrReassign = isPrivileged || isMyTask || isCreator;
                     const isOverdue =
                       task.dueDate && new Date(task.dueDate) < new Date() && task.status !== "COMPLETED";
+                    const cardAssignees = getTaskAssignees(task);
 
                     return (
                       <div
                         key={task.id}
                         draggable
                         onDragStart={(e) => handleDragStart(e, task.id)}
-                        className="p-3.5 bg-white border border-[#E2E6F0] rounded-xl shadow-2xs space-y-2 hover:border-[#5A81FA] transition-all cursor-grab active:cursor-grabbing group"
+                        className="p-3 bg-white border border-[#E2E6F0] rounded-xl shadow-2xs space-y-2 hover:border-[#5A81FA] transition-all cursor-grab active:cursor-grabbing group"
                       >
                         <div className="flex items-center justify-between gap-1">
                           <span className="font-mono text-[10px] font-bold text-[#5A81FA] bg-[#F2F4FF] px-1.5 py-0.5 rounded border border-[#CEDEFF]">
@@ -1716,15 +1941,23 @@ export default function TasksClientView({
                           </h4>
                         </button>
 
-                        {/* Assignee pill */}
-                        <div className="text-[11px] text-[#696E82] flex items-center justify-between gap-1 bg-[#F2F4FF] px-2 py-1 rounded">
-                          <span className="truncate">
-                            {task.assignee ? task.assignee.user.fullName : "Unassigned"}
-                          </span>
-                          {isMyTask && (
-                            <span className="text-[9px] font-bold text-emerald-700 bg-emerald-100 px-1 rounded">
-                              YOU
-                            </span>
+                        {/* Multi-Assignee pill */}
+                        <div className="text-[11px] text-[#696E82] bg-[#F2F4FF] px-2 py-1 rounded flex flex-wrap items-center gap-1">
+                          <Users className="w-3 h-3 text-[#5A81FA] shrink-0" />
+                          {cardAssignees.length > 0 ? (
+                            cardAssignees.map((a, i) => (
+                              <span key={a.id || i} className="font-semibold text-[#1F1F1F] truncate max-w-[110px]">
+                                {a.user.fullName}
+                                {a.id === currentMembershipId && (
+                                  <span className="ml-1 text-[8px] font-bold text-emerald-700 bg-emerald-100 px-1 rounded">
+                                    YOU
+                                  </span>
+                                )}
+                                {i < cardAssignees.length - 1 && ","}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="italic">Unassigned</span>
                           )}
                         </div>
 
@@ -1746,8 +1979,8 @@ export default function TasksClientView({
                         </div>
 
                         {/* Card bottom actions */}
-                        <div className="pt-2 border-t border-[#E2E6F0] flex items-center justify-between">
-                          <div className="flex items-center gap-1">
+                        <div className="pt-2 border-t border-[#E2E6F0] flex items-center justify-between gap-1">
+                          <div className="flex items-center gap-0.5">
                             <button
                               onClick={() => setDrawerTask(task)}
                               className="p-1 text-[#696E82] hover:text-[#1F1F1F] hover:bg-[#F2F4FF] rounded cursor-pointer"
@@ -1776,30 +2009,23 @@ export default function TasksClientView({
                           </div>
 
                           <div>
-                            {task.status === "NOT_STARTED" && (
-                              <button
-                                onClick={() => updateStatus(task.id, "IN_PROGRESS")}
-                                className="text-[10px] font-semibold text-[#5A81FA] hover:underline cursor-pointer flex items-center gap-0.5"
-                              >
-                                <span>Start →</span>
-                              </button>
-                            )}
-                            {task.status === "IN_PROGRESS" && (
-                              <button
-                                onClick={() => updateStatus(task.id, "IN_REVIEW")}
-                                className="text-[10px] font-semibold text-[#5A81FA] hover:underline cursor-pointer flex items-center gap-0.5"
-                              >
-                                <span>Submit →</span>
-                              </button>
-                            )}
-                            {task.status === "IN_REVIEW" && isPrivileged && (
-                              <button
-                                onClick={() => updateStatus(task.id, "COMPLETED")}
-                                className="text-[10px] font-semibold text-emerald-700 hover:underline cursor-pointer flex items-center gap-0.5"
-                              >
-                                <span>Approve ✔</span>
-                              </button>
-                            )}
+                            <select
+                              value={
+                                task.status === "NOT_STARTED" ? "TODO" :
+                                task.status === "IN_PROGRESS" ? "ONGOING" :
+                                task.status === "IN_REVIEW" ? "CHECKING" :
+                                task.status
+                              }
+                              onChange={(e) => updateStatus(task.id, e.target.value)}
+                              disabled={loadingTaskId === task.id}
+                              className="text-[10px] font-semibold text-[#1F1F1F] bg-white border border-[#CEDEFF] rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-[#5A81FA] cursor-pointer"
+                            >
+                              <option value="TODO">Todo</option>
+                              <option value="STARTED">Started</option>
+                              <option value="ONGOING">Ongoing</option>
+                              <option value="CHECKING">Checking</option>
+                              <option value="COMPLETED">Completed</option>
+                            </select>
                           </div>
                         </div>
                       </div>
@@ -1858,15 +2084,30 @@ export default function TasksClientView({
               {/* Meta Grid */}
               <div className="grid grid-cols-2 gap-3 p-3 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl">
                 <div>
-                  <span className="text-[#696E82] text-[11px] block">Assignee</span>
-                  <div className="font-bold text-[#1F1F1F] mt-0.5">
-                    {drawerTask.assignee ? drawerTask.assignee.user.fullName : "Unassigned"}
+                  <span className="text-[#696E82] text-[11px] block">Assigned Staff</span>
+                  <div className="mt-1 space-y-1">
+                    {getTaskAssignees(drawerTask).length > 0 ? (
+                      getTaskAssignees(drawerTask).map((member, idx) => (
+                        <div key={member.id || idx} className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-bold text-[#1F1F1F] text-xs">
+                            {member.user.fullName}
+                          </span>
+                          {member.employee?.employeeId && (
+                            <span className="text-[10px] text-[#5A81FA] font-mono bg-white px-1.5 py-0.2 rounded border border-[#CEDEFF]">
+                              ID: {member.employee.employeeId}
+                            </span>
+                          )}
+                          {member.id === currentMembershipId && (
+                            <span className="text-[9px] font-bold text-emerald-700 bg-emerald-100 px-1 rounded">
+                              YOU
+                            </span>
+                          )}
+                        </div>
+                      ))
+                    ) : (
+                      <span className="font-semibold text-[#696E82] text-xs">Unassigned</span>
+                    )}
                   </div>
-                  {drawerTask.assignee?.employee?.employeeId && (
-                    <span className="text-[10px] text-[#5A81FA] font-mono">
-                      ID: {drawerTask.assignee.employee.employeeId}
-                    </span>
-                  )}
                 </div>
 
                 <div>
@@ -2030,9 +2271,9 @@ export default function TasksClientView({
             </div>
 
             {/* Bottom Actions inside Drawer */}
-            <div className="p-4 border-t border-[#E2E6F0] bg-[#F8F9FD] flex items-center justify-between gap-2">
+            <div className="p-4 border-t border-[#E2E6F0] bg-[#F8F9FD] flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-1.5">
-                {(isPrivileged || drawerTask.assigneeId === currentMembershipId) && (
+                {(isPrivileged || isTaskAssignedToMe(drawerTask) || drawerTask.creatorId === currentMembershipId || drawerTask.creator?.id === currentMembershipId) && (
                   <button
                     onClick={() => {
                       openEditModal(drawerTask);
@@ -2055,39 +2296,32 @@ export default function TasksClientView({
               </div>
 
               <div className="flex items-center gap-2">
-                {drawerTask.status === "NOT_STARTED" && (
-                  <button
-                    onClick={() => updateStatus(drawerTask.id, "IN_PROGRESS")}
-                    className="px-4 py-2 bg-[#5A81FA] hover:bg-[#426EE8] text-white text-xs font-semibold rounded-xl cursor-pointer"
-                  >
-                    Start Work →
-                  </button>
-                )}
+                <span className="text-xs font-medium text-[#696E82]">Status:</span>
+                <select
+                  value={
+                    drawerTask.status === "NOT_STARTED" ? "TODO" :
+                    drawerTask.status === "IN_PROGRESS" ? "ONGOING" :
+                    drawerTask.status === "IN_REVIEW" ? "CHECKING" :
+                    drawerTask.status
+                  }
+                  onChange={(e) => updateStatus(drawerTask.id, e.target.value)}
+                  disabled={loadingTaskId === drawerTask.id}
+                  className="text-xs font-semibold bg-white border border-[#CEDEFF] text-[#1F1F1F] rounded-lg px-2.5 py-1.5 shadow-2xs hover:border-[#5A81FA] focus:outline-none focus:ring-2 focus:ring-[#5A81FA] cursor-pointer"
+                >
+                  <option value="TODO">📋 Todo</option>
+                  <option value="STARTED">▶ Started</option>
+                  <option value="ONGOING">⚡ Ongoing</option>
+                  <option value="CHECKING">🔍 Checking</option>
+                  <option value="COMPLETED">✔ Completed</option>
+                </select>
 
-                {drawerTask.status === "IN_PROGRESS" && (
+                {isPrivileged && (drawerTask.status === "IN_REVIEW" || drawerTask.status === "CHECKING") && (
                   <button
-                    onClick={() => updateStatus(drawerTask.id, "IN_REVIEW")}
-                    className="px-4 py-2 bg-[#5A81FA] hover:bg-[#426EE8] text-white text-xs font-semibold rounded-xl cursor-pointer"
+                    onClick={() => setChangeRequestModal({ taskId: drawerTask.id, title: drawerTask.title })}
+                    className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 text-xs font-semibold rounded-lg cursor-pointer"
                   >
-                    Submit for Review →
+                    Request Changes
                   </button>
-                )}
-
-                {drawerTask.status === "IN_REVIEW" && isPrivileged && (
-                  <>
-                    <button
-                      onClick={() => setChangeRequestModal({ taskId: drawerTask.id, title: drawerTask.title })}
-                      className="px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 text-xs font-semibold rounded-xl cursor-pointer"
-                    >
-                      Request Changes
-                    </button>
-                    <button
-                      onClick={() => updateStatus(drawerTask.id, "COMPLETED")}
-                      className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold rounded-xl cursor-pointer"
-                    >
-                      Approve ✔
-                    </button>
-                  </>
                 )}
               </div>
             </div>
@@ -2198,7 +2432,7 @@ export default function TasksClientView({
       {/* ==================================================== */}
       {editModal && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white border border-[#E2E6F0] rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white border border-[#E2E6F0] rounded-2xl max-w-xl w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-[#E2E6F0] pb-3">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-[#5A81FA] text-white flex items-center justify-center">
@@ -2207,9 +2441,9 @@ export default function TasksClientView({
                 <div>
                   <h3 className="text-base font-bold text-[#1F1F1F]">Edit Deliverable</h3>
                   <p className="text-xs text-[#696E82]">
-                    {isPrivileged
-                      ? "Update task details, schedule, priority, and phase"
-                      : "Update deliverable notes and progress"}
+                    {isPrivileged || editModal.task.creatorId === currentMembershipId
+                      ? "Full edit mode: Update typology, project, phase, assignees, checklist, and specs"
+                      : "Employee progress update: Update deliverable notes, effort, and checklist items"}
                   </p>
                 </div>
               </div>
@@ -2222,102 +2456,232 @@ export default function TasksClientView({
               </button>
             </div>
 
-            {!isPrivileged && (
+            {!isPrivileged && editModal.task.creatorId !== currentMembershipId && (
               <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-900 flex items-center gap-2">
                 <ShieldAlert className="w-4 h-4 text-amber-700 shrink-0" />
                 <span>
-                  Employee field restrictions active: Task title, schedule, priority, and phase are managed by Studio
-                  Leadership. You can update description notes and checklist items.
+                  Employee field mode active: Project, phase, priority, due date, and assignees are set by Studio
+                  Leadership. You can edit deliverable notes, checklist items, estimated hours, and custom field values.
                 </span>
               </div>
             )}
 
             <form onSubmit={handleEditTask} className="space-y-4 text-xs">
+              {/* 1. ARCHITECTURAL TYPOLOGY */}
+              <div className="bg-[#FAFBFD] p-3 rounded-xl border border-[#E2E6F0] space-y-1">
+                <SearchableSelect
+                  id="edit-task-typology"
+                  label="Architectural Typology"
+                  disabled={!isPrivileged && editModal.task.creatorId !== currentMembershipId}
+                  required={false}
+                  placeholder="Select typology (e.g. Commercial, Hospital, Residential)..."
+                  searchPlaceholder="Search typology (e.g. Commercial, Hospital, Villa)..."
+                  options={[
+                    { value: "", label: "All Typologies (Show all projects)" },
+                    ...STUDIO_TYPOLOGIES.map((typ) => ({
+                      value: typ,
+                      label: typ,
+                    })),
+                  ]}
+                  value={editTypology}
+                  onChange={(val) => {
+                    setEditTypology(val);
+                    const eff = val === "OTHER" ? editOtherTypology.trim() : val.trim();
+                    if (eff) {
+                      const match = projects.filter((p) => isTypologyMatch(p.projectType, eff));
+                      if (match.length > 0) {
+                        if (!match.some((p) => p.id === editProjectId)) {
+                          setEditProjectId(match[0].id);
+                          setEditPhaseId("");
+                        }
+                      }
+                    }
+                  }}
+                  allowOther={true}
+                  otherOptionLabel="+ Other Architectural Typology..."
+                  otherValue={editOtherTypology}
+                  onOtherValueChange={(val) => {
+                    setEditOtherTypology(val);
+                    const eff = val.trim();
+                    if (eff) {
+                      const match = projects.filter((p) => isTypologyMatch(p.projectType, eff));
+                      if (match.length > 0) {
+                        if (!match.some((p) => p.id === editProjectId)) {
+                          setEditProjectId(match[0].id);
+                          setEditPhaseId("");
+                        }
+                      }
+                    }
+                  }}
+                  otherInputPlaceholder="Specify custom typology (e.g. Airport, Cultural Pavilion, Data Center)..."
+                  helperText={
+                    effectiveEditTypology
+                      ? `Showing only ${effectiveEditTypology} projects below (${filteredProjectsForEdit.length} found).`
+                      : "Classifies deliverable requirements and filters projects by architectural typology."
+                  }
+                />
+              </div>
+
+              {/* 2. PROJECT & PHASE SELECTOR */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <SearchableSelect
+                  id="edit-select-project"
+                  label="Project"
+                  disabled={!isPrivileged && editModal.task.creatorId !== currentMembershipId}
+                  required={true}
+                  placeholder={
+                    filteredProjectsForEdit.length > 0
+                      ? "Select project..."
+                      : effectiveEditTypology
+                      ? `No ${effectiveEditTypology} projects found`
+                      : "Select project..."
+                  }
+                  searchPlaceholder="Search projects by code, title, or typology..."
+                  options={filteredProjectsForEdit.map((p) => ({
+                    value: p.id,
+                    label: `${p.code} — ${p.name}`,
+                    subLabel: p.projectType || undefined,
+                    badge: p.code,
+                  }))}
+                  value={editProjectId}
+                  onChange={(val) => {
+                    setEditProjectId(val);
+                    setEditPhaseId("");
+                    if (val && val !== "OTHER") {
+                      const found = projects.find((p) => p.id === val);
+                      if (found?.projectType && !editTypology) {
+                        setEditTypology(found.projectType);
+                      }
+                    }
+                  }}
+                  allowOther={true}
+                  otherOptionLabel="+ Other / Custom Project Reference..."
+                  otherValue={editOtherProjectName}
+                  onOtherValueChange={setEditOtherProjectName}
+                  otherInputPlaceholder="Specify custom project code or client reference..."
+                />
+
+                <SearchableSelect
+                  id="edit-select-phase"
+                  label="Architectural Phase"
+                  disabled={!isPrivileged && editModal.task.creatorId !== currentMembershipId}
+                  required={false}
+                  placeholder="Select phase..."
+                  searchPlaceholder="Search phases..."
+                  options={[
+                    { value: "", label: "General Project Deliverable", subLabel: "Not phase-specific" },
+                    ...availableEditPhases.map((ph) => ({
+                      value: ph.id,
+                      label: `${ph.sortOrder}. ${ph.phaseName}`,
+                    })),
+                  ]}
+                  value={editPhaseId}
+                  onChange={setEditPhaseId}
+                  allowOther={true}
+                  otherOptionLabel="+ Other / Custom Phase..."
+                  otherValue={editOtherPhaseName}
+                  onOtherValueChange={setEditOtherPhaseName}
+                  otherInputPlaceholder="Specify custom phase (e.g. Façade Mockup, Commissioning)..."
+                />
+              </div>
+
+              {/* 3. TASK TITLE */}
               <div>
                 <label className="block font-semibold text-[#1F1F1F] mb-1">
-                  Task Title {isPrivileged && <span className="text-red-600">*</span>}
+                  Deliverable Title <span className="text-red-600">*</span>
                 </label>
                 <input
                   type="text"
-                  required={isPrivileged}
-                  disabled={!isPrivileged}
+                  required
+                  disabled={!isPrivileged && editModal.task.creatorId !== currentMembershipId}
                   value={editTitle}
                   onChange={(e) => setEditTitle(e.target.value)}
+                  placeholder="e.g. Prepare 1:20 Pergola Joinery Detail & Column Junctions"
                   className={`w-full p-2.5 rounded-xl border text-[#1F1F1F] focus:outline-none ${
-                    isPrivileged
+                    isPrivileged || editModal.task.creatorId === currentMembershipId
                       ? "bg-[#F8F9FD] border-[#E2E6F0] focus:ring-2 focus:ring-[#5A81FA]"
                       : "bg-[#F2F4FF] border-[#E2E6F0] text-[#696E82] cursor-not-allowed"
                   }`}
                 />
               </div>
 
+              {/* 4. DESCRIPTION & BRIEF */}
               <div>
                 <label className="block font-semibold text-[#1F1F1F] mb-1">
-                  Description & Architectural Notes
+                  Architectural Brief & Instructions
                 </label>
                 <textarea
                   rows={3}
                   value={editDescription}
                   onChange={(e) => setEditDescription(e.target.value)}
-                  placeholder="Material specs, consultant notes, or revisions..."
+                  placeholder="Specify material specifications, MEP coordination notes, or CAD layering rules..."
                   className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-[#1F1F1F] mb-1">Priority</label>
-                  <select
-                    disabled={!isPrivileged}
-                    value={editPriority}
-                    onChange={(e) => setEditPriority(e.target.value as any)}
-                    className={`w-full p-2.5 rounded-xl border text-[#1F1F1F] focus:outline-none ${
-                      isPrivileged
-                        ? "bg-[#F8F9FD] border-[#E2E6F0] focus:ring-2 focus:ring-[#5A81FA]"
-                        : "bg-[#F2F4FF] border-[#E2E6F0] text-[#696E82] cursor-not-allowed"
-                    }`}
-                  >
-                    <option value="LOW">Low</option>
-                    <option value="MEDIUM">Medium</option>
-                    <option value="HIGH">High Priority</option>
-                    <option value="URGENT">Urgent (Monitored)</option>
-                  </select>
-                </div>
+              {/* 5. ASSIGNEES (MULTI-SELECT) & PRIORITY */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <SearchableSelect
+                  id="edit-task-assignee"
+                  label="Assignee(s)"
+                  disabled={!isPrivileged && editModal.task.creatorId !== currentMembershipId}
+                  required={true}
+                  placeholder="Select team member(s)..."
+                  searchPlaceholder="Search team by name, ID or role..."
+                  multiSelect={true}
+                  values={editAssigneeIds}
+                  onMultiChange={setEditAssigneeIds}
+                  options={members.map((m) => {
+                    const designation = m.employee?.designation ? `${m.employee.designation} (${m.role})` : m.role;
+                    return {
+                      value: m.id,
+                      label: m.user.fullName,
+                      subLabel: designation,
+                      badge: m.employee?.employeeId || undefined,
+                    };
+                  })}
+                  allowOther={true}
+                  otherOptionLabel="+ Other / External Specialist or Freelancer..."
+                  otherValue={editOtherAssigneeName}
+                  onOtherValueChange={setEditOtherAssigneeName}
+                  otherInputPlaceholder="Specify external specialist or consultant name..."
+                  helperText="Select one or more employees assigned to this deliverable."
+                />
 
-                <div>
-                  <label className="block font-semibold text-[#1F1F1F] mb-1">Architectural Phase</label>
-                  <select
-                    disabled={!isPrivileged}
-                    value={editPhaseId}
-                    onChange={(e) => setEditPhaseId(e.target.value)}
-                    className={`w-full p-2.5 rounded-xl border text-[#1F1F1F] focus:outline-none ${
-                      isPrivileged
-                        ? "bg-[#F8F9FD] border-[#E2E6F0] focus:ring-2 focus:ring-[#5A81FA]"
-                        : "bg-[#F2F4FF] border-[#E2E6F0] text-[#696E82] cursor-not-allowed"
-                    }`}
-                  >
-                    <option value="">General Project Phase</option>
-                    {projects
-                      .find((p) => p.id === editModal.task.projectId)
-                      ?.phases.map((ph) => (
-                        <option key={ph.id} value={ph.id}>
-                          {ph.sortOrder}. {ph.phaseName}
-                        </option>
-                      ))}
-                  </select>
-                </div>
+                <SearchableSelect
+                  id="edit-task-priority"
+                  label="Priority"
+                  disabled={!isPrivileged && editModal.task.creatorId !== currentMembershipId}
+                  required={false}
+                  placeholder="Select priority..."
+                  searchPlaceholder="Search priority level..."
+                  options={[
+                    { value: "LOW", label: "Low Priority", subLabel: "Routine drafting / non-blocking" },
+                    { value: "MEDIUM", label: "Medium", subLabel: "Standard milestone deliverable" },
+                    { value: "HIGH", label: "High Priority", subLabel: "Client deadline or review gate" },
+                    { value: "URGENT", label: "Urgent (Monitored)", subLabel: "Critical path / Immediate escalation" },
+                  ]}
+                  value={editPriority}
+                  onChange={setEditPriority}
+                  allowOther={true}
+                  otherOptionLabel="+ Other / Custom Priority Level..."
+                  otherValue={editOtherPriorityName}
+                  onOtherValueChange={setEditOtherPriorityName}
+                  otherInputPlaceholder="Specify custom priority descriptor..."
+                />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              {/* 6. DUE DATE & ESTIMATED EFFORT */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold text-[#1F1F1F] mb-1">Target Due Date</label>
                   <input
                     type="date"
-                    disabled={!isPrivileged}
+                    disabled={!isPrivileged && editModal.task.creatorId !== currentMembershipId}
                     value={editDueDate}
                     onChange={(e) => setEditDueDate(e.target.value)}
                     className={`w-full p-2.5 rounded-xl border text-[#1F1F1F] focus:outline-none ${
-                      isPrivileged
+                      isPrivileged || editModal.task.creatorId === currentMembershipId
                         ? "bg-[#F8F9FD] border-[#E2E6F0] focus:ring-2 focus:ring-[#5A81FA]"
                         : "bg-[#F2F4FF] border-[#E2E6F0] text-[#696E82] cursor-not-allowed"
                     }`}
@@ -2330,20 +2694,61 @@ export default function TasksClientView({
                     type="number"
                     step="0.5"
                     min="0.5"
-                    disabled={!isPrivileged}
                     value={editEstimatedHours}
                     onChange={(e) => setEditEstimatedHours(e.target.value)}
-                    className={`w-full p-2.5 rounded-xl border text-[#1F1F1F] focus:outline-none ${
-                      isPrivileged
-                        ? "bg-[#F8F9FD] border-[#E2E6F0] focus:ring-2 focus:ring-[#5A81FA]"
-                        : "bg-[#F2F4FF] border-[#E2E6F0] text-[#696E82] cursor-not-allowed"
-                    }`}
+                    placeholder="e.g. 6"
+                    className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
                   />
                 </div>
               </div>
 
+              {/* 7. DYNAMIC CHECKLIST ITEMS */}
+              <div className="pt-2 border-t border-[#E2E6F0] space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="font-semibold text-[#1F1F1F]">Checklist Items / Deliverable Sub-Tasks</label>
+                  <button
+                    type="button"
+                    onClick={handleAddEditChecklistField}
+                    className="text-[11px] font-semibold text-[#5A81FA] hover:underline cursor-pointer flex items-center gap-1"
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>Add Item</span>
+                  </button>
+                </div>
+
+                {editChecklistItems.map((item, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={item}
+                      onChange={(e) => handleUpdateEditChecklistItem(idx, e.target.value)}
+                      placeholder={`Checklist item ${idx + 1} (e.g. Check waterproofing drop with structural drawings)`}
+                      className="flex-1 p-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-lg text-xs text-[#1F1F1F]"
+                    />
+                    {editChecklistItems.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveEditChecklistItem(idx)}
+                        className="text-[#696E82] hover:text-red-600 p-1 cursor-pointer"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* 8. DYNAMIC CUSTOM FIELDS */}
+              <DynamicFormFields
+                fields={customFields}
+                values={editCustomFieldValues}
+                onChange={handleEditCustomFieldChange}
+                disabled={editing}
+              />
+
+              {/* 9. MODAL BUTTONS (WITH DELETE BUTTON) */}
               <div className="flex items-center justify-between pt-3 border-t border-[#E2E6F0]">
-                {(isPrivileged || editModal.task.creatorId === currentMembershipId || editModal.task.creator?.id === currentMembershipId) ? (
+                {isPrivileged || editModal.task.creatorId === currentMembershipId || editModal.task.creator?.id === currentMembershipId ? (
                   <button
                     type="button"
                     onClick={() => {
@@ -2556,10 +2961,13 @@ export default function TasksClientView({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <SearchableSelect
                   id="task-assignee"
-                  label="Assignee"
+                  label="Assignee(s)"
                   required={true}
-                  placeholder="Select team member..."
+                  placeholder="Select team member(s)..."
                   searchPlaceholder="Search team by name, ID or role..."
+                  multiSelect={true}
+                  values={taskAssigneeIds}
+                  onMultiChange={setTaskAssigneeIds}
                   options={members.map((m) => {
                     const designation = m.employee?.designation ? `${m.employee.designation} (${m.role})` : m.role;
                     return {
@@ -2569,13 +2977,12 @@ export default function TasksClientView({
                       badge: m.employee?.employeeId || undefined,
                     };
                   })}
-                  value={taskAssigneeId}
-                  onChange={setTaskAssigneeId}
                   allowOther={true}
                   otherOptionLabel="+ Other / External Specialist or Freelancer..."
                   otherValue={otherAssigneeName}
                   onOtherValueChange={setOtherAssigneeName}
                   otherInputPlaceholder="Specify external specialist or consultant name..."
+                  helperText="Select one or more employees to assign."
                 />
 
                 <SearchableSelect

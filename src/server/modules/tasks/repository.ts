@@ -19,6 +19,7 @@ export interface CreateTaskData {
   title: string;
   description?: string;
   assigneeId?: string;
+  assigneeIds?: string[];
   priority: TaskPriority;
   startDate?: Date;
   dueDate?: Date;
@@ -55,31 +56,44 @@ export function getWorkspaceDayBoundaries(timezone: string = "Asia/Kolkata") {
 export async function findTasks(ctx: TenantContext, params: TaskFilterParams = {}) {
   const { startOfToday, endOfToday } = getWorkspaceDayBoundaries(ctx.timezone);
 
-  const whereClause: any = {
-    tenantId: ctx.tenantId, // STRICT TENANT ISOLATION
-  };
+  const andConditions: any[] = [
+    { tenantId: ctx.tenantId }, // STRICT TENANT ISOLATION
+  ];
 
-  // Employees can only ever see their own assigned tasks
+  // Employees can only ever see their own assigned tasks or deliverables they created
   if (params.myTasksOnly || !isAdminOrOwner(ctx)) {
-    whereClause.assigneeId = ctx.membershipId;
+    andConditions.push({
+      OR: [
+        { assigneeId: ctx.membershipId },
+        { assignedMemberIds: { string_contains: ctx.membershipId } },
+        { creatorId: ctx.membershipId },
+      ],
+    });
   } else if (params.assigneeId) {
-    whereClause.assigneeId = params.assigneeId;
+    andConditions.push({
+      OR: [
+        { assigneeId: params.assigneeId },
+        { assignedMemberIds: { string_contains: params.assigneeId } },
+      ],
+    });
   }
 
   if (params.projectId) {
-    whereClause.projectId = params.projectId;
+    andConditions.push({ projectId: params.projectId });
   }
 
   if (params.priority && params.priority !== "ALL") {
-    whereClause.priority = params.priority;
+    andConditions.push({ priority: params.priority });
   }
 
   if (params.search && params.search.trim()) {
     const q = params.search.trim().toLowerCase();
-    whereClause.OR = [
-      { title: { contains: q } },
-      { description: { contains: q } },
-    ];
+    andConditions.push({
+      OR: [
+        { title: { contains: q } },
+        { description: { contains: q } },
+      ],
+    });
   }
 
   // 1. Due Date Category Filter (Today, Overdue, Upcoming)
@@ -90,14 +104,20 @@ export async function findTasks(ctx: TenantContext, params: TaskFilterParams = {
   );
 
   if (dueFilter === "TODAY") {
-    whereClause.dueDate = { gte: startOfToday, lte: endOfToday };
-    whereClause.status = { notIn: [TaskWorkflowStatus.COMPLETED, TaskWorkflowStatus.CANCELLED] };
+    andConditions.push({
+      dueDate: { gte: startOfToday, lte: endOfToday },
+      status: { notIn: [TaskWorkflowStatus.COMPLETED, TaskWorkflowStatus.CANCELLED] },
+    });
   } else if (dueFilter === "OVERDUE") {
-    whereClause.dueDate = { lt: startOfToday };
-    whereClause.status = { notIn: [TaskWorkflowStatus.COMPLETED, TaskWorkflowStatus.CANCELLED] };
+    andConditions.push({
+      dueDate: { lt: startOfToday },
+      status: { notIn: [TaskWorkflowStatus.COMPLETED, TaskWorkflowStatus.CANCELLED] },
+    });
   } else if (dueFilter === "UPCOMING") {
-    whereClause.dueDate = { gt: endOfToday };
-    whereClause.status = { notIn: [TaskWorkflowStatus.COMPLETED, TaskWorkflowStatus.CANCELLED] };
+    andConditions.push({
+      dueDate: { gt: endOfToday },
+      status: { notIn: [TaskWorkflowStatus.COMPLETED, TaskWorkflowStatus.CANCELLED] },
+    });
   }
 
   // 2. Status Category Filter (can overlap with due date filters)
@@ -112,11 +132,11 @@ export async function findTasks(ctx: TenantContext, params: TaskFilterParams = {
   );
 
   if (statusFilter && statusFilter !== "ALL") {
-    whereClause.status = statusFilter;
+    andConditions.push({ status: statusFilter });
   }
 
   return await prisma.task.findMany({
-    where: whereClause,
+    where: { AND: andConditions },
     include: {
       project: {
         select: {
@@ -215,6 +235,14 @@ export async function createTask(ctx: TenantContext, data: CreateTaskData) {
     throw new Error("Project not found in this studio workspace");
   }
 
+  // Handle multi-assignee:
+  // If assigneeIds is provided, use first as primary assigneeId, and store array in assignedMemberIds
+  const allAssigneeIds: string[] = Array.isArray(data.assigneeIds) && data.assigneeIds.length > 0
+    ? data.assigneeIds.filter(Boolean)
+    : (data.assigneeId ? [data.assigneeId] : []);
+
+  const primaryAssigneeId = allAssigneeIds[0] || data.assigneeId || null;
+
   const task = await prisma.task.create({
     data: {
       tenantId: ctx.tenantId,
@@ -222,7 +250,8 @@ export async function createTask(ctx: TenantContext, data: CreateTaskData) {
       phaseId: data.phaseId,
       title: data.title.trim(),
       description: data.description,
-      assigneeId: data.assigneeId,
+      assigneeId: primaryAssigneeId,
+      assignedMemberIds: allAssigneeIds.length > 0 ? allAssigneeIds : undefined,
       creatorId: ctx.membershipId,
       priority: data.priority,
       status: TaskWorkflowStatus.NOT_STARTED,
@@ -232,21 +261,25 @@ export async function createTask(ctx: TenantContext, data: CreateTaskData) {
     },
   });
 
-  // Create real-time notification for the assigned employee
-  if (data.assigneeId) {
-    try {
-      await prisma.notification.create({
-        data: {
-          tenantId: ctx.tenantId,
-          recipientId: data.assigneeId,
-          title: "New Task Assigned",
-          message: `${ctx.userFullName || "A manager"} assigned you a new task: "${task.title}" (${project.code}).`,
-          link: `/w/${ctx.tenantSlug}/tasks?taskId=${task.id}`,
-          isRead: false,
-        },
-      });
-    } catch (err) {
-      console.error("Failed to create task assignment notification:", err);
+  // Create real-time notification for ALL assigned employees
+  if (allAssigneeIds.length > 0) {
+    for (const recipientId of allAssigneeIds) {
+      if (recipientId && recipientId !== ctx.membershipId) {
+        try {
+          await prisma.notification.create({
+            data: {
+              tenantId: ctx.tenantId,
+              recipientId,
+              title: "New Task Assigned",
+              message: `${ctx.userFullName || "A manager"} assigned you a new task: "${task.title}" (${project.code}).`,
+              link: `/w/${ctx.tenantSlug}/tasks?taskId=${task.id}`,
+              isRead: false,
+            },
+          });
+        } catch (err) {
+          console.error("Failed to create task assignment notification:", err);
+        }
+      }
     }
   }
 
@@ -280,37 +313,23 @@ export async function transitionTaskStatus(
     return task;
   }
 
-  const isAssignee = task.assigneeId === ctx.membershipId;
+  const assignedMemberIds = Array.isArray(task.assignedMemberIds)
+    ? (task.assignedMemberIds as string[])
+    : [];
+  const isAssignee = task.assigneeId === ctx.membershipId || assignedMemberIds.includes(ctx.membershipId);
   const isPrivileged = isAdminOrOwner(ctx);
+  const isCreator = task.creatorId === ctx.membershipId;
 
-  // Workflow validation
-  if (newStatus === TaskWorkflowStatus.COMPLETED) {
-    if (oldStatus === TaskWorkflowStatus.IN_REVIEW) {
-      // Check: No Self-Approval!
-      if (isAssignee && !isPrivileged) {
-        throw new ForbiddenException(
-          "Self-approval is forbidden. An independent reviewer or project manager must approve your deliverable."
-        );
-      }
-    } else {
-      // Direct completion without review
-      if (!isPrivileged) {
-        throw new ForbiddenException(
-          "Direct completion override requires Administrator or Partner authority with an audit reason."
-        );
-      }
-      if (!options.auditReason) {
-        throw new Error("An audit reason is required for direct completion override.");
-      }
-    }
+  if (!isPrivileged && !isAssignee && !isCreator) {
+    throw new ForbiddenException(
+      "Only assigned team members, the task assigner, or Studio Leadership can update deliverable status."
+    );
   }
 
-  if (oldStatus === TaskWorkflowStatus.IN_REVIEW && newStatus === TaskWorkflowStatus.IN_PROGRESS) {
-    // Reviewer requested changes
-    if (!options.comment) {
-      throw new Error("A review comment detailing requested changes is required.");
-    }
-  }
+  // Reason note helper
+  const defaultReason = isAssignee
+    ? `Status updated to ${newStatus} by assignee ${ctx.userFullName}`
+    : `Workflow transition from ${oldStatus} to ${newStatus} by ${ctx.userFullName}`;
 
   // Execute update in transaction with activity history
   return await prisma.$transaction(async (tx) => {
@@ -331,7 +350,7 @@ export async function transitionTaskStatus(
         action: "STATUS_CHANGED",
         oldValue: oldStatus,
         newValue: newStatus,
-        reason: options.comment || options.auditReason || `Workflow transition from ${oldStatus} to ${newStatus}`,
+        reason: options.comment || options.auditReason || defaultReason,
       },
     });
 
@@ -347,14 +366,17 @@ export async function transitionTaskStatus(
     }
 
     // Real-time status notifications
-    if (newStatus === TaskWorkflowStatus.IN_REVIEW && task.creatorId && task.creatorId !== ctx.membershipId) {
+    const isCheckingOrReview = newStatus === TaskWorkflowStatus.IN_REVIEW || (newStatus as any) === "CHECKING";
+    const isProgressOrStarted = newStatus === TaskWorkflowStatus.IN_PROGRESS || (newStatus as any) === "ONGOING" || (newStatus as any) === "STARTED";
+
+    if (isCheckingOrReview && task.creatorId && task.creatorId !== ctx.membershipId) {
       try {
         await tx.notification.create({
           data: {
             tenantId: ctx.tenantId,
             recipientId: task.creatorId,
-            title: "Task Review Requested",
-            message: `${ctx.userFullName} submitted task "${task.title}" for review.`,
+            title: "Task Review / Checking Requested",
+            message: `${ctx.userFullName} submitted task "${task.title}" for review/checking.`,
             link: `/w/${ctx.tenantSlug}/tasks?taskId=${task.id}`,
             isRead: false,
           },
@@ -362,35 +384,60 @@ export async function transitionTaskStatus(
       } catch (e) {
         console.error("Failed to create review notification:", e);
       }
-    } else if (newStatus === TaskWorkflowStatus.COMPLETED && task.assigneeId && task.assigneeId !== ctx.membershipId) {
-      try {
-        await tx.notification.create({
-          data: {
-            tenantId: ctx.tenantId,
-            recipientId: task.assigneeId,
-            title: "Task Approved & Completed",
-            message: `${ctx.userFullName} approved and marked task "${task.title}" as Completed!`,
-            link: `/w/${ctx.tenantSlug}/tasks?taskId=${task.id}`,
-            isRead: false,
-          },
-        });
-      } catch (e) {
-        console.error("Failed to create approval notification:", e);
+    } else if (newStatus === TaskWorkflowStatus.COMPLETED) {
+      // If employee completed, notify creator; if manager completed, notify assignees
+      const notifyRecipients = new Set<string>();
+      if (isAssignee && task.creatorId && task.creatorId !== ctx.membershipId) {
+        notifyRecipients.add(task.creatorId);
       }
-    } else if (oldStatus === TaskWorkflowStatus.IN_REVIEW && newStatus === TaskWorkflowStatus.IN_PROGRESS && task.assigneeId && task.assigneeId !== ctx.membershipId) {
-      try {
-        await tx.notification.create({
-          data: {
-            tenantId: ctx.tenantId,
-            recipientId: task.assigneeId,
-            title: "Task Revisions Requested",
-            message: `${ctx.userFullName} requested changes on "${task.title}": ${options.comment || "See comments"}`,
-            link: `/w/${ctx.tenantSlug}/tasks?taskId=${task.id}`,
-            isRead: false,
-          },
+      if (isPrivileged) {
+        if (task.assigneeId && task.assigneeId !== ctx.membershipId) notifyRecipients.add(task.assigneeId);
+        assignedMemberIds.forEach((id) => {
+          if (id !== ctx.membershipId) notifyRecipients.add(id);
         });
-      } catch (e) {
-        console.error("Failed to create changes requested notification:", e);
+      }
+
+      for (const recipientId of notifyRecipients) {
+        try {
+          await tx.notification.create({
+            data: {
+              tenantId: ctx.tenantId,
+              recipientId,
+              title: "Task Completed",
+              message: `${ctx.userFullName} marked task "${task.title}" as Completed!`,
+              link: `/w/${ctx.tenantSlug}/tasks?taskId=${task.id}`,
+              isRead: false,
+            },
+          });
+        } catch (e) {
+          console.error("Failed to create completion notification:", e);
+        }
+      }
+    } else if (
+      (oldStatus === TaskWorkflowStatus.IN_REVIEW || (oldStatus as any) === "CHECKING") &&
+      isProgressOrStarted
+    ) {
+      const notifyRecipients = new Set<string>();
+      if (task.assigneeId && task.assigneeId !== ctx.membershipId) notifyRecipients.add(task.assigneeId);
+      assignedMemberIds.forEach((id) => {
+        if (id !== ctx.membershipId) notifyRecipients.add(id);
+      });
+
+      for (const recipientId of notifyRecipients) {
+        try {
+          await tx.notification.create({
+            data: {
+              tenantId: ctx.tenantId,
+              recipientId,
+              title: "Task Revisions Requested",
+              message: `${ctx.userFullName} requested revisions on "${task.title}": ${options.comment || "See comments"}`,
+              link: `/w/${ctx.tenantSlug}/tasks?taskId=${task.id}`,
+              isRead: false,
+            },
+          });
+        } catch (e) {
+          console.error("Failed to create changes requested notification:", e);
+        }
       }
     }
 
@@ -554,12 +601,16 @@ export interface UpdateTaskData {
   priority?: TaskPriority;
   dueDate?: Date | null;
   estimatedHours?: number | null;
+  projectId?: string | null;
   phaseId?: string | null;
+  assigneeId?: string | null;
+  assigneeIds?: string[] | null;
 }
 
 /**
  * Edit task details:
- * - Assignee or Boss/Admin can update title, description, priority, due date, estimated hours.
+ * - Studio Boss/Admin or Task Creator can update all fields (Project, Phase, Assignees, Priority, Due Date, Title, etc.)
+ * - Assignees can update description, progress notes, and estimated hours.
  */
 export async function updateTask(
   ctx: TenantContext,
@@ -571,20 +622,32 @@ export async function updateTask(
     throw new Error("Task not found in this studio workspace");
   }
 
+  const assignedMemberIds = Array.isArray(task.assignedMemberIds)
+    ? (task.assignedMemberIds as string[])
+    : [];
+  const isAssignee = task.assigneeId === ctx.membershipId || assignedMemberIds.includes(ctx.membershipId);
   const isPrivileged = isAdminOrOwner(ctx);
-  const isAssignee = task.assigneeId === ctx.membershipId;
+  const isCreator = task.creatorId === ctx.membershipId;
+  const isCanEditFull = isPrivileged || isCreator;
 
-  if (!isPrivileged && !isAssignee) {
+  if (!isCanEditFull && !isAssignee) {
     throw new ForbiddenException(
-      "You can only edit tasks assigned to you, or have Studio Boss/Admin privileges."
+      "You can only edit tasks assigned to you, created by you, or have Studio Boss/Admin privileges."
     );
   }
 
-  // Strict Employee Field Restrictions: Employees cannot change protected fields
-  if (!isPrivileged) {
-    if (data.priority !== undefined || data.dueDate !== undefined || data.phaseId !== undefined) {
+  // Strict Employee Field Restrictions: Non-managers cannot change protected structural fields
+  if (!isCanEditFull) {
+    if (
+      data.priority !== undefined ||
+      data.dueDate !== undefined ||
+      data.phaseId !== undefined ||
+      data.projectId !== undefined ||
+      data.assigneeId !== undefined ||
+      data.assigneeIds !== undefined
+    ) {
       throw new ForbiddenException(
-        "Employees cannot modify protected task fields (priority, due date, project/phase links). Only task progress, deliverable descriptions, estimated hours, checklists, and comments can be updated."
+        "Employees cannot modify protected task fields (priority, due date, project/phase links, or assignees). Only task progress, deliverable descriptions, estimated hours, checklists, and comments can be updated."
       );
     }
   }
@@ -595,7 +658,19 @@ export async function updateTask(
   if (data.priority !== undefined) updatePayload.priority = data.priority;
   if (data.dueDate !== undefined) updatePayload.dueDate = data.dueDate;
   if (data.estimatedHours !== undefined) updatePayload.estimatedHours = data.estimatedHours;
+  if (data.projectId !== undefined && data.projectId) updatePayload.projectId = data.projectId;
   if (data.phaseId !== undefined) updatePayload.phaseId = data.phaseId;
+
+  let newAssigneeList: string[] | null = null;
+  if (data.assigneeIds !== undefined) {
+    newAssigneeList = Array.isArray(data.assigneeIds) ? data.assigneeIds.filter(Boolean) : [];
+    updatePayload.assigneeId = newAssigneeList[0] || null;
+    updatePayload.assignedMemberIds = newAssigneeList;
+  } else if (data.assigneeId !== undefined) {
+    updatePayload.assigneeId = data.assigneeId;
+    updatePayload.assignedMemberIds = data.assigneeId ? [data.assigneeId] : [];
+    newAssigneeList = data.assigneeId ? [data.assigneeId] : [];
+  }
 
   return await prisma.$transaction(async (tx) => {
     const updated = await tx.task.update({
@@ -612,9 +687,31 @@ export async function updateTask(
         taskId: task.id,
         actorId: ctx.membershipId,
         action: "TASK_EDITED",
-        reason: `Task details edited by ${ctx.userFullName}`,
+        reason: `Task deliverable updated by ${ctx.userFullName}`,
       },
     });
+
+    // Notify newly assigned members
+    if (newAssigneeList && newAssigneeList.length > 0) {
+      for (const recipientId of newAssigneeList) {
+        if (!assignedMemberIds.includes(recipientId) && recipientId !== ctx.membershipId) {
+          try {
+            await tx.notification.create({
+              data: {
+                tenantId: ctx.tenantId,
+                recipientId,
+                title: "Assigned to Task",
+                message: `${ctx.userFullName} assigned you to deliverable "${updated.title}".`,
+                link: `/w/${ctx.tenantSlug}/tasks?taskId=${updated.id}`,
+                isRead: false,
+              },
+            });
+          } catch (e) {
+            console.error("Failed to notify new assignee:", e);
+          }
+        }
+      }
+    }
 
     return updated;
   });
@@ -715,16 +812,20 @@ export async function addTaskComment(
 export async function getTaskDashboardMetrics(ctx: TenantContext, myTasksOnly: boolean = false) {
   const { startOfToday, endOfToday } = getWorkspaceDayBoundaries(ctx.timezone);
 
-  const baseWhere: any = {
-    tenantId: ctx.tenantId,
-  };
+  const andConditions: any[] = [{ tenantId: ctx.tenantId }];
   if (myTasksOnly || !isAdminOrOwner(ctx)) {
-    baseWhere.assigneeId = ctx.membershipId;
+    andConditions.push({
+      OR: [
+        { assigneeId: ctx.membershipId },
+        { assignedMemberIds: { string_contains: ctx.membershipId } },
+        { creatorId: ctx.membershipId },
+      ],
+    });
   }
 
   // 1 single query fetching only status & dueDate instead of 5 separate roundtrips
   const tasks = await prisma.task.findMany({
-    where: baseWhere,
+    where: { AND: andConditions },
     select: {
       status: true,
       dueDate: true,
@@ -738,11 +839,12 @@ export async function getTaskDashboardMetrics(ctx: TenantContext, myTasksOnly: b
   let completed = 0;
 
   for (const t of tasks) {
-    if (t.status === TaskWorkflowStatus.IN_PROGRESS) inProgress++;
-    else if (t.status === TaskWorkflowStatus.IN_REVIEW) waitingReview++;
-    else if (t.status === TaskWorkflowStatus.COMPLETED) completed++;
+    const s = t.status as string;
+    if (s === "IN_PROGRESS" || s === "STARTED" || s === "ONGOING") inProgress++;
+    else if (s === "IN_REVIEW" || s === "CHECKING") waitingReview++;
+    else if (s === "COMPLETED") completed++;
 
-    const isActive = t.status !== TaskWorkflowStatus.COMPLETED && t.status !== TaskWorkflowStatus.CANCELLED;
+    const isActive = s !== "COMPLETED" && s !== "CANCELLED";
     if (isActive && t.dueDate) {
       if (t.dueDate >= startOfToday && t.dueDate <= endOfToday) {
         dueToday++;
