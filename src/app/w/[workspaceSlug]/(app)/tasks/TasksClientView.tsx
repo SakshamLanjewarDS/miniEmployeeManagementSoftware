@@ -35,6 +35,7 @@ import {
   FolderGit2,
   SlidersHorizontal,
   ArrowUpDown,
+  Trash2,
 } from "lucide-react";
 import { CustomFieldsManagerModal } from "@/components/custom-fields/CustomFieldsManagerModal";
 import { DynamicFormFields } from "@/components/custom-fields/DynamicFormFields";
@@ -68,6 +69,7 @@ export interface TaskItem {
     user: { fullName: string; email: string };
     employee: { employeeId: string; designation: string | null } | null;
   } | null;
+  creatorId?: string | null;
   creator?: {
     id: string;
     user: { fullName: string };
@@ -225,6 +227,10 @@ export default function TasksClientView({
   const [editEstimatedHours, setEditEstimatedHours] = useState("");
   const [editPhaseId, setEditPhaseId] = useState("");
   const [editing, setEditing] = useState(false);
+
+  // Delete Task state
+  const [taskToDelete, setTaskToDelete] = useState<TaskItem | null>(null);
+  const [deletingTask, setDeletingTask] = useState<boolean>(false);
 
   // Create Task Modal state
   const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false);
@@ -798,6 +804,42 @@ export default function TasksClientView({
       setErrorMessage("Network error updating task");
     } finally {
       setEditing(false);
+    }
+  };
+
+  // Delete Task Handler
+  const handleDeleteTask = async () => {
+    if (!taskToDelete) return;
+
+    setDeletingTask(true);
+    setErrorMessage(null);
+
+    try {
+      const res = await fetch(`/api/tasks/delete?workspaceSlug=${workspaceSlug}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ taskId: taskToDelete.id }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setErrorMessage(data.error || "Failed to delete task");
+      } else {
+        setTasks((prev) => prev.filter((t) => t.id !== taskToDelete.id));
+        if (drawerTask && drawerTask.id === taskToDelete.id) {
+          setDrawerTask(null);
+        }
+        if (editModal && editModal.task.id === taskToDelete.id) {
+          setEditModal(null);
+        }
+        setSuccessMessage(`Deliverable "${taskToDelete.title}" was permanently deleted.`);
+        setTaskToDelete(null);
+        router.refresh();
+      }
+    } catch {
+      setErrorMessage("Network error while deleting task");
+    } finally {
+      setDeletingTask(false);
     }
   };
 
@@ -1533,6 +1575,17 @@ export default function TasksClientView({
                             </button>
                           </>
                         )}
+
+                        {(isPrivileged || task.creatorId === currentMembershipId || task.creator?.id === currentMembershipId) && (
+                          <button
+                            onClick={() => setTaskToDelete(task)}
+                            className="px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-semibold rounded-lg border border-red-200 flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                            title="Delete task deliverable"
+                          >
+                            <Trash2 className="w-3.5 h-3.5 text-red-600" />
+                            <span>Delete</span>
+                          </button>
+                        )}
                       </div>
 
                       {/* Workflow Status Progression Buttons */}
@@ -1709,6 +1762,15 @@ export default function TasksClientView({
                                 title="Edit"
                               >
                                 <Pencil className="w-3 h-3" />
+                              </button>
+                            )}
+                            {(isPrivileged || task.creatorId === currentMembershipId || task.creator?.id === currentMembershipId) && (
+                              <button
+                                onClick={() => setTaskToDelete(task)}
+                                className="p-1 text-red-600 hover:text-red-700 hover:bg-red-50 rounded cursor-pointer"
+                                title="Delete task"
+                              >
+                                <Trash2 className="w-3 h-3" />
                               </button>
                             )}
                           </div>
@@ -1978,6 +2040,16 @@ export default function TasksClientView({
                     className="px-3 py-1.5 bg-white border border-[#E2E6F0] text-[#1F1F1F] text-xs font-semibold rounded-lg hover:bg-[#F2F4FF] cursor-pointer"
                   >
                     Edit Task
+                  </button>
+                )}
+                {(isPrivileged || drawerTask.creatorId === currentMembershipId || drawerTask.creator?.id === currentMembershipId) && (
+                  <button
+                    onClick={() => setTaskToDelete(drawerTask)}
+                    className="px-3 py-1.5 bg-red-50 border border-red-200 text-red-700 text-xs font-semibold rounded-lg hover:bg-red-100 flex items-center gap-1 cursor-pointer transition-colors"
+                    title="Delete task deliverable"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-red-600" />
+                    <span>Delete Task</span>
                   </button>
                 )}
               </div>
@@ -2270,21 +2342,39 @@ export default function TasksClientView({
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2 pt-3 border-t border-[#E2E6F0]">
-                <button
-                  type="button"
-                  onClick={() => setEditModal(null)}
-                  className="px-4 py-2 bg-[#F2F4FF] hover:bg-[#F2F4FF] text-[#696E82] font-semibold rounded-xl cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={editing}
-                  className="px-5 py-2 bg-[#5A81FA] hover:bg-[#426EE8] text-white font-semibold rounded-xl shadow-xs cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
-                >
-                  {editing ? <span>Saving...</span> : <span>Save Changes</span>}
-                </button>
+              <div className="flex items-center justify-between pt-3 border-t border-[#E2E6F0]">
+                {(isPrivileged || editModal.task.creatorId === currentMembershipId || editModal.task.creator?.id === currentMembershipId) ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const t = editModal.task;
+                      setEditModal(null);
+                      setTaskToDelete(t);
+                    }}
+                    className="px-3.5 py-2 bg-red-50 hover:bg-red-100 text-red-700 font-semibold rounded-xl text-xs flex items-center gap-1.5 cursor-pointer border border-red-200 transition-colors"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-red-600" />
+                    <span>Delete Task</span>
+                  </button>
+                ) : (
+                  <div />
+                )}
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditModal(null)}
+                    className="px-4 py-2 bg-[#F2F4FF] hover:bg-[#F2F4FF] text-[#696E82] font-semibold rounded-xl cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={editing}
+                    className="px-5 py-2 bg-[#5A81FA] hover:bg-[#426EE8] text-white font-semibold rounded-xl shadow-xs cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                  >
+                    {editing ? <span>Saving...</span> : <span>Save Changes</span>}
+                  </button>
+                </div>
               </div>
             </form>
           </div>
@@ -2707,6 +2797,59 @@ export default function TasksClientView({
                 className="px-4 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold rounded-lg cursor-pointer disabled:opacity-50"
               >
                 Record Audit & Mark Complete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==================================================== */}
+      {/* 12. DELETE TASK CONFIRMATION MODAL                   */}
+      {/* ==================================================== */}
+      {taskToDelete && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white border border-[#E2E6F0] rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-red-100 text-red-600 flex items-center justify-center shrink-0">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-[#1F1F1F]">Delete Task Deliverable</h3>
+                <p className="text-xs text-[#696E82]">Permanently remove this task from studio records</p>
+              </div>
+            </div>
+
+            <div className="p-3.5 bg-red-50/60 border border-red-200 rounded-xl text-xs space-y-2 text-red-900">
+              <p>
+                Are you sure you want to delete <strong className="text-red-950 font-bold">&quot;{taskToDelete.title}&quot;</strong>?
+              </p>
+              <div className="flex items-center gap-2 text-[11px] text-red-800">
+                <span className="font-mono font-bold bg-white/80 px-1.5 py-0.5 rounded border border-red-200">
+                  {taskToDelete.project.code}
+                </span>
+                <span>Assignee: {taskToDelete.assignee?.user.fullName || "Unassigned"}</span>
+              </div>
+              <p className="text-[11px] text-red-700 pt-1 border-t border-red-200/60">
+                All associated checklist sub-tasks, comments, and audit records will be removed. This action cannot be undone.
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                disabled={deletingTask}
+                onClick={() => setTaskToDelete(null)}
+                className="px-4 py-2 bg-[#F2F4FF] hover:bg-[#E5EAFF] text-[#1F1F1F] font-semibold rounded-xl text-xs cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={deletingTask}
+                onClick={handleDeleteTask}
+                className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl text-xs shadow-xs cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+              >
+                {deletingTask ? <span>Deleting...</span> : <span>Confirm Delete</span>}
               </button>
             </div>
           </div>

@@ -760,3 +760,72 @@ export async function getTaskDashboardMetrics(ctx: TenantContext, myTasksOnly: b
     completed,
   };
 }
+
+/**
+ * Delete a task deliverable:
+ * - Studio Boss (OWNER) or Admin can delete any task in the tenant.
+ * - The employee who created/assigned the task can delete their task.
+ * - Enforces strict tenant isolation.
+ * - Records an audit event before permanent deletion.
+ */
+export async function deleteTask(ctx: TenantContext, taskId: string) {
+  const task = await findTaskById(ctx, taskId);
+  if (!task) {
+    throw new Error("Task not found in this studio workspace");
+  }
+
+  const isPrivileged = isAdminOrOwner(ctx);
+  const isCreator = task.creatorId === ctx.membershipId;
+
+  if (!isPrivileged && !isCreator) {
+    throw new ForbiddenException(
+      "Only Studio Owners, Administrators, or the person who assigned the task can delete this deliverable."
+    );
+  }
+
+  return await prisma.$transaction(async (tx) => {
+    // 1. Record audit event for studio compliance & traceability
+    await tx.auditEvent.create({
+      data: {
+        tenantId: ctx.tenantId,
+        actorId: ctx.membershipId,
+        projectId: task.projectId,
+        action: "TASK_DELETED",
+        entityType: "Task",
+        entityId: task.id,
+        safeChangeSummary: `${ctx.userFullName} deleted task deliverable "${task.title}" (Project: ${task.project.code})`,
+      },
+    });
+
+    // 2. Delete child items (cascade)
+    await tx.taskChecklistItem.deleteMany({
+      where: { taskId: task.id, tenantId: ctx.tenantId },
+    });
+    await tx.taskComment.deleteMany({
+      where: { taskId: task.id, tenantId: ctx.tenantId },
+    });
+    await tx.taskActivityHistory.deleteMany({
+      where: { taskId: task.id, tenantId: ctx.tenantId },
+    });
+
+    // 3. Nullify references in site visits or documents if any
+    await tx.siteVisit.updateMany({
+      where: { taskId: task.id, tenantId: ctx.tenantId },
+      data: { taskId: null },
+    });
+    await tx.document.updateMany({
+      where: { taskId: task.id, tenantId: ctx.tenantId },
+      data: { taskId: null },
+    });
+    await tx.approvalRequest.deleteMany({
+      where: { taskId: task.id, tenantId: ctx.tenantId },
+    });
+
+    // 4. Finally delete the task
+    const deleted = await tx.task.delete({
+      where: { id: task.id },
+    });
+
+    return deleted;
+  });
+}

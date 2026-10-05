@@ -108,7 +108,7 @@ miniEmployeeManagementSoftware/
 | Route Path | View Component | Core Functionality & Capabilities |
 |---|---|---|
 | `/w/[slug]/login` | `LoginPage` | Dual-identifier login: Company-scoped Employee ID or Email + Password. |
-| `/w/[slug]/tasks` | `TasksClientView` | Task creation, Kanban boards, status transitions, checklists, activity history, four-eyes review gate. |
+| `/w/[slug]/tasks` | `TasksClientView` | Task creation, Kanban boards, status transitions, checklists, activity history, four-eyes review gate, task delegation, and Owner/Admin/Creator task deletion with audit trails. |
 | `/w/[slug]/projects` | `ProjectsClientView` | Project creation, phase breakdown (Concept, Schematic, DD, GFC, Handover), client/team/consultant assignment. |
 | `/w/[slug]/visits` | `VisitsClientView` | Site visit scheduling, Haversine GPS geofence check-in/out, one-active-visit concurrency lock, supervisor review. |
 | `/w/[slug]/drawings` | `DrawingsClientView` | Drawing register ($R_0, R_1, R_2$), private file attachment, revision approval workflow, supersession history. |
@@ -339,6 +339,7 @@ The following modules represent high-impact features ready to be added to the pl
 | Manage Team Members & Roles | ✅ | ✅ | ❌ | ❌ |
 | Create / Edit Projects & Phases | ✅ | ✅ | ✅ | View Only |
 | Assign Tasks & Approve Work | ✅ | ✅ | ✅ | Self Only (No self-approval) |
+| Delete Task Deliverable | ✅ | ✅ | Creator Only | Creator Only |
 | Site Visit Check-in/out | ✅ | ✅ | ✅ | ✅ |
 | Site Visit Supervisor Review | ✅ | ✅ | ✅ | ❌ |
 | Upload Drawing Revisions | ✅ | ✅ | ✅ | ✅ |
