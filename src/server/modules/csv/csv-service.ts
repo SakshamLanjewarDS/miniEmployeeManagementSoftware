@@ -769,20 +769,35 @@ export async function importProjectsFromCsv(
     const rowNum = i + 2;
 
     const name = findValue(row, ["project name", "name", "project title", "project"]);
-    let code = findValue(row, ["project code", "code", "id", "project id"]);
+    let code = findValue(row, ["projet code", "project code", "code", "id", "project id"]);
     const clientName = findValue(row, ["client name", "clients", "client", "client company"]);
     const projectType =
-      findValue(row, ["typology", "project type", "type", "category"]) || "Residential Architecture";
+      findValue(row, ["typology", "topology", "project type", "type", "category"]) || "Residential Architecture";
     
     // Architect, Manager, Coordinator
-    const architectName = findValue(row, ["project architect", "architect", "lead architect", "project architec"]);
-    const managerName = findValue(row, ["project manager", "manager", "secondary architect", "co-architect"]);
+    const architectName = findValue(row, [
+      "project architect 1",
+      "project architect",
+      "architect 1",
+      "architect",
+      "lead architect",
+      "project architec",
+    ]);
+    const managerName = findValue(row, [
+      "project architect 2",
+      "project manager",
+      "architect 2",
+      "manager",
+      "secondary architect",
+      "co-architect",
+    ]);
     const coordinatorName = findValue(row, [
+      "project cordinator",
       "project coordinator",
       "coordinator",
+      "cordinator",
       "project cordina",
       "project cordinat",
-      "project cordinator",
     ]);
 
     // Contractor & Consultant
@@ -848,8 +863,8 @@ export async function importProjectsFromCsv(
     // Areas
     const plotArea = findValue(row, ["plot area", "plot ar", "plot size", "plot"]);
     const constructionArea = findValue(row, [
-      "total construction",
       "total construction area",
+      "total construction",
       "construction area",
       "built up area",
       "built-up area",
@@ -868,8 +883,8 @@ export async function importProjectsFromCsv(
 
     // Brief / Narrative
     const brief = findValue(row, [
-      "brief / project brief",
       "brief project brief",
+      "brief / project brief",
       "project brief",
       "brief",
       "architectural scope & narrative",
@@ -894,17 +909,16 @@ export async function importProjectsFromCsv(
     }
 
     try {
-      // Auto-generate unique code if not provided
-      if (!code) {
-        code = await getNextProjectCode(ctx.tenantId);
-      }
-
-      const existingCode = await prisma.project.findFirst({
-        where: { tenantId: ctx.tenantId, code: code.trim().toUpperCase() },
+      // Check if project already exists by code or exact name (preserving ID and existing tasks!)
+      const existingProject = await prisma.project.findFirst({
+        where: {
+          tenantId: ctx.tenantId,
+          OR: [
+            ...(code ? [{ code: code.trim().toUpperCase() }] : []),
+            { name: { equals: name.trim() } },
+          ],
+        },
       });
-      if (existingCode) {
-        code = await getNextProjectCode(ctx.tenantId);
-      }
 
       // Associate or auto-create client
       let primaryClientId: string | undefined = undefined;
@@ -1013,6 +1027,53 @@ export async function importProjectsFromCsv(
         if (!isNaN(cleanB) && cleanB > 0) {
           budget = cleanB;
         }
+      }
+
+      if (existingProject) {
+        // UPDATE existing project in place! (Preserves existing ID and all assigned tasks!)
+        const updated = await prisma.project.update({
+          where: { id: existingProject.id },
+          data: {
+            projectType,
+            description: brief || existingProject.description,
+            primaryClientId: primaryClientId || existingProject.primaryClientId,
+            projectArchitectId: projectArchitectId !== undefined ? projectArchitectId : existingProject.projectArchitectId,
+            projectManagerId: projectManagerId !== undefined ? projectManagerId : existingProject.projectManagerId,
+            projectCoordinatorId: projectCoordinatorId !== undefined ? projectCoordinatorId : existingProject.projectCoordinatorId,
+            contractorId: contractorId !== undefined ? contractorId : existingProject.contractorId,
+            consultantId: consultantId !== undefined ? consultantId : existingProject.consultantId,
+            siteAddress: siteAddress || existingProject.siteAddress,
+            siteCity: siteCity || existingProject.siteCity,
+            googleMapLocation: googleMapLocation || existingProject.googleMapLocation,
+            plotArea: plotArea || existingProject.plotArea,
+            constructionArea: constructionArea || existingProject.constructionArea,
+            budget: budget !== undefined ? budget : existingProject.budget,
+            startDate: startDate || existingProject.startDate,
+            targetDate: targetDate || existingProject.targetDate,
+          },
+        });
+
+        if (phase) {
+          await prisma.project.update({
+            where: { id: updated.id },
+            data: { currentPhase: phase },
+          });
+        }
+
+        created.push(updated);
+        continue;
+      }
+
+      // Auto-generate unique code if not provided
+      if (!code) {
+        code = await getNextProjectCode(ctx.tenantId);
+      }
+
+      const existingCode = await prisma.project.findFirst({
+        where: { tenantId: ctx.tenantId, code: code.trim().toUpperCase() },
+      });
+      if (existingCode) {
+        code = await getNextProjectCode(ctx.tenantId);
       }
 
       const project = await createProject(ctx, {

@@ -40,8 +40,14 @@ import {
 import { CustomFieldsManagerModal } from "@/components/custom-fields/CustomFieldsManagerModal";
 import { DynamicFormFields } from "@/components/custom-fields/DynamicFormFields";
 import { DynamicCardFields } from "@/components/custom-fields/DynamicCardFields";
-import { CustomFieldDefinition } from "@/server/modules/custom-fields/repository";
-import { SearchableSelect, STUDIO_TYPOLOGIES, isTypologyMatch } from "@/components/ui/SearchableSelect";
+import { SearchableSelect } from "@/components/ui/SearchableSelect";
+import {
+  getAllTypologies,
+  ProjectProfileCircle,
+  TypologyBadge,
+  TypologyDot,
+  isTypologyMatch,
+} from "@/lib/typology";
 
 export interface TaskItem {
   id: string;
@@ -202,8 +208,8 @@ export default function TasksClientView({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  // Client Filters & Search
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedTypologyFilter, setSelectedTypologyFilter] = useState<string>("ALL");
   const [selectedProjectFilter, setSelectedProjectFilter] = useState<string>("ALL");
   const [selectedPriorityFilter, setSelectedPriorityFilter] = useState<string>("ALL");
   const [selectedDueDateCategory, setSelectedDueDateCategory] = useState<string>(
@@ -344,6 +350,13 @@ export default function TasksClientView({
         return false;
       }
 
+      // 2.5 Architectural Typology Filter
+      if (selectedTypologyFilter !== "ALL") {
+        if (!isTypologyMatch(task.project.projectType, selectedTypologyFilter)) {
+          return false;
+        }
+      }
+
       // 3. Priority Filter
       if (selectedPriorityFilter !== "ALL" && task.priority !== selectedPriorityFilter) {
         return false;
@@ -404,6 +417,7 @@ export default function TasksClientView({
   }, [
     tasks,
     searchQuery,
+    selectedTypologyFilter,
     selectedProjectFilter,
     selectedPriorityFilter,
     selectedDueDateCategory,
@@ -426,6 +440,7 @@ export default function TasksClientView({
 
   const handleClearFilters = () => {
     setSearchQuery("");
+    setSelectedTypologyFilter("ALL");
     setSelectedProjectFilter("ALL");
     setSelectedPriorityFilter("ALL");
     setSelectedDueDateCategory("ALL");
@@ -467,6 +482,11 @@ export default function TasksClientView({
     if (Array.isArray(task.assignedMemberIds) && task.assignedMemberIds.includes(currentMembershipId)) return true;
     return false;
   };
+
+  // Dynamic Typologies extracted from projects + studio standards
+  const dynamicTypologies = useMemo(() => {
+    return getAllTypologies(projects);
+  }, [projects]);
 
   // Filter projects for task assign modal by selected architectural typology
   const effectiveTypology = useMemo(() => {
@@ -1174,6 +1194,7 @@ export default function TasksClientView({
 
   const isFilterActive =
     searchQuery.trim().length > 0 ||
+    selectedTypologyFilter !== "ALL" ||
     selectedProjectFilter !== "ALL" ||
     selectedPriorityFilter !== "ALL" ||
     selectedDueDateCategory !== "ALL" ||
@@ -1529,6 +1550,22 @@ export default function TasksClientView({
             <option value="LOW">Low</option>
           </select>
 
+          {/* Typology Filter */}
+          <select
+            suppressHydrationWarning
+            value={selectedTypologyFilter}
+            onChange={(e) => setSelectedTypologyFilter(e.target.value)}
+            className="p-1.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-lg text-xs font-medium text-[#1F1F1F] focus:outline-none focus:ring-1 focus:ring-[#5A81FA] max-w-[170px]"
+            title="Filter deliverables by architectural typology"
+          >
+            <option value="ALL">All Typologies</option>
+            {dynamicTypologies.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+
           {/* Project */}
           <select
             suppressHydrationWarning
@@ -1537,11 +1574,13 @@ export default function TasksClientView({
             className="p-1.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-lg text-xs font-medium text-[#1F1F1F] focus:outline-none focus:ring-1 focus:ring-[#5A81FA] max-w-[200px]"
           >
             <option value="ALL">All Projects</option>
-            {projects.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.code} — {p.name}
-              </option>
-            ))}
+            {projects
+              .filter((p) => selectedTypologyFilter === "ALL" || isTypologyMatch(p.projectType, selectedTypologyFilter))
+              .map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.code} — {p.name}
+                </option>
+              ))}
           </select>
 
           {/* Sort By Filter (Date, Day, Alphabetical) */}
@@ -1619,9 +1658,18 @@ export default function TasksClientView({
                     {/* Left: Task Info & Direct Drawer Opener */}
                     <div className="space-y-2 min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-mono text-xs font-bold text-[#5A81FA] bg-[#F2F4FF] px-2 py-0.5 rounded border border-[#CEDEFF]">
-                          {task.project.code}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <ProjectProfileCircle typology={task.project.projectType} name={task.project.name} size="xs" />
+                          <span className="font-mono text-xs font-bold text-[#5A81FA] bg-[#F2F4FF] px-2 py-0.5 rounded border border-[#CEDEFF]">
+                            {task.project.code}
+                          </span>
+                          <span className="text-xs font-semibold text-[#1F1F1F]">
+                            {task.project.name}
+                          </span>
+                        </div>
+                        {task.project.projectType && (
+                          <TypologyBadge typology={task.project.projectType} size="xs" />
+                        )}
                         {task.phase && (
                           <span className="text-[11px] font-medium text-[#696E82] bg-[#F2F4FF] px-2 py-0.5 rounded">
                             {task.phase.phaseName}
@@ -1924,10 +1972,16 @@ export default function TasksClientView({
                         onDragStart={(e) => handleDragStart(e, task.id)}
                         className="p-3 bg-white border border-[#E2E6F0] rounded-xl shadow-2xs space-y-2 hover:border-[#5A81FA] transition-all cursor-grab active:cursor-grabbing group"
                       >
-                        <div className="flex items-center justify-between gap-1">
-                          <span className="font-mono text-[10px] font-bold text-[#5A81FA] bg-[#F2F4FF] px-1.5 py-0.5 rounded border border-[#CEDEFF]">
-                            {task.project.code}
-                          </span>
+                        <div className="flex items-center justify-between gap-1 flex-wrap">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <ProjectProfileCircle typology={task.project.projectType} name={task.project.name} size="xs" />
+                            <span className="font-mono text-[10px] font-bold text-[#5A81FA] bg-[#F2F4FF] px-1.5 py-0.5 rounded border border-[#CEDEFF]">
+                              {task.project.code}
+                            </span>
+                            <span className="text-[11px] font-semibold text-[#1F1F1F] truncate max-w-[110px]" title={task.project.name}>
+                              {task.project.name}
+                            </span>
+                          </div>
                           {getPriorityBadge(task.priority)}
                         </div>
 
@@ -2053,9 +2107,16 @@ export default function TasksClientView({
             <div className="p-5 border-b border-[#E2E6F0] flex items-start justify-between gap-4 bg-[#F8F9FD]">
               <div className="space-y-1.5 min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-mono text-xs font-bold text-[#5A81FA] bg-[#F2F4FF] px-2 py-0.5 rounded border border-[#CEDEFF]">
-                    {drawerTask.project.code}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <ProjectProfileCircle typology={drawerTask.project.projectType} name={drawerTask.project.name} size="xs" />
+                    <span className="font-mono text-xs font-bold text-[#5A81FA] bg-[#F2F4FF] px-2 py-0.5 rounded border border-[#CEDEFF]">
+                      {drawerTask.project.code}
+                    </span>
+                    <span className="text-xs font-bold text-[#1F1F1F]">{drawerTask.project.name}</span>
+                  </div>
+                  {drawerTask.project.projectType && (
+                    <TypologyBadge typology={drawerTask.project.projectType} size="xs" />
+                  )}
                   {drawerTask.phase && (
                     <span className="text-[11px] font-medium text-[#696E82] bg-[#F2F4FF] px-2 py-0.5 rounded">
                       {drawerTask.phase.phaseName}
@@ -2065,9 +2126,6 @@ export default function TasksClientView({
                   {getStatusBadge(drawerTask.status)}
                 </div>
                 <h3 className="text-lg font-bold text-[#1F1F1F] tracking-tight">{drawerTask.title}</h3>
-                <p className="text-xs text-[#696E82]">
-                  Project: <strong>{drawerTask.project.name}</strong>
-                </p>
               </div>
 
               <button
@@ -2478,9 +2536,10 @@ export default function TasksClientView({
                   searchPlaceholder="Search typology (e.g. Commercial, Hospital, Villa)..."
                   options={[
                     { value: "", label: "All Typologies (Show all projects)" },
-                    ...STUDIO_TYPOLOGIES.map((typ) => ({
+                    ...dynamicTypologies.map((typ) => ({
                       value: typ,
                       label: typ,
+                      icon: <TypologyDot typology={typ} />,
                     })),
                   ]}
                   value={editTypology}
@@ -2542,6 +2601,7 @@ export default function TasksClientView({
                     label: `${p.code} — ${p.name}`,
                     subLabel: p.projectType || undefined,
                     badge: p.code,
+                    icon: <ProjectProfileCircle typology={p.projectType} name={p.name} size="xs" />,
                   }))}
                   value={editProjectId}
                   onChange={(val) => {
@@ -2822,9 +2882,10 @@ export default function TasksClientView({
                   searchPlaceholder="Search typology (e.g. Commercial, Hospital, Villa)..."
                   options={[
                     { value: "", label: "All Typologies (Show all projects)" },
-                    ...STUDIO_TYPOLOGIES.map((typ) => ({
+                    ...dynamicTypologies.map((typ) => ({
                       value: typ,
                       label: typ,
+                      icon: <TypologyDot typology={typ} />,
                     })),
                   ]}
                   value={taskTypology}
@@ -2888,6 +2949,7 @@ export default function TasksClientView({
                     label: `${p.code} — ${p.name}`,
                     subLabel: p.projectType || undefined,
                     badge: p.code,
+                    icon: <ProjectProfileCircle typology={p.projectType} name={p.name} size="xs" />,
                   }))}
                   value={selectedProjectId}
                   onChange={(val) => {

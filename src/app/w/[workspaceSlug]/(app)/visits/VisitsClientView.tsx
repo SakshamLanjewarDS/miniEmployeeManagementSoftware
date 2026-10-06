@@ -38,7 +38,14 @@ import {
   Filter,
   SlidersHorizontal,
 } from "lucide-react";
-import { SearchableSelect, STUDIO_TYPOLOGIES, isTypologyMatch } from "@/components/ui/SearchableSelect";
+import { SearchableSelect } from "@/components/ui/SearchableSelect";
+import {
+  getAllTypologies,
+  ProjectProfileCircle,
+  TypologyBadge,
+  TypologyDot,
+  isTypologyMatch,
+} from "@/lib/typology";
 
 interface SiteVisitItem {
   id: string;
@@ -148,6 +155,10 @@ export default function VisitsClientView({
   const [visitProjectFilter, setVisitProjectFilter] = useState("ALL");
   const [visitReviewFilter, setVisitReviewFilter] = useState("ALL");
   const [visitSortBy, setVisitSortBy] = useState<string>("DATE_DESC");
+
+  const dynamicTypologies = useMemo(() => {
+    return getAllTypologies(availableProjects);
+  }, [availableProjects]);
 
   // Filter available projects for assignment according to architectural typology
   const effectiveAssignTypology = useMemo(() => {
@@ -1703,9 +1714,10 @@ export default function VisitsClientView({
                   searchPlaceholder="Search typology (e.g. Hospital, Commercial, Villa)..."
                   options={[
                     { value: "", label: "All Typologies (Show all projects)" },
-                    ...STUDIO_TYPOLOGIES.map((typ) => ({
+                    ...dynamicTypologies.map((typ) => ({
                       value: typ,
                       label: typ,
+                      icon: <TypologyDot typology={typ} />,
                     })),
                   ]}
                   value={assignTypology}
@@ -1765,6 +1777,7 @@ export default function VisitsClientView({
                   label: `${p.code} — ${p.name}`,
                   subLabel: p.projectType || undefined,
                   badge: p.code,
+                  icon: <ProjectProfileCircle typology={p.projectType} name={p.name} size="xs" />,
                 }))}
                 value={assignProjectId}
                 onChange={(val) => {

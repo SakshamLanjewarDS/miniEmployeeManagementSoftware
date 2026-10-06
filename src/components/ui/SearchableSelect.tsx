@@ -11,30 +11,30 @@ export interface SelectOption {
   badge?: string;
 }
 
-export const STUDIO_TYPOLOGIES = [
-  "Commercial & Corporate Office",
-  "Healthcare & Hospital",
-  "Residential Architecture",
-  "Luxury Villa & Penthouse",
-  "Hospitality & Boutique Resort",
-  "Interior Architecture & Fitout",
-  "High-Rise Residential",
-  "Retail & Showroom",
-  "Landscape & Urban Design",
-  "Institutional & Cultural",
-  "Industrial & Warehousing",
-];
+import {
+  getAllTypologies,
+  isTypologyMatch as robustIsTypologyMatch,
+  ProjectProfileCircle,
+  TypologyBadge,
+  TypologyDot,
+  getTypologyConfig,
+} from "@/lib/typology";
 
-export function isTypologyMatch(projectType: string | null | undefined, selectedTypology: string): boolean {
-  if (!selectedTypology || selectedTypology === "ALL") return true;
-  if (!projectType) return false;
-  const pLower = projectType.trim().toLowerCase();
-  const sLower = selectedTypology.trim().toLowerCase();
-  if (pLower === sLower) return true;
-  if (pLower.includes(sLower) || sLower.includes(pLower)) return true;
-  
-  const keywords = sLower.split(/[\s,&/]+/).filter((w) => w.length > 3);
-  return keywords.some((kw) => pLower.includes(kw));
+export {
+  getAllTypologies,
+  ProjectProfileCircle,
+  TypologyBadge,
+  TypologyDot,
+  getTypologyConfig,
+};
+
+export const STUDIO_TYPOLOGIES = getAllTypologies();
+
+export function isTypologyMatch(
+  projectType: string | null | undefined,
+  selectedTypology: string
+): boolean {
+  return robustIsTypologyMatch(projectType, selectedTypology);
 }
 
 export interface SearchableSelectProps {

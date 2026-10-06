@@ -17,6 +17,7 @@ import {
   ShieldAlert,
   TrendingUp,
 } from "lucide-react";
+import { ProjectProfileCircle, TypologyBadge } from "@/lib/typology";
 
 interface ProjectDetailPageProps {
   params: Promise<{ workspaceSlug: string; projectId: string }>;
@@ -64,10 +65,11 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
       <div className="bg-white border border-[#E2E6F0] rounded-2xl p-6 shadow-2xs space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="font-mono text-xs font-bold text-[#5A81FA] bg-[#F2F4FF] px-2.5 py-1 rounded border border-[#CEDEFF]">
                 {project.code}
               </span>
+              <TypologyBadge typology={project.projectType} size="sm" />
               <span className="text-xs font-semibold text-[#696E82] bg-[#F8F9FD] px-2.5 py-1 rounded border border-[#E2E6F0]">
                 Phase: {project.currentPhase || "Brief"}
               </span>
@@ -89,7 +91,10 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
                 </span>
               )}
             </div>
-            <h1 className="text-2xl font-bold tracking-tight text-[#1F1F1F] mt-1">{project.name}</h1>
+            <div className="flex items-center gap-3 mt-1.5">
+              <ProjectProfileCircle typology={project.projectType} name={project.name} size="lg" />
+              <h1 className="text-2xl font-bold tracking-tight text-[#1F1F1F]">{project.name}</h1>
+            </div>
             <p className="text-xs text-[#696E82]">{project.description}</p>
           </div>
 

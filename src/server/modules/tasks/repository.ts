@@ -143,6 +143,7 @@ export async function findTasks(ctx: TenantContext, params: TaskFilterParams = {
           id: true,
           code: true,
           name: true,
+          projectType: true,
         },
       },
       phase: {

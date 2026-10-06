@@ -47,6 +47,13 @@ import { CustomFieldsManagerModal } from "@/components/custom-fields/CustomField
 import { DynamicFormFields } from "@/components/custom-fields/DynamicFormFields";
 import { DynamicCardFields } from "@/components/custom-fields/DynamicCardFields";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
+import {
+  getAllTypologies,
+  ProjectProfileCircle,
+  TypologyBadge,
+  TypologyDot,
+  isTypologyMatch,
+} from "@/lib/typology";
 
 interface ProjectItem {
   id: string;
@@ -157,6 +164,10 @@ export function ProjectsClientView({
 
   // Role Permissions: Owner and Admin have full manipulation rights; Employee is read-only
   const canManage = context.role === "OWNER" || context.role === "ADMIN";
+
+  const dynamicTypologies = useMemo(() => {
+    return getAllTypologies(initialProjects);
+  }, [initialProjects]);
 
   // Dynamic Custom Fields State (Configurable without code changes)
   const [customFields, setCustomFields] = useState<CustomFieldDefinition[]>(initialCustomFields);
@@ -340,7 +351,7 @@ export function ProjectsClientView({
 
       const matchesStatus = statusFilter === "ALL" || p.status === statusFilter;
       const matchesPhase = phaseFilter === "ALL" || p.currentPhase === phaseFilter;
-      const matchesTypology = typologyFilter === "ALL" || p.projectType === typologyFilter;
+      const matchesTypology = typologyFilter === "ALL" || isTypologyMatch(p.projectType, typologyFilter);
       const matchesArchitect = architectFilter === "ALL" || p.projectArchitectId === architectFilter;
       const matchesManager = managerFilter === "ALL" || p.projectManagerId === managerFilter;
       const matchesCoordinator = coordinatorFilter === "ALL" || p.projectCoordinatorId === coordinatorFilter;
@@ -1035,7 +1046,7 @@ export function ProjectsClientView({
                   className="w-full bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl px-2.5 py-1.5 text-xs text-[#1F1F1F] focus:outline-none focus:border-[#5A81FA]"
                 >
                   <option value="ALL">All Typologies</option>
-                  {PROJECT_TYPOLOGIES.map((t) => (
+                  {dynamicTypologies.map((t) => (
                     <option key={t} value={t}>
                       {t}
                     </option>
@@ -1383,10 +1394,7 @@ export function ProjectsClientView({
                       </span>
 
                       {/* 4. Typology Badge */}
-                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#696E82] bg-gray-100 px-2 py-0.5 rounded-full border border-gray-200">
-                        <Building2 className="w-3 h-3 text-[#5A81FA]" />
-                        <span>{p.projectType || "Architecture"}</span>
-                      </span>
+                      <TypologyBadge typology={p.projectType} size="sm" />
 
                       {getStatusBadge(p.status)}
                     </div>
@@ -1425,9 +1433,12 @@ export function ProjectsClientView({
 
                   {/* 2. Project Name */}
                   <div>
-                    <h3 className="text-lg font-bold text-[#1F1F1F] tracking-tight group-hover:text-[#5A81FA] transition-colors">
-                      {p.name}
-                    </h3>
+                    <div className="flex items-center gap-2.5">
+                      <ProjectProfileCircle typology={p.projectType} name={p.name} size="md" />
+                      <h3 className="text-lg font-bold text-[#1F1F1F] tracking-tight group-hover:text-[#5A81FA] transition-colors">
+                        {p.name}
+                      </h3>
+                    </div>
                     {/* 18. Brief / Project Brief */}
                     {p.description ? (
                       <div className="mt-1.5 p-2 rounded-xl bg-[#F8F9FD] border border-[#E2E6F0]/80 text-xs text-[#696E82] flex items-start gap-1.5">
@@ -1781,9 +1792,10 @@ export function ProjectsClientView({
                   label="Typology"
                   placeholder="Select Typology..."
                   searchPlaceholder="Search typology..."
-                  options={PROJECT_TYPOLOGIES.map((typ) => ({
+                  options={dynamicTypologies.map((typ) => ({
                     value: typ,
                     label: typ,
+                    icon: <TypologyDot typology={typ} />,
                   }))}
                   value={formData.projectType}
                   onChange={(val) => setFormData({ ...formData, projectType: val })}
@@ -2172,9 +2184,10 @@ export function ProjectsClientView({
                   label="Typology"
                   placeholder="Select Typology..."
                   searchPlaceholder="Search typology..."
-                  options={PROJECT_TYPOLOGIES.map((typ) => ({
+                  options={dynamicTypologies.map((typ) => ({
                     value: typ,
                     label: typ,
+                    icon: <TypologyDot typology={typ} />,
                   }))}
                   value={editFormData.projectType}
                   onChange={(val) =>
