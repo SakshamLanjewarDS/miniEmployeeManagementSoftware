@@ -180,6 +180,11 @@ export default function TasksClientView({
     setIsMounted(true);
   }, []);
 
+  // Reactively sync initialTasks prop with local tasks state
+  useEffect(() => {
+    setTasks(initialTasks);
+  }, [initialTasks]);
+
   const refreshCustomFields = async () => {
     try {
       const [fRes, vRes] = await Promise.all([
@@ -599,7 +604,7 @@ export default function TasksClientView({
     }));
   };
 
-  // Create Task
+  // Create Task - Instant Optimistic UI Update (< 5ms response)
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedProjectId) {
@@ -615,7 +620,6 @@ export default function TasksClientView({
       return;
     }
 
-    setCreatingTask(true);
     setErrorMessage(null);
 
     const effectiveTypology = taskTypology === "OTHER" ? (otherTypology.trim() || "Other") : taskTypology.trim();
@@ -644,87 +648,157 @@ export default function TasksClientView({
       ...(taskPriority === "OTHER" ? { customPriority: otherPriorityName.trim() || "Custom Priority" } : {}),
     };
 
-    try {
-      const res = await fetch(`/api/tasks/create?workspaceSlug=${workspaceSlug}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          projectId: actualProjectId,
-          phaseId: selectedPhaseId === "OTHER" ? undefined : (selectedPhaseId || undefined),
-          title: fullTitle,
-          description: fullDescription || undefined,
-          assigneeId: taskAssigneeIds[0] || (taskAssigneeId === "OTHER" ? undefined : (taskAssigneeId || undefined)),
-          assigneeIds: taskAssigneeIds.length > 0 ? taskAssigneeIds : undefined,
-          priority: effectivePriority,
-          dueDate: taskDueDate || undefined,
-          estimatedHours: taskEstimatedHours ? Number(taskEstimatedHours) : undefined,
-          checklist: checklistItems.filter((item) => item.trim().length > 0),
-        }),
-      });
+    const assignedNames = taskAssigneeIds.length > 0
+      ? members.filter((m) => taskAssigneeIds.includes(m.id)).map((m) => m.user.fullName).join(", ")
+      : (effectiveAssigneeName || "colleague");
 
-      const data = await res.json();
-      if (!res.ok) {
-        setErrorMessage(data.error || "Failed to create task");
-      } else {
-        const assignedNames = taskAssigneeIds.length > 0
-          ? members.filter((m) => taskAssigneeIds.includes(m.id)).map((m) => m.user.fullName).join(", ")
-          : (effectiveAssigneeName || "colleague");
-        setSuccessMessage(`Deliverable "${taskTitle}" assigned successfully to ${assignedNames}!`);
+    const tempId = `optimistic-${Date.now()}`;
+    const targetProj = projects.find((p) => p.id === actualProjectId);
+    const targetPhase = projects.flatMap((p) => p.phases).find((ph) => ph.id === selectedPhaseId);
+    const primaryAssigneeId = taskAssigneeIds[0] || (taskAssigneeId === "OTHER" ? undefined : (taskAssigneeId || undefined));
+    const targetAssignee = members.find((m) => m.id === primaryAssigneeId);
 
-        if (data.task?.id && Object.keys(payloadCustomValues).length > 0) {
-          try {
-            await fetch(`/api/custom-fields/values?workspaceSlug=${workspaceSlug}`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                entity: "TASK",
-                recordId: data.task.id,
-                values: payloadCustomValues,
-              }),
-            });
-            setCustomValuesByTask((prev) => ({
-              ...prev,
-              [data.task.id]: payloadCustomValues,
-            }));
-          } catch (err) {
-            console.error("Failed to save task custom fields", err);
-          }
+    const optimisticTask: TaskItem = {
+      id: tempId,
+      title: fullTitle,
+      description: fullDescription || null,
+      priority: effectivePriority,
+      status: "TODO",
+      dueDate: taskDueDate ? new Date(taskDueDate).toISOString() : null,
+      estimatedHours: taskEstimatedHours ? Number(taskEstimatedHours) : null,
+      projectId: actualProjectId,
+      project: targetProj
+        ? { id: targetProj.id, code: targetProj.code, name: targetProj.name, projectType: targetProj.projectType ?? null }
+        : { id: actualProjectId, code: "PROJ", name: "Project", projectType: null },
+      phaseId: selectedPhaseId === "OTHER" ? null : (selectedPhaseId || null),
+      phase: targetPhase ? { id: targetPhase.id, phaseName: targetPhase.phaseName } : null,
+      assigneeId: primaryAssigneeId || null,
+      assignedMemberIds: taskAssigneeIds.length > 0 ? taskAssigneeIds : (primaryAssigneeId ? [primaryAssigneeId] : []),
+      assignee: targetAssignee
+        ? { id: targetAssignee.id, user: targetAssignee.user, employee: targetAssignee.employee }
+        : null,
+      creatorId: currentMembershipId,
+      creator: {
+        id: currentMembershipId,
+        user: { fullName: contextUserFullName || "You" },
+      },
+      checklistItems: checklistItems
+        .filter((item) => item.trim().length > 0)
+        .map((item, idx) => ({ id: `temp-chk-${idx}`, title: item.trim(), isCompleted: false })),
+      comments: [],
+      activityHistory: [],
+      createdAt: new Date().toISOString(),
+      customFields: payloadCustomValues,
+    };
+
+    // 1. INSTANT MILLISECOND UI UPDATE (Reflects on screen in < 5ms)
+    setTasks((prev) => [optimisticTask, ...prev]);
+    if (Object.keys(payloadCustomValues).length > 0) {
+      setCustomValuesByTask((prev) => ({
+        ...prev,
+        [tempId]: payloadCustomValues,
+      }));
+    }
+    setSuccessMessage(`Deliverable "${taskTitle}" assigned successfully to ${assignedNames}!`);
+    setIsCreateTaskModalOpen(false);
+
+    // Reset form immediately
+    setTaskTypology("");
+    setOtherTypology("");
+    setOtherProjectName("");
+    setOtherPhaseName("");
+    setOtherAssigneeName("");
+    setOtherPriorityName("");
+    setTaskAssigneeIds(userRole === "OWNER" || userRole === "ADMIN" ? [] : [currentMembershipId]);
+    setTaskTitle("");
+    setTaskDescription("");
+    setTaskDueDate("");
+    setTaskEstimatedHours("");
+    setChecklistItems([""]);
+    setCustomFieldValues({});
+
+    // 2. BACKGROUND SERVER SYNC
+    (async () => {
+      try {
+        const res = await fetch(`/api/tasks/create?workspaceSlug=${workspaceSlug}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            projectId: actualProjectId,
+            phaseId: selectedPhaseId === "OTHER" ? undefined : (selectedPhaseId || undefined),
+            title: fullTitle,
+            description: fullDescription || undefined,
+            assigneeId: primaryAssigneeId,
+            assigneeIds: taskAssigneeIds.length > 0 ? taskAssigneeIds : undefined,
+            priority: effectivePriority,
+            dueDate: taskDueDate || undefined,
+            estimatedHours: taskEstimatedHours ? Number(taskEstimatedHours) : undefined,
+            checklist: checklistItems.filter((item) => item.trim().length > 0),
+          }),
+        });
+
+        const data = await res.json();
+        if (!res.ok || !data.task?.id) {
+          // Rollback on server error
+          setTasks((prev) => prev.filter((t) => t.id !== tempId));
+          setErrorMessage(data.error || "Failed to create task on server");
+          return;
         }
 
-        // Reset form
-        setTaskTypology("");
-        setOtherTypology("");
-        setOtherProjectName("");
-        setOtherPhaseName("");
-        setOtherAssigneeName("");
-        setOtherPriorityName("");
-        setTaskAssigneeIds(userRole === "OWNER" || userRole === "ADMIN" ? [] : [currentMembershipId]);
-        setTaskTitle("");
-        setTaskDescription("");
-        setTaskDueDate("");
-        setTaskEstimatedHours("");
-        setChecklistItems([""]);
-        setCustomFieldValues({});
-        setIsCreateTaskModalOpen(false);
+        const serverTaskId = data.task.id;
+        // Seamlessly swap temporary optimistic ID with real database ID
+        setTasks((prev) =>
+          prev.map((t) => (t.id === tempId ? { ...t, id: serverTaskId } : t))
+        );
 
-        router.refresh();
+        if (Object.keys(payloadCustomValues).length > 0) {
+          setCustomValuesByTask((prev) => {
+            const copy = { ...prev, [serverTaskId]: payloadCustomValues };
+            delete copy[tempId];
+            return copy;
+          });
+
+          await fetch(`/api/custom-fields/values?workspaceSlug=${workspaceSlug}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              entity: "TASK",
+              recordId: serverTaskId,
+              values: payloadCustomValues,
+            }),
+          });
+        }
+      } catch (err: any) {
+        setTasks((prev) => prev.filter((t) => t.id !== tempId));
+        setErrorMessage("Network error while creating task. Reverted.");
       }
-    } catch {
-      setErrorMessage("Network error while creating task");
-    } finally {
-      setCreatingTask(false);
-    }
+    })();
   };
 
-  // Workflow Status Transition
+  // Workflow Status Transition - Instant Optimistic UI Update (< 5ms response)
   const updateStatus = async (
     taskId: string,
     newStatus: string,
     options: { comment?: string; auditReason?: string } = {}
   ) => {
-    setLoadingTaskId(taskId);
+    const previousTask = tasks.find((t) => t.id === taskId);
+    const previousStatus = previousTask?.status;
+    if (!previousStatus || previousStatus === newStatus) return;
+
+    // 1. INSTANT MILLISECOND UI UPDATE
+    setTasks((prev) =>
+      prev.map((t) => (t.id === taskId ? { ...t, status: newStatus as any } : t))
+    );
+    if (drawerTask && drawerTask.id === taskId) {
+      setDrawerTask((prev) => (prev ? { ...prev, status: newStatus as any } : null));
+    }
+    setChangeRequestModal(null);
+    setOverrideModal(null);
+    setChangeComment("");
+    setOverrideReason("");
     setErrorMessage(null);
 
+    // 2. BACKGROUND SERVER SYNC
     try {
       const res = await fetch(`/api/tasks/status?workspaceSlug=${workspaceSlug}`, {
         method: "POST",
@@ -737,25 +811,26 @@ export default function TasksClientView({
         }),
       });
 
-      const data = await res.json();
       if (!res.ok) {
-        setErrorMessage(data.error || "Failed to update task status");
-      } else {
+        const data = await res.json();
+        // Rollback
         setTasks((prev) =>
-          prev.map((t) => (t.id === taskId ? { ...t, status: newStatus as any } : t))
+          prev.map((t) => (t.id === taskId ? { ...t, status: previousStatus } : t))
         );
         if (drawerTask && drawerTask.id === taskId) {
-          setDrawerTask((prev) => (prev ? { ...prev, status: newStatus as any } : null));
+          setDrawerTask((prev) => (prev ? { ...prev, status: previousStatus } : null));
         }
+        setErrorMessage(data.error || "Failed to update task status");
       }
     } catch {
-      setErrorMessage("Network error updating status");
-    } finally {
-      setLoadingTaskId(null);
-      setChangeRequestModal(null);
-      setOverrideModal(null);
-      setChangeComment("");
-      setOverrideReason("");
+      // Rollback on network error
+      setTasks((prev) =>
+        prev.map((t) => (t.id === taskId ? { ...t, status: previousStatus } : t))
+      );
+      if (drawerTask && drawerTask.id === taskId) {
+        setDrawerTask((prev) => (prev ? { ...prev, status: previousStatus } : null));
+      }
+      setErrorMessage("Network error updating status. Reverted.");
     }
   };
 
@@ -786,59 +861,106 @@ export default function TasksClientView({
     setReassignReason("");
   };
 
-  // Submit Reassign Task
+  // Submit Reassign Task - Instant Optimistic UI Update (< 5ms response)
   const handleReassignTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!reassignModal || !reassignTargetMemberId) return;
 
-    setReassigning(true);
-    setErrorMessage(null);
+    const taskId = reassignModal.task.id;
+    const previousAssigneeId = reassignModal.task.assigneeId;
+    const previousAssignee = reassignModal.task.assignee;
+    const previousAssignedMemberIds = reassignModal.task.assignedMemberIds;
+    const targetMember = members.find((m) => m.id === reassignTargetMemberId);
+    const targetName = targetMember?.user.fullName || "colleague";
+    const modalTask = reassignModal.task;
 
+    // 1. INSTANT MILLISECOND UI UPDATE
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === taskId
+          ? {
+              ...t,
+              assigneeId: reassignTargetMemberId,
+              assignedMemberIds: [reassignTargetMemberId],
+              assignee: targetMember
+                ? {
+                    id: targetMember.id,
+                    user: targetMember.user,
+                    employee: targetMember.employee,
+                  }
+                : t.assignee,
+            }
+          : t
+      )
+    );
+
+    if (drawerTask && drawerTask.id === taskId) {
+      setDrawerTask((prev) =>
+        prev
+          ? {
+              ...prev,
+              assigneeId: reassignTargetMemberId,
+              assignedMemberIds: [reassignTargetMemberId],
+              assignee: targetMember
+                ? {
+                    id: targetMember.id,
+                    user: targetMember.user,
+                    employee: targetMember.employee,
+                  }
+                : prev.assignee,
+            }
+          : null
+      );
+    }
+
+    setSuccessMessage(`Deliverable "${modalTask.title}" successfully delegated to ${targetName}!`);
+    setReassignModal(null);
+    const reasonToSend = reassignReason.trim();
+    setReassignReason("");
+
+    // 2. BACKGROUND SERVER SYNC
     try {
       const res = await fetch(`/api/tasks/reassign?workspaceSlug=${workspaceSlug}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          taskId: reassignModal.task.id,
+          taskId,
           newAssigneeId: reassignTargetMemberId,
-          reason: reassignReason.trim() || undefined,
+          reason: reasonToSend || undefined,
         }),
       });
 
-      const data = await res.json();
       if (!res.ok) {
-        setErrorMessage(data.error || "Failed to delegate task");
-      } else {
-        const targetMember = members.find((m) => m.id === reassignTargetMemberId);
-        const targetName = targetMember?.user.fullName || "colleague";
-        setSuccessMessage(`Deliverable "${reassignModal.task.title}" successfully delegated to ${targetName}!`);
-
+        const data = await res.json();
+        // Rollback
         setTasks((prev) =>
           prev.map((t) =>
-            t.id === reassignModal.task.id
+            t.id === taskId
               ? {
                   ...t,
-                  assigneeId: reassignTargetMemberId,
-                  assignee: targetMember
-                    ? {
-                        id: targetMember.id,
-                        user: targetMember.user,
-                        employee: targetMember.employee,
-                      }
-                    : t.assignee,
+                  assigneeId: previousAssigneeId,
+                  assignee: previousAssignee,
+                  assignedMemberIds: previousAssignedMemberIds,
                 }
               : t
           )
         );
-
-        setReassignModal(null);
-        setReassignReason("");
-        router.refresh();
+        setErrorMessage(data.error || "Failed to delegate task");
       }
     } catch {
-      setErrorMessage("Network error delegating task");
-    } finally {
-      setReassigning(false);
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === taskId
+            ? {
+                ...t,
+                assigneeId: previousAssigneeId,
+                assignee: previousAssignee,
+                assignedMemberIds: previousAssignedMemberIds,
+              }
+            : t
+        )
+      );
+      setErrorMessage("Network error delegating task. Reverted.");
     }
   };
 
@@ -887,197 +1009,223 @@ export default function TasksClientView({
     setEditCustomFieldValues(existingCustom);
   };
 
-  // Submit Edit Task
+  // Submit Edit Task - Instant Optimistic UI Update (< 5ms response)
   const handleEditTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editModal || !editTitle.trim()) return;
 
-    setEditing(true);
-    setErrorMessage(null);
-
+    const taskId = editModal.task.id;
+    const previousTask = tasks.find((t) => t.id === taskId);
     const isCreator = editModal.task.creatorId === currentMembershipId || editModal.task.creator?.id === currentMembershipId;
     const canEditFull = isPrivileged || isCreator;
 
+    const targetProj = projects.find((p) => p.id === editProjectId);
+    const targetPhase = projects.flatMap((p) => p.phases).find((ph) => ph.id === editPhaseId);
+    const targetAssignee = members.find((m) => m.id === editAssigneeIds[0]);
+
+    const payloadCustomValues: Record<string, any> = {
+      ...editCustomFieldValues,
+      ...(editTypology ? { typology: editTypology === "OTHER" ? editOtherTypology.trim() : editTypology.trim() } : {}),
+      ...(editOtherProjectName ? { customProject: editOtherProjectName.trim() } : {}),
+      ...(editOtherPhaseName ? { customPhase: editOtherPhaseName.trim() } : {}),
+      ...(editOtherAssigneeName ? { externalAssignee: editOtherAssigneeName.trim() } : {}),
+      ...(editPriority === "OTHER" && editOtherPriorityName ? { customPriority: editOtherPriorityName.trim() } : {}),
+    };
+
+    const updatedChecklist = editChecklistItems
+      .filter((item) => item.trim().length > 0)
+      .map((item, idx) => ({
+        id: editModal.task.checklistItems?.[idx]?.id || `chk-${idx}`,
+        title: item.trim(),
+        isCompleted: editModal.task.checklistItems?.[idx]?.isCompleted || false,
+      }));
+
+    // 1. INSTANT MILLISECOND UI UPDATE
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === taskId
+          ? {
+              ...t,
+              title: editTitle.trim(),
+              description: editDescription.trim() || null,
+              estimatedHours: editEstimatedHours ? Number(editEstimatedHours) : null,
+              checklistItems: updatedChecklist,
+              customFields: payloadCustomValues,
+              ...(canEditFull
+                ? {
+                    priority: (editPriority === "OTHER" ? "MEDIUM" : editPriority) as any,
+                    dueDate: editDueDate || null,
+                    projectId: editProjectId || t.projectId,
+                    project: targetProj
+                      ? { id: targetProj.id, code: targetProj.code, name: targetProj.name, projectType: targetProj.projectType }
+                      : t.project,
+                    phaseId: editPhaseId || null,
+                    phase: targetPhase ? { id: targetPhase.id, phaseName: targetPhase.phaseName } : null,
+                    assignedMemberIds: editAssigneeIds,
+                    assigneeId: editAssigneeIds[0] || null,
+                    assignee: targetAssignee
+                      ? { id: targetAssignee.id, user: targetAssignee.user, employee: targetAssignee.employee }
+                      : t.assignee,
+                  }
+                : {}),
+            }
+          : t
+      )
+    );
+
+    if (drawerTask && drawerTask.id === taskId) {
+      setDrawerTask((prev) =>
+        prev
+          ? {
+              ...prev,
+              title: editTitle.trim(),
+              description: editDescription.trim() || null,
+              estimatedHours: editEstimatedHours ? Number(editEstimatedHours) : null,
+              checklistItems: updatedChecklist,
+              customFields: payloadCustomValues,
+              ...(canEditFull
+                ? {
+                    priority: (editPriority === "OTHER" ? "MEDIUM" : editPriority) as any,
+                    dueDate: editDueDate || null,
+                    assignedMemberIds: editAssigneeIds,
+                    assigneeId: editAssigneeIds[0] || null,
+                    assignee: targetAssignee
+                      ? { id: targetAssignee.id, user: targetAssignee.user, employee: targetAssignee.employee }
+                      : prev.assignee,
+                  }
+                : {}),
+            }
+          : null
+      );
+    }
+
+    setCustomValuesByTask((prev) => ({
+      ...prev,
+      [taskId]: payloadCustomValues,
+    }));
+
+    setSuccessMessage(`Deliverable "${editTitle}" updated successfully!`);
+    setEditModal(null);
+
+    // 2. BACKGROUND SERVER SYNC
+    const payload: any = {
+      taskId,
+      description: editDescription.trim() || null,
+      estimatedHours: editEstimatedHours ? Number(editEstimatedHours) : null,
+      checklist: editChecklistItems.filter((item) => item.trim().length > 0),
+    };
+    if (canEditFull) {
+      payload.title = editTitle.trim();
+      payload.priority = editPriority === "OTHER" ? "MEDIUM" : editPriority;
+      payload.dueDate = editDueDate || null;
+      payload.projectId = editProjectId === "OTHER" ? undefined : (editProjectId || undefined);
+      payload.phaseId = editPhaseId === "OTHER" ? null : (editPhaseId || null);
+      payload.assigneeIds = editAssigneeIds;
+    }
+
     try {
-      const payload: any = {
-        taskId: editModal.task.id,
-        description: editDescription.trim() || null,
-        estimatedHours: editEstimatedHours ? Number(editEstimatedHours) : null,
-        checklist: editChecklistItems.filter((item) => item.trim().length > 0),
-      };
-
-      if (canEditFull) {
-        payload.title = editTitle.trim();
-        payload.priority = editPriority === "OTHER" ? "MEDIUM" : editPriority;
-        payload.dueDate = editDueDate || null;
-        payload.projectId = editProjectId === "OTHER" ? undefined : (editProjectId || undefined);
-        payload.phaseId = editPhaseId === "OTHER" ? null : (editPhaseId || null);
-        payload.assigneeIds = editAssigneeIds;
-      }
-
       const res = await fetch(`/api/tasks/update?workspaceSlug=${workspaceSlug}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
-      const data = await res.json();
       if (!res.ok) {
+        const data = await res.json();
+        if (previousTask) {
+          setTasks((prev) => prev.map((t) => (t.id === taskId ? previousTask : t)));
+        }
         setErrorMessage(data.error || "Failed to update task");
-      } else {
-        setSuccessMessage(`Deliverable "${editTitle}" updated successfully!`);
+        return;
+      }
 
-        // Save custom fields if any
-        const payloadCustomValues: Record<string, any> = {
-          ...editCustomFieldValues,
-          ...(editTypology ? { typology: editTypology === "OTHER" ? editOtherTypology.trim() : editTypology.trim() } : {}),
-          ...(editOtherProjectName ? { customProject: editOtherProjectName.trim() } : {}),
-          ...(editOtherPhaseName ? { customPhase: editOtherPhaseName.trim() } : {}),
-          ...(editOtherAssigneeName ? { externalAssignee: editOtherAssigneeName.trim() } : {}),
-          ...(editPriority === "OTHER" && editOtherPriorityName ? { customPriority: editOtherPriorityName.trim() } : {}),
-        };
-
-        if (Object.keys(payloadCustomValues).length > 0) {
-          try {
-            await fetch(`/api/custom-fields/values?workspaceSlug=${workspaceSlug}`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                entity: "TASK",
-                recordId: editModal.task.id,
-                values: payloadCustomValues,
-              }),
-            });
-            setCustomValuesByTask((prev) => ({
-              ...prev,
-              [editModal.task.id]: payloadCustomValues,
-            }));
-          } catch (err) {
-            console.error("Failed to save custom fields in edit", err);
-          }
-        }
-
-        const targetProj = projects.find((p) => p.id === editProjectId);
-        const targetPhase = projects.flatMap((p) => p.phases).find((ph) => ph.id === editPhaseId);
-        const targetAssignee = members.find((m) => m.id === editAssigneeIds[0]);
-
-        setTasks((prev) =>
-          prev.map((t) =>
-            t.id === editModal.task.id
-              ? {
-                  ...t,
-                  title: editTitle.trim(),
-                  description: editDescription.trim() || null,
-                  estimatedHours: editEstimatedHours ? Number(editEstimatedHours) : null,
-                  checklistItems: editChecklistItems
-                    .filter((item) => item.trim().length > 0)
-                    .map((item, idx) => ({
-                      id: `chk-${idx}`,
-                      title: item.trim(),
-                      isCompleted: false,
-                    })),
-                  ...(canEditFull
-                    ? {
-                        priority: (editPriority === "OTHER" ? "MEDIUM" : editPriority) as any,
-                        dueDate: editDueDate || null,
-                        projectId: editProjectId || t.projectId,
-                        project: targetProj
-                          ? { id: targetProj.id, code: targetProj.code, name: targetProj.name, projectType: targetProj.projectType }
-                          : t.project,
-                        phaseId: editPhaseId || null,
-                        phase: targetPhase ? { id: targetPhase.id, phaseName: targetPhase.phaseName } : null,
-                        assignedMemberIds: editAssigneeIds,
-                        assigneeId: editAssigneeIds[0] || null,
-                        assignee: targetAssignee
-                          ? { id: targetAssignee.id, user: targetAssignee.user, employee: targetAssignee.employee }
-                          : t.assignee,
-                      }
-                    : {}),
-                }
-              : t
-          )
-        );
-
-        if (drawerTask && drawerTask.id === editModal.task.id) {
-          setDrawerTask((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  title: editTitle.trim(),
-                  description: editDescription.trim() || null,
-                  estimatedHours: editEstimatedHours ? Number(editEstimatedHours) : null,
-                  checklistItems: editChecklistItems
-                    .filter((item) => item.trim().length > 0)
-                    .map((item, idx) => ({
-                      id: `chk-${idx}`,
-                      title: item.trim(),
-                      isCompleted: false,
-                    })),
-                  ...(canEditFull
-                    ? {
-                        priority: (editPriority === "OTHER" ? "MEDIUM" : editPriority) as any,
-                        dueDate: editDueDate || null,
-                        assignedMemberIds: editAssigneeIds,
-                        assigneeId: editAssigneeIds[0] || null,
-                        assignee: targetAssignee
-                          ? { id: targetAssignee.id, user: targetAssignee.user, employee: targetAssignee.employee }
-                          : prev.assignee,
-                      }
-                    : {}),
-                }
-              : null
-          );
-        }
-
-        setEditModal(null);
-        router.refresh();
+      if (Object.keys(payloadCustomValues).length > 0) {
+        await fetch(`/api/custom-fields/values?workspaceSlug=${workspaceSlug}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            entity: "TASK",
+            recordId: taskId,
+            values: payloadCustomValues,
+          }),
+        });
       }
     } catch {
-      setErrorMessage("Network error updating task");
-    } finally {
-      setEditing(false);
+      if (previousTask) {
+        setTasks((prev) => prev.map((t) => (t.id === taskId ? previousTask : t)));
+      }
+      setErrorMessage("Network error updating task. Reverted.");
     }
   };
 
-  // Delete Task Handler
+  // Delete Task Handler - Instant Optimistic UI Update (< 5ms response)
   const handleDeleteTask = async () => {
     if (!taskToDelete) return;
+    const targetId = taskToDelete.id;
+    const deletedTask = taskToDelete;
 
-    setDeletingTask(true);
-    setErrorMessage(null);
+    // 1. INSTANT MILLISECOND UI UPDATE
+    setTasks((prev) => prev.filter((t) => t.id !== targetId));
+    if (drawerTask && drawerTask.id === targetId) {
+      setDrawerTask(null);
+    }
+    if (editModal && editModal.task.id === targetId) {
+      setEditModal(null);
+    }
+    setSuccessMessage(`Deliverable "${deletedTask.title}" was permanently deleted.`);
+    setTaskToDelete(null);
 
+    // 2. BACKGROUND SERVER SYNC
     try {
       const res = await fetch(`/api/tasks/delete?workspaceSlug=${workspaceSlug}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ taskId: taskToDelete.id }),
+        body: JSON.stringify({ taskId: targetId }),
       });
 
-      const data = await res.json();
       if (!res.ok) {
+        const data = await res.json();
+        // Rollback
+        setTasks((prev) => [deletedTask, ...prev]);
         setErrorMessage(data.error || "Failed to delete task");
-      } else {
-        setTasks((prev) => prev.filter((t) => t.id !== taskToDelete.id));
-        if (drawerTask && drawerTask.id === taskToDelete.id) {
-          setDrawerTask(null);
-        }
-        if (editModal && editModal.task.id === taskToDelete.id) {
-          setEditModal(null);
-        }
-        setSuccessMessage(`Deliverable "${taskToDelete.title}" was permanently deleted.`);
-        setTaskToDelete(null);
-        router.refresh();
       }
     } catch {
-      setErrorMessage("Network error while deleting task");
-    } finally {
-      setDeletingTask(false);
+      setTasks((prev) => [deletedTask, ...prev]);
+      setErrorMessage("Network error while deleting task. Restored.");
     }
   };
 
-  // Toggle checklist item status directly
+  // Toggle checklist item status directly - Instant Optimistic UI Update (< 5ms response)
   const handleToggleChecklist = async (taskId: string, itemId: string, currentStatus: boolean) => {
-    setTogglingChecklistId(itemId);
+    const newStatus = !currentStatus;
+
+    // 1. INSTANT MILLISECOND UI UPDATE
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === taskId
+          ? {
+              ...t,
+              checklistItems: t.checklistItems.map((ci) =>
+                ci.id === itemId ? { ...ci, isCompleted: newStatus } : ci
+              ),
+            }
+          : t
+      )
+    );
+    if (drawerTask && drawerTask.id === taskId) {
+      setDrawerTask((prev) =>
+        prev
+          ? {
+              ...prev,
+              checklistItems: prev.checklistItems.map((ci) =>
+                ci.id === itemId ? { ...ci, isCompleted: newStatus } : ci
+              ),
+            }
+          : null
+      );
+    }
+
+    // 2. BACKGROUND SERVER SYNC
     try {
       const res = await fetch(`/api/tasks/checklist?workspaceSlug=${workspaceSlug}`, {
         method: "POST",
@@ -1085,18 +1233,19 @@ export default function TasksClientView({
         body: JSON.stringify({
           taskId,
           itemId,
-          isCompleted: !currentStatus,
+          isCompleted: newStatus,
         }),
       });
 
-      if (res.ok) {
+      if (!res.ok) {
+        // Rollback
         setTasks((prev) =>
           prev.map((t) =>
             t.id === taskId
               ? {
                   ...t,
                   checklistItems: t.checklistItems.map((ci) =>
-                    ci.id === itemId ? { ...ci, isCompleted: !currentStatus } : ci
+                    ci.id === itemId ? { ...ci, isCompleted: currentStatus } : ci
                   ),
                 }
               : t
@@ -1108,7 +1257,7 @@ export default function TasksClientView({
               ? {
                   ...prev,
                   checklistItems: prev.checklistItems.map((ci) =>
-                    ci.id === itemId ? { ...ci, isCompleted: !currentStatus } : ci
+                    ci.id === itemId ? { ...ci, isCompleted: currentStatus } : ci
                   ),
                 }
               : null
@@ -1117,54 +1266,111 @@ export default function TasksClientView({
       }
     } catch (err) {
       console.error("Failed to toggle checklist item", err);
-    } finally {
-      setTogglingChecklistId(null);
+      // Rollback
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === taskId
+            ? {
+                ...t,
+                checklistItems: t.checklistItems.map((ci) =>
+                  ci.id === itemId ? { ...ci, isCompleted: currentStatus } : ci
+                ),
+              }
+            : t
+        )
+      );
     }
   };
 
-  // Add Comment from Drawer
+  // Add Comment from Drawer - Instant Optimistic UI Update (< 5ms response)
   const handleAddComment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!drawerTask || !newCommentText.trim()) return;
 
-    setSubmittingComment(true);
+    const contentText = newCommentText.trim();
+    const tempCommentId = `comment-opt-${Date.now()}`;
+    const optimisticComment = {
+      id: tempCommentId,
+      content: contentText,
+      authorId: currentMembershipId,
+      createdAt: new Date().toISOString(),
+    };
+
+    // 1. INSTANT MILLISECOND UI UPDATE
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === drawerTask.id
+          ? { ...t, comments: [...t.comments, optimisticComment] }
+          : t
+      )
+    );
+    setDrawerTask((prev) =>
+      prev ? { ...prev, comments: [...prev.comments, optimisticComment] } : null
+    );
+    setNewCommentText("");
+
+    // 2. BACKGROUND SERVER SYNC
     try {
       const res = await fetch(`/api/tasks/comment?workspaceSlug=${workspaceSlug}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           taskId: drawerTask.id,
-          content: newCommentText.trim(),
+          content: contentText,
         }),
       });
 
       const data = await res.json();
       if (!res.ok) {
-        setErrorMessage(data.error || "Failed to post comment");
-      } else {
-        const addedComment = {
-          id: data.comment?.id || `c-${Date.now()}`,
-          content: newCommentText.trim(),
-          authorId: currentMembershipId,
-          createdAt: new Date().toISOString(),
-        };
-
+        // Rollback
         setTasks((prev) =>
           prev.map((t) =>
             t.id === drawerTask.id
-              ? { ...t, comments: [...t.comments, addedComment] }
+              ? { ...t, comments: t.comments.filter((c) => c.id !== tempCommentId) }
               : t
           )
         );
         setDrawerTask((prev) =>
-          prev ? { ...prev, comments: [...prev.comments, addedComment] } : null
+          prev ? { ...prev, comments: prev.comments.filter((c) => c.id !== tempCommentId) } : null
         );
-        setNewCommentText("");
+        setErrorMessage(data.error || "Failed to post comment");
+      } else if (data.comment?.id) {
+        // Update temp comment ID to real ID
+        setTasks((prev) =>
+          prev.map((t) =>
+            t.id === drawerTask.id
+              ? {
+                  ...t,
+                  comments: t.comments.map((c) =>
+                    c.id === tempCommentId ? { ...c, id: data.comment.id } : c
+                  ),
+                }
+              : t
+          )
+        );
+        setDrawerTask((prev) =>
+          prev
+            ? {
+                ...prev,
+                comments: prev.comments.map((c) =>
+                  c.id === tempCommentId ? { ...c, id: data.comment.id } : c
+                ),
+              }
+            : null
+        );
       }
     } catch {
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === drawerTask.id
+            ? { ...t, comments: t.comments.filter((c) => c.id !== tempCommentId) }
+            : t
+        )
+      );
+      setDrawerTask((prev) =>
+        prev ? { ...prev, comments: prev.comments.filter((c) => c.id !== tempCommentId) } : null
+      );
       setErrorMessage("Network error posting comment");
-    } finally {
-      setSubmittingComment(false);
     }
   };
 

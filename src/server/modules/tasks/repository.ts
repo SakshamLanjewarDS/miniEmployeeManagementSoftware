@@ -262,26 +262,21 @@ export async function createTask(ctx: TenantContext, data: CreateTaskData) {
     },
   });
 
-  // Create real-time notification for ALL assigned employees
-  if (allAssigneeIds.length > 0) {
-    for (const recipientId of allAssigneeIds) {
-      if (recipientId && recipientId !== ctx.membershipId) {
-        try {
-          await prisma.notification.create({
-            data: {
-              tenantId: ctx.tenantId,
-              recipientId,
-              title: "New Task Assigned",
-              message: `${ctx.userFullName || "A manager"} assigned you a new task: "${task.title}" (${project.code}).`,
-              link: `/w/${ctx.tenantSlug}/tasks?taskId=${task.id}`,
-              isRead: false,
-            },
-          });
-        } catch (err) {
-          console.error("Failed to create task assignment notification:", err);
-        }
-      }
-    }
+  // Create real-time notification for ALL assigned employees in batch
+  const recipientIds = allAssigneeIds.filter((id) => id && id !== ctx.membershipId);
+  if (recipientIds.length > 0) {
+    prisma.notification.createMany({
+      data: recipientIds.map((recipientId) => ({
+        tenantId: ctx.tenantId,
+        recipientId,
+        title: "New Task Assigned",
+        message: `${ctx.userFullName || "A manager"} assigned you a new task: "${task.title}" (${project.code}).`,
+        link: `/w/${ctx.tenantSlug}/tasks?taskId=${task.id}`,
+        isRead: false,
+      })),
+    }).catch((err) => {
+      console.error("Failed to create task assignment notifications:", err);
+    });
   }
 
   return task;
@@ -398,20 +393,20 @@ export async function transitionTaskStatus(
         });
       }
 
-      for (const recipientId of notifyRecipients) {
+      if (notifyRecipients.size > 0) {
         try {
-          await tx.notification.create({
-            data: {
+          await tx.notification.createMany({
+            data: Array.from(notifyRecipients).map((recipientId) => ({
               tenantId: ctx.tenantId,
               recipientId,
               title: "Task Completed",
               message: `${ctx.userFullName} marked task "${task.title}" as Completed!`,
               link: `/w/${ctx.tenantSlug}/tasks?taskId=${task.id}`,
               isRead: false,
-            },
+            })),
           });
         } catch (e) {
-          console.error("Failed to create completion notification:", e);
+          console.error("Failed to create completion notifications:", e);
         }
       }
     } else if (
@@ -424,20 +419,20 @@ export async function transitionTaskStatus(
         if (id !== ctx.membershipId) notifyRecipients.add(id);
       });
 
-      for (const recipientId of notifyRecipients) {
+      if (notifyRecipients.size > 0) {
         try {
-          await tx.notification.create({
-            data: {
+          await tx.notification.createMany({
+            data: Array.from(notifyRecipients).map((recipientId) => ({
               tenantId: ctx.tenantId,
               recipientId,
               title: "Task Revisions Requested",
               message: `${ctx.userFullName} requested revisions on "${task.title}": ${options.comment || "See comments"}`,
               link: `/w/${ctx.tenantSlug}/tasks?taskId=${task.id}`,
               isRead: false,
-            },
+            })),
           });
         } catch (e) {
-          console.error("Failed to create changes requested notification:", e);
+          console.error("Failed to create changes requested notifications:", e);
         }
       }
     }
