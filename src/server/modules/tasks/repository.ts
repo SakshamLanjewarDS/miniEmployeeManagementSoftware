@@ -53,6 +53,43 @@ export function getWorkspaceDayBoundaries(timezone: string = "Asia/Kolkata") {
   }
 }
 
+/**
+ * Helper to retrieve IDs of all tasks in the tenant where the given membership ID
+ * is included in `assignedMemberIds` (JSON array of strings).
+ * 
+ * Compatible across TiDB Cloud and MySQL using JSON_CONTAINS, JSON_SEARCH,
+ * and LIKE pattern fallback.
+ */
+export async function getMultiAssignedTaskIds(tenantId: string, membershipId: string): Promise<string[]> {
+  if (!tenantId || !membershipId) return [];
+
+  try {
+    const rows = await prisma.$queryRaw<Array<{ id: string }>>`
+      SELECT id FROM tasks 
+      WHERE tenantId = ${tenantId} 
+        AND assignedMemberIds IS NOT NULL
+        AND (
+          JSON_CONTAINS(assignedMemberIds, JSON_QUOTE(${membershipId}))
+          OR JSON_SEARCH(assignedMemberIds, 'one', ${membershipId}) IS NOT NULL
+        )
+    `;
+    return rows.map((r) => r.id);
+  } catch (err) {
+    try {
+      const fallbackRows = await prisma.$queryRaw<Array<{ id: string }>>`
+        SELECT id FROM tasks 
+        WHERE tenantId = ${tenantId} 
+          AND assignedMemberIds IS NOT NULL
+          AND assignedMemberIds LIKE ${`%${membershipId}%`}
+      `;
+      return fallbackRows.map((r) => r.id);
+    } catch (fallbackErr) {
+      console.warn("Could not query multi-assigned task IDs:", fallbackErr);
+      return [];
+    }
+  }
+}
+
 export async function findTasks(ctx: TenantContext, params: TaskFilterParams = {}) {
   const { startOfToday, endOfToday } = getWorkspaceDayBoundaries(ctx.timezone);
 
@@ -60,22 +97,26 @@ export async function findTasks(ctx: TenantContext, params: TaskFilterParams = {
     { tenantId: ctx.tenantId }, // STRICT TENANT ISOLATION
   ];
 
-  // Employees can only ever see their own assigned tasks or deliverables they created
+  // Employees can see their primary assigned tasks, co-assigned tasks (in assignedMemberIds), or deliverables they created
   if (params.myTasksOnly || !isAdminOrOwner(ctx)) {
-    andConditions.push({
-      OR: [
-        { assigneeId: ctx.membershipId },
-        { assignedMemberIds: { string_contains: ctx.membershipId } },
-        { creatorId: ctx.membershipId },
-      ],
-    });
+    const multiTaskIds = await getMultiAssignedTaskIds(ctx.tenantId, ctx.membershipId);
+    const orClauses: any[] = [
+      { assigneeId: ctx.membershipId },
+      { creatorId: ctx.membershipId },
+    ];
+    if (multiTaskIds.length > 0) {
+      orClauses.push({ id: { in: multiTaskIds } });
+    }
+    andConditions.push({ OR: orClauses });
   } else if (params.assigneeId) {
-    andConditions.push({
-      OR: [
-        { assigneeId: params.assigneeId },
-        { assignedMemberIds: { string_contains: params.assigneeId } },
-      ],
-    });
+    const multiTaskIds = await getMultiAssignedTaskIds(ctx.tenantId, params.assigneeId);
+    const orClauses: any[] = [
+      { assigneeId: params.assigneeId },
+    ];
+    if (multiTaskIds.length > 0) {
+      orClauses.push({ id: { in: multiTaskIds } });
+    }
+    andConditions.push({ OR: orClauses });
   }
 
   if (params.projectId) {
@@ -495,7 +536,10 @@ export async function reassignTask(
   }
 
   const isPrivileged = isAdminOrOwner(ctx);
-  const isCurrentAssignee = task.assigneeId === ctx.membershipId;
+  const assignedMemberIds = Array.isArray(task.assignedMemberIds)
+    ? (task.assignedMemberIds as string[])
+    : [];
+  const isCurrentAssignee = task.assigneeId === ctx.membershipId || assignedMemberIds.includes(ctx.membershipId);
 
   if (!isPrivileged && !isCurrentAssignee) {
     throw new ForbiddenException(
@@ -528,6 +572,7 @@ export async function reassignTask(
       where: { id: taskId },
       data: {
         assigneeId: targetMember.id,
+        assignedMemberIds: [targetMember.id],
         version: { increment: 1 },
       },
     });
@@ -729,10 +774,14 @@ export async function toggleChecklistItem(
   }
 
   const isPrivileged = isAdminOrOwner(ctx);
-  const isAssignee = task.assigneeId === ctx.membershipId;
+  const assignedMemberIds = Array.isArray(task.assignedMemberIds)
+    ? (task.assignedMemberIds as string[])
+    : [];
+  const isAssignee = task.assigneeId === ctx.membershipId || assignedMemberIds.includes(ctx.membershipId);
+  const isCreator = task.creatorId === ctx.membershipId;
 
-  if (!isPrivileged && !isAssignee) {
-    throw new ForbiddenException("Only the assignee or Studio Admin/Boss can update checklist items.");
+  if (!isPrivileged && !isAssignee && !isCreator) {
+    throw new ForbiddenException("Only assigned employees, the task creator, or Studio Admin/Boss can update checklist items.");
   }
 
   const item = await prisma.taskChecklistItem.findFirst({
@@ -767,10 +816,14 @@ export async function addTaskComment(
   }
 
   const isPrivileged = isAdminOrOwner(ctx);
-  const isAssignee = task.assigneeId === ctx.membershipId;
+  const assignedMemberIds = Array.isArray(task.assignedMemberIds)
+    ? (task.assignedMemberIds as string[])
+    : [];
+  const isAssignee = task.assigneeId === ctx.membershipId || assignedMemberIds.includes(ctx.membershipId);
+  const isCreator = task.creatorId === ctx.membershipId;
 
-  if (!isPrivileged && !isAssignee) {
-    throw new ForbiddenException("You can only comment on tasks assigned to you.");
+  if (!isPrivileged && !isAssignee && !isCreator) {
+    throw new ForbiddenException("You can only comment on tasks assigned to you, created by you, or as Studio Admin/Boss.");
   }
 
   if (!content || !content.trim()) {
@@ -810,13 +863,15 @@ export async function getTaskDashboardMetrics(ctx: TenantContext, myTasksOnly: b
 
   const andConditions: any[] = [{ tenantId: ctx.tenantId }];
   if (myTasksOnly || !isAdminOrOwner(ctx)) {
-    andConditions.push({
-      OR: [
-        { assigneeId: ctx.membershipId },
-        { assignedMemberIds: { string_contains: ctx.membershipId } },
-        { creatorId: ctx.membershipId },
-      ],
-    });
+    const multiTaskIds = await getMultiAssignedTaskIds(ctx.tenantId, ctx.membershipId);
+    const orClauses: any[] = [
+      { assigneeId: ctx.membershipId },
+      { creatorId: ctx.membershipId },
+    ];
+    if (multiTaskIds.length > 0) {
+      orClauses.push({ id: { in: multiTaskIds } });
+    }
+    andConditions.push({ OR: orClauses });
   }
 
   // 1 single query fetching only status & dueDate instead of 5 separate roundtrips

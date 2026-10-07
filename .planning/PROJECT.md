@@ -135,7 +135,7 @@ miniEmployeeManagementSoftware/
 | Module / Route | Client View Component | Core Functionality & Capabilities |
 |---|---|---|
 | `/w/[slug]/login` | `LoginPage` | Dual-identifier login: Company-scoped Employee ID or Email + Password. Secure session token cookie. |
-| `/w/[slug]/tasks` | `TasksClientView` | Task creation, Kanban boards & Grid view, status transitions (5-state & expanded), multi-employee assignment (`assignedMemberIds`), checklists, activity history, four-eyes review gate, task delegation, and Owner/Admin/Creator task deletion with audit trails. |
+| `/w/[slug]/tasks` | `TasksClientView` | Task creation, Kanban boards & Grid view, status transitions (5-state & expanded), multi-employee assignment (`assignedMemberIds`) with full visibility for all assigned employees via JSON array resolution, metric synchronization, checklists, activity history, four-eyes review gate, task delegation, and Owner/Admin/Creator task deletion with audit trails. |
 | `/w/[slug]/projects` | `ProjectsClientView` | Project creation, phase breakdown (Concept, Schematic, DD, GFC, Handover), client/team/consultant assignment, project budgets, and custom fields. |
 | `/w/[slug]/visits` | `VisitsClientView` | Site visit scheduling, Haversine GPS geofence check-in/out, one-active-visit concurrency lock, supervisor review, and export. |
 | `/w/[slug]/drawings` | `DrawingsClientView` | Drawing register ($R_0, R_1, R_2$), private file attachment, revision approval workflow, and supersession history. |

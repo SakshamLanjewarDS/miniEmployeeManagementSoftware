@@ -339,31 +339,44 @@ export default function TasksClientView({
 
   // Multi-Assignee Resolution Helper
   const getTaskAssignees = (task: TaskItem): MemberOption[] => {
+    const list: MemberOption[] = [];
+    const seenIds = new Set<string>();
+
     if (Array.isArray(task.assignedMemberIds) && task.assignedMemberIds.length > 0) {
-      const found = members.filter((m) => task.assignedMemberIds!.includes(m.id));
-      if (found.length > 0) return found;
+      members
+        .filter((m) => task.assignedMemberIds!.includes(m.id))
+        .forEach((m) => {
+          list.push(m);
+          seenIds.add(m.id);
+        });
     }
-    if (task.assigneeId) {
+
+    if (task.assigneeId && !seenIds.has(task.assigneeId)) {
       const primary = members.find((m) => m.id === task.assigneeId);
-      if (primary) return [primary];
+      if (primary) {
+        list.push(primary);
+        seenIds.add(primary.id);
+      }
     }
-    if (task.assignee) {
-      return [
-        {
-          id: task.assignee.id || task.assigneeId || "",
-          role: "",
-          user: task.assignee.user,
-          employee: task.assignee.employee
-            ? {
-                employeeId: task.assignee.employee.employeeId,
-                designation: task.assignee.employee.designation,
-                department: task.assignee.employee.department ?? null,
-              }
-            : null,
-        },
-      ];
+
+    if (task.assignee && !seenIds.has(task.assignee.id || task.assigneeId || "")) {
+      const id = task.assignee.id || task.assigneeId || "";
+      if (id) seenIds.add(id);
+      list.push({
+        id,
+        role: "",
+        user: task.assignee.user,
+        employee: task.assignee.employee
+          ? {
+              employeeId: task.assignee.employee.employeeId,
+              designation: task.assignee.employee.designation,
+              department: task.assignee.employee.department ?? null,
+            }
+          : null,
+      });
     }
-    return [];
+
+    return list;
   };
 
   // Filter tasks based on search, project, priority, employee, due-date category, and status category
@@ -406,9 +419,10 @@ export default function TasksClientView({
       if (selectedAssigneeFilter !== "ALL") {
         const assignees = getTaskAssignees(task);
         if (selectedAssigneeFilter === "UNASSIGNED") {
-          if (assignees.length > 0) return false;
+          if (assignees.length > 0 || task.assigneeId || (Array.isArray(task.assignedMemberIds) && task.assignedMemberIds.length > 0)) return false;
         } else {
-          const hasMember = assignees.some(
+          const inAssignedList = Array.isArray(task.assignedMemberIds) && task.assignedMemberIds.includes(selectedAssigneeFilter);
+          const hasMember = inAssignedList || assignees.some(
             (a) => a.id === selectedAssigneeFilter || (task.assigneeId && task.assigneeId === selectedAssigneeFilter)
           );
           if (!hasMember) return false;
@@ -985,8 +999,9 @@ export default function TasksClientView({
     setEditDescription(sanitizeTaskDescription(task.description));
 
     // 4. Assignees (Multi-select)
-    const assignees = getTaskAssignees(task);
-    const initialAssigneeIds = assignees.map((a) => a.id).filter(Boolean);
+    const initialAssigneeIds = Array.isArray(task.assignedMemberIds) && task.assignedMemberIds.length > 0
+      ? task.assignedMemberIds
+      : (task.assigneeId ? [task.assigneeId] : []);
     setEditAssigneeIds(initialAssigneeIds);
     setEditOtherAssigneeName(existingCustom.externalAssignee || "");
 
