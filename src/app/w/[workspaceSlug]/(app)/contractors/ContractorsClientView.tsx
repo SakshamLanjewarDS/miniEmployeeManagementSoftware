@@ -32,6 +32,7 @@ import { DynamicFormFields } from "@/components/custom-fields/DynamicFormFields"
 import { DynamicCardFields } from "@/components/custom-fields/DynamicCardFields";
 import { CustomFieldDefinition } from "@/server/modules/custom-fields/repository";
 import { ContactShareModal, ShareableContact, ClientOption } from "@/components/share/ContactShareModal";
+import { SearchableDropdown } from "@/components/ui/SearchableDropdown";
 
 export interface ProjectContractorItem {
   id: string;
@@ -678,38 +679,41 @@ export default function ContractorsClientView({
 
           {/* Filter Trade & Sort Dropdown */}
           <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-[#696E82]">Filter Trade:</span>
-              <select
+            <div className="min-w-[170px]">
+              <SearchableDropdown
+                size="sm"
                 value={selectedTrade}
-                onChange={(e) => setSelectedTrade(e.target.value)}
-                className="p-1.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-lg text-xs text-[#1F1F1F] focus:outline-none focus:ring-1 focus:ring-[#5A81FA]"
-              >
-                <option value="ALL">All Trade Disciplines</option>
-                {availableTrades.map((trade) => (
-                  <option key={trade} value={trade}>
-                    {trade}
-                  </option>
-                ))}
-              </select>
+                onChange={setSelectedTrade}
+                placeholder="All Trade Disciplines"
+                clearable={false}
+                options={[
+                  { value: "ALL", label: "All Trade Disciplines" },
+                  ...availableTrades.map((trade) => ({
+                    value: trade,
+                    label: trade,
+                  })),
+                ]}
+              />
             </div>
 
-            <div className="flex items-center gap-1.5 bg-[#F8F9FD] border border-[#E2E6F0] px-2.5 py-1 rounded-lg">
-              <ArrowUpDown className="w-3.5 h-3.5 text-[#696E82]" />
-              <span className="text-xs text-[#696E82] font-medium">Sort:</span>
-              <select
+            <div className="min-w-[190px]">
+              <SearchableDropdown
+                size="sm"
                 value={contractorSortBy}
-                onChange={(e) => setContractorSortBy(e.target.value)}
-                className="bg-transparent text-xs text-[#1F1F1F] font-semibold focus:outline-none cursor-pointer"
-              >
-                <option value="DATE_DESC">Date Created (Newest First)</option>
-                <option value="DATE_ASC">Date Created (Oldest First)</option>
-                <option value="ALPHA_NAME_ASC">Contact Name (A → Z)</option>
-                <option value="ALPHA_NAME_DESC">Contact Name (Z → A)</option>
-                <option value="ALPHA_FIRM_ASC">Firm Name (A → Z)</option>
-                <option value="ALPHA_FIRM_DESC">Firm Name (Z → A)</option>
-                <option value="TRADE_ASC">Trade Discipline (A → Z)</option>
-              </select>
+                onChange={setContractorSortBy}
+                placeholder="Sort By"
+                searchable={false}
+                clearable={false}
+                options={[
+                  { value: "DATE_DESC", label: "Date Created (Newest First)" },
+                  { value: "DATE_ASC", label: "Date Created (Oldest First)" },
+                  { value: "ALPHA_NAME_ASC", label: "Contact Name (A → Z)" },
+                  { value: "ALPHA_NAME_DESC", label: "Contact Name (Z → A)" },
+                  { value: "ALPHA_FIRM_ASC", label: "Firm Name (A → Z)" },
+                  { value: "ALPHA_FIRM_DESC", label: "Firm Name (Z → A)" },
+                  { value: "TRADE_ASC", label: "Trade Discipline (A → Z)" },
+                ]}
+              />
             </div>
           </div>
         </div>
@@ -1295,23 +1299,24 @@ export default function ContractorsClientView({
 
             {/* Add New Association Form */}
             <form onSubmit={handleAddProjectAssociation} className="pt-3 border-t border-[#E2E6F0] space-y-3 text-xs">
-              <label className="block font-semibold text-[#1F1F1F]">Link Another Project</label>
               <div>
-                <select
+                <SearchableDropdown
+                  id="link-contractor-project"
+                  label="Link Another Project"
                   required
+                  optionType="project"
                   value={selectedProjectIdToLink}
-                  onChange={(e) => setSelectedProjectIdToLink(e.target.value)}
-                  className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
-                >
-                  <option value="">Select a project...</option>
-                  {projects
+                  onChange={setSelectedProjectIdToLink}
+                  placeholder="Select a project to link..."
+                  searchPlaceholder="Search projects by code or name..."
+                  options={projects
                     .filter((p) => !projectManageContractor.projects.some((link) => link.projectId === p.id))
-                    .map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.code} — {p.name}
-                      </option>
-                    ))}
-                </select>
+                    .map((p) => ({
+                      value: p.id,
+                      label: p.name,
+                      projectCode: p.code,
+                    }))}
+                />
               </div>
 
               <div>

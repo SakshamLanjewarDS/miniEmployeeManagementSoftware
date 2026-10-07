@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { EmployeeItem } from "@/app/w/[workspaceSlug]/(app)/team/TeamClientView";
 import { correctGrammar } from "@/lib/grammar/grammarEngine";
+import { SearchableDropdown } from "@/components/ui/SearchableDropdown";
 
 interface BulkMailModalProps {
   isOpen: boolean;
@@ -685,17 +686,25 @@ export default function BulkMailModal({
                     <div className="text-xs font-semibold text-[#1F1F1F]">
                       Simulate and preview how the email appears for:
                     </div>
-                    <select
-                      value={previewEmployee?.membershipId || ""}
-                      onChange={(e) => setPreviewEmployeeId(e.target.value)}
-                      className="text-xs bg-white border border-[#E2E6F0] rounded-lg px-3 py-1.5 text-[#1F1F1F] font-medium"
-                    >
-                      {selectedEmployees.map((e) => (
-                        <option key={e.membershipId} value={e.membershipId}>
-                          {e.fullName} ({e.employeeId}) &bull; {e.email}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="w-full sm:w-[280px]">
+                      <SearchableDropdown
+                        size="sm"
+                        optionType="employee"
+                        searchable={true}
+                        clearable={false}
+                        value={previewEmployee?.membershipId || ""}
+                        onChange={(val) => setPreviewEmployeeId(val as string)}
+                        placeholder="Select recipient to preview..."
+                        searchPlaceholder="Search recipient..."
+                        options={selectedEmployees.map((e) => ({
+                          value: e.membershipId,
+                          label: e.fullName,
+                          employeeId: e.employeeId,
+                          email: e.email,
+                          type: "employee" as const,
+                        }))}
+                      />
+                    </div>
                   </div>
 
                   {/* Mock Email Client Preview Card */}

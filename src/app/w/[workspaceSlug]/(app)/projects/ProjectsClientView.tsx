@@ -46,7 +46,7 @@ import { CustomFieldDefinition } from "@/server/modules/custom-fields/repository
 import { CustomFieldsManagerModal } from "@/components/custom-fields/CustomFieldsManagerModal";
 import { DynamicFormFields } from "@/components/custom-fields/DynamicFormFields";
 import { DynamicCardFields } from "@/components/custom-fields/DynamicCardFields";
-import { SearchableSelect } from "@/components/ui/SearchableSelect";
+import { SearchableDropdown, SearchableSelect } from "@/components/ui/SearchableDropdown";
 import {
   getAllTypologies,
   ProjectProfileCircle,
@@ -926,59 +926,62 @@ export function ProjectsClientView({
           </div>
 
           {/* Status Filter */}
-          <div className="flex items-center gap-2 w-full md:w-auto">
-            <span className="text-xs font-medium text-[#696E82] shrink-0">Status:</span>
-            <select
-              suppressHydrationWarning
+          <div className="min-w-[145px] w-full md:w-auto">
+            <SearchableDropdown
+              size="sm"
+              optionType="status"
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl px-3 py-2 text-[#1F1F1F] focus:outline-none focus:border-[#5A81FA]"
-            >
-              <option value="ALL">All Statuses ({initialProjects.length})</option>
-              <option value="ACTIVE">Active</option>
-              <option value="PLANNING">Planning</option>
-              <option value="ON_HOLD">On Hold</option>
-              <option value="COMPLETED">Completed</option>
-            </select>
+              onChange={setStatusFilter}
+              placeholder="All Statuses"
+              searchable={false}
+              clearable={false}
+              options={[
+                { value: "ALL", label: `All Statuses (${initialProjects.length})` },
+                { value: "ACTIVE", label: "Active" },
+                { value: "PLANNING", label: "Planning" },
+                { value: "ON_HOLD", label: "On Hold" },
+                { value: "COMPLETED", label: "Completed" },
+              ]}
+            />
           </div>
 
           {/* Phase Filter */}
-          <div className="flex items-center gap-2 w-full md:w-auto">
-            <span className="text-xs font-medium text-[#696E82] shrink-0">Phase:</span>
-            <select
-              suppressHydrationWarning
+          <div className="min-w-[155px] w-full md:w-auto">
+            <SearchableDropdown
+              size="sm"
+              optionType="phase"
               value={phaseFilter}
-              onChange={(e) => setPhaseFilter(e.target.value)}
-              className="text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl px-3 py-2 text-[#1F1F1F] focus:outline-none focus:border-[#5A81FA]"
-            >
-              <option value="ALL">All Phases</option>
-              {ARCHITECTURAL_PHASES.map((ph) => (
-                <option key={ph} value={ph}>
-                  {ph}
-                </option>
-              ))}
-            </select>
+              onChange={setPhaseFilter}
+              placeholder="All Phases"
+              searchPlaceholder="Search phases..."
+              clearable={false}
+              options={[
+                { value: "ALL", label: "All Phases" },
+                ...ARCHITECTURAL_PHASES.map((ph) => ({ value: ph, label: ph })),
+              ]}
+            />
           </div>
 
           {/* Sort By Filter (Date, Day & Alphabetical Order) */}
-          <div className="flex items-center gap-1.5 shrink-0 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl px-2.5 py-1.5">
-            <ArrowUpDown className="w-3.5 h-3.5 text-[#5A81FA] shrink-0" />
-            <select
-              suppressHydrationWarning
+          <div className="min-w-[200px] w-full md:w-auto">
+            <SearchableDropdown
+              size="sm"
               value={projectSortBy}
-              onChange={(e) => setProjectSortBy(e.target.value)}
-              className="text-xs bg-transparent text-[#1F1F1F] font-semibold focus:outline-none cursor-pointer"
-              title="Sort projects by date day or alphabetical order"
-            >
-              <option value="CREATED_DESC">Sort: Date (Newest First)</option>
-              <option value="CREATED_ASC">Sort: Date (Oldest First)</option>
-              <option value="TARGET_DATE_ASC">Sort: Target Date (Earliest Day)</option>
-              <option value="TARGET_DATE_DESC">Sort: Target Date (Latest Day)</option>
-              <option value="ALPHA_NAME_ASC">Sort: Name (A → Z)</option>
-              <option value="ALPHA_NAME_DESC">Sort: Name (Z → A)</option>
-              <option value="ALPHA_CODE_ASC">Sort: Code (A → Z)</option>
-              <option value="ALPHA_CODE_DESC">Sort: Code (Z → A)</option>
-            </select>
+              onChange={setProjectSortBy}
+              placeholder="Sort projects..."
+              searchable={false}
+              clearable={false}
+              options={[
+                { value: "CREATED_DESC", label: "Sort: Date (Newest First)" },
+                { value: "CREATED_ASC", label: "Sort: Date (Oldest First)" },
+                { value: "TARGET_DATE_ASC", label: "Sort: Target Date (Earliest Day)" },
+                { value: "TARGET_DATE_DESC", label: "Sort: Target Date (Latest Day)" },
+                { value: "ALPHA_NAME_ASC", label: "Sort: Name (A → Z)" },
+                { value: "ALPHA_NAME_DESC", label: "Sort: Name (Z → A)" },
+                { value: "ALPHA_CODE_ASC", label: "Sort: Code (A → Z)" },
+                { value: "ALPHA_CODE_DESC", label: "Sort: Code (Z → A)" },
+              ]}
+            />
           </div>
 
           {/* Advanced Filters Toggle Button */}
@@ -1040,18 +1043,23 @@ export function ProjectsClientView({
                 <label className="block text-[10px] font-bold text-[#696E82] uppercase mb-1">
                   Typology
                 </label>
-                <select
+                <SearchableDropdown
+                  size="sm"
                   value={typologyFilter}
-                  onChange={(e) => setTypologyFilter(e.target.value)}
-                  className="w-full bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl px-2.5 py-1.5 text-xs text-[#1F1F1F] focus:outline-none focus:border-[#5A81FA]"
-                >
-                  <option value="ALL">All Typologies</option>
-                  {dynamicTypologies.map((t) => (
-                    <option key={t} value={t}>
-                      {t}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setTypologyFilter}
+                  placeholder="All Typologies"
+                  searchPlaceholder="Search typology..."
+                  clearable={false}
+                  options={[
+                    { value: "ALL", label: "All Typologies" },
+                    ...dynamicTypologies.map((t) => ({
+                      value: t,
+                      label: t,
+                      icon: <TypologyDot typology={t} />,
+                    })),
+                  ]}
+                  className="w-full"
+                />
               </div>
 
               {/* Project Architect */}
@@ -1059,18 +1067,26 @@ export function ProjectsClientView({
                 <label className="block text-[10px] font-bold text-[#696E82] uppercase mb-1">
                   Project Architect
                 </label>
-                <select
+                <SearchableDropdown
+                  size="sm"
+                  optionType="employee"
                   value={architectFilter}
-                  onChange={(e) => setArchitectFilter(e.target.value)}
-                  className="w-full bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl px-2.5 py-1.5 text-xs text-[#1F1F1F] focus:outline-none focus:border-[#5A81FA]"
-                >
-                  <option value="ALL">All Architects</option>
-                  {members.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.user.fullName} {m.employee?.designation ? `(${m.employee.designation})` : ""}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setArchitectFilter}
+                  placeholder="All Architects"
+                  searchPlaceholder="Search architects..."
+                  clearable={false}
+                  options={[
+                    { value: "ALL", label: "All Architects" },
+                    ...members.map((m) => ({
+                      value: m.id,
+                      label: m.user.fullName,
+                      employeeId: m.employee?.id ? `EMP-${m.employee.id.slice(-2)}` : undefined,
+                      designation: m.employee?.designation || "Architect",
+                      type: "employee" as const,
+                    })),
+                  ]}
+                  className="w-full"
+                />
               </div>
 
               {/* Project Manager */}
@@ -1078,18 +1094,26 @@ export function ProjectsClientView({
                 <label className="block text-[10px] font-bold text-[#696E82] uppercase mb-1">
                   Project Manager
                 </label>
-                <select
+                <SearchableDropdown
+                  size="sm"
+                  optionType="employee"
                   value={managerFilter}
-                  onChange={(e) => setManagerFilter(e.target.value)}
-                  className="w-full bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl px-2.5 py-1.5 text-xs text-[#1F1F1F] focus:outline-none focus:border-[#5A81FA]"
-                >
-                  <option value="ALL">All Managers</option>
-                  {members.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.user.fullName}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setManagerFilter}
+                  placeholder="All Managers"
+                  searchPlaceholder="Search managers..."
+                  clearable={false}
+                  options={[
+                    { value: "ALL", label: "All Managers" },
+                    ...members.map((m) => ({
+                      value: m.id,
+                      label: m.user.fullName,
+                      employeeId: m.employee?.id ? `EMP-${m.employee.id.slice(-2)}` : undefined,
+                      designation: m.employee?.designation || "Project Manager",
+                      type: "employee" as const,
+                    })),
+                  ]}
+                  className="w-full"
+                />
               </div>
 
               {/* Project Coordinator */}
@@ -1097,18 +1121,26 @@ export function ProjectsClientView({
                 <label className="block text-[10px] font-bold text-[#696E82] uppercase mb-1">
                   Project Coordinator
                 </label>
-                <select
+                <SearchableDropdown
+                  size="sm"
+                  optionType="employee"
                   value={coordinatorFilter}
-                  onChange={(e) => setCoordinatorFilter(e.target.value)}
-                  className="w-full bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl px-2.5 py-1.5 text-xs text-[#1F1F1F] focus:outline-none focus:border-[#5A81FA]"
-                >
-                  <option value="ALL">All Coordinators</option>
-                  {members.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.user.fullName}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setCoordinatorFilter}
+                  placeholder="All Coordinators"
+                  searchPlaceholder="Search coordinators..."
+                  clearable={false}
+                  options={[
+                    { value: "ALL", label: "All Coordinators" },
+                    ...members.map((m) => ({
+                      value: m.id,
+                      label: m.user.fullName,
+                      employeeId: m.employee?.id ? `EMP-${m.employee.id.slice(-2)}` : undefined,
+                      designation: m.employee?.designation || "Coordinator",
+                      type: "employee" as const,
+                    })),
+                  ]}
+                  className="w-full"
+                />
               </div>
 
               {/* Site City */}
@@ -1116,18 +1148,24 @@ export function ProjectsClientView({
                 <label className="block text-[10px] font-bold text-[#696E82] uppercase mb-1">
                   Site City
                 </label>
-                <select
+                <SearchableDropdown
+                  size="sm"
+                  optionType="location"
                   value={cityFilter}
-                  onChange={(e) => setCityFilter(e.target.value)}
-                  className="w-full bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl px-2.5 py-1.5 text-xs text-[#1F1F1F] focus:outline-none focus:border-[#5A81FA]"
-                >
-                  <option value="ALL">All Cities</option>
-                  {availableCities.map((city) => (
-                    <option key={city} value={city}>
-                      {city}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setCityFilter}
+                  placeholder="All Cities"
+                  searchPlaceholder="Search cities..."
+                  clearable={false}
+                  options={[
+                    { value: "ALL", label: "All Cities" },
+                    ...availableCities.map((city) => ({
+                      value: city,
+                      label: city,
+                      type: "location" as const,
+                    })),
+                  ]}
+                  className="w-full"
+                />
               </div>
 
               {/* Contractor */}
@@ -1135,18 +1173,25 @@ export function ProjectsClientView({
                 <label className="block text-[10px] font-bold text-[#696E82] uppercase mb-1">
                   Contractor
                 </label>
-                <select
+                <SearchableDropdown
+                  size="sm"
+                  optionType="contractor"
                   value={contractorFilter}
-                  onChange={(e) => setContractorFilter(e.target.value)}
-                  className="w-full bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl px-2.5 py-1.5 text-xs text-[#1F1F1F] focus:outline-none focus:border-[#5A81FA]"
-                >
-                  <option value="ALL">All Contractors</option>
-                  {contractors.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.firmName || c.name} {c.trade ? `(${c.trade})` : ""}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setContractorFilter}
+                  placeholder="All Contractors"
+                  searchPlaceholder="Search contractors..."
+                  clearable={false}
+                  options={[
+                    { value: "ALL", label: "All Contractors" },
+                    ...contractors.map((c) => ({
+                      value: c.id,
+                      label: c.firmName || c.name,
+                      badge: c.trade || undefined,
+                      type: "contractor" as const,
+                    })),
+                  ]}
+                  className="w-full"
+                />
               </div>
 
               {/* Consultant */}
@@ -1154,18 +1199,25 @@ export function ProjectsClientView({
                 <label className="block text-[10px] font-bold text-[#696E82] uppercase mb-1">
                   Consultant
                 </label>
-                <select
+                <SearchableDropdown
+                  size="sm"
+                  optionType="consultant"
                   value={consultantFilter}
-                  onChange={(e) => setConsultantFilter(e.target.value)}
-                  className="w-full bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl px-2.5 py-1.5 text-xs text-[#1F1F1F] focus:outline-none focus:border-[#5A81FA]"
-                >
-                  <option value="ALL">All Consultants</option>
-                  {consultants.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.firmName || c.name} {c.discipline ? `(${c.discipline})` : ""}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setConsultantFilter}
+                  placeholder="All Consultants"
+                  searchPlaceholder="Search consultants..."
+                  clearable={false}
+                  options={[
+                    { value: "ALL", label: "All Consultants" },
+                    ...consultants.map((c) => ({
+                      value: c.id,
+                      label: c.firmName || c.name,
+                      badge: c.discipline || undefined,
+                      type: "consultant" as const,
+                    })),
+                  ]}
+                  className="w-full"
+                />
               </div>
 
               {/* Client */}
@@ -1173,18 +1225,25 @@ export function ProjectsClientView({
                 <label className="block text-[10px] font-bold text-[#696E82] uppercase mb-1">
                   Client
                 </label>
-                <select
+                <SearchableDropdown
+                  size="sm"
+                  optionType="client"
                   value={clientFilter}
-                  onChange={(e) => setClientFilter(e.target.value)}
-                  className="w-full bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl px-2.5 py-1.5 text-xs text-[#1F1F1F] focus:outline-none focus:border-[#5A81FA]"
-                >
-                  <option value="ALL">All Clients</option>
-                  {clients.map((cl) => (
-                    <option key={cl.id} value={cl.id}>
-                      {cl.name} {cl.company ? `(${cl.company})` : ""}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setClientFilter}
+                  placeholder="All Clients"
+                  searchPlaceholder="Search clients..."
+                  clearable={false}
+                  options={[
+                    { value: "ALL", label: "All Clients" },
+                    ...clients.map((cl) => ({
+                      value: cl.id,
+                      label: cl.name,
+                      badge: cl.company || undefined,
+                      type: "client" as const,
+                    })),
+                  ]}
+                  className="w-full"
+                />
               </div>
             </div>
           </div>
@@ -1988,18 +2047,23 @@ export function ProjectsClientView({
                 <label className="text-xs font-semibold text-[#1F1F1F] block mb-1">
                   Budget
                 </label>
-                <div className="flex gap-2">
-                  <select
-                    value={formData.currency}
-                    onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
-                    className="w-24 p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
-                  >
-                    <option value="INR">INR (₹)</option>
-                    <option value="USD">USD ($)</option>
-                    <option value="EUR">EUR (€)</option>
-                    <option value="AED">AED</option>
-                    <option value="GBP">GBP (£)</option>
-                  </select>
+                <div className="flex gap-2 items-center">
+                  <div className="w-28 shrink-0">
+                    <SearchableDropdown
+                      size="sm"
+                      searchable={false}
+                      clearable={false}
+                      value={formData.currency}
+                      onChange={(val) => setFormData({ ...formData, currency: val })}
+                      options={[
+                        { value: "INR", label: "INR (₹)" },
+                        { value: "USD", label: "USD ($)" },
+                        { value: "EUR", label: "EUR (€)" },
+                        { value: "AED", label: "AED" },
+                        { value: "GBP", label: "GBP (£)" },
+                      ]}
+                    />
+                  </div>
                   <input
                     type="number"
                     step="any"
@@ -2406,18 +2470,23 @@ export function ProjectsClientView({
                 <label className="text-xs font-semibold text-[#1F1F1F] block mb-1">
                   Budget
                 </label>
-                <div className="flex gap-2">
-                  <select
-                    value={editFormData.currency}
-                    onChange={(e) => setEditFormData({ ...editFormData, currency: e.target.value })}
-                    className="w-24 p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
-                  >
-                    <option value="INR">INR (₹)</option>
-                    <option value="USD">USD ($)</option>
-                    <option value="EUR">EUR (€)</option>
-                    <option value="AED">AED</option>
-                    <option value="GBP">GBP (£)</option>
-                  </select>
+                <div className="flex gap-2 items-center">
+                  <div className="w-28 shrink-0">
+                    <SearchableDropdown
+                      size="sm"
+                      searchable={false}
+                      clearable={false}
+                      value={editFormData.currency}
+                      onChange={(val) => setEditFormData({ ...editFormData, currency: val })}
+                      options={[
+                        { value: "INR", label: "INR (₹)" },
+                        { value: "USD", label: "USD ($)" },
+                        { value: "EUR", label: "EUR (€)" },
+                        { value: "AED", label: "AED" },
+                        { value: "GBP", label: "GBP (£)" },
+                      ]}
+                    />
+                  </div>
                   <input
                     type="number"
                     step="any"

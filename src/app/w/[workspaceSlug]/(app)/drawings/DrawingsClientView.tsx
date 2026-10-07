@@ -28,7 +28,7 @@ import {
   FolderGit2,
   ArrowUpDown,
 } from "lucide-react";
-import { SearchableSelect } from "@/components/ui/SearchableSelect";
+import { SearchableDropdown, SearchableSelect } from "@/components/ui/SearchableDropdown";
 
 export interface ApprovalRequestItem {
   id: string;
@@ -569,64 +569,88 @@ export default function DrawingsClientView({
 
         {/* Filter Dropdowns */}
         <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-[#E2E6F0] text-xs">
-          <span className="text-[#696E82] font-semibold">Filter:</span>
+          <div className="flex items-center gap-1 text-[#696E82] font-semibold">
+            <Filter className="w-3.5 h-3.5 text-[#5878FF]" />
+            <span>Filters:</span>
+          </div>
 
           {/* Project */}
-          <select
-            value={selectedProjectFilter}
-            onChange={(e) => setSelectedProjectFilter(e.target.value)}
-            className="p-1.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-lg text-xs font-medium text-[#1F1F1F] focus:outline-none focus:ring-1 focus:ring-[#5A81FA] max-w-[200px]"
-          >
-            <option value="ALL">All Projects</option>
-            {projects.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.code} — {p.name}
-              </option>
-            ))}
-          </select>
+          <div className="min-w-[180px]">
+            <SearchableDropdown
+              size="sm"
+              optionType="project"
+              value={selectedProjectFilter}
+              onChange={setSelectedProjectFilter}
+              placeholder="All Projects"
+              searchPlaceholder="Search projects..."
+              clearable={false}
+              options={[
+                { value: "ALL", label: "All Projects" },
+                ...projects.map((p) => ({
+                  value: p.id,
+                  label: p.name,
+                  projectCode: p.code,
+                })),
+              ]}
+            />
+          </div>
 
           {/* Discipline */}
-          <select
-            value={selectedDisciplineFilter}
-            onChange={(e) => setSelectedDisciplineFilter(e.target.value)}
-            className="p-1.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-lg text-xs font-medium text-[#1F1F1F] focus:outline-none focus:ring-1 focus:ring-[#5A81FA]"
-          >
-            <option value="ALL">All Disciplines</option>
-            {disciplines.map((d) => (
-              <option key={d} value={d}>
-                {d}
-              </option>
-            ))}
-          </select>
+          <div className="min-w-[150px]">
+            <SearchableDropdown
+              size="sm"
+              value={selectedDisciplineFilter}
+              onChange={setSelectedDisciplineFilter}
+              placeholder="All Disciplines"
+              searchable={false}
+              clearable={false}
+              options={[
+                { value: "ALL", label: "All Disciplines" },
+                ...disciplines.map((d) => ({
+                  value: d,
+                  label: d,
+                })),
+              ]}
+            />
+          </div>
 
           {/* Status */}
-          <select
-            value={selectedStatusFilter}
-            onChange={(e) => setSelectedStatusFilter(e.target.value)}
-            className="p-1.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-lg text-xs font-medium text-[#1F1F1F] focus:outline-none focus:ring-1 focus:ring-[#5A81FA]"
-          >
-            <option value="ALL">All Workflow States</option>
-            <option value="DRAFT">Draft Revisions</option>
-            <option value="IN_REVIEW">In Review</option>
-            <option value="APPROVED">Approved Deliverables</option>
-          </select>
+          <div className="min-w-[160px]">
+            <SearchableDropdown
+              size="sm"
+              optionType="status"
+              value={selectedStatusFilter}
+              onChange={setSelectedStatusFilter}
+              placeholder="All Workflow States"
+              searchable={false}
+              clearable={false}
+              options={[
+                { value: "ALL", label: "All Workflow States" },
+                { value: "DRAFT", label: "Draft Revisions", subLabel: "In progress" },
+                { value: "IN_REVIEW", label: "In Review", subLabel: "Pending review" },
+                { value: "APPROVED", label: "Approved Deliverables", subLabel: "Formally accepted" },
+              ]}
+            />
+          </div>
 
           {/* Sort By Filter (Date, Day & Alphabetical Order) */}
-          <div className="flex items-center gap-1.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-lg px-2 py-1 text-xs">
-            <ArrowUpDown className="w-3.5 h-3.5 text-[#5A81FA] shrink-0" />
-            <select
+          <div className="min-w-[180px]">
+            <SearchableDropdown
+              size="sm"
               value={drawingSortBy}
-              onChange={(e) => setDrawingSortBy(e.target.value)}
-              className="bg-transparent font-medium text-[#1F1F1F] focus:outline-none cursor-pointer"
-              title="Sort drawings by date day or alphabetical order"
-            >
-              <option value="DATE_DESC">Sort: Date (Newest First)</option>
-              <option value="DATE_ASC">Sort: Date (Oldest First)</option>
-              <option value="ALPHA_TITLE_ASC">Sort: Title (A → Z)</option>
-              <option value="ALPHA_TITLE_DESC">Sort: Title (Z → A)</option>
-              <option value="ALPHA_NUMBER_ASC">Sort: Drawing No. (A → Z)</option>
-              <option value="ALPHA_NUMBER_DESC">Sort: Drawing No. (Z → A)</option>
-            </select>
+              onChange={setDrawingSortBy}
+              placeholder="Sort By"
+              searchable={false}
+              clearable={false}
+              options={[
+                { value: "DATE_DESC", label: "Sort: Date (Newest First)" },
+                { value: "DATE_ASC", label: "Sort: Date (Oldest First)" },
+                { value: "ALPHA_TITLE_ASC", label: "Sort: Title (A → Z)" },
+                { value: "ALPHA_TITLE_DESC", label: "Sort: Title (Z → A)" },
+                { value: "ALPHA_NUMBER_ASC", label: "Sort: Drawing No. (A → Z)" },
+                { value: "ALPHA_NUMBER_DESC", label: "Sort: Drawing No. (Z → A)" },
+              ]}
+            />
           </div>
 
           {(selectedProjectFilter !== "ALL" ||
@@ -903,38 +927,36 @@ export default function DrawingsClientView({
               {/* Project & Discipline */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold text-[#1F1F1F] mb-1">
-                    Select Project <span className="text-red-600">*</span>
-                  </label>
-                  <select
-                    value={createProjectId}
-                    onChange={(e) => setCreateProjectId(e.target.value)}
+                  <SearchableDropdown
+                    id="create-drawing-project"
+                    label="Select Project"
                     required
-                    className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
-                  >
-                    {projects.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.code} — {p.name}
-                      </option>
-                    ))}
-                  </select>
+                    optionType="project"
+                    value={createProjectId}
+                    onChange={setCreateProjectId}
+                    placeholder="Select project..."
+                    searchPlaceholder="Search projects..."
+                    options={projects.map((p) => ({
+                      value: p.id,
+                      label: p.name,
+                      projectCode: p.code,
+                    }))}
+                  />
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-[#1F1F1F] mb-1">
-                    Discipline / Category <span className="text-red-600">*</span>
-                  </label>
-                  <select
+                  <SearchableDropdown
+                    id="create-drawing-discipline"
+                    label="Discipline / Category"
+                    required
                     value={createDiscipline}
-                    onChange={(e) => setCreateDiscipline(e.target.value)}
-                    className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
-                  >
-                    {disciplines.map((d) => (
-                      <option key={d} value={d}>
-                        {d}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={setCreateDiscipline}
+                    placeholder="Select category..."
+                    options={disciplines.map((d) => ({
+                      value: d,
+                      label: d,
+                    }))}
+                  />
                 </div>
               </div>
 
@@ -969,18 +991,21 @@ export default function DrawingsClientView({
               {/* Document Type & Issue Purpose */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold text-[#1F1F1F] mb-1">Document Type</label>
-                  <select
+                  <SearchableDropdown
+                    id="create-doc-type"
+                    label="Document Type"
                     value={createDocumentType}
-                    onChange={(e) => setCreateDocumentType(e.target.value)}
-                    className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
-                  >
-                    <option value="Working Drawing">Working Drawing</option>
-                    <option value="Concept Sketch">Concept Sketch</option>
-                    <option value="3D View">3D View / Render</option>
-                    <option value="Permit Approval Sheet">Permit Approval Sheet</option>
-                    <option value="Site Documentation">Site Documentation</option>
-                  </select>
+                    onChange={setCreateDocumentType}
+                    placeholder="Select document type..."
+                    searchable={false}
+                    options={[
+                      { value: "Working Drawing", label: "Working Drawing" },
+                      { value: "Concept Sketch", label: "Concept Sketch" },
+                      { value: "3D View", label: "3D View / Render" },
+                      { value: "Permit Approval Sheet", label: "Permit Approval Sheet" },
+                      { value: "Site Documentation", label: "Site Documentation" },
+                    ]}
+                  />
                 </div>
 
                 <div>
@@ -1178,15 +1203,18 @@ export default function DrawingsClientView({
 
             <form onSubmit={handleRecordClientApproval} className="space-y-4 text-xs">
               <div>
-                <label className="block font-semibold text-[#1F1F1F] mb-1">Decision</label>
-                <select
+                <SearchableDropdown
+                  id="client-approval-decision"
+                  label="Decision"
                   value={clientStatus}
-                  onChange={(e) => setClientStatus(e.target.value as any)}
-                  className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
-                >
-                  <option value="APPROVED">Client Approved</option>
-                  <option value="REJECTED">Client Rejected</option>
-                </select>
+                  onChange={(val) => setClientStatus(val as any)}
+                  searchable={false}
+                  clearable={false}
+                  options={[
+                    { value: "APPROVED", label: "Client Approved", subLabel: "Formally signed off" },
+                    { value: "REJECTED", label: "Client Rejected", subLabel: "Revision required" },
+                  ]}
+                />
               </div>
 
               <div>

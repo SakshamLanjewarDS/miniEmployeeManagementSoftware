@@ -20,6 +20,7 @@ import {
   User,
   Sliders,
 } from "lucide-react";
+import { SearchableDropdown } from "@/components/ui/SearchableDropdown";
 
 export interface ShareableContact {
   id: string;
@@ -337,18 +338,25 @@ export function ContactShareModal({
                   <label className="block text-[11px] font-semibold text-[#696E82] mb-1">
                     Quick Select Client from Directory (Optional)
                   </label>
-                  <select
+                  <SearchableDropdown
                     value={selectedClientId}
-                    onChange={(e) => handleClientSelect(e.target.value)}
-                    className="w-full p-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-xs text-[#1F1F1F] focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
-                  >
-                    <option value="">-- Choose Existing Client (Auto-fills details) --</option>
-                    {clients.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name} {c.company ? `(${c.company})` : ""} {c.contact ? `• ${c.contact}` : ""}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => handleClientSelect(val as string)}
+                    options={[
+                      { value: "", label: "Choose Existing Client (Auto-fills details)" },
+                      ...clients.map((c) => ({
+                        value: c.id,
+                        label: c.name,
+                        description: [c.company, c.contact].filter(Boolean).join(" • "),
+                        badge: c.company || undefined,
+                        type: "client" as const,
+                      })),
+                    ]}
+                    placeholder="Search or select client..."
+                    searchPlaceholder="Search clients by name, company..."
+                    size="sm"
+                    clearable
+                    className="w-full"
+                  />
                 </div>
               )}
 
@@ -405,18 +413,24 @@ export function ContactShareModal({
                     <label className="block text-[11px] font-semibold text-[#696E82] mb-1">
                       Project Reference (Optional)
                     </label>
-                    <select
+                    <SearchableDropdown
                       value={selectedProjectId}
-                      onChange={(e) => setSelectedProjectId(e.target.value)}
-                      className="w-full p-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-xs text-[#1F1F1F] focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
-                    >
-                      <option value="">-- No specific project --</option>
-                      {projects.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.code} — {p.name}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(val) => setSelectedProjectId(val as string)}
+                      options={[
+                        { value: "", label: "No specific project" },
+                        ...projects.map((p) => ({
+                          value: p.id,
+                          label: p.name,
+                          badge: p.code,
+                          type: "project" as const,
+                        })),
+                      ]}
+                      placeholder="Select project reference..."
+                      searchPlaceholder="Search projects..."
+                      size="sm"
+                      clearable
+                      className="w-full"
+                    />
                   </div>
                 )}
               </div>

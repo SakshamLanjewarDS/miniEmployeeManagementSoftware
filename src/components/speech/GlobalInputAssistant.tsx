@@ -14,6 +14,7 @@ import {
   HelpCircle,
   Wand2,
 } from "lucide-react";
+import { SearchableDropdown } from "@/components/ui/SearchableDropdown";
 import { correctGrammar } from "@/lib/grammar/grammarEngine";
 import { formatSpokenPunctuation } from "@/lib/speech/useSpeechRecognition";
 
@@ -484,17 +485,18 @@ export function GlobalInputAssistant() {
                 <label className="text-[11px] font-semibold text-[#696E82] block mb-1">
                   Dictation Language
                 </label>
-                <select
+                <SearchableDropdown
+                  size="sm"
+                  searchable={false}
+                  clearable={false}
                   value={selectedLang}
-                  onChange={(e) => setSelectedLang(e.target.value)}
-                  className="w-full p-1.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-lg text-xs font-medium text-[#1F1F1F]"
-                >
-                  {SUPPORTED_LANGUAGES.map((lang) => (
-                    <option key={lang.code} value={lang.code}>
-                      {lang.name}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(val) => setSelectedLang(val as string)}
+                  options={SUPPORTED_LANGUAGES.map((lang) => ({
+                    value: lang.code,
+                    label: lang.name,
+                  }))}
+                  className="w-full"
+                />
               </div>
 
               {/* Auto Correct After Speaking */}

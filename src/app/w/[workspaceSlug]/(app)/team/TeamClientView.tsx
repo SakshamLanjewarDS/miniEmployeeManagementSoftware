@@ -41,7 +41,7 @@ import { CustomFieldsManagerModal } from "@/components/custom-fields/CustomField
 import { DynamicFormFields } from "@/components/custom-fields/DynamicFormFields";
 import { DynamicCardFields } from "@/components/custom-fields/DynamicCardFields";
 import { CustomFieldDefinition } from "@/server/modules/custom-fields/repository";
-import { SearchableSelect } from "@/components/ui/SearchableSelect";
+import { SearchableDropdown, SearchableSelect } from "@/components/ui/SearchableDropdown";
 import { correctGrammar } from "@/lib/grammar/grammarEngine";
 
 const DEPARTMENT_OPTIONS = [
@@ -964,43 +964,48 @@ export default function TeamClientView({
             />
           </div>
 
-          <div>
-            <select
-              suppressHydrationWarning
+          <div className="min-w-[150px]">
+            <SearchableDropdown
+              size="sm"
+              optionType="status"
               value={roleFilter}
-              onChange={(e) => {
-                setRoleFilter(e.target.value);
+              onChange={(val) => {
+                setRoleFilter(val);
                 setCurrentPage(1);
               }}
-              className="w-full px-3 py-2 text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:outline-hidden focus:ring-1 focus:ring-[#5A81FA] text-[#1F1F1F]"
-            >
-              <option value="ALL">All Roles</option>
-              <option value="OWNER">Owner / Partner</option>
-              <option value="ADMIN">Administrator</option>
-              <option value="PROJECT_MANAGER">Project Manager</option>
-              <option value="EMPLOYEE">Employee</option>
-            </select>
+              placeholder="All Roles"
+              searchable={false}
+              clearable={false}
+              options={[
+                { value: "ALL", label: "All Roles" },
+                { value: "OWNER", label: "Owner / Partner" },
+                { value: "ADMIN", label: "Administrator" },
+                { value: "PROJECT_MANAGER", label: "Project Manager" },
+                { value: "EMPLOYEE", label: "Employee" },
+              ]}
+            />
           </div>
 
-          <div className="flex items-center gap-1.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl px-2.5 py-1.5">
-            <ArrowUpDown className="w-3.5 h-3.5 text-[#5A81FA] shrink-0" />
-            <select
-              suppressHydrationWarning
+          <div className="min-w-[190px]">
+            <SearchableDropdown
+              size="sm"
               value={teamSortBy}
-              onChange={(e) => {
-                setTeamSortBy(e.target.value);
+              onChange={(val) => {
+                setTeamSortBy(val);
                 setCurrentPage(1);
               }}
-              className="w-full bg-transparent text-xs text-[#1F1F1F] font-semibold focus:outline-none cursor-pointer"
-              title="Sort team members by date day or alphabetical order"
-            >
-              <option value="JOIN_DATE_DESC">Sort: Date (Newest First)</option>
-              <option value="JOIN_DATE_ASC">Sort: Date (Oldest First)</option>
-              <option value="ALPHA_NAME_ASC">Sort: Name (A → Z)</option>
-              <option value="ALPHA_NAME_DESC">Sort: Name (Z → A)</option>
-              <option value="ALPHA_EMP_ID_ASC">Sort: Employee ID (A → Z)</option>
-              <option value="ALPHA_EMP_ID_DESC">Sort: Employee ID (Z → A)</option>
-            </select>
+              placeholder="Sort team..."
+              searchable={false}
+              clearable={false}
+              options={[
+                { value: "JOIN_DATE_DESC", label: "Sort: Date (Newest First)" },
+                { value: "JOIN_DATE_ASC", label: "Sort: Date (Oldest First)" },
+                { value: "ALPHA_NAME_ASC", label: "Sort: Name (A → Z)" },
+                { value: "ALPHA_NAME_DESC", label: "Sort: Name (Z → A)" },
+                { value: "ALPHA_EMP_ID_ASC", label: "Sort: Employee ID (A → Z)" },
+                { value: "ALPHA_EMP_ID_DESC", label: "Sort: Employee ID (Z → A)" },
+              ]}
+            />
           </div>
         </div>
       </div>

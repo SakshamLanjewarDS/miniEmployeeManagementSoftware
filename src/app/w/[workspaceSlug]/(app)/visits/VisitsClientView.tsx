@@ -38,7 +38,7 @@ import {
   Filter,
   SlidersHorizontal,
 } from "lucide-react";
-import { SearchableSelect } from "@/components/ui/SearchableSelect";
+import { SearchableDropdown } from "@/components/ui/SearchableDropdown";
 import {
   getAllTypologies,
   ProjectProfileCircle,
@@ -1410,66 +1410,90 @@ export default function VisitsClientView({
           {/* Filter selects row */}
           <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-[#E2E6F0]/60 text-xs">
             <div className="flex items-center gap-1 text-[#696E82] font-semibold text-xs">
-              <Filter className="w-3.5 h-3.5" />
+              <Filter className="w-3.5 h-3.5 text-[#5878FF]" />
               <span>Filters:</span>
             </div>
 
             {/* State Filter */}
-            <select
-              value={visitStateFilter}
-              onChange={(e) => setVisitStateFilter(e.target.value)}
-              className="p-1.5 bg-white border border-[#E2E6F0] rounded-lg text-xs font-medium text-[#1F1F1F] focus:outline-none focus:ring-1 focus:ring-[#5A81FA]"
-            >
-              <option value="ALL">All States</option>
-              <option value="ACTIVE">Active On-Site</option>
-              <option value="CHECKED_OUT">Checked Out</option>
-              <option value="SCHEDULED">Scheduled</option>
-              <option value="CANCELLED">Cancelled</option>
-            </select>
+            <div className="min-w-[140px]">
+              <SearchableDropdown
+                size="sm"
+                optionType="status"
+                value={visitStateFilter}
+                onChange={setVisitStateFilter}
+                placeholder="All States"
+                searchable={false}
+                clearable={false}
+                options={[
+                  { value: "ALL", label: "All States" },
+                  { value: "ACTIVE", label: "Active On-Site", subLabel: "Currently verified" },
+                  { value: "CHECKED_OUT", label: "Checked Out", subLabel: "Completed visit" },
+                  { value: "SCHEDULED", label: "Scheduled", subLabel: "Upcoming" },
+                  { value: "CANCELLED", label: "Cancelled", subLabel: "Not conducted" },
+                ]}
+              />
+            </div>
 
             {/* Project Filter */}
-            <select
-              value={visitProjectFilter}
-              onChange={(e) => setVisitProjectFilter(e.target.value)}
-              className="p-1.5 bg-white border border-[#E2E6F0] rounded-lg text-xs font-medium text-[#1F1F1F] focus:outline-none focus:ring-1 focus:ring-[#5A81FA] max-w-[180px]"
-            >
-              <option value="ALL">All Projects</option>
-              {availableProjects.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.code} — {p.name}
-                </option>
-              ))}
-            </select>
+            <div className="min-w-[180px]">
+              <SearchableDropdown
+                size="sm"
+                optionType="project"
+                value={visitProjectFilter}
+                onChange={setVisitProjectFilter}
+                placeholder="All Projects"
+                searchPlaceholder="Search projects..."
+                clearable={false}
+                options={[
+                  { value: "ALL", label: "All Projects" },
+                  ...availableProjects.map((p) => ({
+                    value: p.id,
+                    label: p.name,
+                    projectCode: p.code,
+                    subLabel: p.projectType || undefined,
+                    icon: <ProjectProfileCircle typology={p.projectType} name={p.name} size="xs" />,
+                  })),
+                ]}
+              />
+            </div>
 
             {/* Review Decision Filter */}
-            <select
-              value={visitReviewFilter}
-              onChange={(e) => setVisitReviewFilter(e.target.value)}
-              className="p-1.5 bg-white border border-[#E2E6F0] rounded-lg text-xs font-medium text-[#1F1F1F] focus:outline-none focus:ring-1 focus:ring-[#5A81FA]"
-            >
-              <option value="ALL">All Reviews</option>
-              <option value="PENDING">Pending Review</option>
-              <option value="ACCEPTED">Accepted</option>
-              <option value="NEEDS_CLARIFICATION">Needs Clarification</option>
-              <option value="REJECTED">Rejected</option>
-            </select>
+            <div className="min-w-[160px]">
+              <SearchableDropdown
+                size="sm"
+                value={visitReviewFilter}
+                onChange={setVisitReviewFilter}
+                placeholder="All Reviews"
+                searchable={false}
+                clearable={false}
+                options={[
+                  { value: "ALL", label: "All Reviews" },
+                  { value: "PENDING", label: "Pending Review", subLabel: "Awaiting partner review" },
+                  { value: "ACCEPTED", label: "Accepted", subLabel: "Verified & approved" },
+                  { value: "NEEDS_CLARIFICATION", label: "Needs Clarification", subLabel: "Follow-up required" },
+                  { value: "REJECTED", label: "Rejected", subLabel: "Outside perimeter / invalid" },
+                ]}
+              />
+            </div>
 
             {/* Sort Filter: Date Day & Alphabetical Order */}
-            <div className="flex items-center gap-1.5 bg-white border border-[#E2E6F0] rounded-lg px-2 py-1">
-              <ArrowUpDown className="w-3.5 h-3.5 text-[#5A81FA] shrink-0" />
-              <select
+            <div className="min-w-[180px]">
+              <SearchableDropdown
+                size="sm"
                 value={visitSortBy}
-                onChange={(e) => setVisitSortBy(e.target.value)}
-                className="bg-transparent text-xs font-medium text-[#1F1F1F] focus:outline-none cursor-pointer"
-                title="Sort site visits by date day or alphabetical order"
-              >
-                <option value="DATE_DESC">Sort: Date (Newest First)</option>
-                <option value="DATE_ASC">Sort: Date (Oldest First)</option>
-                <option value="ALPHA_EMPLOYEE_ASC">Sort: Alphabetical Employee (A → Z)</option>
-                <option value="ALPHA_EMPLOYEE_DESC">Sort: Alphabetical Employee (Z → A)</option>
-                <option value="ALPHA_PROJECT_ASC">Sort: Alphabetical Project (A → Z)</option>
-                <option value="ALPHA_PURPOSE_ASC">Sort: Alphabetical Purpose (A → Z)</option>
-              </select>
+                onChange={setVisitSortBy}
+                placeholder="Sort By"
+                searchable={false}
+                clearable={false}
+                options={[
+                  { value: "DATE_DESC", label: "Sort: Date (Newest First)" },
+                  { value: "DATE_ASC", label: "Sort: Date (Oldest First)" },
+                  { value: "ALPHA_EMPLOYEE_ASC", label: "Sort: Employee (A → Z)" },
+                  { value: "ALPHA_EMPLOYEE_DESC", label: "Sort: Employee (Z → A)" },
+                  { value: "ALPHA_PROJECT_ASC", label: "Sort: Project (A → Z)" },
+                  { value: "ALPHA_PURPOSE_ASC", label: "Sort: Purpose (A → Z)" },
+                ]}
+              />
             </div>
 
             {/* Clear filters */}

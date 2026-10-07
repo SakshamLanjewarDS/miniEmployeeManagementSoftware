@@ -36,8 +36,7 @@ import {
   CheckCircle2,
   X,
   Search,
-  ArrowUpDown,
-} from "lucide-react";
+import { SearchableDropdown } from "@/components/ui/SearchableDropdown";
 
 export interface FeeMilestoneItem {
   id: string;
@@ -711,37 +710,43 @@ export default function FinanceClientView({
                   {/* Filter and Sort Selectors */}
                   <div className="flex flex-wrap items-center gap-2">
                     {/* Status Filter */}
-                    <div className="flex items-center gap-1.5 bg-white border border-[#E2E6F0] px-2 py-1 rounded-lg">
-                      <span className="text-slate-500 font-medium text-[11px]">Status:</span>
-                      <select
+                    <div className="min-w-[140px]">
+                      <SearchableDropdown
+                        size="sm"
+                        optionType="status"
                         value={milestoneStatusFilter}
-                        onChange={(e) => setMilestoneStatusFilter(e.target.value)}
-                        className="bg-transparent text-xs text-[#0F172A] font-semibold focus:outline-none cursor-pointer"
-                      >
-                        <option value="ALL">All Statuses</option>
-                        <option value="PENDING">Pending</option>
-                        <option value="INVOICED">Invoiced</option>
-                        <option value="PAID">Paid</option>
-                      </select>
+                        onChange={setMilestoneStatusFilter}
+                        placeholder="All Statuses"
+                        searchable={false}
+                        clearable={false}
+                        options={[
+                          { value: "ALL", label: "All Statuses" },
+                          { value: "PENDING", label: "Pending", subLabel: "Not yet invoiced" },
+                          { value: "INVOICED", label: "Invoiced", subLabel: "Invoice raised" },
+                          { value: "PAID", label: "Paid", subLabel: "Funds received" },
+                        ]}
+                      />
                     </div>
 
                     {/* Sort Filter */}
-                    <div className="flex items-center gap-1.5 bg-white border border-[#E2E6F0] px-2 py-1 rounded-lg">
-                      <ArrowUpDown className="w-3.5 h-3.5 text-slate-500" />
-                      <span className="text-slate-500 font-medium text-[11px]">Sort:</span>
-                      <select
+                    <div className="min-w-[190px]">
+                      <SearchableDropdown
+                        size="sm"
                         value={milestoneSortBy}
-                        onChange={(e) => setMilestoneSortBy(e.target.value)}
-                        className="bg-transparent text-xs text-[#0F172A] font-semibold focus:outline-none cursor-pointer"
-                      >
-                        <option value="DATE_ASC">Target Date (Earliest First)</option>
-                        <option value="DATE_DESC">Target Date (Latest First)</option>
-                        <option value="ALPHA_TITLE_ASC">Title (A → Z)</option>
-                        <option value="ALPHA_TITLE_DESC">Title (Z → A)</option>
-                        <option value="ALPHA_PROJECT_ASC">Project Code (A → Z)</option>
-                        <option value="AMOUNT_DESC">Amount (Highest First)</option>
-                        <option value="AMOUNT_ASC">Amount (Lowest First)</option>
-                      </select>
+                        onChange={setMilestoneSortBy}
+                        placeholder="Sort By"
+                        searchable={false}
+                        clearable={false}
+                        options={[
+                          { value: "DATE_ASC", label: "Target Date (Earliest First)" },
+                          { value: "DATE_DESC", label: "Target Date (Latest First)" },
+                          { value: "ALPHA_TITLE_ASC", label: "Title (A → Z)" },
+                          { value: "ALPHA_TITLE_DESC", label: "Title (Z → A)" },
+                          { value: "ALPHA_PROJECT_ASC", label: "Project Code (A → Z)" },
+                          { value: "AMOUNT_DESC", label: "Amount (Highest First)" },
+                          { value: "AMOUNT_ASC", label: "Amount (Lowest First)" },
+                        ]}
+                      />
                     </div>
 
                     {(milestoneSearch || milestoneStatusFilter !== "ALL" || milestoneSortBy !== "DATE_ASC") && (

@@ -24,6 +24,7 @@ import {
   Link as LinkIcon,
 } from "lucide-react";
 import { CustomFieldDefinition, CustomFieldType } from "@/server/modules/custom-fields/repository";
+import { SearchableDropdown } from "@/components/ui/SearchableDropdown";
 
 interface CustomFieldsManagerModalProps {
   isOpen: boolean;
@@ -282,20 +283,25 @@ export function CustomFieldsManagerModal({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#F8F9FD] p-2.5 rounded-xl border border-[#E2E6F0] text-xs">
           <div className="flex items-center gap-2">
             <span className="font-bold text-slate-700">Target Module:</span>
-            <select
-              value={entity}
-              onChange={(e) => {
-                setEntity(e.target.value);
-                resetForm();
-              }}
-              className="p-1.5 bg-white border border-[#E2E6F0] rounded-lg font-semibold text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#5A81FA]"
-            >
-              <option value="PROJECT">Projects Form & Cards</option>
-              <option value="TASK">Tasks & Deliverables Form</option>
-              <option value="TEAM">Studio Team & Staff Form</option>
-              <option value="CONTRACTOR">Contractor Directory Form</option>
-              <option value="CONSULTANT">Consultant Directory Form</option>
-            </select>
+            <div className="min-w-[190px]">
+              <SearchableDropdown
+                size="sm"
+                value={entity}
+                onChange={(val) => {
+                  setEntity(val);
+                  resetForm();
+                }}
+                searchable={false}
+                clearable={false}
+                options={[
+                  { value: "PROJECT", label: "Projects Form & Cards" },
+                  { value: "TASK", label: "Tasks & Deliverables Form" },
+                  { value: "TEAM", label: "Studio Team & Staff Form" },
+                  { value: "CONTRACTOR", label: "Contractor Directory Form" },
+                  { value: "CONSULTANT", label: "Consultant Directory Form" },
+                ]}
+              />
+            </div>
           </div>
 
           <div className="flex items-center gap-1 bg-white p-0.5 rounded-lg border border-[#E2E6F0]">
@@ -502,22 +508,24 @@ export function CustomFieldsManagerModal({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block font-bold text-slate-700 mb-1">
-                  Field Type <span className="text-red-500">*</span>
-                </label>
-                <select
+                <SearchableDropdown
+                  id="custom-field-type"
+                  label="Field Type"
+                  required
                   value={type}
-                  onChange={(e) => setType(e.target.value as CustomFieldType)}
-                  className="w-full p-2.5 bg-white border border-[#E2E6F0] rounded-xl text-slate-800 font-semibold focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
-                >
-                  <option value="text">🔤 Short Text (Single line)</option>
-                  <option value="number">🔢 Number (Numeric / Sqft / Amount)</option>
-                  <option value="date">📅 Date (Date picker)</option>
-                  <option value="select">📋 Dropdown / Select (Choose 1 option)</option>
-                  <option value="boolean">☑️ Yes / No Switch (Boolean)</option>
-                  <option value="textarea">📝 Long Text / Multiline</option>
-                  <option value="url">🌐 Web Link / Map URL</option>
-                </select>
+                  onChange={(val) => setType(val as CustomFieldType)}
+                  searchable={false}
+                  clearable={false}
+                  options={[
+                    { value: "text", label: "Short Text (Single line)", icon: <Type className="w-3.5 h-3.5 text-slate-600" /> },
+                    { value: "number", label: "Number (Numeric / Sqft / Amount)", icon: <Hash className="w-3.5 h-3.5 text-blue-600" /> },
+                    { value: "date", label: "Date (Date picker)", icon: <Calendar className="w-3.5 h-3.5 text-purple-600" /> },
+                    { value: "select", label: "Dropdown / Select (Choose 1 option)", icon: <ListFilter className="w-3.5 h-3.5 text-amber-600" /> },
+                    { value: "boolean", label: "Yes / No Switch (Boolean)", icon: <ToggleLeft className="w-3.5 h-3.5 text-emerald-600" /> },
+                    { value: "textarea", label: "Long Text / Multiline", icon: <FileText className="w-3.5 h-3.5 text-indigo-600" /> },
+                    { value: "url", label: "Web Link / Map URL", icon: <LinkIcon className="w-3.5 h-3.5 text-teal-600" /> },
+                  ]}
+                />
               </div>
 
               <div>
@@ -639,12 +647,16 @@ export function CustomFieldsManagerModal({
                   {required && <span className="text-red-500">*</span>}
                 </label>
                 {type === "select" ? (
-                  <select className="w-full p-2 border border-slate-200 rounded-lg text-xs" disabled>
-                    <option>{placeholder || `Select ${label || "option"}...`}</option>
-                    {options.map((o) => (
-                      <option key={o}>{o}</option>
-                    ))}
-                  </select>
+                  <SearchableDropdown
+                    value=""
+                    onChange={() => {}}
+                    options={options.map((o) => ({ value: o, label: o }))}
+                    placeholder={placeholder || `Select ${label || "option"}...`}
+                    searchPlaceholder={`Search ${label || "options"}...`}
+                    size="sm"
+                    className="w-full"
+                    disabled
+                  />
                 ) : type === "boolean" ? (
                   <label className="flex items-center gap-2 text-xs font-medium text-slate-700">
                     <input type="checkbox" className="w-4 h-4 rounded text-[#5A81FA]" disabled />

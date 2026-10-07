@@ -10,6 +10,7 @@ import {
   RotateCcw,
   CheckCheck,
   Plus,
+  LayoutGrid,
   LayoutList,
   Columns3,
   Calendar,
@@ -40,7 +41,9 @@ import {
 import { CustomFieldsManagerModal } from "@/components/custom-fields/CustomFieldsManagerModal";
 import { DynamicFormFields } from "@/components/custom-fields/DynamicFormFields";
 import { DynamicCardFields } from "@/components/custom-fields/DynamicCardFields";
-import { SearchableSelect } from "@/components/ui/SearchableSelect";
+import { SearchableDropdown, SearchableSelect } from "@/components/ui/SearchableDropdown";
+import { TaskGrid } from "@/components/tasks/TaskGrid";
+import { sanitizeTaskDescription } from "@/components/tasks/task-utils";
 import {
   getAllTypologies,
   ProjectProfileCircle,
@@ -202,7 +205,9 @@ export default function TasksClientView({
       [key]: value,
     }));
   };
-  const [view, setView] = useState<"list" | "kanban">(initialView === "kanban" ? "kanban" : "list");
+  const [view, setView] = useState<"grid" | "list" | "kanban">(
+    initialView === "kanban" ? "kanban" : initialView === "list" ? "list" : "grid"
+  );
   const [loadingTaskId, setLoadingTaskId] = useState<string | null>(null);
   const [togglingChecklistId, setTogglingChecklistId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -211,6 +216,7 @@ export default function TasksClientView({
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTypologyFilter, setSelectedTypologyFilter] = useState<string>("ALL");
   const [selectedProjectFilter, setSelectedProjectFilter] = useState<string>("ALL");
+  const [selectedAssigneeFilter, setSelectedAssigneeFilter] = useState<string>("ALL");
   const [selectedPriorityFilter, setSelectedPriorityFilter] = useState<string>("ALL");
   const [selectedDueDateCategory, setSelectedDueDateCategory] = useState<string>(
     ["TODAY", "OVERDUE", "UPCOMING"].includes(activeFilter) ? activeFilter : "ALL"
@@ -326,7 +332,36 @@ export default function TasksClientView({
     return map;
   }, [members]);
 
-  // Filter tasks based on search, project, priority, due-date category, and status category
+  // Multi-Assignee Resolution Helper
+  const getTaskAssignees = (task: TaskItem): MemberOption[] => {
+    if (Array.isArray(task.assignedMemberIds) && task.assignedMemberIds.length > 0) {
+      const found = members.filter((m) => task.assignedMemberIds!.includes(m.id));
+      if (found.length > 0) return found;
+    }
+    if (task.assigneeId) {
+      const primary = members.find((m) => m.id === task.assigneeId);
+      if (primary) return [primary];
+    }
+    if (task.assignee) {
+      return [
+        {
+          id: task.assignee.id || task.assigneeId || "",
+          role: "",
+          user: task.assignee.user,
+          employee: task.assignee.employee
+            ? {
+                employeeId: task.assignee.employee.employeeId,
+                designation: task.assignee.employee.designation,
+                department: task.assignee.employee.department ?? null,
+              }
+            : null,
+        },
+      ];
+    }
+    return [];
+  };
+
+  // Filter tasks based on search, project, priority, employee, due-date category, and status category
   const filteredTasks = useMemo(() => {
     const now = new Date();
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
@@ -339,7 +374,12 @@ export default function TasksClientView({
         const matchTitle = task.title.toLowerCase().includes(q);
         const matchDesc = task.description?.toLowerCase().includes(q);
         const matchProj = task.project.code.toLowerCase().includes(q) || task.project.name.toLowerCase().includes(q);
-        const matchAssignee = task.assignee?.user.fullName.toLowerCase().includes(q);
+        const assignees = getTaskAssignees(task);
+        const matchAssignee = assignees.some(
+          (a) =>
+            a.user.fullName.toLowerCase().includes(q) ||
+            (a.employee?.employeeId && a.employee.employeeId.toLowerCase().includes(q))
+        );
         if (!matchTitle && !matchDesc && !matchProj && !matchAssignee) {
           return false;
         }
@@ -354,6 +394,19 @@ export default function TasksClientView({
       if (selectedTypologyFilter !== "ALL") {
         if (!isTypologyMatch(task.project.projectType, selectedTypologyFilter)) {
           return false;
+        }
+      }
+
+      // 2.7 Employee / Assignee Filter
+      if (selectedAssigneeFilter !== "ALL") {
+        const assignees = getTaskAssignees(task);
+        if (selectedAssigneeFilter === "UNASSIGNED") {
+          if (assignees.length > 0) return false;
+        } else {
+          const hasMember = assignees.some(
+            (a) => a.id === selectedAssigneeFilter || (task.assigneeId && task.assigneeId === selectedAssigneeFilter)
+          );
+          if (!hasMember) return false;
         }
       }
 
@@ -379,10 +432,21 @@ export default function TasksClientView({
 
       // 5. Status Category Filter
       if (selectedStatusCategory !== "ALL") {
-        if (selectedStatusCategory === "IN_PROGRESS" && task.status !== "IN_PROGRESS") return false;
-        if (selectedStatusCategory === "WAITING_REVIEW" && task.status !== "IN_REVIEW") return false;
-        if (selectedStatusCategory === "COMPLETED" && task.status !== "COMPLETED") return false;
-        if (selectedStatusCategory === "NOT_STARTED" && task.status !== "NOT_STARTED") return false;
+        if (selectedStatusCategory === "NOT_STARTED" || selectedStatusCategory === "TODO") {
+          if (task.status !== "NOT_STARTED" && task.status !== "TODO") return false;
+        } else if (selectedStatusCategory === "STARTED") {
+          if (task.status !== "STARTED") return false;
+        } else if (selectedStatusCategory === "ONGOING") {
+          if (task.status !== "ONGOING" && task.status !== "IN_PROGRESS") return false;
+        } else if (selectedStatusCategory === "IN_PROGRESS") {
+          if (task.status !== "IN_PROGRESS" && task.status !== "ONGOING" && task.status !== "STARTED") return false;
+        } else if (selectedStatusCategory === "CHECKING" || selectedStatusCategory === "WAITING_REVIEW") {
+          if (task.status !== "CHECKING" && task.status !== "IN_REVIEW") return false;
+        } else if (selectedStatusCategory === "COMPLETED") {
+          if (task.status !== "COMPLETED") return false;
+        } else if (task.status !== selectedStatusCategory) {
+          return false;
+        }
       }
 
       return true;
@@ -419,10 +483,12 @@ export default function TasksClientView({
     searchQuery,
     selectedTypologyFilter,
     selectedProjectFilter,
+    selectedAssigneeFilter,
     selectedPriorityFilter,
     selectedDueDateCategory,
     selectedStatusCategory,
     taskSortBy,
+    members,
   ]);
 
   const handleScopeChange = (newScope: string) => {
@@ -442,45 +508,28 @@ export default function TasksClientView({
     setSearchQuery("");
     setSelectedTypologyFilter("ALL");
     setSelectedProjectFilter("ALL");
+    setSelectedAssigneeFilter("ALL");
     setSelectedPriorityFilter("ALL");
     setSelectedDueDateCategory("ALL");
     setSelectedStatusCategory("ALL");
     setTaskSortBy("DUE_DATE_ASC");
   };
 
-  // Multi-Assignee Resolution Helper
-  const getTaskAssignees = (task: TaskItem): MemberOption[] => {
-    if (Array.isArray(task.assignedMemberIds) && task.assignedMemberIds.length > 0) {
-      const found = members.filter((m) => task.assignedMemberIds!.includes(m.id));
-      if (found.length > 0) return found;
-    }
-    if (task.assigneeId) {
-      const primary = members.find((m) => m.id === task.assigneeId);
-      if (primary) return [primary];
-    }
-    if (task.assignee) {
-      return [
-        {
-          id: task.assignee.id || task.assigneeId || "",
-          role: "",
-          user: task.assignee.user,
-          employee: task.assignee.employee
-            ? {
-                employeeId: task.assignee.employee.employeeId,
-                designation: task.assignee.employee.designation,
-                department: task.assignee.employee.department ?? null,
-              }
-            : null,
-        },
-      ];
-    }
-    return [];
-  };
-
   const isTaskAssignedToMe = (task: TaskItem): boolean => {
     if (task.assigneeId === currentMembershipId) return true;
     if (Array.isArray(task.assignedMemberIds) && task.assignedMemberIds.includes(currentMembershipId)) return true;
     return false;
+  };
+
+  const canEditTask = (task: TaskItem): boolean => {
+    const isMyTask = isTaskAssignedToMe(task);
+    const isCreator = task.creatorId === currentMembershipId || task.creator?.id === currentMembershipId;
+    return isPrivileged || isMyTask || isCreator;
+  };
+
+  const canDeleteTask = (task: TaskItem): boolean => {
+    const isCreator = task.creatorId === currentMembershipId || task.creator?.id === currentMembershipId;
+    return isPrivileged || isCreator;
   };
 
   // Dynamic Typologies extracted from projects + studio standards
@@ -584,17 +633,7 @@ export default function TasksClientView({
       fullTitle = `[${effectiveProjectName}] ${fullTitle}`;
     }
 
-    let fullDescription = taskDescription.trim();
-    const metaNotes: string[] = [];
-    if (effectiveTypology) metaNotes.push(`Typology: ${effectiveTypology}`);
-    if (effectiveAssigneeName) metaNotes.push(`Assigned Specialist: ${effectiveAssigneeName}`);
-    if (effectivePhaseName) metaNotes.push(`Phase: ${effectivePhaseName}`);
-    if (taskPriority === "OTHER" && otherPriorityName.trim()) metaNotes.push(`Priority: ${otherPriorityName.trim()}`);
-    if (metaNotes.length > 0) {
-      fullDescription = fullDescription
-        ? `${fullDescription}\n\n---\n${metaNotes.join(" • ")}`
-        : metaNotes.join(" • ");
-    }
+    const fullDescription = taskDescription.trim();
 
     const payloadCustomValues: Record<string, any> = {
       ...customFieldValues,
@@ -821,7 +860,7 @@ export default function TasksClientView({
 
     // 3. Title & Description
     setEditTitle(task.title);
-    setEditDescription(task.description || "");
+    setEditDescription(sanitizeTaskDescription(task.description));
 
     // 4. Assignees (Multi-select)
     const assignees = getTaskAssignees(task);
@@ -1196,6 +1235,7 @@ export default function TasksClientView({
     searchQuery.trim().length > 0 ||
     selectedTypologyFilter !== "ALL" ||
     selectedProjectFilter !== "ALL" ||
+    selectedAssigneeFilter !== "ALL" ||
     selectedPriorityFilter !== "ALL" ||
     selectedDueDateCategory !== "ALL" ||
     selectedStatusCategory !== "ALL" ||
@@ -1475,24 +1515,46 @@ export default function TasksClientView({
               <span>Assign Deliverable</span>
             </button>
 
-            {/* View Switcher */}
-            <div className="flex items-center gap-1 bg-[#F2F4FF] border border-[#E2E6F0] p-1 rounded-xl shrink-0">
+            {/* View Switcher: Grid, List, Kanban */}
+            <div className="flex items-center gap-1 bg-[#F3F5FF] border border-[#DFE5F2] p-1 rounded-xl shrink-0">
               <button
+                type="button"
+                suppressHydrationWarning
+                onClick={() => setView("grid")}
+                className={`px-2.5 py-1 rounded-lg text-xs font-medium flex items-center gap-1 cursor-pointer transition-colors ${
+                  view === "grid"
+                    ? "bg-white text-[#111B35] font-semibold shadow-2xs border border-[#DFE5F2]/60"
+                    : "text-[#52617C] hover:text-[#111B35]"
+                }`}
+                title="Grid view (3 cards per desktop row)"
+              >
+                <LayoutGrid className="w-3.5 h-3.5 text-[#5878FF]" />
+                <span>Grid</span>
+              </button>
+              <button
+                type="button"
                 suppressHydrationWarning
                 onClick={() => setView("list")}
                 className={`px-2.5 py-1 rounded-lg text-xs font-medium flex items-center gap-1 cursor-pointer transition-colors ${
-                  view === "list" ? "bg-white text-[#1F1F1F] font-semibold shadow-2xs" : "text-[#696E82] hover:text-[#1F1F1F]"
+                  view === "list"
+                    ? "bg-white text-[#111B35] font-semibold shadow-2xs border border-[#DFE5F2]/60"
+                    : "text-[#52617C] hover:text-[#111B35]"
                 }`}
+                title="List view"
               >
                 <LayoutList className="w-3.5 h-3.5" />
                 <span>List</span>
               </button>
               <button
+                type="button"
                 suppressHydrationWarning
                 onClick={() => setView("kanban")}
                 className={`px-2.5 py-1 rounded-lg text-xs font-medium flex items-center gap-1 cursor-pointer transition-colors ${
-                  view === "kanban" ? "bg-white text-[#1F1F1F] font-semibold shadow-2xs" : "text-[#696E82] hover:text-[#1F1F1F]"
+                  view === "kanban"
+                    ? "bg-white text-[#111B35] font-semibold shadow-2xs border border-[#DFE5F2]/60"
+                    : "text-[#52617C] hover:text-[#111B35]"
                 }`}
+                title="Kanban view"
               >
                 <Columns3 className="w-3.5 h-3.5" />
                 <span>Kanban</span>
@@ -1504,103 +1566,157 @@ export default function TasksClientView({
         {/* Second Row: Specific Category Selectors */}
         <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-[#E2E6F0] text-xs">
           <div className="flex items-center gap-1 text-[#696E82] font-semibold">
-            <Filter className="w-3.5 h-3.5" />
+            <Filter className="w-3.5 h-3.5 text-[#5878FF]" />
             <span>Filters:</span>
           </div>
 
           {/* Due Date Category */}
-          <select
-            suppressHydrationWarning
-            value={selectedDueDateCategory}
-            onChange={(e) => setSelectedDueDateCategory(e.target.value)}
-            className="p-1.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-lg text-xs font-medium text-[#1F1F1F] focus:outline-none focus:ring-1 focus:ring-[#5A81FA]"
-          >
-            <option value="ALL">All Due Dates</option>
-            <option value="TODAY">Due Today</option>
-            <option value="OVERDUE">Overdue Only</option>
-            <option value="UPCOMING">Upcoming</option>
-          </select>
+          <div className="min-w-[130px]">
+            <SearchableDropdown
+              size="sm"
+              value={selectedDueDateCategory}
+              onChange={setSelectedDueDateCategory}
+              placeholder="All Due Dates"
+              searchable={false}
+              clearable={false}
+              options={[
+                { value: "ALL", label: "All Due Dates" },
+                { value: "TODAY", label: "Due Today", icon: <Clock className="w-3.5 h-3.5 text-[#5878FF]" /> },
+                { value: "OVERDUE", label: "Overdue Only", icon: <AlertTriangle className="w-3.5 h-3.5 text-rose-500" /> },
+                { value: "UPCOMING", label: "Upcoming", icon: <Calendar className="w-3.5 h-3.5 text-indigo-500" /> },
+              ]}
+            />
+          </div>
 
           {/* Status Category */}
-          <select
-            suppressHydrationWarning
-            value={selectedStatusCategory}
-            onChange={(e) => setSelectedStatusCategory(e.target.value)}
-            className="p-1.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-lg text-xs font-medium text-[#1F1F1F] focus:outline-none focus:ring-1 focus:ring-[#5A81FA]"
-          >
-            <option value="ALL">All Statuses</option>
-            <option value="NOT_STARTED">📋 Todo</option>
-            <option value="STARTED">▶ Started</option>
-            <option value="ONGOING">⚡ Ongoing</option>
-            <option value="CHECKING">🔍 Checking</option>
-            <option value="COMPLETED">✔ Completed</option>
-          </select>
+          <div className="min-w-[130px]">
+            <SearchableDropdown
+              size="sm"
+              optionType="status"
+              value={selectedStatusCategory}
+              onChange={setSelectedStatusCategory}
+              placeholder="All Statuses"
+              searchable={false}
+              clearable={false}
+              options={[
+                { value: "ALL", label: "All Statuses" },
+                { value: "NOT_STARTED", label: "📋 Todo", subLabel: "Pending work" },
+                { value: "STARTED", label: "▶ Started", subLabel: "Commenced" },
+                { value: "ONGOING", label: "⚡ Ongoing", subLabel: "In progress" },
+                { value: "CHECKING", label: "🔍 Checking", subLabel: "Waiting review" },
+                { value: "COMPLETED", label: "✔ Completed", subLabel: "Done & approved" },
+              ]}
+            />
+          </div>
 
           {/* Priority */}
-          <select
-            suppressHydrationWarning
-            value={selectedPriorityFilter}
-            onChange={(e) => setSelectedPriorityFilter(e.target.value)}
-            className="p-1.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-lg text-xs font-medium text-[#1F1F1F] focus:outline-none focus:ring-1 focus:ring-[#5A81FA]"
-          >
-            <option value="ALL">All Priorities</option>
-            <option value="URGENT">Urgent</option>
-            <option value="HIGH">High Priority</option>
-            <option value="MEDIUM">Medium</option>
-            <option value="LOW">Low</option>
-          </select>
+          <div className="min-w-[130px]">
+            <SearchableDropdown
+              size="sm"
+              optionType="priority"
+              value={selectedPriorityFilter}
+              onChange={setSelectedPriorityFilter}
+              placeholder="All Priorities"
+              searchable={false}
+              clearable={false}
+              options={[
+                { value: "ALL", label: "All Priorities" },
+                { value: "URGENT", label: "Urgent", subLabel: "Critical path" },
+                { value: "HIGH", label: "High Priority", subLabel: "Strict deadline" },
+                { value: "MEDIUM", label: "Medium", subLabel: "Standard deliverable" },
+                { value: "LOW", label: "Low", subLabel: "Routine drafting" },
+              ]}
+            />
+          </div>
 
           {/* Typology Filter */}
-          <select
-            suppressHydrationWarning
-            value={selectedTypologyFilter}
-            onChange={(e) => setSelectedTypologyFilter(e.target.value)}
-            className="p-1.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-lg text-xs font-medium text-[#1F1F1F] focus:outline-none focus:ring-1 focus:ring-[#5A81FA] max-w-[170px]"
-            title="Filter deliverables by architectural typology"
-          >
-            <option value="ALL">All Typologies</option>
-            {dynamicTypologies.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
+          <div className="min-w-[150px]">
+            <SearchableDropdown
+              size="sm"
+              value={selectedTypologyFilter}
+              onChange={setSelectedTypologyFilter}
+              placeholder="All Typologies"
+              searchPlaceholder="Search typology..."
+              clearable={false}
+              options={[
+                { value: "ALL", label: "All Typologies" },
+                ...dynamicTypologies.map((t) => ({
+                  value: t,
+                  label: t,
+                  icon: <TypologyDot typology={t} />,
+                })),
+              ]}
+            />
+          </div>
 
           {/* Project */}
-          <select
-            suppressHydrationWarning
-            value={selectedProjectFilter}
-            onChange={(e) => setSelectedProjectFilter(e.target.value)}
-            className="p-1.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-lg text-xs font-medium text-[#1F1F1F] focus:outline-none focus:ring-1 focus:ring-[#5A81FA] max-w-[200px]"
-          >
-            <option value="ALL">All Projects</option>
-            {projects
-              .filter((p) => selectedTypologyFilter === "ALL" || isTypologyMatch(p.projectType, selectedTypologyFilter))
-              .map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.code} — {p.name}
-                </option>
-              ))}
-          </select>
+          <div className="min-w-[170px]">
+            <SearchableDropdown
+              size="sm"
+              optionType="project"
+              value={selectedProjectFilter}
+              onChange={setSelectedProjectFilter}
+              placeholder="All Projects"
+              searchPlaceholder="Search projects..."
+              clearable={false}
+              options={[
+                { value: "ALL", label: "All Projects" },
+                ...projects
+                  .filter((p) => selectedTypologyFilter === "ALL" || isTypologyMatch(p.projectType, selectedTypologyFilter))
+                  .map((p) => ({
+                    value: p.id,
+                    label: p.name,
+                    projectCode: p.code,
+                    subLabel: p.projectType || undefined,
+                    icon: <ProjectProfileCircle typology={p.projectType} name={p.name} size="xs" />,
+                  })),
+              ]}
+            />
+          </div>
+
+          {/* Employee Filter */}
+          <div className="min-w-[180px]">
+            <SearchableDropdown
+              size="sm"
+              optionType="employee"
+              value={selectedAssigneeFilter}
+              onChange={setSelectedAssigneeFilter}
+              placeholder="All Employees"
+              searchPlaceholder="Search employees..."
+              clearable={false}
+              options={[
+                { value: "ALL", label: "All Employees", icon: <Users className="w-3.5 h-3.5 text-[#5878FF]" /> },
+                { value: "UNASSIGNED", label: "Unassigned Tasks", subLabel: "No assignee attached" },
+                ...members.map((m) => ({
+                  value: m.id,
+                  label: m.user.fullName,
+                  employeeId: m.employee?.employeeId,
+                  subLabel: m.employee?.designation ? `${m.employee.designation} (${m.role})` : m.role,
+                  category: "employee" as const,
+                })),
+              ]}
+            />
+          </div>
 
           {/* Sort By Filter (Date, Day, Alphabetical) */}
-          <div className="flex items-center gap-1.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-lg px-2 py-1 text-xs">
-            <ArrowUpDown className="w-3.5 h-3.5 text-[#5A81FA] shrink-0" />
-            <select
-              suppressHydrationWarning
+          <div className="min-w-[180px]">
+            <SearchableDropdown
+              size="sm"
               value={taskSortBy}
-              onChange={(e) => setTaskSortBy(e.target.value)}
-              className="bg-transparent font-medium text-[#1F1F1F] focus:outline-none cursor-pointer"
-              title="Sort tasks by date day or alphabetical order"
-            >
-              <option value="DUE_DATE_ASC">Sort: Due Date (Closest First)</option>
-              <option value="DUE_DATE_DESC">Sort: Due Date (Furthest First)</option>
-              <option value="CREATED_DESC">Sort: Date Created (Newest First)</option>
-              <option value="CREATED_ASC">Sort: Date Created (Oldest First)</option>
-              <option value="ALPHA_ASC">Sort: Alphabetical (A → Z)</option>
-              <option value="ALPHA_DESC">Sort: Alphabetical (Z → A)</option>
-              <option value="PROJ_ALPHA_ASC">Sort: Project Code (A → Z)</option>
-            </select>
+              onChange={setTaskSortBy}
+              placeholder="Sort By"
+              searchable={false}
+              clearable={false}
+              options={[
+                { value: "DUE_DATE_ASC", label: "Sort: Due Date (Closest First)" },
+                { value: "DUE_DATE_DESC", label: "Sort: Due Date (Furthest First)" },
+                { value: "CREATED_DESC", label: "Sort: Date Created (Newest First)" },
+                { value: "CREATED_ASC", label: "Sort: Date Created (Oldest First)" },
+                { value: "ALPHA_ASC", label: "Sort: Alphabetical (A → Z)" },
+                { value: "ALPHA_DESC", label: "Sort: Alphabetical (Z → A)" },
+                { value: "PROJ_ALPHA_ASC", label: "Sort: Project Code (A → Z)" },
+              ]}
+            />
           </div>
 
           {/* Clear Filters */}
@@ -1621,7 +1737,36 @@ export default function TasksClientView({
         </div>
       </div>
 
-      {/* 4. MAIN VIEW: LIST OR KANBAN */}
+      {/* 4. MAIN VIEW: GRID, LIST OR KANBAN */}
+      {view === "grid" && (
+        <TaskGrid
+          tasks={filteredTasks}
+          isFilterActive={isFilterActive}
+          canAssignDeliverable={isPrivileged || true}
+          currentMembershipId={currentMembershipId}
+          isPrivileged={isPrivileged}
+          workspaceTimezone={workspaceTimezone}
+          customFields={customFields}
+          customValuesByTask={customValuesByTask}
+          loadingTaskId={loadingTaskId}
+          onOpenCreateTask={() => {
+            setCustomFieldValues({});
+            setIsCreateTaskModalOpen(true);
+          }}
+          onClearFilters={handleClearFilters}
+          onUpdateStatus={updateStatus}
+          onOpenDetails={(task) => setDrawerTask(task)}
+          onEdit={(task) => openEditModal(task)}
+          onDelegate={(task) => openReassignModal(task)}
+          onDelete={(task) => setTaskToDelete(task)}
+          onRequestChanges={(task) => setChangeRequestModal({ taskId: task.id, title: task.title })}
+          onToggleChecklist={handleToggleChecklist}
+          getTaskAssignees={getTaskAssignees}
+          canEditTask={canEditTask}
+          canDeleteTask={canDeleteTask}
+        />
+      )}
+
       {view === "list" && (
         <div className="bg-white border border-[#E2E6F0] rounded-2xl shadow-xs overflow-hidden">
           {filteredTasks.length === 0 ? (
@@ -1689,8 +1834,8 @@ export default function TasksClientView({
                             {task.title}
                           </h4>
                         </button>
-                        {task.description && (
-                          <p className="text-xs text-[#696E82] mt-0.5 line-clamp-2">{task.description}</p>
+                        {sanitizeTaskDescription(task.description) && (
+                          <p className="text-xs text-[#696E82] mt-0.5 line-clamp-2">{sanitizeTaskDescription(task.description)}</p>
                         )}
                       </div>
 
@@ -1860,23 +2005,29 @@ export default function TasksClientView({
                       {/* Workflow Status Quick Selector (5 Statuses) */}
                       <div className="flex items-center gap-2 mt-1">
                         <span className="text-[11px] text-[#696E82] font-semibold hidden sm:inline">Status:</span>
-                        <select
-                          value={
-                            task.status === "NOT_STARTED" ? "TODO" :
-                            task.status === "IN_PROGRESS" ? "ONGOING" :
-                            task.status === "IN_REVIEW" ? "CHECKING" :
-                            task.status
-                          }
-                          onChange={(e) => updateStatus(task.id, e.target.value)}
-                          disabled={loadingTaskId === task.id}
-                          className="text-xs font-semibold bg-white border border-[#CEDEFF] text-[#1F1F1F] rounded-lg px-2.5 py-1.5 shadow-2xs hover:border-[#5A81FA] focus:outline-none focus:ring-2 focus:ring-[#5A81FA] cursor-pointer"
-                        >
-                          <option value="TODO">📋 Todo</option>
-                          <option value="STARTED">▶ Started</option>
-                          <option value="ONGOING">⚡ Ongoing</option>
-                          <option value="CHECKING">🔍 Checking</option>
-                          <option value="COMPLETED">✔ Completed</option>
-                        </select>
+                        <div className="w-[140px]">
+                          <SearchableDropdown
+                            size="sm"
+                            optionType="status"
+                            disabled={loadingTaskId === task.id}
+                            value={
+                              task.status === "NOT_STARTED" ? "TODO" :
+                              task.status === "IN_PROGRESS" ? "ONGOING" :
+                              task.status === "IN_REVIEW" ? "CHECKING" :
+                              task.status
+                            }
+                            onChange={(val) => updateStatus(task.id, val)}
+                            searchable={false}
+                            clearable={false}
+                            options={[
+                              { value: "TODO", label: "📋 Todo", subLabel: "Pending work" },
+                              { value: "STARTED", label: "▶ Started", subLabel: "Commenced" },
+                              { value: "ONGOING", label: "⚡ Ongoing", subLabel: "In progress" },
+                              { value: "CHECKING", label: "🔍 Checking", subLabel: "Waiting review" },
+                              { value: "COMPLETED", label: "✔ Completed", subLabel: "Done & approved" },
+                            ]}
+                          />
+                        </div>
 
                         {isPrivileged && (task.status === "IN_REVIEW" || task.status === "CHECKING") && (
                           <button
@@ -2062,24 +2213,28 @@ export default function TasksClientView({
                             )}
                           </div>
 
-                          <div>
-                            <select
+                          <div className="w-[125px]">
+                            <SearchableDropdown
+                              size="sm"
+                              optionType="status"
+                              disabled={loadingTaskId === task.id}
                               value={
                                 task.status === "NOT_STARTED" ? "TODO" :
                                 task.status === "IN_PROGRESS" ? "ONGOING" :
                                 task.status === "IN_REVIEW" ? "CHECKING" :
                                 task.status
                               }
-                              onChange={(e) => updateStatus(task.id, e.target.value)}
-                              disabled={loadingTaskId === task.id}
-                              className="text-[10px] font-semibold text-[#1F1F1F] bg-white border border-[#CEDEFF] rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-[#5A81FA] cursor-pointer"
-                            >
-                              <option value="TODO">Todo</option>
-                              <option value="STARTED">Started</option>
-                              <option value="ONGOING">Ongoing</option>
-                              <option value="CHECKING">Checking</option>
-                              <option value="COMPLETED">Completed</option>
-                            </select>
+                              onChange={(val) => updateStatus(task.id, val)}
+                              searchable={false}
+                              clearable={false}
+                              options={[
+                                { value: "TODO", label: "Todo" },
+                                { value: "STARTED", label: "Started" },
+                                { value: "ONGOING", label: "Ongoing" },
+                                { value: "CHECKING", label: "Checking" },
+                                { value: "COMPLETED", label: "Completed" },
+                              ]}
+                            />
                           </div>
                         </div>
                       </div>
@@ -2204,7 +2359,7 @@ export default function TasksClientView({
                   <span>Deliverable Instructions & Brief</span>
                 </h4>
                 <div className="p-3 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-xs text-[#696E82] whitespace-pre-line leading-relaxed">
-                  {drawerTask.description || "No detailed brief provided for this deliverable."}
+                  {sanitizeTaskDescription(drawerTask.description) || "No detailed brief provided for this deliverable."}
                 </div>
               </div>
 
@@ -2355,23 +2510,29 @@ export default function TasksClientView({
 
               <div className="flex items-center gap-2">
                 <span className="text-xs font-medium text-[#696E82]">Status:</span>
-                <select
-                  value={
-                    drawerTask.status === "NOT_STARTED" ? "TODO" :
-                    drawerTask.status === "IN_PROGRESS" ? "ONGOING" :
-                    drawerTask.status === "IN_REVIEW" ? "CHECKING" :
-                    drawerTask.status
-                  }
-                  onChange={(e) => updateStatus(drawerTask.id, e.target.value)}
-                  disabled={loadingTaskId === drawerTask.id}
-                  className="text-xs font-semibold bg-white border border-[#CEDEFF] text-[#1F1F1F] rounded-lg px-2.5 py-1.5 shadow-2xs hover:border-[#5A81FA] focus:outline-none focus:ring-2 focus:ring-[#5A81FA] cursor-pointer"
-                >
-                  <option value="TODO">📋 Todo</option>
-                  <option value="STARTED">▶ Started</option>
-                  <option value="ONGOING">⚡ Ongoing</option>
-                  <option value="CHECKING">🔍 Checking</option>
-                  <option value="COMPLETED">✔ Completed</option>
-                </select>
+                <div className="min-w-[140px]">
+                  <SearchableDropdown
+                    size="sm"
+                    optionType="status"
+                    searchable={false}
+                    clearable={false}
+                    disabled={loadingTaskId === drawerTask.id}
+                    value={
+                      drawerTask.status === "NOT_STARTED" ? "TODO" :
+                      drawerTask.status === "IN_PROGRESS" ? "ONGOING" :
+                      drawerTask.status === "IN_REVIEW" ? "CHECKING" :
+                      drawerTask.status
+                    }
+                    onChange={(val) => updateStatus(drawerTask.id, val)}
+                    options={[
+                      { value: "TODO", label: "📋 Todo" },
+                      { value: "STARTED", label: "▶ Started" },
+                      { value: "ONGOING", label: "⚡ Ongoing" },
+                      { value: "CHECKING", label: "🔍 Checking" },
+                      { value: "COMPLETED", label: "✔ Completed" },
+                    ]}
+                  />
+                </div>
 
                 {isPrivileged && (drawerTask.status === "IN_REVIEW" || drawerTask.status === "CHECKING") && (
                   <button

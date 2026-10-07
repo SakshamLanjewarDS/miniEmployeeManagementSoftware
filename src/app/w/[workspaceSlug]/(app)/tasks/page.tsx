@@ -16,7 +16,7 @@ interface TasksPageProps {
 
 export default async function TasksPage({ params, searchParams }: TasksPageProps) {
   const { workspaceSlug } = await params;
-  const { filter = "ALL", view = "list", scope } = await searchParams;
+  const { filter = "ALL", view = "grid", scope } = await searchParams;
 
   const ctx = await getCurrentTenantContext(workspaceSlug);
   if (!ctx) return null;
@@ -108,6 +108,7 @@ export default async function TasksPage({ params, searchParams }: TasksPageProps
       id: t.project.id,
       code: t.project.code,
       name: t.project.name,
+      projectType: (t.project as any).projectType ?? null,
     },
     phase: t.phase ? { id: t.phase.id, phaseName: t.phase.phaseName } : null,
     checklistItems: t.checklistItems.map((ci) => ({
