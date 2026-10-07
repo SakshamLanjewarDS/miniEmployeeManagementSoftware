@@ -10,7 +10,7 @@ export const CreateEmployeeSchema = z.object({
   phone: z.string().optional().nullable(),
   department: z.string().optional().nullable(),
   designation: z.string().optional().nullable(),
-  role: z.enum(["OWNER", "ADMIN", "PROJECT_MANAGER", "EMPLOYEE"]),
+  role: z.enum(["OWNER", "ADMIN", "EMPLOYEE"]),
   hasFinanceAccess: z.boolean().optional(),
   temporaryPassword: z
     .string()
@@ -32,7 +32,7 @@ export const UpdateEmployeeSchema = z.object({
   phone: z.string().optional().nullable(),
   department: z.string().optional().nullable(),
   designation: z.string().optional().nullable(),
-  role: z.enum(["OWNER", "ADMIN", "PROJECT_MANAGER", "EMPLOYEE"]).optional(),
+  role: z.enum(["OWNER", "ADMIN", "EMPLOYEE"]).optional(),
   hasFinanceAccess: z.boolean().optional(),
   projectIds: z.array(z.string()).optional(),
 });

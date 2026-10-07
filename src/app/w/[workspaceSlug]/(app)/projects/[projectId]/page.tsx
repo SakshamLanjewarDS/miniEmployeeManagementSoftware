@@ -246,10 +246,10 @@ export default async function ProjectDetailPage({ params, searchParams }: Projec
                   </span>
                 </div>
                 <div>
-                  <span className="text-[#696E82] block text-[10px]">Project Manager</span>
+                  <span className="text-[#696E82] block text-[10px]">Project Architecture 2</span>
                   <span className="font-semibold text-[#1F1F1F]">
                     {project.projectManager?.user.fullName
-                      ? `${project.projectManager.user.fullName} (${project.projectManager.employee?.designation || "Project Manager"})`
+                      ? `${project.projectManager.user.fullName} (${project.projectManager.employee?.designation || "Project Architecture 2"})`
                       : "Unassigned"}
                   </span>
                 </div>

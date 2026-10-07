@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
     const res = NextResponse.json({
       success: true,
       user: result.user,
-      redirectUrl: `/w/${workspaceSlug}/tasks`,
+      redirectUrl: `/w/${workspaceSlug}/dashboard`,
     });
 
     res.cookies.set("studio_session_token", result.sessionToken, {

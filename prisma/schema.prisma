@@ -110,6 +110,7 @@ model TenantMembership {
   siteVisits       SiteVisit[]      @relation("VisitEmployee")
   reviewedVisits   SiteVisit[]      @relation("VisitReviewer")
   notifications    Notification[]   @relation("RecipientNotifications")
+  assignedChecklistItems TaskChecklistItem[] @relation("ChecklistItemAssignee")
 
   @@unique([tenantId, userId])
   @@index([tenantId, role])
@@ -477,18 +478,28 @@ model Task {
 }
 
 model TaskChecklistItem {
-  id            String    @id @default(uuid())
-  tenantId      String
-  taskId        String
-  task          Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  title         String    @db.VarChar(255)
-  isCompleted   Boolean   @default(false)
-  sortOrder     Int       @default(0)
-  completedAt   DateTime?
-  completedById String?
-  createdAt     DateTime  @default(now())
+  id               String              @id @default(uuid())
+  tenantId         String
+  taskId           String
+  task             Task                @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  title            String              @db.VarChar(255)
+  isCompleted      Boolean             @default(false)
+  sortOrder        Int                 @default(0)
+  completedAt      DateTime?
+  completedById    String?
+  assignedMemberId String?
+  assignedMember   TenantMembership?   @relation("ChecklistItemAssignee", fields: [assignedMemberId], references: [id], onDelete: SetNull)
+  priority         TaskPriority        @default(MEDIUM)
+  dueDate          DateTime?
+  status           TaskWorkflowStatus  @default(NOT_STARTED)
+  blockerReason    String?             @db.Text
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @default(now()) @updatedAt
+
+  approvalRequests ApprovalRequest[]
 
   @@index([tenantId, taskId])
+  @@index([tenantId, assignedMemberId])
   @@map("task_checklist_items")
 }
 
@@ -707,6 +718,8 @@ model ApprovalRequest {
   targetType                 ApprovalTargetType
   taskId                     String?
   task                       Task?              @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  checklistItemId            String?
+  checklistItem              TaskChecklistItem? @relation(fields: [checklistItemId], references: [id], onDelete: SetNull)
   documentVersionId          String?
   documentVersion            DocumentVersion?   @relation(fields: [documentVersionId], references: [id], onDelete: SetNull)
   requesterId                String

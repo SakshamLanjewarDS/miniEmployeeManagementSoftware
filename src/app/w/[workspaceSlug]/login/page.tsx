@@ -45,8 +45,22 @@ export default function WorkspaceLoginPage() {
       if (!res.ok) {
         setError(data.error || "Authentication failed. Check your Employee ID and password.");
       } else {
+        // Safe deep link check: preserve authorized deep links and reject unsafe redirect destinations
+        const urlParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+        const requestedNext = urlParams?.get("next") || urlParams?.get("redirect");
+        
+        let destination = data.redirectUrl || `/w/${workspaceSlug}/dashboard`;
+        if (
+          requestedNext &&
+          requestedNext.startsWith(`/w/${workspaceSlug}`) &&
+          !requestedNext.startsWith("//") &&
+          !requestedNext.includes("://")
+        ) {
+          destination = requestedNext;
+        }
+
         // Use full navigation to ensure session cookies and tenant context load seamlessly
-        window.location.href = data.redirectUrl || `/w/${workspaceSlug}/tasks`;
+        window.location.href = destination;
       }
     } catch {
       setError("Network or server connection failed. The server may be waking up from cold start; please retry in a few seconds.");

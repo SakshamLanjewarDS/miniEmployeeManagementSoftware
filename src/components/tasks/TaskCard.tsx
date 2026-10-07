@@ -80,7 +80,7 @@ export function TaskCard({
       ? `${rawDescription.slice(0, 140)}...`
       : rawDescription;
 
-  const completedChecklistCount = task.checklistItems.filter((i) => i.isCompleted).length;
+  const completedChecklistCount = task.checklistItems.filter((i: any) => i.isCompleted).length;
   const totalChecklistCount = task.checklistItems.length;
 
   return (
@@ -288,7 +288,7 @@ export function TaskCard({
                     </span>
                   </div>
                   <div className="space-y-1 pl-1">
-                    {task.checklistItems.map((item) => (
+                    {task.checklistItems.map((item: any) => (
                       <button
                         key={item.id}
                         type="button"

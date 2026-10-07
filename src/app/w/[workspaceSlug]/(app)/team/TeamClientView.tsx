@@ -980,7 +980,6 @@ export default function TeamClientView({
                 { value: "ALL", label: "All Roles" },
                 { value: "OWNER", label: "Owner / Partner" },
                 { value: "ADMIN", label: "Administrator" },
-                { value: "PROJECT_MANAGER", label: "Project Manager" },
                 { value: "EMPLOYEE", label: "Employee" },
               ]}
             />
@@ -1440,7 +1439,6 @@ export default function TeamClientView({
                   searchPlaceholder="Search roles..."
                   options={[
                     { value: "EMPLOYEE", label: "Employee", subLabel: "Tasks, Drawings, Visits" },
-                    { value: "PROJECT_MANAGER", label: "Project Manager", subLabel: "Project Leadership" },
                     { value: "ADMIN", label: "Administrator", subLabel: "Operations & Staff" },
                     ...((userRole === "OWNER" || userRole === "ADMIN")
                       ? [{ value: "OWNER", label: "Owner / Boss", subLabel: "Leadership & Governance" }]
@@ -1701,7 +1699,6 @@ export default function TeamClientView({
                   searchPlaceholder="Search role..."
                   options={[
                     { value: "EMPLOYEE", label: "Employee", subLabel: "Core Studio Member" },
-                    { value: "PROJECT_MANAGER", label: "Project Manager", subLabel: "Project Lead" },
                     { value: "ADMIN", label: "Administrator", subLabel: "Operations & Staff" },
                     ...((userRole === "OWNER" || userRole === "ADMIN")
                       ? [{ value: "OWNER", label: "Owner / Boss", subLabel: "Leadership & Governance" }]

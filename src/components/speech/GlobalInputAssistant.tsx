@@ -13,6 +13,7 @@ import {
   Volume2,
   HelpCircle,
   Wand2,
+  RotateCcw,
 } from "lucide-react";
 import { SearchableDropdown } from "@/components/ui/SearchableDropdown";
 import { correctGrammar } from "@/lib/grammar/grammarEngine";
@@ -143,38 +144,76 @@ export function GlobalInputAssistant() {
     };
   }, [activeElement, updatePosition]);
 
+  const [lastUndo, setLastUndo] = useState<{
+    element: HTMLInputElement | HTMLTextAreaElement;
+    previousText: string;
+  } | null>(null);
+
+  // Helper: check if element is an opted-in free-text field
+  const isEligibleElement = useCallback((
+    el: HTMLElement | null
+  ): el is HTMLInputElement | HTMLTextAreaElement => {
+    if (!el) return false;
+    if (el.hasAttribute("readonly") || el.hasAttribute("disabled")) return false;
+
+    // Strict exclusion: dropdown search inputs, comboboxes, option lists, and custom dropdown containers
+    if (
+      el.closest(
+        '[role="combobox"], [role="listbox"], .searchable-dropdown, [data-dropdown], [data-no-assistant="true"]'
+      )
+    ) {
+      return false;
+    }
+
+    // Strict exclusion for structured, numeric, picker, or credential inputs
+    if (el.tagName === "INPUT") {
+      const input = el as HTMLInputElement;
+      const type = (input.type || "text").toLowerCase();
+      const ineligibleTypes = [
+        "password",
+        "email",
+        "number",
+        "date",
+        "time",
+        "datetime-local",
+        "month",
+        "week",
+        "checkbox",
+        "radio",
+        "file",
+        "submit",
+        "button",
+        "reset",
+        "image",
+        "range",
+        "color",
+        "hidden",
+        "tel",
+        "search",
+      ];
+      if (ineligibleTypes.includes(type)) return false;
+      if (
+        input.placeholder?.toLowerCase().includes("search") ||
+        input.name?.toLowerCase().includes("search") ||
+        input.id?.toLowerCase().includes("search")
+      ) {
+        return false;
+      }
+    }
+
+    // Explicit opt-in requirement: approved free-text fields
+    const hasOptIn =
+      el.hasAttribute("data-enable-assistant") ||
+      el.getAttribute("data-enable-assistant") === "true" ||
+      el.getAttribute("data-voice-assistant") === "true" ||
+      el.classList.contains("enable-voice-assistant") ||
+      el.classList.contains("enable-assistant");
+
+    return Boolean(hasOptIn);
+  }, []);
+
   // Global focus listener
   useEffect(() => {
-    const isEligibleElement = (
-      el: HTMLElement | null
-    ): el is HTMLInputElement | HTMLTextAreaElement => {
-      if (!el) return false;
-      if (el.tagName === "TEXTAREA") return !el.hasAttribute("readonly") && !el.hasAttribute("disabled");
-      if (el.tagName === "INPUT") {
-        const input = el as HTMLInputElement;
-        const type = (input.type || "text").toLowerCase();
-        const ineligibleTypes = [
-          "password",
-          "checkbox",
-          "radio",
-          "file",
-          "submit",
-          "button",
-          "reset",
-          "image",
-          "range",
-          "color",
-          "hidden",
-        ];
-        return (
-          !ineligibleTypes.includes(type) &&
-          !input.hasAttribute("readonly") &&
-          !input.hasAttribute("disabled")
-        );
-      }
-      return false;
-    };
-
     const handleFocusIn = (e: FocusEvent) => {
       const target = e.target as HTMLElement;
       if (isEligibleElement(target)) {
@@ -185,6 +224,13 @@ export function GlobalInputAssistant() {
         setActiveElement(target);
         activeElementRef.current = target;
         setTimeout(updatePosition, 10);
+      } else {
+        // Not eligible: ensure toolbar is hidden immediately
+        if (!shouldListenRef.current) {
+          setActiveElement(null);
+          setToolbarPos(null);
+          setShowSettings(false);
+        }
       }
     };
 
@@ -207,7 +253,7 @@ export function GlobalInputAssistant() {
       document.removeEventListener("focusout", handleFocusOut);
       if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
     };
-  }, [updatePosition]);
+  }, [isEligibleElement, updatePosition]);
 
   // Show temporary feedback toast
   const showFeedback = (msg: string) => {
@@ -220,7 +266,7 @@ export function GlobalInputAssistant() {
   // Perform Grammar Correction on current field
   const handleAutoCorrect = useCallback(() => {
     const el = activeElementRef.current;
-    if (!el) return;
+    if (!el || !isEligibleElement(el)) return;
 
     const currentVal = el.value || "";
     if (!currentVal.trim()) {
@@ -230,13 +276,25 @@ export function GlobalInputAssistant() {
 
     const { correctedText, changesCount } = correctGrammar(currentVal);
 
-    if (changesCount > 0) {
+    if (changesCount > 0 && correctedText !== currentVal) {
+      setLastUndo({
+        element: el,
+        previousText: currentVal,
+      });
       updateNativeInputValue(el, correctedText);
       showFeedback(`Corrected ${changesCount} issue${changesCount > 1 ? "s" : ""} ✨`);
     } else {
       showFeedback("Grammar & spelling look great! 👍");
     }
-  }, []);
+  }, [isEligibleElement]);
+
+  // Revert last grammar correction (Undo)
+  const handleUndoGrammar = useCallback(() => {
+    if (!lastUndo) return;
+    updateNativeInputValue(lastUndo.element, lastUndo.previousText);
+    setLastUndo(null);
+    showFeedback("Reverted grammar changes ↩️");
+  }, [lastUndo]);
 
   // Stop speech recognition
   const stopListening = useCallback(() => {
@@ -367,15 +425,15 @@ export function GlobalInputAssistant() {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Check if user pressed Ctrl+Shift+V or Cmd+Shift+V
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "v") {
-        e.preventDefault();
-        if (activeElementRef.current) {
+        if (activeElementRef.current && isEligibleElement(activeElementRef.current)) {
+          e.preventDefault();
           toggleListening();
         }
       }
       // Check if user pressed Ctrl+Shift+G or Cmd+Shift+G
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "g") {
-        e.preventDefault();
-        if (activeElementRef.current) {
+        if (activeElementRef.current && isEligibleElement(activeElementRef.current)) {
+          e.preventDefault();
           handleAutoCorrect();
         }
       }
@@ -383,7 +441,7 @@ export function GlobalInputAssistant() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleAutoCorrect]);
+  }, [handleAutoCorrect, isEligibleElement]);
 
   // Clean up recognition
   useEffect(() => {
@@ -452,6 +510,19 @@ export function GlobalInputAssistant() {
             <Sparkles className="w-3.5 h-3.5 text-[#5A81FA]" />
             <span className="text-[11px] hidden sm:inline">Fix Grammar</span>
           </button>
+
+          {/* Undo Grammar Correction Button */}
+          {lastUndo && (
+            <button
+              type="button"
+              onClick={handleUndoGrammar}
+              title="Undo last grammar correction"
+              className="p-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-lg flex items-center gap-1 text-xs font-semibold cursor-pointer transition-colors border border-amber-200"
+            >
+              <RotateCcw className="w-3.5 h-3.5 text-amber-700" />
+              <span className="text-[11px] hidden sm:inline">Undo</span>
+            </button>
+          )}
 
           {/* Settings / Language Toggle */}
           <button

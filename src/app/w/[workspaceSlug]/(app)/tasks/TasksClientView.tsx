@@ -44,6 +44,7 @@ import { DynamicCardFields } from "@/components/custom-fields/DynamicCardFields"
 import { SearchableDropdown, SearchableSelect } from "@/components/ui/SearchableDropdown";
 import { TaskGrid } from "@/components/tasks/TaskGrid";
 import { sanitizeTaskDescription } from "@/components/tasks/task-utils";
+import { CustomFieldDefinition } from "@/server/modules/custom-fields/repository";
 import {
   getAllTypologies,
   ProjectProfileCircle,
@@ -275,26 +276,96 @@ export default function TasksClientView({
   // Create Task Modal state
   const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false);
   const [creatingTask, setCreatingTask] = useState(false);
-  const [taskTypology, setTaskTypology] = useState<string>("");
-  const [otherTypology, setOtherTypology] = useState<string>("");
   const [selectedProjectId, setSelectedProjectId] = useState<string>(projects[0]?.id || "");
-  const [otherProjectName, setOtherProjectName] = useState<string>("");
   const [selectedPhaseId, setSelectedPhaseId] = useState<string>("");
-  const [otherPhaseName, setOtherPhaseName] = useState<string>("");
-  const [taskTitle, setTaskTitle] = useState("");
   const [taskDescription, setTaskDescription] = useState("");
   const [taskAssigneeIds, setTaskAssigneeIds] = useState<string[]>(
     userRole === "OWNER" || userRole === "ADMIN" ? [] : [currentMembershipId]
   );
-  const [taskAssigneeId, setTaskAssigneeId] = useState<string>(
-    userRole === "OWNER" || userRole === "ADMIN" ? "" : currentMembershipId
-  );
-  const [otherAssigneeName, setOtherAssigneeName] = useState<string>("");
   const [taskPriority, setTaskPriority] = useState<string>("MEDIUM");
-  const [otherPriorityName, setOtherPriorityName] = useState<string>("");
-  const [taskDueDate, setTaskDueDate] = useState("");
   const [taskEstimatedHours, setTaskEstimatedHours] = useState("");
-  const [checklistItems, setChecklistItems] = useState<string[]>([""]);
+  
+  // Independent Employee Checklist Sections State
+  const [employeeChecklists, setEmployeeChecklists] = useState<Record<string, Array<{
+    id: string;
+    title: string;
+    priority: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+    dueDate: string;
+  }>>>({});
+  const [expandedEmployeeSections, setExpandedEmployeeSections] = useState<Record<string, boolean>>({});
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [pendingMemberRemoval, setPendingMemberRemoval] = useState<{ memberId: string; memberName: string } | null>(null);
+
+  // Initialize/sync employee checklist state when taskAssigneeIds change
+  const handleAssigneesChange = (newAssigneeIds: string[]) => {
+    // Check if any existing member was removed and has checklist content
+    const removedMemberId = taskAssigneeIds.find((id) => !newAssigneeIds.includes(id));
+    if (removedMemberId) {
+      const existingItems = employeeChecklists[removedMemberId] || [];
+      const hasContent = existingItems.some((item) => item.title.trim().length > 0);
+      if (hasContent) {
+        const memberObj = members.find((m) => m.id === removedMemberId);
+        setPendingMemberRemoval({
+          memberId: removedMemberId,
+          memberName: memberObj?.user.fullName || "this team member",
+        });
+        return; // Pause removal until confirmed
+      }
+    }
+
+    // Update assignees
+    setTaskAssigneeIds(newAssigneeIds);
+    setFormErrors((prev) => {
+      const copy = { ...prev };
+      delete copy.assignees;
+      return copy;
+    });
+
+    // Ensure new members have at least one checklist item
+    setEmployeeChecklists((prev) => {
+      const updated = { ...prev };
+      newAssigneeIds.forEach((id) => {
+        if (!updated[id] || updated[id].length === 0) {
+          updated[id] = [
+            {
+              id: `chk-${id}-${Date.now()}`,
+              title: "",
+              priority: (taskPriority as any) || "MEDIUM",
+              dueDate: "",
+            },
+          ];
+        }
+      });
+      return updated;
+    });
+
+    // Expand new sections
+    setExpandedEmployeeSections((prev) => {
+      const updated = { ...prev };
+      newAssigneeIds.forEach((id) => {
+        if (updated[id] === undefined) {
+          updated[id] = true;
+        }
+      });
+      return updated;
+    });
+  };
+
+  const confirmDiscardMember = () => {
+    if (!pendingMemberRemoval) return;
+    const { memberId } = pendingMemberRemoval;
+    setTaskAssigneeIds((prev) => prev.filter((id) => id !== memberId));
+    setEmployeeChecklists((prev) => {
+      const copy = { ...prev };
+      delete copy[memberId];
+      return copy;
+    });
+    setPendingMemberRemoval(null);
+  };
+
+  const cancelDiscardMember = () => {
+    setPendingMemberRemoval(null);
+  };
 
   // Drag and Drop State
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
@@ -556,33 +627,9 @@ export default function TasksClientView({
     return getAllTypologies(projects);
   }, [projects]);
 
-  // Filter projects for task assign modal by selected architectural typology
-  const effectiveTypology = useMemo(() => {
-    return taskTypology === "OTHER" ? otherTypology.trim() : taskTypology.trim();
-  }, [taskTypology, otherTypology]);
-
-  const filteredProjectsForAssign = useMemo(() => {
-    if (!effectiveTypology) return projects;
-    return projects.filter((p) => isTypologyMatch(p.projectType, effectiveTypology));
-  }, [projects, effectiveTypology]);
-
   // Find phases for currently selected project in task creation modal
   const currentProject = projects.find((p) => p.id === selectedProjectId);
   const availablePhases = currentProject?.phases || [];
-
-  const handleAddChecklistField = () => {
-    setChecklistItems([...checklistItems, ""]);
-  };
-
-  const handleUpdateChecklistItem = (index: number, val: string) => {
-    const updated = [...checklistItems];
-    updated[index] = val;
-    setChecklistItems(updated);
-  };
-
-  const handleRemoveChecklistItem = (index: number) => {
-    setChecklistItems(checklistItems.filter((_, i) => i !== index));
-  };
 
   // Edit Modal Typology, Project, and Phase helpers
   const effectiveEditTypology = useMemo(() => {
@@ -618,175 +665,212 @@ export default function TasksClientView({
     }));
   };
 
-  // Create Task - Instant Optimistic UI Update (< 5ms response)
+  const handleAddEmployeeTask = (memberId: string) => {
+    setEmployeeChecklists((prev) => ({
+      ...prev,
+      [memberId]: [
+        ...(prev[memberId] || []),
+        {
+          id: `chk-${memberId}-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          title: "",
+          priority: (taskPriority as any) || "MEDIUM",
+          dueDate: "",
+        },
+      ],
+    }));
+  };
+
+  const handleUpdateEmployeeTask = (
+    memberId: string,
+    rowId: string,
+    updates: Partial<{ title: string; priority: "LOW" | "MEDIUM" | "HIGH" | "URGENT"; dueDate: string }>
+  ) => {
+    setEmployeeChecklists((prev) => ({
+      ...prev,
+      [memberId]: (prev[memberId] || []).map((row) =>
+        row.id === rowId ? { ...row, ...updates } : row
+      ),
+    }));
+    // Clear specific field errors
+    setFormErrors((prev) => {
+      const copy = { ...prev };
+      if (updates.title !== undefined) delete copy[`chk-text-${rowId}`];
+      if (updates.dueDate !== undefined) delete copy[`chk-date-${rowId}`];
+      return copy;
+    });
+  };
+
+  const handleRemoveEmployeeTask = (memberId: string, rowId: string) => {
+    setEmployeeChecklists((prev) => ({
+      ...prev,
+      [memberId]: (prev[memberId] || []).filter((row) => row.id !== rowId),
+    }));
+  };
+
+  // Create Deliverable - Validated against Studio Business & Security Rules
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
+    const errors: Record<string, string> = {};
+
+    // 1. Project Validation
     if (!selectedProjectId) {
-      setErrorMessage("Please select a project or specify a custom project.");
-      return;
+      errors.project = "Please select an active architectural project.";
     }
-    if (selectedProjectId === "OTHER" && !otherProjectName.trim()) {
-      setErrorMessage("Please enter a custom project name.");
-      return;
+
+    const targetProj = projects.find((p) => p.id === selectedProjectId);
+    if (targetProj && (!targetProj.projectType || !targetProj.projectType.trim())) {
+      errors.project = `Project "${targetProj.name}" has no architectural topology configured. Set a typology in Projects first.`;
     }
-    if (!taskTitle.trim()) {
-      setErrorMessage("Please enter a deliverable title.");
+
+    // 2. Architectural Brief & Instructions
+    if (!taskDescription.trim()) {
+      errors.description = "Architectural Brief & Instructions are required.";
+    } else if (taskDescription.trim().length < 5) {
+      errors.description = "Brief must be at least 5 characters long.";
+    }
+
+    // 3. Assignees Validation
+    if (taskAssigneeIds.length === 0) {
+      errors.assignees = "At least one eligible employee must be assigned.";
+    }
+
+    // 4. Employee Checklist Validation (Every employee must have >= 1 task with text & due date)
+    let firstErrorElementId: string | null = null;
+    taskAssigneeIds.forEach((empId) => {
+      const rows = employeeChecklists[empId] || [];
+      if (rows.length === 0) {
+        errors[`emp-${empId}`] = "At least one checklist task is required for this employee.";
+        setExpandedEmployeeSections((prev) => ({ ...prev, [empId]: true }));
+        if (!firstErrorElementId) firstErrorElementId = `emp-section-${empId}`;
+      } else {
+        rows.forEach((row) => {
+          if (!row.title.trim()) {
+            errors[`chk-text-${row.id}`] = "Task description is required.";
+            setExpandedEmployeeSections((prev) => ({ ...prev, [empId]: true }));
+            if (!firstErrorElementId) firstErrorElementId = `chk-text-${row.id}`;
+          }
+          if (!row.dueDate) {
+            errors[`chk-date-${row.id}`] = "Due date is required.";
+            setExpandedEmployeeSections((prev) => ({ ...prev, [empId]: true }));
+            if (!firstErrorElementId) firstErrorElementId = `chk-date-${row.id}`;
+          }
+        });
+      }
+    });
+
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      setErrorMessage("Please complete all required fields and checklist tasks.");
+      if (firstErrorElementId) {
+        const el = document.getElementById(firstErrorElementId);
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+          el.focus();
+        }
+      }
       return;
     }
 
+    setFormErrors({});
     setErrorMessage(null);
+    setCreatingTask(true);
 
-    const effectiveTypology = taskTypology === "OTHER" ? (otherTypology.trim() || "Other") : taskTypology.trim();
-    const effectiveProjectName = selectedProjectId === "OTHER" ? (otherProjectName.trim() || "Ad-Hoc Project") : null;
-    const effectivePhaseName = selectedPhaseId === "OTHER" ? (otherPhaseName.trim() || "Custom Phase") : null;
-    const effectiveAssigneeName = taskAssigneeId === "OTHER" ? (otherAssigneeName.trim() || "External Specialist") : null;
-    const effectivePriority = taskPriority === "OTHER" ? "HIGH" : (taskPriority as "LOW" | "MEDIUM" | "HIGH" | "URGENT");
+    // Derive parent due date from latest checklist item deadline
+    let latestChecklistDate: Date | null = null;
+    const flatChecklistItems = taskAssigneeIds.flatMap((empId) =>
+      (employeeChecklists[empId] || []).map((row, idx) => {
+        if (row.dueDate) {
+          const d = new Date(row.dueDate);
+          if (!isNaN(d.getTime())) {
+            if (!latestChecklistDate || d > latestChecklistDate) {
+              latestChecklistDate = d;
+            }
+          }
+        }
+        return {
+          title: row.title.trim(),
+          assignedMemberId: empId,
+          priority: row.priority || taskPriority || "MEDIUM",
+          dueDate: row.dueDate ? new Date(row.dueDate).toISOString() : null,
+          sortOrder: idx + 1,
+        };
+      })
+    );
 
-    // Project ID for DB foreign key
-    const actualProjectId = selectedProjectId === "OTHER" ? (projects[0]?.id || "") : selectedProjectId;
-
-    // Build title and description with any custom metadata
-    let fullTitle = taskTitle.trim();
-    if (effectiveProjectName) {
-      fullTitle = `[${effectiveProjectName}] ${fullTitle}`;
-    }
-
-    const fullDescription = taskDescription.trim();
-
-    const payloadCustomValues: Record<string, any> = {
-      ...customFieldValues,
-      ...(effectiveTypology ? { typology: effectiveTypology } : {}),
-      ...(effectiveProjectName ? { customProject: effectiveProjectName } : {}),
-      ...(effectivePhaseName ? { customPhase: effectivePhaseName } : {}),
-      ...(effectiveAssigneeName ? { externalAssignee: effectiveAssigneeName } : {}),
-      ...(taskPriority === "OTHER" ? { customPriority: otherPriorityName.trim() || "Custom Priority" } : {}),
-    };
-
-    const assignedNames = taskAssigneeIds.length > 0
-      ? members.filter((m) => taskAssigneeIds.includes(m.id)).map((m) => m.user.fullName).join(", ")
-      : (effectiveAssigneeName || "colleague");
-
-    const tempId = `optimistic-${Date.now()}`;
-    const targetProj = projects.find((p) => p.id === actualProjectId);
+    const derivedDueDateIso = latestChecklistDate ? (latestChecklistDate as Date).toISOString() : null;
     const targetPhase = projects.flatMap((p) => p.phases).find((ph) => ph.id === selectedPhaseId);
-    const primaryAssigneeId = taskAssigneeIds[0] || (taskAssigneeId === "OTHER" ? undefined : (taskAssigneeId || undefined));
+    const primaryAssigneeId = taskAssigneeIds[0];
     const targetAssignee = members.find((m) => m.id === primaryAssigneeId);
 
-    const optimisticTask: TaskItem = {
-      id: tempId,
-      title: fullTitle,
-      description: fullDescription || null,
-      priority: effectivePriority,
-      status: "TODO",
-      dueDate: taskDueDate ? new Date(taskDueDate).toISOString() : null,
-      estimatedHours: taskEstimatedHours ? Number(taskEstimatedHours) : null,
-      projectId: actualProjectId,
-      project: targetProj
-        ? { id: targetProj.id, code: targetProj.code, name: targetProj.name, projectType: targetProj.projectType ?? null }
-        : { id: actualProjectId, code: "PROJ", name: "Project", projectType: null },
-      phaseId: selectedPhaseId === "OTHER" ? null : (selectedPhaseId || null),
-      phase: targetPhase ? { id: targetPhase.id, phaseName: targetPhase.phaseName } : null,
-      assigneeId: primaryAssigneeId || null,
-      assignedMemberIds: taskAssigneeIds.length > 0 ? taskAssigneeIds : (primaryAssigneeId ? [primaryAssigneeId] : []),
-      assignee: targetAssignee
-        ? { id: targetAssignee.id, user: targetAssignee.user, employee: targetAssignee.employee }
-        : null,
-      creatorId: currentMembershipId,
-      creator: {
-        id: currentMembershipId,
-        user: { fullName: contextUserFullName || "You" },
-      },
-      checklistItems: checklistItems
-        .filter((item) => item.trim().length > 0)
-        .map((item, idx) => ({ id: `temp-chk-${idx}`, title: item.trim(), isCompleted: false })),
-      comments: [],
-      activityHistory: [],
-      createdAt: new Date().toISOString(),
-      customFields: payloadCustomValues,
-    };
+    const generatedTitle = targetProj
+      ? `${targetProj.code} — Deliverable`
+      : "Architectural Deliverable";
 
-    // 1. INSTANT MILLISECOND UI UPDATE (Reflects on screen in < 5ms)
-    setTasks((prev) => [optimisticTask, ...prev]);
-    if (Object.keys(payloadCustomValues).length > 0) {
-      setCustomValuesByTask((prev) => ({
-        ...prev,
-        [tempId]: payloadCustomValues,
-      }));
-    }
-    setSuccessMessage(`Deliverable "${taskTitle}" assigned successfully to ${assignedNames}!`);
-    setIsCreateTaskModalOpen(false);
+    const assignedNames = members
+      .filter((m) => taskAssigneeIds.includes(m.id))
+      .map((m) => m.user.fullName)
+      .join(", ");
 
-    // Reset form immediately
-    setTaskTypology("");
-    setOtherTypology("");
-    setOtherProjectName("");
-    setOtherPhaseName("");
-    setOtherAssigneeName("");
-    setOtherPriorityName("");
-    setTaskAssigneeIds(userRole === "OWNER" || userRole === "ADMIN" ? [] : [currentMembershipId]);
-    setTaskTitle("");
-    setTaskDescription("");
-    setTaskDueDate("");
-    setTaskEstimatedHours("");
-    setChecklistItems([""]);
-    setCustomFieldValues({});
+    try {
+      const res = await fetch(`/api/tasks/create?workspaceSlug=${workspaceSlug}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId: selectedProjectId,
+          phaseId: selectedPhaseId || undefined,
+          description: taskDescription.trim(),
+          priority: taskPriority,
+          assigneeIds: taskAssigneeIds,
+          checklistItems: flatChecklistItems,
+          estimatedHours: taskEstimatedHours ? Number(taskEstimatedHours) : undefined,
+        }),
+      });
 
-    // 2. BACKGROUND SERVER SYNC
-    (async () => {
-      try {
-        const res = await fetch(`/api/tasks/create?workspaceSlug=${workspaceSlug}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            projectId: actualProjectId,
-            phaseId: selectedPhaseId === "OTHER" ? undefined : (selectedPhaseId || undefined),
-            title: fullTitle,
-            description: fullDescription || undefined,
-            assigneeId: primaryAssigneeId,
-            assigneeIds: taskAssigneeIds.length > 0 ? taskAssigneeIds : undefined,
-            priority: effectivePriority,
-            dueDate: taskDueDate || undefined,
-            estimatedHours: taskEstimatedHours ? Number(taskEstimatedHours) : undefined,
-            checklist: checklistItems.filter((item) => item.trim().length > 0),
-          }),
-        });
-
-        const data = await res.json();
-        if (!res.ok || !data.task?.id) {
-          // Rollback on server error
-          setTasks((prev) => prev.filter((t) => t.id !== tempId));
-          setErrorMessage(data.error || "Failed to create task on server");
-          return;
-        }
-
-        const serverTaskId = data.task.id;
-        // Seamlessly swap temporary optimistic ID with real database ID
-        setTasks((prev) =>
-          prev.map((t) => (t.id === tempId ? { ...t, id: serverTaskId } : t))
-        );
-
-        if (Object.keys(payloadCustomValues).length > 0) {
-          setCustomValuesByTask((prev) => {
-            const copy = { ...prev, [serverTaskId]: payloadCustomValues };
-            delete copy[tempId];
-            return copy;
-          });
-
-          await fetch(`/api/custom-fields/values?workspaceSlug=${workspaceSlug}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              entity: "TASK",
-              recordId: serverTaskId,
-              values: payloadCustomValues,
-            }),
-          });
-        }
-      } catch (err: any) {
-        setTasks((prev) => prev.filter((t) => t.id !== tempId));
-        setErrorMessage("Network error while creating task. Reverted.");
+      const data = await res.json();
+      if (!res.ok || !data.task?.id) {
+        setErrorMessage(data.error || "Failed to create deliverable");
+        setCreatingTask(false);
+        return;
       }
-    })();
+
+      // Add real task returned by server
+      const createdTask: TaskItem = {
+        ...data.task,
+        project: targetProj
+          ? { id: targetProj.id, code: targetProj.code, name: targetProj.name, projectType: targetProj.projectType ?? null }
+          : { id: selectedProjectId, code: "PROJ", name: "Project", projectType: null },
+        phase: targetPhase ? { id: targetPhase.id, phaseName: targetPhase.phaseName } : null,
+        assignee: targetAssignee
+          ? { id: targetAssignee.id, user: targetAssignee.user, employee: targetAssignee.employee }
+          : null,
+        creator: {
+          id: currentMembershipId,
+          user: { fullName: contextUserFullName || "You" },
+        },
+        checklistItems: flatChecklistItems.map((item, idx) => ({
+          id: `chk-created-${idx}`,
+          title: item.title,
+          isCompleted: false,
+        })),
+        comments: [],
+        activityHistory: [],
+      };
+
+      setTasks((prev) => [createdTask, ...prev]);
+      setSuccessMessage(`Deliverable "${createdTask.title}" assigned successfully to ${assignedNames}!`);
+      setIsCreateTaskModalOpen(false);
+
+      // Reset form
+      setTaskDescription("");
+      setTaskEstimatedHours("");
+      setTaskAssigneeIds(userRole === "OWNER" || userRole === "ADMIN" ? [] : [currentMembershipId]);
+      setEmployeeChecklists({});
+      setFormErrors({});
+    } catch (err: any) {
+      setErrorMessage("Network error while creating deliverable. Please try again.");
+    } finally {
+      setCreatingTask(false);
+    }
   };
 
   // Workflow Status Transition - Instant Optimistic UI Update (< 5ms response)
@@ -3229,133 +3313,103 @@ export default function TasksClientView({
       )}
 
       {/* ==================================================== */}
-      {/* 9. CREATE & ASSIGN DELIVERABLE MODAL                 */}
+      {/* 9. ASSIGN ARCHITECTURAL DELIVERABLE MODAL            */}
       {/* ==================================================== */}
       {isCreateTaskModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white border border-[#E2E6F0] rounded-2xl max-w-xl w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white border border-[#E2E6F0] rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto">
+            {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-[#E2E6F0] pb-3">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-[#5A81FA] text-white flex items-center justify-center">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-[#5A81FA] text-white flex items-center justify-center shadow-xs">
                   <UserPlus className="w-4 h-4" />
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-[#1F1F1F]">Assign Architectural Deliverable</h3>
-                  <p className="text-xs text-[#696E82]">Assign deliverable to a partner, PM, or employee</p>
+                  <p className="text-xs text-[#696E82]">Configure deliverable requirements and assign individual checklists to team members</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setIsCreateTaskModalOpen(false)}
-                className="text-[#696E82] hover:text-[#1F1F1F] p-1 rounded-lg hover:bg-[#F2F4FF] cursor-pointer"
+                className="text-[#696E82] hover:text-[#1F1F1F] p-1.5 rounded-lg hover:bg-[#F2F4FF] cursor-pointer transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
+            {/* Error Message Banner */}
+            {errorMessage && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                <span className="flex-1 font-medium">{errorMessage}</span>
+              </div>
+            )}
+
             <form onSubmit={handleCreateTask} className="space-y-4 text-xs">
-              {/* 1. ARCHITECTURAL TYPOLOGY (AT VERY FIRST!) */}
-              <div className="bg-[#FAFBFD] p-3 rounded-xl border border-[#E2E6F0] space-y-1">
-                <SearchableSelect
-                  id="task-typology"
-                  label="Architectural Typology"
-                  required={false}
-                  placeholder="Select typology (e.g. Commercial, Hospital, Residential)..."
-                  searchPlaceholder="Search typology (e.g. Commercial, Hospital, Villa)..."
-                  options={[
-                    { value: "", label: "All Typologies (Show all projects)" },
-                    ...dynamicTypologies.map((typ) => ({
-                      value: typ,
-                      label: typ,
-                      icon: <TypologyDot typology={typ} />,
-                    })),
-                  ]}
-                  value={taskTypology}
-                  onChange={(val) => {
-                    setTaskTypology(val);
-                    const eff = val === "OTHER" ? otherTypology.trim() : val.trim();
-                    if (eff) {
-                      const match = projects.filter((p) => isTypologyMatch(p.projectType, eff));
-                      if (match.length > 0) {
-                        if (!match.some((p) => p.id === selectedProjectId)) {
-                          setSelectedProjectId(match[0].id);
-                          setSelectedPhaseId("");
-                        }
-                      } else {
-                        setSelectedProjectId("");
-                        setSelectedPhaseId("");
-                      }
+              {/* 1. SELECT PROJECT & READ-ONLY TOPOLOGY */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-start">
+                <div className="md:col-span-2">
+                  <SearchableSelect
+                    id="select-project"
+                    label="Select Project"
+                    required={true}
+                    placeholder="Select project..."
+                    searchPlaceholder="Search projects by code or name..."
+                    options={projects.map((p) => ({
+                      value: p.id,
+                      label: `${p.code} — ${p.name}`,
+                      subLabel: p.projectType || undefined,
+                      badge: p.code,
+                      icon: <ProjectProfileCircle typology={p.projectType} name={p.name} size="xs" />,
+                    }))}
+                    value={selectedProjectId}
+                    onChange={(val) => {
+                      setSelectedProjectId(val);
+                      setSelectedPhaseId("");
+                      setFormErrors((prev) => {
+                        const copy = { ...prev };
+                        delete copy.project;
+                        return copy;
+                      });
+                    }}
+                    allowOther={false}
+                    error={formErrors.project}
+                  />
+                </div>
+
+                {/* Read-Only Topology Display: Desktop on right, Mobile below */}
+                <div className="md:col-span-1">
+                  <label className="block font-semibold text-[#1F1F1F] mb-1">
+                    Project Topology <span className="text-[10px] text-[#696E82] font-normal">(Read-only)</span>
+                  </label>
+                  {(() => {
+                    const selProj = projects.find((p) => p.id === selectedProjectId);
+                    if (selProj?.projectType) {
+                      return (
+                        <div className="p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl flex items-center gap-2">
+                          <TypologyDot typology={selProj.projectType} />
+                          <span className="font-semibold text-xs text-[#1F1F1F] truncate">{selProj.projectType}</span>
+                        </div>
+                      );
                     }
-                  }}
-                  allowOther={true}
-                  otherOptionLabel="+ Other Architectural Typology..."
-                  otherValue={otherTypology}
-                  onOtherValueChange={(val) => {
-                    setOtherTypology(val);
-                    const eff = val.trim();
-                    if (eff) {
-                      const match = projects.filter((p) => isTypologyMatch(p.projectType, eff));
-                      if (match.length > 0) {
-                        if (!match.some((p) => p.id === selectedProjectId)) {
-                          setSelectedProjectId(match[0].id);
-                          setSelectedPhaseId("");
-                        }
-                      }
-                    }
-                  }}
-                  otherInputPlaceholder="Specify custom typology (e.g. Airport, Cultural Pavilion, Data Center)..."
-                  helperText={
-                    effectiveTypology
-                      ? `Showing only ${effectiveTypology} projects below (${filteredProjectsForAssign.length} found).`
-                      : "Classifies deliverable requirements and filters projects by architectural typology."
-                  }
-                />
+                    return (
+                      <div className="p-2.5 bg-[#FFFBEB] border border-[#FDE68A] rounded-xl flex items-center gap-1.5 text-amber-800">
+                        <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                        <span className="text-[11px] font-medium truncate">No topology configured</span>
+                      </div>
+                    );
+                  })()}
+                </div>
               </div>
 
-              {/* 2. PROJECT & PHASE SELECTOR */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <SearchableSelect
-                  id="select-project"
-                  label="Select Project"
-                  required={true}
-                  placeholder={
-                    filteredProjectsForAssign.length > 0
-                      ? "Select project..."
-                      : effectiveTypology
-                      ? `No ${effectiveTypology} projects found`
-                      : "Select project..."
-                  }
-                  searchPlaceholder="Search projects by code, title, or typology..."
-                  options={filteredProjectsForAssign.map((p) => ({
-                    value: p.id,
-                    label: `${p.code} — ${p.name}`,
-                    subLabel: p.projectType || undefined,
-                    badge: p.code,
-                    icon: <ProjectProfileCircle typology={p.projectType} name={p.name} size="xs" />,
-                  }))}
-                  value={selectedProjectId}
-                  onChange={(val) => {
-                    setSelectedProjectId(val);
-                    setSelectedPhaseId("");
-                    if (val && val !== "OTHER") {
-                      const found = projects.find((p) => p.id === val);
-                      if (found?.projectType && !taskTypology) {
-                        setTaskTypology(found.projectType);
-                      }
-                    }
-                  }}
-                  allowOther={true}
-                  otherOptionLabel="+ Other / Custom Project Reference..."
-                  otherValue={otherProjectName}
-                  onOtherValueChange={setOtherProjectName}
-                  otherInputPlaceholder="Specify custom project code or client reference..."
-                />
-
+              {/* 2. ARCHITECTURAL PHASE */}
+              <div>
                 <SearchableSelect
                   id="select-phase"
                   label="Architectural Phase"
                   required={false}
-                  placeholder="Select phase..."
+                  placeholder="Select phase (optional)..."
                   searchPlaceholder="Search phases..."
                   options={[
                     { value: "", label: "General Project Deliverable", subLabel: "Not phase-specific" },
@@ -3366,52 +3420,92 @@ export default function TasksClientView({
                   ]}
                   value={selectedPhaseId}
                   onChange={setSelectedPhaseId}
-                  allowOther={true}
-                  otherOptionLabel="+ Other / Custom Phase..."
-                  otherValue={otherPhaseName}
-                  onOtherValueChange={setOtherPhaseName}
-                  otherInputPlaceholder="Specify custom phase (e.g. Façade Mockup, Commissioning)..."
+                  allowOther={false}
                 />
               </div>
 
-              {/* 3. TASK TITLE */}
+              {/* 3. ARCHITECTURAL BRIEF & INSTRUCTIONS (VOICE/GRAMMAR ASSISTANT OPTED-IN) */}
+              <div id="field-brief">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="font-semibold text-[#1F1F1F]">
+                    Architectural Brief & Instructions <span className="text-red-600">*</span>
+                  </label>
+                  <span className="text-[10px] text-[#696E82]">
+                    Speech & Grammar Assistant enabled
+                  </span>
+                </div>
+                <textarea
+                  id="task-description-input"
+                  rows={3}
+                  required
+                  data-enable-assistant="true"
+                  value={taskDescription}
+                  onChange={(e) => {
+                    setTaskDescription(e.target.value);
+                    if (formErrors.description) {
+                      setFormErrors((prev) => {
+                        const copy = { ...prev };
+                        delete copy.description;
+                        return copy;
+                      });
+                    }
+                  }}
+                  placeholder="Specify drafting requirements, sheet numbers, MEP coordination instructions, material specs, or review gates..."
+                  className={`w-full p-2.5 bg-[#F8F9FD] border rounded-xl text-[#1F1F1F] focus:outline-none focus:ring-2 focus:ring-[#5A81FA] transition-all ${
+                    formErrors.description ? "border-red-400 bg-red-50/30" : "border-[#E2E6F0]"
+                  }`}
+                />
+                {formErrors.description && (
+                  <p className="text-[11px] text-red-600 font-medium mt-1">{formErrors.description}</p>
+                )}
+              </div>
+
+              {/* 4. OVERALL PRIORITY */}
               <div>
                 <label className="block font-semibold text-[#1F1F1F] mb-1">
-                  Deliverable Title <span className="text-red-600">*</span>
+                  Overall Deliverable Priority <span className="text-red-600">*</span>
                 </label>
-                <input
-                  type="text"
-                  required
-                  value={taskTitle}
-                  onChange={(e) => setTaskTitle(e.target.value)}
-                  placeholder="e.g. Prepare 1:20 Pergola Joinery Detail & Column Junctions"
-                  className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
-                />
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {[
+                    { val: "LOW", label: "Low", color: "bg-emerald-50 text-emerald-800 border-emerald-300", desc: "Calm / Routine" },
+                    { val: "MEDIUM", label: "Medium", color: "bg-amber-50 text-amber-800 border-amber-300", desc: "Standard gate" },
+                    { val: "HIGH", label: "High", color: "bg-orange-50 text-orange-800 border-orange-300", desc: "Milestone gate" },
+                    { val: "URGENT", label: "Urgent", color: "bg-rose-50 text-rose-800 border-rose-300", desc: "Critical path" },
+                  ].map((p) => {
+                    const isSelected = taskPriority === p.val;
+                    return (
+                      <button
+                        key={p.val}
+                        type="button"
+                        onClick={() => setTaskPriority(p.val)}
+                        className={`p-2 rounded-xl border text-left cursor-pointer transition-all ${
+                          isSelected
+                            ? `${p.color} ring-2 ring-offset-1 ring-[#5A81FA] font-bold shadow-xs`
+                            : "bg-[#F8F9FD] border-[#E2E6F0] text-[#696E82] hover:bg-white"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs">{p.label}</span>
+                          {isSelected && <CheckCircle2 className="w-3.5 h-3.5" />}
+                        </div>
+                        <span className="text-[10px] block opacity-80 mt-0.5">{p.desc}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
-              {/* 4. DESCRIPTION */}
-              <div>
-                <label className="block font-semibold text-[#1F1F1F] mb-1">Architectural Brief & Instructions</label>
-                <textarea
-                  rows={2}
-                  value={taskDescription}
-                  onChange={(e) => setTaskDescription(e.target.value)}
-                  placeholder="Specify material specifications, MEP coordination notes, or CAD layering rules..."
-                  className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
-                />
-              </div>
-
-              {/* 5. ASSIGNEE & PRIORITY */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* 5. ELIGIBLE ASSIGNEES MULTISELECT */}
+              <div id="field-assignees">
                 <SearchableSelect
                   id="task-assignee"
-                  label="Assignee(s)"
+                  label="Select Eligible Assignee(s)"
                   required={true}
-                  placeholder="Select team member(s)..."
+                  placeholder="Select one or more team members..."
                   searchPlaceholder="Search team by name, ID or role..."
                   multiSelect={true}
                   values={taskAssigneeIds}
-                  onMultiChange={setTaskAssigneeIds}
+                  onMultiChange={handleAssigneesChange}
                   options={members.map((m) => {
                     const designation = m.employee?.designation ? `${m.employee.designation} (${m.role})` : m.role;
                     return {
@@ -3421,96 +3515,215 @@ export default function TasksClientView({
                       badge: m.employee?.employeeId || undefined,
                     };
                   })}
-                  allowOther={true}
-                  otherOptionLabel="+ Other / External Specialist or Freelancer..."
-                  otherValue={otherAssigneeName}
-                  onOtherValueChange={setOtherAssigneeName}
-                  otherInputPlaceholder="Specify external specialist or consultant name..."
-                  helperText="Select one or more employees to assign."
-                />
-
-                <SearchableSelect
-                  id="task-priority"
-                  label="Priority"
-                  required={false}
-                  placeholder="Select priority..."
-                  searchPlaceholder="Search priority level..."
-                  options={[
-                    { value: "LOW", label: "Low Priority", subLabel: "Routine drafting / non-blocking" },
-                    { value: "MEDIUM", label: "Medium", subLabel: "Standard milestone deliverable" },
-                    { value: "HIGH", label: "High Priority", subLabel: "Client deadline or review gate" },
-                    { value: "URGENT", label: "Urgent (Monitored)", subLabel: "Critical path / Immediate escalation" },
-                  ]}
-                  value={taskPriority}
-                  onChange={setTaskPriority}
-                  allowOther={true}
-                  otherOptionLabel="+ Other / Custom Priority Level..."
-                  otherValue={otherPriorityName}
-                  onOtherValueChange={setOtherPriorityName}
-                  otherInputPlaceholder="Specify custom priority descriptor..."
+                  allowOther={false}
+                  error={formErrors.assignees}
+                  helperText="Each selected employee will receive an independent checklist section below."
                 />
               </div>
 
-              {/* Due Date & Estimated Hours */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-[#1F1F1F] mb-1">Target Due Date</label>
-                  <input
-                    type="date"
-                    value={taskDueDate}
-                    onChange={(e) => setTaskDueDate(e.target.value)}
-                    className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-[#1F1F1F] mb-1">Estimated Effort (Hours)</label>
-                  <input
-                    type="number"
-                    step="0.5"
-                    min="0.5"
-                    value={taskEstimatedHours}
-                    onChange={(e) => setTaskEstimatedHours(e.target.value)}
-                    placeholder="e.g. 6"
-                    className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
-                  />
-                </div>
-              </div>
-
-              {/* Dynamic Checklist Items */}
-              <div className="pt-2 border-t border-[#E2E6F0] space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="font-semibold text-[#1F1F1F]">Checklist Items / Deliverable Sub-Tasks</label>
-                  <button
-                    type="button"
-                    onClick={handleAddChecklistField}
-                    className="text-[11px] font-semibold text-[#5A81FA] hover:underline cursor-pointer flex items-center gap-1"
-                  >
-                    <Plus className="w-3 h-3" />
-                    <span>Add Item</span>
-                  </button>
-                </div>
-
-                {checklistItems.map((item, idx) => (
-                  <div key={idx} className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      value={item}
-                      onChange={(e) => handleUpdateChecklistItem(idx, e.target.value)}
-                      placeholder={`Checklist item ${idx + 1} (e.g. Check waterproofing drop with structural drawings)`}
-                      className="flex-1 p-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-lg text-xs text-[#1F1F1F]"
-                    />
-                    {checklistItems.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveChecklistItem(idx)}
-                        className="text-[#696E82] hover:text-red-600 p-1 cursor-pointer"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    )}
+              {/* 6. INDEPENDENT EMPLOYEE CHECKLIST SECTIONS */}
+              {taskAssigneeIds.length > 0 && (
+                <div className="space-y-3 pt-2 border-t border-[#E2E6F0]">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-bold text-[#1F1F1F] text-xs uppercase tracking-wider flex items-center gap-1.5">
+                        <CheckSquare className="w-3.5 h-3.5 text-[#5A81FA]" />
+                        <span>Independent Employee Checklists</span>
+                      </h4>
+                      <p className="text-[11px] text-[#696E82]">
+                        Define individual checklist tasks, priority levels, and deadlines for each assigned employee.
+                      </p>
+                    </div>
                   </div>
-                ))}
+
+                  <div className="space-y-3">
+                    {taskAssigneeIds.map((empId) => {
+                      const memberObj = members.find((m) => m.id === empId);
+                      const rows = employeeChecklists[empId] || [];
+                      const isExpanded = expandedEmployeeSections[empId] !== false;
+                      const hasSectionError = formErrors[`emp-${empId}`] || rows.some((r) => formErrors[`chk-text-${r.id}`] || formErrors[`chk-date-${r.id}`]);
+
+                      return (
+                        <div
+                          key={empId}
+                          id={`emp-section-${empId}`}
+                          className={`rounded-xl border transition-all ${
+                            hasSectionError
+                              ? "border-red-300 bg-red-50/20"
+                              : "border-[#E2E6F0] bg-white shadow-2xs"
+                          }`}
+                        >
+                          {/* Section Header */}
+                          <div
+                            onClick={() =>
+                              setExpandedEmployeeSections((prev) => ({
+                                ...prev,
+                                [empId]: !isExpanded,
+                              }))
+                            }
+                            className="p-3 flex items-center justify-between bg-[#F8F9FD] rounded-t-xl cursor-pointer hover:bg-[#F2F4FF] transition-colors"
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div className="w-6 h-6 rounded-full bg-[#EBF1FF] text-[#5A81FA] font-bold text-[10px] flex items-center justify-center border border-[#CEDEFF] shrink-0">
+                                {memberObj?.user.fullName ? memberObj.user.fullName.slice(0, 2).toUpperCase() : "EM"}
+                              </div>
+                              <span className="font-bold text-xs text-[#1F1F1F] truncate">
+                                {memberObj?.user.fullName || "Assigned Employee"}
+                              </span>
+                              {memberObj?.employee?.employeeId && (
+                                <span className="font-mono text-[10px] bg-white border border-[#DFE5F2] px-1.5 py-0.2 rounded text-[#5A81FA] shrink-0">
+                                  {memberObj.employee.employeeId}
+                                </span>
+                              )}
+                              {memberObj?.employee?.designation && (
+                                <span className="text-[10px] text-[#696E82] hidden sm:inline truncate">
+                                  • {memberObj.employee.designation}
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className="text-[11px] font-medium text-[#696E82] bg-white px-2 py-0.5 rounded border border-[#E2E6F0]">
+                                {rows.length} {rows.length === 1 ? "task" : "tasks"}
+                              </span>
+                              <span className="text-[#696E82] text-xs">
+                                {isExpanded ? "▲" : "▼"}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Section Tasks Content */}
+                          {isExpanded && (
+                            <div className="p-3 space-y-2.5">
+                              {formErrors[`emp-${empId}`] && (
+                                <p className="text-[11px] text-red-600 font-medium">
+                                  {formErrors[`emp-${empId}`]}
+                                </p>
+                              )}
+
+                              {rows.map((row, idx) => (
+                                <div
+                                  key={row.id}
+                                  className="p-2.5 rounded-lg border border-[#E2E6F0] bg-[#FAFBFD] space-y-2"
+                                >
+                                  {/* Row 1: Task Description */}
+                                  <div className="flex items-start gap-2">
+                                    <div className="flex-1">
+                                      <input
+                                        id={`chk-text-${row.id}`}
+                                        type="text"
+                                        data-enable-assistant="true"
+                                        value={row.title}
+                                        onChange={(e) =>
+                                          handleUpdateEmployeeTask(empId, row.id, {
+                                            title: e.target.value,
+                                          })
+                                        }
+                                        placeholder={`Task ${idx + 1}: e.g. Detail joinery junctions & waterproofing`}
+                                        className={`w-full p-2 bg-white border rounded-lg text-xs text-[#1F1F1F] focus:outline-none focus:ring-2 focus:ring-[#5A81FA] ${
+                                          formErrors[`chk-text-${row.id}`]
+                                            ? "border-red-400 bg-red-50/40"
+                                            : "border-[#E2E6F0]"
+                                        }`}
+                                      />
+                                      {formErrors[`chk-text-${row.id}`] && (
+                                        <p className="text-[10px] text-red-600 font-medium mt-0.5">
+                                          {formErrors[`chk-text-${row.id}`]}
+                                        </p>
+                                      )}
+                                    </div>
+
+                                    {rows.length > 1 && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleRemoveEmployeeTask(empId, row.id)}
+                                        className="text-[#696E82] hover:text-red-600 p-1.5 rounded hover:bg-red-50 cursor-pointer transition-colors shrink-0"
+                                        title="Remove task row"
+                                      >
+                                        <X className="w-3.5 h-3.5" />
+                                      </button>
+                                    )}
+                                  </div>
+
+                                  {/* Row 2: Priority and Due Date */}
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 border-t border-[#E2E6F0]/60">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-[11px] text-[#696E82] shrink-0 font-medium">Priority:</span>
+                                      <select
+                                        value={row.priority}
+                                        onChange={(e) =>
+                                          handleUpdateEmployeeTask(empId, row.id, {
+                                            priority: e.target.value as any,
+                                          })
+                                        }
+                                        className="flex-1 p-1.5 bg-white border border-[#E2E6F0] rounded-lg text-xs text-[#1F1F1F] focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
+                                      >
+                                        <option value="LOW">Low (Calm)</option>
+                                        <option value="MEDIUM">Medium (Standard)</option>
+                                        <option value="HIGH">High (Milestone)</option>
+                                        <option value="URGENT">Urgent (Critical)</option>
+                                      </select>
+                                    </div>
+
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-[11px] text-[#696E82] shrink-0 font-medium">Due:</span>
+                                      <div className="flex-1">
+                                        <input
+                                          id={`chk-date-${row.id}`}
+                                          type="date"
+                                          value={row.dueDate}
+                                          onChange={(e) =>
+                                            handleUpdateEmployeeTask(empId, row.id, {
+                                              dueDate: e.target.value,
+                                            })
+                                          }
+                                          className={`w-full p-1.5 bg-white border rounded-lg text-xs text-[#1F1F1F] focus:outline-none focus:ring-2 focus:ring-[#5A81FA] ${
+                                            formErrors[`chk-date-${row.id}`]
+                                              ? "border-red-400 bg-red-50/40"
+                                              : "border-[#E2E6F0]"
+                                          }`}
+                                        />
+                                        {formErrors[`chk-date-${row.id}`] && (
+                                          <p className="text-[10px] text-red-600 font-medium mt-0.5">
+                                            {formErrors[`chk-date-${row.id}`]}
+                                          </p>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+
+                              {/* Add Task for Employee Button */}
+                              <button
+                                type="button"
+                                onClick={() => handleAddEmployeeTask(empId)}
+                                className="w-full py-1.5 px-3 border border-dashed border-[#5A81FA]/50 hover:border-[#5A81FA] bg-[#F2F4FF]/50 hover:bg-[#F2F4FF] text-[#5A81FA] rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                                <span>Add checklist task for {memberObj?.user.fullName || "employee"}</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Estimated Hours (Optional) */}
+              <div className="pt-2 border-t border-[#E2E6F0]">
+                <label className="block font-semibold text-[#1F1F1F] mb-1">Estimated Deliverable Effort (Hours)</label>
+                <input
+                  type="number"
+                  step="0.5"
+                  min="0.5"
+                  value={taskEstimatedHours}
+                  onChange={(e) => setTaskEstimatedHours(e.target.value)}
+                  placeholder="e.g. 8 (optional studio capacity tracking)"
+                  className="w-full p-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-xs text-[#1F1F1F] focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
+                />
               </div>
 
               {/* Dynamic Custom Fields */}
@@ -3521,22 +3734,22 @@ export default function TasksClientView({
                 disabled={creatingTask}
               />
 
-              {/* Modal Buttons */}
+              {/* Modal Action Buttons */}
               <div className="flex justify-end gap-2 pt-4 border-t border-[#E2E6F0]">
                 <button
                   type="button"
                   onClick={() => setIsCreateTaskModalOpen(false)}
-                  className="px-4 py-2 bg-[#F2F4FF] hover:bg-[#F2F4FF] text-[#696E82] font-semibold rounded-xl cursor-pointer"
+                  className="px-4 py-2 bg-[#F2F4FF] hover:bg-[#E2E6F0] text-[#696E82] font-semibold rounded-xl cursor-pointer transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={creatingTask}
-                  className="px-5 py-2 bg-[#5A81FA] hover:bg-[#426EE8] text-white font-semibold rounded-xl shadow-xs cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                  className="px-5 py-2 bg-[#5A81FA] hover:bg-[#426EE8] text-white font-semibold rounded-xl shadow-xs cursor-pointer disabled:opacity-50 flex items-center gap-1.5 transition-colors"
                 >
                   {creatingTask ? (
-                    <span>Assigning...</span>
+                    <span>Assigning Deliverable...</span>
                   ) : (
                     <>
                       <UserPlus className="w-4 h-4" />
@@ -3546,6 +3759,37 @@ export default function TasksClientView({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal for Discarding Checklist Tasks when removing an assignee */}
+      {pendingMemberRemoval && (
+        <div className="fixed inset-0 z-60 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white border border-[#E2E6F0] rounded-2xl max-w-sm w-full p-5 shadow-2xl space-y-3">
+            <div className="flex items-center gap-2 text-amber-600">
+              <AlertTriangle className="w-5 h-5 shrink-0" />
+              <h4 className="font-bold text-sm text-[#1F1F1F]">Discard Checklist Tasks?</h4>
+            </div>
+            <p className="text-xs text-[#696E82]">
+              {pendingMemberRemoval.memberName} currently has checklist tasks entered. Removing this team member will discard their tasks.
+            </p>
+            <div className="flex justify-end gap-2 pt-2 border-t border-[#E2E6F0]">
+              <button
+                type="button"
+                onClick={cancelDiscardMember}
+                className="px-3 py-1.5 bg-[#F2F4FF] hover:bg-[#E2E6F0] text-[#696E82] font-semibold rounded-xl text-xs cursor-pointer"
+              >
+                Keep Team Member
+              </button>
+              <button
+                type="button"
+                onClick={confirmDiscardMember}
+                className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl text-xs cursor-pointer"
+              >
+                Discard & Remove
+              </button>
+            </div>
           </div>
         </div>
       )}

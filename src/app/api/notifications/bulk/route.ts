@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentTenantContext } from "@/server/auth/session";
+import { isAdminOrOwner } from "@/server/tenancy/context";
 import { dispatchBulkNotifications, BulkMailParams } from "@/server/modules/notifications/bulk-mailer";
 
 export async function POST(req: NextRequest) {
@@ -18,8 +19,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Role check: Only Owner, Admin, or Project Manager can dispatch bulk communications
-    if (ctx.role !== "OWNER" && ctx.role !== "ADMIN" && ctx.role !== "PROJECT_MANAGER") {
+    // Role check: Only Owner or Admin can dispatch bulk communications
+    if (!isAdminOrOwner(ctx)) {
       return NextResponse.json(
         { error: "Forbidden: You do not have permission to send bulk communications." },
         { status: 403 }

@@ -21,7 +21,7 @@ export function TaskPriorityBadge({
     case "URGENT":
       return (
         <span
-          className={`inline-flex items-center font-bold rounded-full bg-[#FFF1F3] text-[#C62844] border border-[#FECDD3] shadow-2xs ${sizeClasses} ${className}`}
+          className={`inline-flex items-center font-bold rounded-full bg-rose-50 text-rose-700 border border-rose-200 shadow-2xs ${sizeClasses} ${className}`}
         >
           <AlertCircle className="w-3.5 h-3.5" />
           <span>Urgent</span>
@@ -31,7 +31,7 @@ export function TaskPriorityBadge({
     case "HIGH":
       return (
         <span
-          className={`inline-flex items-center font-semibold rounded-full bg-[#FFF8E6] text-[#9A6700] border border-[#FDE68A] shadow-2xs ${sizeClasses} ${className}`}
+          className={`inline-flex items-center font-semibold rounded-full bg-orange-50 text-orange-800 border border-orange-200 shadow-2xs ${sizeClasses} ${className}`}
         >
           <AlertTriangle className="w-3.5 h-3.5" />
           <span>High</span>
@@ -41,9 +41,9 @@ export function TaskPriorityBadge({
     case "MEDIUM":
       return (
         <span
-          className={`inline-flex items-center font-medium rounded-full bg-[#F3F5FF] text-[#52617C] border border-[#DFE5F2] shadow-2xs ${sizeClasses} ${className}`}
+          className={`inline-flex items-center font-medium rounded-full bg-amber-50 text-amber-800 border border-amber-200 shadow-2xs ${sizeClasses} ${className}`}
         >
-          <ArrowUp className="w-3 h-3 text-[#68758E]" />
+          <ArrowUp className="w-3 h-3 text-amber-700" />
           <span>Medium</span>
         </span>
       );
@@ -52,7 +52,7 @@ export function TaskPriorityBadge({
     default:
       return (
         <span
-          className={`inline-flex items-center font-medium rounded-full bg-slate-50 text-slate-600 border border-slate-200 shadow-2xs ${sizeClasses} ${className}`}
+          className={`inline-flex items-center font-medium rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs ${sizeClasses} ${className}`}
         >
           <span>Low</span>
         </span>

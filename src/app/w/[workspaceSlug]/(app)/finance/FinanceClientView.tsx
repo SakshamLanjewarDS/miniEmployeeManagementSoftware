@@ -36,6 +36,7 @@ import {
   CheckCircle2,
   X,
   Search,
+} from "lucide-react";
 import { SearchableDropdown } from "@/components/ui/SearchableDropdown";
 
 export interface FeeMilestoneItem {

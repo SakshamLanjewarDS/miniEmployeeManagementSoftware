@@ -27,6 +27,7 @@ import {
   Award,
   FolderGit2,
   ArrowUpDown,
+  Filter,
 } from "lucide-react";
 import { SearchableDropdown, SearchableSelect } from "@/components/ui/SearchableDropdown";
 

@@ -6,6 +6,7 @@ import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { TenantContext } from "@/server/tenancy/context";
 import {
+  LayoutDashboard,
   CheckSquare,
   FolderKanban,
   MapPin,
@@ -39,6 +40,11 @@ export function AppSidebar({ context }: AppSidebarProps) {
   };
 
   const navItems = [
+    {
+      name: "Dashboard",
+      href: `/w/${context.tenantSlug}/dashboard`,
+      icon: LayoutDashboard,
+    },
     {
       name:
         context.role === "OWNER" || context.role === "ADMIN"

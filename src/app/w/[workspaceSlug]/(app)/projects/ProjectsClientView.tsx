@@ -77,6 +77,10 @@ interface ProjectItem {
   googleMapLocation?: string | null;
   contractorId?: string | null;
   consultantId?: string | null;
+  contractorIds?: string[];
+  consultantIds?: string[];
+  contractors?: Array<{ contractor: { id: string; name: string; firmName?: string | null; trade?: string | null } }>;
+  consultants?: Array<{ consultant: { id: string; name: string; firmName?: string | null; discipline?: string | null } }>;
   plotArea?: string | null;
   constructionArea?: string | null;
   customFields?: Record<string, any> | null;
@@ -291,7 +295,9 @@ export function ProjectsClientView({
     projectManagerId: "",
     projectCoordinatorId: "",
     contractorId: "",
+    contractorIds: [] as string[],
     consultantId: "",
+    consultantIds: [] as string[],
     siteAddress: "",
     siteCity: "",
     googleMapLocation: "",
@@ -315,7 +321,9 @@ export function ProjectsClientView({
     projectManagerId: "",
     projectCoordinatorId: "",
     contractorId: "",
+    contractorIds: [] as string[],
     consultantId: "",
+    consultantIds: [] as string[],
     siteAddress: "",
     siteCity: "",
     googleMapLocation: "",
@@ -491,7 +499,9 @@ export function ProjectsClientView({
           projectManagerId: formData.projectManagerId || undefined,
           projectCoordinatorId: formData.projectCoordinatorId || undefined,
           contractorId: formData.contractorId || undefined,
+          contractorIds: formData.contractorIds.length > 0 ? formData.contractorIds : undefined,
           consultantId: formData.consultantId || undefined,
+          consultantIds: formData.consultantIds.length > 0 ? formData.consultantIds : undefined,
           siteAddress: formData.siteAddress.trim() || undefined,
           siteCity: formData.siteCity.trim() || undefined,
           googleMapLocation: formData.googleMapLocation.trim() || undefined,
@@ -542,7 +552,9 @@ export function ProjectsClientView({
         projectManagerId: "",
         projectCoordinatorId: "",
         contractorId: "",
+        contractorIds: [],
         consultantId: "",
+        consultantIds: [],
         siteAddress: "",
         siteCity: "",
         googleMapLocation: "",
@@ -566,6 +578,9 @@ export function ProjectsClientView({
 
   // Open Edit Modal with Pre-populated data
   const handleOpenEdit = (project: ProjectItem) => {
+    const existingContractorIds = project.contractors?.map((c) => c.contractor.id) || (project.contractorId ? [project.contractorId] : []);
+    const existingConsultantIds = project.consultants?.map((c) => c.consultant.id) || (project.consultantId ? [project.consultantId] : []);
+
     setEditingProject(project);
     setErrorMessage(null);
     setEditFormData({
@@ -577,7 +592,9 @@ export function ProjectsClientView({
       projectManagerId: project.projectManagerId || "",
       projectCoordinatorId: project.projectCoordinatorId || "",
       contractorId: project.contractorId || "",
+      contractorIds: existingContractorIds,
       consultantId: project.consultantId || "",
+      consultantIds: existingConsultantIds,
       siteAddress: project.siteAddress || "",
       siteCity: project.siteCity || "",
       googleMapLocation: project.googleMapLocation || "",
@@ -620,7 +637,9 @@ export function ProjectsClientView({
           projectManagerId: editFormData.projectManagerId || null,
           projectCoordinatorId: editFormData.projectCoordinatorId || null,
           contractorId: editFormData.contractorId || null,
+          contractorIds: editFormData.contractorIds,
           consultantId: editFormData.consultantId || null,
+          consultantIds: editFormData.consultantIds,
           siteAddress: editFormData.siteAddress.trim() || undefined,
           siteCity: editFormData.siteCity.trim() || null,
           googleMapLocation: editFormData.googleMapLocation.trim() || null,
@@ -1080,7 +1099,7 @@ export function ProjectsClientView({
                     ...members.map((m) => ({
                       value: m.id,
                       label: m.user.fullName,
-                      employeeId: m.employee?.id ? `EMP-${m.employee.id.slice(-2)}` : undefined,
+                      employeeId: m.employee?.employeeId || undefined,
                       designation: m.employee?.designation || "Architect",
                       type: "employee" as const,
                     })),
@@ -1092,23 +1111,23 @@ export function ProjectsClientView({
               {/* Project Manager */}
               <div>
                 <label className="block text-[10px] font-bold text-[#696E82] uppercase mb-1">
-                  Project Manager
+                  Project Architecture 2
                 </label>
                 <SearchableDropdown
                   size="sm"
                   optionType="employee"
                   value={managerFilter}
                   onChange={setManagerFilter}
-                  placeholder="All Managers"
-                  searchPlaceholder="Search managers..."
+                  placeholder="All Project Architecture 2"
+                  searchPlaceholder="Search team..."
                   clearable={false}
                   options={[
-                    { value: "ALL", label: "All Managers" },
+                    { value: "ALL", label: "All Project Architecture 2" },
                     ...members.map((m) => ({
                       value: m.id,
                       label: m.user.fullName,
-                      employeeId: m.employee?.id ? `EMP-${m.employee.id.slice(-2)}` : undefined,
-                      designation: m.employee?.designation || "Project Manager",
+                      employeeId: m.employee?.employeeId || undefined,
+                      designation: m.employee?.designation || "Project Architecture 2",
                       type: "employee" as const,
                     })),
                   ]}
@@ -1134,7 +1153,7 @@ export function ProjectsClientView({
                     ...members.map((m) => ({
                       value: m.id,
                       label: m.user.fullName,
-                      employeeId: m.employee?.id ? `EMP-${m.employee.id.slice(-2)}` : undefined,
+                      employeeId: m.employee?.employeeId || undefined,
                       designation: m.employee?.designation || "Coordinator",
                       type: "employee" as const,
                     })),
@@ -1612,10 +1631,10 @@ export function ProjectsClientView({
                         </span>
                       </div>
 
-                      {/* 6. Project Manager */}
+                      {/* 6. Project Architecture 2 */}
                       <div>
                         <span className="text-[#696E82] block text-[10px] uppercase font-semibold">
-                          Project Manager
+                          Project Architecture 2
                         </span>
                         <span className="font-semibold text-[#1F1F1F] truncate block" title={p.projectManager?.user.fullName || "Unassigned"}>
                           {p.projectManager?.user.fullName || "Unassigned"}
@@ -1858,11 +1877,11 @@ export function ProjectsClientView({
                   }))}
                   value={formData.projectType}
                   onChange={(val) => setFormData({ ...formData, projectType: val })}
-                  allowOther={true}
+                  allowOther={false}
                 />
               </div>
 
-              {/* Row 3: Project Architect & Project Manager */}
+              {/* Row 3: Project Architect & Project Architecture 2 */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <SearchableSelect
                   id="create-architect"
@@ -1881,9 +1900,9 @@ export function ProjectsClientView({
 
                 <SearchableSelect
                   id="create-manager"
-                  label="Project Manager"
-                  placeholder="Select Project Manager..."
-                  searchPlaceholder="Search project manager..."
+                  label="Project Architecture 2"
+                  placeholder="Select Project Architecture 2..."
+                  searchPlaceholder="Search project architecture 2..."
                   options={members.map((m) => ({
                     value: m.id,
                     label: m.user.fullName,
@@ -1926,35 +1945,37 @@ export function ProjectsClientView({
                 </div>
               </div>
 
-              {/* Row 5: Project Contractor & Project Consultant */}
+              {/* Row 5: Project Contractors & Project Consultants */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <SearchableSelect
                   id="create-contractor"
-                  label="Project Contractor"
-                  placeholder="Select Contractor / Vendor..."
-                  searchPlaceholder="Search contractor..."
+                  label="Project Contractors"
+                  placeholder="Select Contractor(s) / Vendor(s)..."
+                  searchPlaceholder="Search contractors..."
+                  multiSelect={true}
+                  values={formData.contractorIds}
+                  onMultiChange={(vals) => setFormData({ ...formData, contractorIds: vals, contractorId: vals[0] || "" })}
                   options={contractors.map((c) => ({
                     value: c.id,
                     label: `${c.name}${c.firmName ? ` (${c.firmName})` : ""}`,
                     subLabel: c.trade || c.firmName || undefined,
                   }))}
-                  value={formData.contractorId}
-                  onChange={(val) => setFormData({ ...formData, contractorId: val })}
                   allowOther={false}
                 />
 
                 <SearchableSelect
                   id="create-consultant"
-                  label="Project Consultant"
-                  placeholder="Select Consultant..."
-                  searchPlaceholder="Search consultant..."
+                  label="Project Consultants"
+                  placeholder="Select Consultant(s)..."
+                  searchPlaceholder="Search consultants..."
+                  multiSelect={true}
+                  values={formData.consultantIds}
+                  onMultiChange={(vals) => setFormData({ ...formData, consultantIds: vals, consultantId: vals[0] || "" })}
                   options={consultants.map((c) => ({
                     value: c.id,
                     label: `${c.name}${c.firmName ? ` (${c.firmName})` : ""}`,
                     subLabel: c.discipline || c.firmName || undefined,
                   }))}
-                  value={formData.consultantId}
-                  onChange={(val) => setFormData({ ...formData, consultantId: val })}
                   allowOther={false}
                 />
               </div>
@@ -2257,11 +2278,11 @@ export function ProjectsClientView({
                   onChange={(val) =>
                     setEditFormData({ ...editFormData, projectType: val })
                   }
-                  allowOther={true}
+                  allowOther={false}
                 />
               </div>
 
-              {/* Row 4: Project Architect & Project Manager */}
+              {/* Row 4: Project Architect & Project Architecture 2 */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <SearchableSelect
                   id="edit-architect"
@@ -2282,9 +2303,9 @@ export function ProjectsClientView({
 
                 <SearchableSelect
                   id="edit-manager"
-                  label="Project Manager"
-                  placeholder="Select Project Manager..."
-                  searchPlaceholder="Search manager..."
+                  label="Project Architecture 2"
+                  placeholder="Select Project Architecture 2..."
+                  searchPlaceholder="Search project architecture 2..."
                   options={members.map((m) => ({
                     value: m.id,
                     label: m.user.fullName,
@@ -2333,39 +2354,41 @@ export function ProjectsClientView({
                 </div>
               </div>
 
-              {/* Row 6: Project Contractor & Project Consultant */}
+              {/* Row 6: Project Contractors & Project Consultants */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <SearchableSelect
                   id="edit-contractor"
-                  label="Project Contractor"
-                  placeholder="Select Contractor / Vendor..."
-                  searchPlaceholder="Search contractor..."
+                  label="Project Contractors"
+                  placeholder="Select Contractor(s) / Vendor(s)..."
+                  searchPlaceholder="Search contractors..."
+                  multiSelect={true}
+                  values={editFormData.contractorIds}
+                  onMultiChange={(vals) =>
+                    setEditFormData({ ...editFormData, contractorIds: vals, contractorId: vals[0] || "" })
+                  }
                   options={contractors.map((c) => ({
                     value: c.id,
                     label: `${c.name}${c.firmName ? ` (${c.firmName})` : ""}`,
                     subLabel: c.trade || c.firmName || undefined,
                   }))}
-                  value={editFormData.contractorId}
-                  onChange={(val) =>
-                    setEditFormData({ ...editFormData, contractorId: val })
-                  }
                   allowOther={false}
                 />
 
                 <SearchableSelect
                   id="edit-consultant"
-                  label="Project Consultant"
-                  placeholder="Select Consultant..."
-                  searchPlaceholder="Search consultant..."
+                  label="Project Consultants"
+                  placeholder="Select Consultant(s)..."
+                  searchPlaceholder="Search consultants..."
+                  multiSelect={true}
+                  values={editFormData.consultantIds}
+                  onMultiChange={(vals) =>
+                    setEditFormData({ ...editFormData, consultantIds: vals, consultantId: vals[0] || "" })
+                  }
                   options={consultants.map((c) => ({
                     value: c.id,
                     label: `${c.name}${c.firmName ? ` (${c.firmName})` : ""}`,
                     subLabel: c.discipline || c.firmName || undefined,
                   }))}
-                  value={editFormData.consultantId}
-                  onChange={(val) =>
-                    setEditFormData({ ...editFormData, consultantId: val })
-                  }
                   allowOther={false}
                 />
               </div>

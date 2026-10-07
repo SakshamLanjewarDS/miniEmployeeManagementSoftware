@@ -38,7 +38,7 @@ import {
   Filter,
   SlidersHorizontal,
 } from "lucide-react";
-import { SearchableDropdown } from "@/components/ui/SearchableDropdown";
+import { SearchableDropdown, SearchableSelect } from "@/components/ui/SearchableDropdown";
 import {
   getAllTypologies,
   ProjectProfileCircle,
@@ -248,7 +248,7 @@ export default function VisitsClientView({
   const [reviewDecision, setReviewDecision] = useState<"ACCEPTED" | "NEEDS_CLARIFICATION" | "REJECTED">("ACCEPTED");
   const [reviewComment, setReviewComment] = useState("");
 
-  const isPrivileged = userRole === "OWNER" || userRole === "ADMIN" || userRole === "PROJECT_MANAGER";
+  const isPrivileged = userRole === "OWNER" || userRole === "ADMIN";
 
   // Mounting state to prevent browser extension hydration attribute mismatches
   const [isMounted, setIsMounted] = useState(false);
@@ -1745,7 +1745,7 @@ export default function VisitsClientView({
                     })),
                   ]}
                   value={assignTypology}
-                  onChange={(val) => {
+                  onChange={(val: any) => {
                     setAssignTypology(val);
                     const eff = val === "OTHER" ? assignOtherTypology.trim() : val.trim();
                     if (eff) {
@@ -1762,7 +1762,7 @@ export default function VisitsClientView({
                   allowOther={true}
                   otherOptionLabel="+ Other Architectural Typology..."
                   otherValue={assignOtherTypology}
-                  onOtherValueChange={(val) => {
+                  onOtherValueChange={(val: any) => {
                     setAssignOtherTypology(val);
                     const eff = val.trim();
                     if (eff) {
@@ -1804,7 +1804,7 @@ export default function VisitsClientView({
                   icon: <ProjectProfileCircle typology={p.projectType} name={p.name} size="xs" />,
                 }))}
                 value={assignProjectId}
-                onChange={(val) => {
+                onChange={(val: any) => {
                   setAssignProjectId(val);
                   if (val) {
                     const found = availableProjects.find((p) => p.id === val);
@@ -2417,7 +2417,7 @@ export default function VisitsClientView({
                     { value: "REJECTED", label: "REJECTED", subLabel: "Outside Perimeter / Inaccurate" },
                   ]}
                   value={reviewDecision}
-                  onChange={(val) => setReviewDecision(val as any)}
+                  onChange={(val: any) => setReviewDecision(val as any)}
                   allowOther={false}
                 />
 

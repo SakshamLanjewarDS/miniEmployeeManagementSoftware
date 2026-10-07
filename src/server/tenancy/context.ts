@@ -49,6 +49,9 @@ export function assertTenantAccess(context: TenantContext, resourceTenantId: str
   }
 }
 
+export const ACTIVE_ROLES = [TenantRole.OWNER, TenantRole.ADMIN, TenantRole.EMPLOYEE] as const;
+export type ActiveRole = (typeof ACTIVE_ROLES)[number];
+
 export function isOwner(context: TenantContext): boolean {
   return context.role === TenantRole.OWNER;
 }
@@ -58,16 +61,14 @@ export function isAdmin(context: TenantContext): boolean {
 }
 
 /**
- * OWNER and ADMIN have full management access to all business modules within their own tenant:
- * Employees, projects, tasks, clients, contractors, consultants, site visits, drawings, approvals,
- * finance, reports, and workspace settings.
+ * OWNER and ADMIN have equal management permissions within their own tenant:
+ * Projects, phases, milestones, assignments, tasks, checklists, submissions,
+ * reviews, drawings, site visits, employees, accounts, roles, clients,
+ * contractors, consultants, finance, custom fields, import/export, announcements,
+ * reports, and settings.
  */
 export function isAdminOrOwner(context: TenantContext): boolean {
   return context.role === TenantRole.OWNER || context.role === TenantRole.ADMIN;
-}
-
-export function isProjectManager(context: TenantContext): boolean {
-  return context.role === TenantRole.PROJECT_MANAGER;
 }
 
 export function isEmployee(context: TenantContext): boolean {
@@ -87,10 +88,7 @@ export function canManageFinance(context: TenantContext): boolean {
 }
 
 export function canApproveWork(context: TenantContext): boolean {
-  return (
-    isAdminOrOwner(context) ||
-    context.role === TenantRole.PROJECT_MANAGER
-  );
+  return isAdminOrOwner(context);
 }
 
 export function assertAdminOrOwner(context: TenantContext, message = "Forbidden: Administrator or Owner privileges required"): void {

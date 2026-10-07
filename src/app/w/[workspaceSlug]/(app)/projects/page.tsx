@@ -84,6 +84,14 @@ export default async function ProjectsPage({ params }: ProjectsPageProps) {
           trade: p.contractor.trade,
         }
       : null,
+    contractors: (p as any).contractors?.map((pc: any) => ({
+      contractor: {
+        id: pc.contractor.id,
+        name: pc.contractor.name,
+        firmName: pc.contractor.firmName,
+        trade: pc.contractor.trade,
+      },
+    })) || [],
     consultant: p.consultant
       ? {
           id: p.consultant.id,
@@ -92,6 +100,14 @@ export default async function ProjectsPage({ params }: ProjectsPageProps) {
           discipline: p.consultant.discipline,
         }
       : null,
+    consultants: (p as any).consultants?.map((pc: any) => ({
+      consultant: {
+        id: pc.consultant.id,
+        name: pc.consultant.name,
+        firmName: pc.consultant.firmName,
+        discipline: pc.consultant.discipline,
+      },
+    })) || [],
     taskProgress: p.taskProgress,
     phaseProgress: p.phaseProgress,
     _count: p._count,

@@ -71,6 +71,30 @@ export async function findProjects(ctx: TenantContext) {
           discipline: true,
         },
       },
+      contractors: {
+        include: {
+          contractor: {
+            select: {
+              id: true,
+              name: true,
+              firmName: true,
+              trade: true,
+            },
+          },
+        },
+      },
+      consultants: {
+        include: {
+          consultant: {
+            select: {
+              id: true,
+              name: true,
+              firmName: true,
+              discipline: true,
+            },
+          },
+        },
+      },
       phases: {
         orderBy: { sortOrder: "asc" },
       },
@@ -287,6 +311,8 @@ export async function findProjectDetail(ctx: TenantContext, projectId: string) {
   };
 }
 
+export const getProjectById = findProjectDetail;
+
 export async function createProject(
   ctx: TenantContext,
   data: {
@@ -302,7 +328,9 @@ export async function createProject(
     projectManagerId?: string;
     projectCoordinatorId?: string;
     contractorId?: string;
+    contractorIds?: string[];
     consultantId?: string;
+    consultantIds?: string[];
     plotArea?: string;
     constructionArea?: string;
     budget?: number;
@@ -312,6 +340,16 @@ export async function createProject(
   }
 ) {
   assertAdminOrOwner(ctx, "Only Studio Administrators or Owners can create projects.");
+
+  const rawContractorIds = Array.isArray(data.contractorIds)
+    ? data.contractorIds.filter(Boolean)
+    : (data.contractorId ? [data.contractorId] : []);
+  const uniqueContractorIds = Array.from(new Set(rawContractorIds));
+
+  const rawConsultantIds = Array.isArray(data.consultantIds)
+    ? data.consultantIds.filter(Boolean)
+    : (data.consultantId ? [data.consultantId] : []);
+  const uniqueConsultantIds = Array.from(new Set(rawConsultantIds));
 
   return await prisma.$transaction(async (tx) => {
     const project = await tx.project.create({
@@ -328,8 +366,8 @@ export async function createProject(
         projectArchitectId: data.projectArchitectId || null,
         projectManagerId: data.projectManagerId || null,
         projectCoordinatorId: data.projectCoordinatorId || null,
-        contractorId: data.contractorId || null,
-        consultantId: data.consultantId || null,
+        contractorId: uniqueContractorIds[0] || data.contractorId || null,
+        consultantId: uniqueConsultantIds[0] || data.consultantId || null,
         plotArea: data.plotArea,
         constructionArea: data.constructionArea,
         budget: data.budget,
@@ -340,23 +378,23 @@ export async function createProject(
       },
     });
 
-    if (data.contractorId) {
+    for (const cId of uniqueContractorIds) {
       await tx.projectContractor.create({
         data: {
           tenantId: ctx.tenantId,
           projectId: project.id,
-          contractorId: data.contractorId,
+          contractorId: cId,
           scope: "Commissioned Contractor",
         },
       }).catch(() => {});
     }
 
-    if (data.consultantId) {
+    for (const cId of uniqueConsultantIds) {
       await tx.projectConsultant.create({
         data: {
           tenantId: ctx.tenantId,
           projectId: project.id,
-          consultantId: data.consultantId,
+          consultantId: cId,
           scope: "Commissioned Consultant",
         },
       }).catch(() => {});
@@ -459,7 +497,9 @@ export async function updateProject(
     projectManagerId?: string | null;
     projectCoordinatorId?: string | null;
     contractorId?: string | null;
+    contractorIds?: string[] | null;
     consultantId?: string | null;
+    consultantIds?: string[] | null;
     plotArea?: string | null;
     constructionArea?: string | null;
     currentPhase?: string | null;
@@ -492,8 +532,27 @@ export async function updateProject(
   if (data.projectArchitectId !== undefined) updatePayload.projectArchitectId = data.projectArchitectId || null;
   if (data.projectManagerId !== undefined) updatePayload.projectManagerId = data.projectManagerId || null;
   if (data.projectCoordinatorId !== undefined) updatePayload.projectCoordinatorId = data.projectCoordinatorId || null;
-  if (data.contractorId !== undefined) updatePayload.contractorId = data.contractorId || null;
-  if (data.consultantId !== undefined) updatePayload.consultantId = data.consultantId || null;
+
+  let uniqueContractorIds: string[] | null = null;
+  if (data.contractorIds !== undefined) {
+    uniqueContractorIds = Array.isArray(data.contractorIds)
+      ? Array.from(new Set(data.contractorIds.filter(Boolean)))
+      : [];
+    updatePayload.contractorId = uniqueContractorIds[0] || null;
+  } else if (data.contractorId !== undefined) {
+    updatePayload.contractorId = data.contractorId || null;
+  }
+
+  let uniqueConsultantIds: string[] | null = null;
+  if (data.consultantIds !== undefined) {
+    uniqueConsultantIds = Array.isArray(data.consultantIds)
+      ? Array.from(new Set(data.consultantIds.filter(Boolean)))
+      : [];
+    updatePayload.consultantId = uniqueConsultantIds[0] || null;
+  } else if (data.consultantId !== undefined) {
+    updatePayload.consultantId = data.consultantId || null;
+  }
+
   if (data.plotArea !== undefined) updatePayload.plotArea = data.plotArea || null;
   if (data.constructionArea !== undefined) updatePayload.constructionArea = data.constructionArea || null;
   if (data.currentPhase !== undefined) updatePayload.currentPhase = data.currentPhase;
@@ -503,29 +562,63 @@ export async function updateProject(
   if (data.startDate !== undefined) updatePayload.startDate = data.startDate;
   if (data.targetDate !== undefined) updatePayload.targetDate = data.targetDate;
 
-  const updated = await prisma.project.update({
-    where: { id: projectId },
-    data: updatePayload,
-  });
-
-  // Log audit event
-  try {
-    await prisma.auditEvent.create({
-      data: {
-        tenantId: ctx.tenantId,
-        actorId: ctx.membershipId,
-        projectId: existing.id,
-        action: "PROJECT_UPDATED",
-        entityType: "Project",
-        entityId: existing.id,
-        safeChangeSummary: `Updated architectural project "${existing.name}" (${existing.code})`,
-      },
+  return await prisma.$transaction(async (tx) => {
+    const updated = await tx.project.update({
+      where: { id: projectId },
+      data: updatePayload,
     });
-  } catch (e) {
-    console.error("Failed to log project update audit event:", e);
-  }
 
-  return updated;
+    if (uniqueContractorIds !== null) {
+      await tx.projectContractor.deleteMany({
+        where: { projectId: projectId, tenantId: ctx.tenantId },
+      });
+      for (const cId of uniqueContractorIds) {
+        await tx.projectContractor.create({
+          data: {
+            tenantId: ctx.tenantId,
+            projectId: projectId,
+            contractorId: cId,
+            scope: "Commissioned Contractor",
+          },
+        }).catch(() => {});
+      }
+    }
+
+    if (uniqueConsultantIds !== null) {
+      await tx.projectConsultant.deleteMany({
+        where: { projectId: projectId, tenantId: ctx.tenantId },
+      });
+      for (const cId of uniqueConsultantIds) {
+        await tx.projectConsultant.create({
+          data: {
+            tenantId: ctx.tenantId,
+            projectId: projectId,
+            consultantId: cId,
+            scope: "Commissioned Consultant",
+          },
+        }).catch(() => {});
+      }
+    }
+
+    // Log audit event
+    try {
+      await tx.auditEvent.create({
+        data: {
+          tenantId: ctx.tenantId,
+          actorId: ctx.membershipId,
+          projectId: existing.id,
+          action: "PROJECT_UPDATED",
+          entityType: "Project",
+          entityId: existing.id,
+          safeChangeSummary: `Updated architectural project "${existing.name}" (${existing.code})`,
+        },
+      });
+    } catch (e) {
+      console.error("Failed to log project update audit event:", e);
+    }
+
+    return updated;
+  });
 }
 
 export async function deleteProject(ctx: TenantContext, projectId: string) {

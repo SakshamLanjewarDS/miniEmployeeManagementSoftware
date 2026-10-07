@@ -26,64 +26,54 @@ export async function POST(req: NextRequest) {
       startDate,
       estimatedHours,
       checklist,
+      checklistItems,
     } = body;
 
-    if (!projectId || !title) {
-      return NextResponse.json({ error: "Project and Task Title are required." }, { status: 400 });
+    if (!projectId) {
+      return NextResponse.json({ error: "Project selection is required." }, { status: 400 });
     }
 
-    // Create task
+    if (!description || !description.trim()) {
+      return NextResponse.json({ error: "Architectural Brief & Instructions are required." }, { status: 400 });
+    }
+
+    // Format checklist items if given as structured items or simple strings
+    let formattedChecklistItems: any[] | undefined = undefined;
+    if (Array.isArray(checklistItems) && checklistItems.length > 0) {
+      formattedChecklistItems = checklistItems;
+    } else if (Array.isArray(checklist) && checklist.length > 0) {
+      formattedChecklistItems = checklist
+        .map((itemText: string) => (typeof itemText === "string" ? itemText.trim() : ""))
+        .filter((text: string) => text.length > 0)
+        .map((text: string, idx: number) => ({
+          title: text,
+          assignedMemberId: (Array.isArray(assigneeIds) && assigneeIds[0]) || assigneeId || ctx.membershipId,
+          priority: priority || "MEDIUM",
+          dueDate: dueDate ? new Date(dueDate) : undefined,
+          sortOrder: idx + 1,
+        }));
+    }
+
+    // Create deliverable with structured checklist items atomically
     const task = await createTask(ctx, {
       projectId,
       phaseId: phaseId || undefined,
-      title,
-      description,
+      title: title ? title.trim() : undefined,
+      description: description.trim(),
       assigneeId: assigneeId || undefined,
       assigneeIds: Array.isArray(assigneeIds) ? assigneeIds : undefined,
       priority: priority || "MEDIUM",
       dueDate: dueDate ? new Date(dueDate) : undefined,
       startDate: startDate ? new Date(startDate) : undefined,
       estimatedHours: estimatedHours ? Number(estimatedHours) : undefined,
-    });
-
-    // If checklist items provided, create them
-    if (Array.isArray(checklist) && checklist.length > 0) {
-      const itemsToCreate = checklist
-        .map((itemText: string, idx: number) => itemText.trim())
-        .filter((text: string) => text.length > 0)
-        .map((text: string, idx: number) => ({
-          tenantId: ctx.tenantId,
-          taskId: task.id,
-          title: text,
-          sortOrder: idx + 1,
-          isCompleted: false,
-        }));
-
-      if (itemsToCreate.length > 0) {
-        await prisma.taskChecklistItem.createMany({
-          data: itemsToCreate,
-        });
-      }
-    }
-
-    // Log audit event
-    await prisma.auditEvent.create({
-      data: {
-        tenantId: ctx.tenantId,
-        actorId: ctx.membershipId,
-        projectId: task.projectId,
-        action: "TASK_CREATED",
-        entityType: "Task",
-        entityId: task.id,
-        safeChangeSummary: `Created task "${task.title}" with priority ${task.priority}${assigneeId ? ` assigned to membership ${assigneeId}` : ""}`,
-      },
+      checklistItems: formattedChecklistItems,
     });
 
     return NextResponse.json({ success: true, task });
   } catch (err: any) {
     console.error("Task creation error:", err);
     return NextResponse.json(
-      { error: err.message || "Failed to create task" },
+      { error: err.message || "Failed to create deliverable" },
       { status: 400 }
     );
   }
