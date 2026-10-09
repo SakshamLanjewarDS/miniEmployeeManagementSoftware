@@ -63,7 +63,7 @@ interface ProjectItem {
   projectType?: string | null;
   siteAddress?: string | null;
   currentPhase?: string | null;
-  status: "PLANNING" | "ACTIVE" | "ON_HOLD" | "COMPLETED" | "ARCHIVED";
+  status: "DRAFT" | "PLANNING" | "ACTIVE" | "ON_HOLD" | "COMPLETED" | "CANCELLED" | "ARCHIVED";
   budget?: number | null;
   currency: string;
   startDate?: string | Date | null;
@@ -229,6 +229,34 @@ export function ProjectsClientView({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [createValidationErrors, setCreateValidationErrors] = useState<string[]>([]);
+  const [activatingProjectId, setActivatingProjectId] = useState<string | null>(null);
+
+  const handleQuickActivate = async (project: ProjectItem) => {
+    if (!canManage) return;
+    setActivatingProjectId(project.id);
+    setErrorMessage(null);
+    try {
+      const res = await fetch(`/api/projects/${project.id}/lifecycle?workspaceSlug=${context.tenantSlug}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "ACTIVATE" }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        if (data.validationErrors && data.validationErrors.length > 0) {
+          throw new Error(`Activation requirements: ${data.validationErrors.join(" ")}`);
+        }
+        throw new Error(data.error || "Failed to activate project");
+      }
+      setSuccessMessage(`✓ Project "${project.name}" (${project.code}) is now ACTIVE!`);
+      router.refresh();
+    } catch (err: any) {
+      setErrorMessage(err.message || "Failed to activate project");
+    } finally {
+      setActivatingProjectId(null);
+    }
+  };
 
   // Distinct cities from initialProjects (memoized)
   const availableCities = useMemo(() => {
@@ -473,18 +501,23 @@ export function ProjectsClientView({
     }
   };
 
-  // Handle Create Project
-  const handleCreateSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Handle Create Project (Draft or Active Commission)
+  const handleCreateSubmit = async (e: React.FormEvent, targetStatus: "DRAFT" | "ACTIVE" = "ACTIVE") => {
+    if (e && e.preventDefault) e.preventDefault();
     if (!canManage) return;
 
-    if (!formData.code.trim() || !formData.name.trim()) {
-      setErrorMessage("Project Code and Name are required.");
+    if (targetStatus === "ACTIVE" && (!formData.code.trim() || !formData.name.trim())) {
+      setErrorMessage("Project Code and Name are required for activation.");
+      return;
+    }
+    if (targetStatus === "DRAFT" && !formData.code.trim() && !formData.name.trim()) {
+      setErrorMessage("Draft project requires at least a Project Code or Name.");
       return;
     }
 
     setIsSubmitting(true);
     setErrorMessage(null);
+    setCreateValidationErrors([]);
 
     try {
       const res = await fetch(`/api/projects?workspaceSlug=${context.tenantSlug}`, {
@@ -512,11 +545,16 @@ export function ProjectsClientView({
           budget: formData.budget ? parseFloat(formData.budget) : undefined,
           currency: formData.currency || "INR",
           description: formData.description.trim() || undefined,
+          brief: formData.description.trim() || undefined,
+          status: targetStatus,
         }),
       });
 
       const data = await res.json();
       if (!res.ok) {
+        if (data.validationErrors && Array.isArray(data.validationErrors)) {
+          setCreateValidationErrors(data.validationErrors);
+        }
         throw new Error(data.error || "Failed to create project");
       }
 
@@ -541,8 +579,13 @@ export function ProjectsClientView({
         }
       }
 
-      setSuccessMessage(`Project "${formData.name}" created with default architectural phases!`);
+      setSuccessMessage(
+        targetStatus === "DRAFT"
+          ? `✓ Project "${formData.name || formData.code}" saved as Draft!`
+          : `✓ Project "${formData.name}" commissioned & activated into operational portfolio!`
+      );
       setIsCreateModalOpen(false);
+      setCreateValidationErrors([]);
       setFormData({
         code: "",
         name: "",
@@ -567,10 +610,9 @@ export function ProjectsClientView({
         description: "",
         customValues: {},
       });
-
       router.refresh();
     } catch (err: any) {
-      setErrorMessage(err.message || "An unexpected error occurred");
+      setErrorMessage(err.message || "Failed to create project");
     } finally {
       setIsSubmitting(false);
     }
@@ -773,6 +815,13 @@ export function ProjectsClientView({
             Active Commission
           </span>
         );
+      case "DRAFT":
+        return (
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-300 flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+            Draft Setup
+          </span>
+        );
       case "PLANNING":
         return (
           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
@@ -789,6 +838,12 @@ export function ProjectsClientView({
         return (
           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
             Completed
+          </span>
+        );
+      case "CANCELLED":
+        return (
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200">
+            Cancelled
           </span>
         );
       case "ARCHIVED":
@@ -957,9 +1012,12 @@ export function ProjectsClientView({
               options={[
                 { value: "ALL", label: `All Statuses (${initialProjects.length})` },
                 { value: "ACTIVE", label: "Active" },
+                { value: "DRAFT", label: "Draft Setup" },
                 { value: "PLANNING", label: "Planning" },
                 { value: "ON_HOLD", label: "On Hold" },
                 { value: "COMPLETED", label: "Completed" },
+                { value: "CANCELLED", label: "Cancelled" },
+                { value: "ARCHIVED", label: "Archived" },
               ]}
             />
           </div>
@@ -1480,6 +1538,18 @@ export function ProjectsClientView({
                     {/* Owner/Admin Action Buttons (Edit / Progress / Delete) */}
                     {canManage && (
                       <div className="flex items-center gap-1.5 opacity-90 group-hover:opacity-100 transition-opacity shrink-0">
+                        {p.status === "DRAFT" && (
+                          <button
+                            type="button"
+                            disabled={activatingProjectId === p.id}
+                            onClick={() => handleQuickActivate(p)}
+                            className="px-2.5 py-1 rounded-lg border border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-600 hover:text-white transition-all text-[11px] font-bold flex items-center gap-1 cursor-pointer shadow-2xs disabled:opacity-50"
+                            title="Activate Project into Operational Workflow"
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 group-hover:text-white" />
+                            <span>{activatingProjectId === p.id ? "Activating..." : "Activate"}</span>
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={() => handleOpenProgressModal(p)}
@@ -1812,6 +1882,23 @@ export function ProjectsClientView({
               </button>
             </div>
 
+            {createValidationErrors.length > 0 && (
+              <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 space-y-1.5 animate-in fade-in">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-amber-800">
+                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>Activation Requirements Incomplete</span>
+                </div>
+                <p className="text-[11px] text-amber-700">
+                  The project could not be directly activated. You may click &quot;Save as Draft&quot; below to finish setup later, or satisfy the requirements below:
+                </p>
+                <ul className="list-disc pl-5 text-[11px] space-y-0.5 text-amber-800">
+                  {createValidationErrors.map((err, i) => (
+                    <li key={i}>{err}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             {/* Modal Form */}
             <form onSubmit={handleCreateSubmit} className="space-y-4 text-xs">
               {/* Row 1: Project Code & Project Name */}
@@ -2123,7 +2210,7 @@ export function ProjectsClientView({
               />
 
               {/* Form Buttons */}
-              <div className="pt-4 border-t border-[#E2E6F0] flex justify-end gap-2">
+              <div className="pt-4 border-t border-[#E2E6F0] flex flex-wrap justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setIsCreateModalOpen(false)}
@@ -2132,12 +2219,24 @@ export function ProjectsClientView({
                   Cancel
                 </button>
                 <button
-                  type="submit"
+                  type="button"
                   disabled={isSubmitting}
+                  onClick={(e) => handleCreateSubmit(e, "DRAFT")}
+                  className="px-4 py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 font-semibold rounded-xl text-xs cursor-pointer disabled:opacity-50 flex items-center gap-1.5 transition-colors"
+                  title="Save incomplete setup as draft. Operational deliverables cannot be assigned until activated."
+                >
+                  <Clock className="w-3.5 h-3.5 text-amber-600" />
+                  <span>{isSubmitting ? "Saving..." : "Save as Draft"}</span>
+                </button>
+                <button
+                  type="button"
+                  disabled={isSubmitting}
+                  onClick={(e) => handleCreateSubmit(e, "ACTIVE")}
                   className="px-5 py-2 bg-[#5A81FA] hover:bg-[#426EE8] text-white font-semibold rounded-xl text-xs shadow-xs cursor-pointer disabled:opacity-50 flex items-center gap-1.5 transition-colors"
+                  title="Validate all architectural parameters and activate into operational portfolio"
                 >
                   <Plus className="w-4 h-4" />
-                  <span>{isSubmitting ? "Creating Project..." : "Commission Project"}</span>
+                  <span>{isSubmitting ? "Activating..." : "Commission & Activate"}</span>
                 </button>
               </div>
             </form>

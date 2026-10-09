@@ -27,6 +27,12 @@ export async function PATCH(req: NextRequest) {
       siteAddress,
       siteLatitude,
       siteLongitude,
+      weather,
+      checklistItemsJson,
+      snagsJson,
+      photosJson,
+      contractorSignOff,
+      voiceMemoTranscript,
     } = body;
 
     if (!visitId) {
@@ -43,6 +49,12 @@ export async function PATCH(req: NextRequest) {
       siteAddress,
       siteLatitude: typeof siteLatitude === "number" ? siteLatitude : undefined,
       siteLongitude: typeof siteLongitude === "number" ? siteLongitude : undefined,
+      weather,
+      checklistItemsJson,
+      snagsJson,
+      photosJson,
+      contractorSignOff,
+      voiceMemoTranscript,
     });
 
     return NextResponse.json({ success: true, visit: updated });

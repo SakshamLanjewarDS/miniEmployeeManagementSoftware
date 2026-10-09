@@ -69,6 +69,64 @@ export interface TaskItem {
     | "COMPLETED"
     | "BLOCKED"
     | "CANCELLED";
+  version?: number;
+  acceptanceCriteria?: string | null;
+  reviewerId?: string | null;
+  reviewer?: {
+    id: string;
+    user: { fullName: string };
+  } | null;
+  assignments?: Array<{
+    id: string;
+    membershipId: string;
+    acknowledgedAt: string | null;
+    acknowledgedVersion: number | null;
+    isCompleted: boolean;
+    completedAt: string | null;
+    memberName: string;
+  }>;
+  submissions?: Array<{
+    id: string;
+    version: number;
+    summary: string;
+    checklistTaskIds: string[];
+    criteriaSnapshot: any;
+    evidenceFiles: any;
+    evidenceLinks: any;
+    status: string;
+    reviewFeedback?: string | null;
+    decidedAt?: string | null;
+    createdAt: string;
+    submitterName: string;
+    reviewerName?: string | null;
+  }>;
+  extensionRequests?: Array<{
+    id: string;
+    checklistItemId: string;
+    itemTitle: string;
+    requesterName: string;
+    currentDueDate: string | null;
+    proposedDueDate: string | null;
+    reason: string;
+    status: string;
+    decisionReason?: string | null;
+    decidedAt?: string | null;
+    createdAt: string;
+  }>;
+  clarifications?: Array<{
+    id: string;
+    checklistItemId?: string | null;
+    question: string;
+    attachments?: any;
+    authorName: string;
+    createdAt: string;
+    answers?: Array<{
+      id: string;
+      authorName: string;
+      message: string;
+      createdAt: string;
+    }>;
+  }>;
   createdAt?: string | null;
   dueDate: string | null;
   estimatedHours: any;
@@ -97,7 +155,31 @@ export interface TaskItem {
     id: string;
     user: { fullName: string };
   } | null;
-  checklistItems: Array<{ id: string; title: string; isCompleted: boolean }>;
+  checklistItems: Array<{
+    id: string;
+    title: string;
+    description?: string | null;
+    acceptanceCriteria?: string | null;
+    isCompleted: boolean;
+    sortOrder?: number;
+    priority?: string;
+    status?: string;
+    dueDate?: string | null;
+    startedAt?: string | null;
+    completedAt?: string | null;
+    isBlocked?: boolean;
+    blockerReason?: string | null;
+    blockerDetails?: any;
+    prerequisiteItemId?: string | null;
+    prerequisiteItem?: {
+      id: string;
+      title: string;
+      status: string;
+      isCompleted: boolean;
+    } | null;
+    assignedMemberId?: string | null;
+    assignedMember?: any;
+  }>;
   comments: Array<{ id: string; content: string; authorId?: string; createdAt?: string }>;
   activityHistory?: Array<{
     id: string;
@@ -242,6 +324,68 @@ export default function TasksClientView({
   const [changeComment, setChangeComment] = useState("");
   const [overrideModal, setOverrideModal] = useState<{ taskId: string; title: string } | null>(null);
   const [overrideReason, setOverrideReason] = useState("");
+
+  // End-to-End Workflow States
+  const [taskAcceptanceCriteria, setTaskAcceptanceCriteria] = useState("");
+  const [taskReviewerId, setTaskReviewerId] = useState("");
+
+  const [blockerModal, setBlockerModal] = useState<{
+    taskId: string;
+    checklistItemId?: string;
+    title: string;
+    isResolving?: boolean;
+    existingReason?: string;
+  } | null>(null);
+  const [blockerReasonInput, setBlockerReasonInput] = useState("");
+  const [blockerCategory, setBlockerCategory] = useState<string>("INTERNAL");
+  const [blockerSeverity, setBlockerSeverity] = useState<string>("MEDIUM");
+  const [submittingBlocker, setSubmittingBlocker] = useState(false);
+
+  const [extensionModal, setExtensionModal] = useState<{
+    taskId: string;
+    checklistItemId?: string;
+    title: string;
+    currentDueDate?: string | null;
+  } | null>(null);
+  const [extensionProposedDate, setExtensionProposedDate] = useState("");
+  const [extensionReasonInput, setExtensionReasonInput] = useState("");
+  const [submittingExtension, setSubmittingExtension] = useState(false);
+
+  const [submissionModal, setSubmissionModal] = useState<{
+    task: TaskItem;
+  } | null>(null);
+  const [submissionSummary, setSubmissionSummary] = useState("");
+  const [submissionSelectedItems, setSubmissionSelectedItems] = useState<string[]>([]);
+  const [submissionEvidenceLinks, setSubmissionEvidenceLinks] = useState("");
+  const [submittingSnapshot, setSubmittingSnapshot] = useState(false);
+
+  const [reviewDecisionModal, setReviewDecisionModal] = useState<{
+    submissionId: string;
+    taskId: string;
+    action: "APPROVE" | "REQUEST_CHANGES";
+  } | null>(null);
+  const [reviewFeedbackInput, setReviewFeedbackInput] = useState("");
+  const [submittingDecision, setSubmittingDecision] = useState(false);
+
+  const [reopenModal, setReopenModal] = useState<{
+    taskId: string;
+    checklistItemId: string;
+    title: string;
+  } | null>(null);
+  const [reopenReasonInput, setReopenReasonInput] = useState("");
+  const [submittingReopen, setSubmittingReopen] = useState(false);
+
+  const [clarificationQuestion, setClarificationQuestion] = useState("");
+  const [clarificationUrgency, setClarificationUrgency] = useState<"NORMAL" | "URGENT">("NORMAL");
+  const [clarificationItemId, setClarificationItemId] = useState("");
+  const [submittingClarification, setSubmittingClarification] = useState(false);
+  const [replyModal, setReplyModal] = useState<{
+    clarificationId: string;
+    question: string;
+    taskId: string;
+  } | null>(null);
+  const [replyMessageInput, setReplyMessageInput] = useState("");
+  const [submittingReply, setSubmittingReply] = useState(false);
 
   // Reassign / Delegate Modal state
   const [reassignModal, setReassignModal] = useState<{ task: TaskItem } | null>(null);
@@ -608,6 +752,8 @@ export default function TasksClientView({
   const isTaskAssignedToMe = (task: TaskItem): boolean => {
     if (task.assigneeId === currentMembershipId) return true;
     if (Array.isArray(task.assignedMemberIds) && task.assignedMemberIds.includes(currentMembershipId)) return true;
+    if (Array.isArray((task as any).assignments) && (task as any).assignments.some((a: any) => a.membershipId === currentMembershipId)) return true;
+    if (Array.isArray(task.checklistItems) && task.checklistItems.some((ci) => ci.assignedMemberId === currentMembershipId)) return true;
     return false;
   };
 
@@ -821,6 +967,8 @@ export default function TasksClientView({
           description: taskDescription.trim(),
           priority: taskPriority,
           assigneeIds: taskAssigneeIds,
+          reviewerId: taskReviewerId || undefined,
+          acceptanceCriteria: taskAcceptanceCriteria.trim() || undefined,
           checklistItems: flatChecklistItems,
           estimatedHours: taskEstimatedHours ? Number(taskEstimatedHours) : undefined,
         }),
@@ -862,6 +1010,8 @@ export default function TasksClientView({
 
       // Reset form
       setTaskDescription("");
+      setTaskAcceptanceCriteria("");
+      setTaskReviewerId("");
       setTaskEstimatedHours("");
       setTaskAssigneeIds(userRole === "OWNER" || userRole === "ADMIN" ? [] : [currentMembershipId]);
       setEmployeeChecklists({});
@@ -1297,6 +1447,7 @@ export default function TasksClientView({
   // Toggle checklist item status directly - Instant Optimistic UI Update (< 5ms response)
   const handleToggleChecklist = async (taskId: string, itemId: string, currentStatus: boolean) => {
     const newStatus = !currentStatus;
+    setTogglingChecklistId(itemId);
 
     // 1. INSTANT MILLISECOND UI UPDATE
     setTasks((prev) =>
@@ -1305,7 +1456,13 @@ export default function TasksClientView({
           ? {
               ...t,
               checklistItems: t.checklistItems.map((ci) =>
-                ci.id === itemId ? { ...ci, isCompleted: newStatus } : ci
+                ci.id === itemId
+                  ? {
+                      ...ci,
+                      isCompleted: newStatus,
+                      status: newStatus ? "COMPLETED" : "IN_PROGRESS",
+                    }
+                  : ci
               ),
             }
           : t
@@ -1317,7 +1474,13 @@ export default function TasksClientView({
           ? {
               ...prev,
               checklistItems: prev.checklistItems.map((ci) =>
-                ci.id === itemId ? { ...ci, isCompleted: newStatus } : ci
+                ci.id === itemId
+                  ? {
+                      ...ci,
+                      isCompleted: newStatus,
+                      status: newStatus ? "COMPLETED" : "IN_PROGRESS",
+                    }
+                  : ci
               ),
             }
           : null
@@ -1337,6 +1500,8 @@ export default function TasksClientView({
       });
 
       if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        console.error("Checklist toggle failed on server:", errorData);
         // Rollback
         setTasks((prev) =>
           prev.map((t) =>
@@ -1344,7 +1509,13 @@ export default function TasksClientView({
               ? {
                   ...t,
                   checklistItems: t.checklistItems.map((ci) =>
-                    ci.id === itemId ? { ...ci, isCompleted: currentStatus } : ci
+                    ci.id === itemId
+                      ? {
+                          ...ci,
+                          isCompleted: currentStatus,
+                          status: currentStatus ? "COMPLETED" : "IN_PROGRESS",
+                        }
+                      : ci
                   ),
                 }
               : t
@@ -1356,11 +1527,57 @@ export default function TasksClientView({
               ? {
                   ...prev,
                   checklistItems: prev.checklistItems.map((ci) =>
-                    ci.id === itemId ? { ...ci, isCompleted: currentStatus } : ci
+                    ci.id === itemId
+                      ? {
+                          ...ci,
+                          isCompleted: currentStatus,
+                          status: currentStatus ? "COMPLETED" : "IN_PROGRESS",
+                        }
+                      : ci
                   ),
                 }
               : null
           );
+        }
+      } else {
+        const data = await res.json();
+        if (data?.item) {
+          setTasks((prev) =>
+            prev.map((t) =>
+              t.id === taskId
+                ? {
+                    ...t,
+                    checklistItems: t.checklistItems.map((ci) =>
+                      ci.id === itemId
+                        ? {
+                            ...ci,
+                            isCompleted: data.item.isCompleted,
+                            status: data.item.status || (data.item.isCompleted ? "COMPLETED" : "IN_PROGRESS"),
+                          }
+                        : ci
+                    ),
+                  }
+                : t
+            )
+          );
+          if (drawerTask && drawerTask.id === taskId) {
+            setDrawerTask((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    checklistItems: prev.checklistItems.map((ci) =>
+                      ci.id === itemId
+                        ? {
+                            ...ci,
+                            isCompleted: data.item.isCompleted,
+                            status: data.item.status || (data.item.isCompleted ? "COMPLETED" : "IN_PROGRESS"),
+                          }
+                        : ci
+                    ),
+                  }
+                : null
+            );
+          }
         }
       }
     } catch (err) {
@@ -1372,12 +1589,38 @@ export default function TasksClientView({
             ? {
                 ...t,
                 checklistItems: t.checklistItems.map((ci) =>
-                  ci.id === itemId ? { ...ci, isCompleted: currentStatus } : ci
+                  ci.id === itemId
+                    ? {
+                        ...ci,
+                        isCompleted: currentStatus,
+                        status: currentStatus ? "COMPLETED" : "IN_PROGRESS",
+                      }
+                    : ci
                 ),
               }
             : t
         )
       );
+      if (drawerTask && drawerTask.id === taskId) {
+        setDrawerTask((prev) =>
+          prev
+            ? {
+                ...prev,
+                checklistItems: prev.checklistItems.map((ci) =>
+                  ci.id === itemId
+                    ? {
+                        ...ci,
+                        isCompleted: currentStatus,
+                        status: currentStatus ? "COMPLETED" : "IN_PROGRESS",
+                      }
+                    : ci
+                ),
+              }
+            : null
+        );
+      }
+    } finally {
+      setTogglingChecklistId(null);
     }
   };
 
@@ -1470,6 +1713,347 @@ export default function TasksClientView({
         prev ? { ...prev, comments: prev.comments.filter((c) => c.id !== tempCommentId) } : null
       );
       setErrorMessage("Network error posting comment");
+    }
+  };
+
+  // 1. Acknowledge Deliverable Assignment
+  const handleAcknowledgeAssignment = async (taskId: string, version?: number) => {
+    try {
+      const res = await fetch(`/api/tasks/acknowledge?workspaceSlug=${workspaceSlug}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ taskId, version }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to acknowledge assignment");
+      }
+      setSuccessMessage("✓ Deliverable assignment acknowledged successfully!");
+      // Update local state
+      setTasks((prev) =>
+        prev.map((t) => {
+          if (t.id !== taskId) return t;
+          const updatedAssignments = (t.assignments || []).map((a) =>
+            a.membershipId === currentMembershipId
+              ? { ...a, acknowledgedAt: new Date().toISOString(), acknowledgedVersion: version || 1 }
+              : a
+          );
+          return { ...t, assignments: updatedAssignments };
+        })
+      );
+      setDrawerTask((prev) => {
+        if (!prev || prev.id !== taskId) return prev;
+        const updatedAssignments = (prev.assignments || []).map((a) =>
+          a.membershipId === currentMembershipId
+            ? { ...a, acknowledgedAt: new Date().toISOString(), acknowledgedVersion: version || 1 }
+            : a
+        );
+        return { ...prev, assignments: updatedAssignments };
+      });
+      router.refresh();
+    } catch (err: any) {
+      setErrorMessage(err.message);
+    }
+  };
+
+  // 2. Start Checklist Work
+  const handleStartChecklistItem = async (taskId: string, checklistItemId: string) => {
+    try {
+      const res = await fetch(`/api/tasks/start?workspaceSlug=${workspaceSlug}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ taskId, checklistItemId }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to start checklist task");
+      }
+      setSuccessMessage("✓ Work started on checklist task!");
+      // Update local state
+      const updateChecklist = (items: TaskItem["checklistItems"]) =>
+        items.map((i) =>
+          i.id === checklistItemId
+            ? { ...i, status: "IN_PROGRESS", startedAt: new Date().toISOString() }
+            : i
+        );
+
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === taskId
+            ? {
+                ...t,
+                status: t.status === "NOT_STARTED" ? "IN_PROGRESS" : t.status,
+                checklistItems: updateChecklist(t.checklistItems),
+              }
+            : t
+        )
+      );
+      setDrawerTask((prev) =>
+        prev && prev.id === taskId
+          ? {
+              ...prev,
+              status: prev.status === "NOT_STARTED" ? "IN_PROGRESS" : prev.status,
+              checklistItems: updateChecklist(prev.checklistItems),
+            }
+          : prev
+      );
+      router.refresh();
+    } catch (err: any) {
+      setErrorMessage(err.message);
+    }
+  };
+
+  // 3. Raise or Resolve Blocker
+  const handleRaiseOrResolveBlocker = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!blockerModal) return;
+    setSubmittingBlocker(true);
+    try {
+      if (blockerModal.isResolving) {
+        const res = await fetch(`/api/tasks/blocker?workspaceSlug=${workspaceSlug}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            taskId: blockerModal.taskId,
+            checklistItemId: blockerModal.checklistItemId,
+            resolutionNotes: blockerReasonInput.trim() || undefined,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed to resolve blocker");
+        setSuccessMessage("✓ Blocker resolved successfully!");
+      } else {
+        const res = await fetch(`/api/tasks/blocker?workspaceSlug=${workspaceSlug}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            taskId: blockerModal.taskId,
+            checklistItemId: blockerModal.checklistItemId,
+            reason: blockerReasonInput.trim(),
+            category: blockerCategory,
+            severity: blockerSeverity,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed to raise blocker");
+        setSuccessMessage("⚠️ Blocker raised and logged with leadership!");
+      }
+
+      setBlockerModal(null);
+      setBlockerReasonInput("");
+      router.refresh();
+    } catch (err: any) {
+      setErrorMessage(err.message);
+    } finally {
+      setSubmittingBlocker(false);
+    }
+  };
+
+  // 4. Request Deadline Extension
+  const handleRequestExtension = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!extensionModal || !extensionProposedDate || !extensionReasonInput.trim()) return;
+    setSubmittingExtension(true);
+    try {
+      const res = await fetch(`/api/tasks/extension?workspaceSlug=${workspaceSlug}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          taskId: extensionModal.taskId,
+          checklistItemId: extensionModal.checklistItemId,
+          proposedDueDate: extensionProposedDate,
+          reason: extensionReasonInput.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to request extension");
+      setSuccessMessage("✓ Extension request submitted for leadership review!");
+      setExtensionModal(null);
+      setExtensionProposedDate("");
+      setExtensionReasonInput("");
+      router.refresh();
+    } catch (err: any) {
+      setErrorMessage(err.message);
+    } finally {
+      setSubmittingExtension(false);
+    }
+  };
+
+  // 5. Decide Deadline Extension (Admin / Reviewer)
+  const handleDecideExtension = async (requestId: string, decision: "APPROVE" | "REJECT", decisionReason?: string) => {
+    try {
+      const res = await fetch(`/api/tasks/extension?workspaceSlug=${workspaceSlug}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          requestId,
+          decision,
+          decisionReason: decisionReason || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to process extension");
+      setSuccessMessage(`✓ Extension request ${decision.toLowerCase()}d!`);
+      router.refresh();
+    } catch (err: any) {
+      setErrorMessage(err.message);
+    }
+  };
+
+  // 6. Submit Tasks for Review (Versioned Snapshot)
+  const handleSubmitVersionedSnapshot = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!submissionModal || !submissionSummary.trim()) return;
+    setSubmittingSnapshot(true);
+    try {
+      const rawLinks = submissionEvidenceLinks
+        .split("\n")
+        .map((l) => l.trim())
+        .filter(Boolean);
+
+      const res = await fetch(`/api/tasks/submit?workspaceSlug=${workspaceSlug}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          taskId: submissionModal.task.id,
+          checklistTaskIds: submissionSelectedItems,
+          summary: submissionSummary.trim(),
+          evidenceLinks: rawLinks,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to submit deliverable");
+      setSuccessMessage(`✓ Version snapshot (v${data.submission?.version || 1}) submitted for review!`);
+      setSubmissionModal(null);
+      setSubmissionSummary("");
+      setSubmissionSelectedItems([]);
+      setSubmissionEvidenceLinks("");
+      router.refresh();
+    } catch (err: any) {
+      setErrorMessage(err.message);
+    } finally {
+      setSubmittingSnapshot(false);
+    }
+  };
+
+  // 7. Review Decision (Four-Eyes Enforcement)
+  const handleReviewDecision = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reviewDecisionModal) return;
+    if (reviewDecisionModal.action === "REQUEST_CHANGES" && !reviewFeedbackInput.trim()) {
+      setErrorMessage("Please provide specific feedback explaining the requested changes.");
+      return;
+    }
+    setSubmittingDecision(true);
+    try {
+      const res = await fetch(`/api/tasks/review?workspaceSlug=${workspaceSlug}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          submissionId: reviewDecisionModal.submissionId,
+          decision: reviewDecisionModal.action,
+          feedback: reviewFeedbackInput.trim() || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to record review decision");
+      setSuccessMessage(
+        reviewDecisionModal.action === "APPROVE"
+          ? "✓ Deliverable submission approved and verified!"
+          : "⚠️ Revisions requested. Submitter has been notified to make corrections."
+      );
+      setReviewDecisionModal(null);
+      setReviewFeedbackInput("");
+      router.refresh();
+    } catch (err: any) {
+      setErrorMessage(err.message);
+    } finally {
+      setSubmittingDecision(false);
+    }
+  };
+
+  // 8. Reopen Completed Task
+  const handleReopenItem = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reopenModal || !reopenReasonInput.trim()) return;
+    setSubmittingReopen(true);
+    try {
+      const res = await fetch(`/api/tasks/reopen?workspaceSlug=${workspaceSlug}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          taskId: reopenModal.taskId,
+          checklistItemId: reopenModal.checklistItemId,
+          reason: reopenReasonInput.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to reopen task");
+      setSuccessMessage("✓ Task reopened and moved back to In Progress!");
+      setReopenModal(null);
+      setReopenReasonInput("");
+      router.refresh();
+    } catch (err: any) {
+      setErrorMessage(err.message);
+    } finally {
+      setSubmittingReopen(false);
+    }
+  };
+
+  // 9. Ask Clarification
+  const handleAskClarification = async (e: React.FormEvent, taskId: string) => {
+    e.preventDefault();
+    if (!clarificationQuestion.trim()) return;
+    setSubmittingClarification(true);
+    try {
+      const res = await fetch(`/api/tasks/clarifications?workspaceSlug=${workspaceSlug}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          taskId,
+          checklistItemId: clarificationItemId || undefined,
+          question: clarificationQuestion.trim(),
+          urgency: clarificationUrgency,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to post question");
+      setSuccessMessage("✓ Clarification question posted to deliverable thread!");
+      setClarificationQuestion("");
+      setClarificationItemId("");
+      setClarificationUrgency("NORMAL");
+      router.refresh();
+    } catch (err: any) {
+      setErrorMessage(err.message);
+    } finally {
+      setSubmittingClarification(false);
+    }
+  };
+
+  // 10. Reply to Clarification
+  const handleReplyClarification = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!replyModal || !replyMessageInput.trim()) return;
+    setSubmittingReply(true);
+    try {
+      const res = await fetch(`/api/tasks/clarifications?workspaceSlug=${workspaceSlug}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          clarificationId: replyModal.clarificationId,
+          reply: replyMessageInput.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to post reply");
+      setSuccessMessage("✓ Reply posted to clarification thread!");
+      setReplyModal(null);
+      setReplyMessageInput("");
+      router.refresh();
+    } catch (err: any) {
+      setErrorMessage(err.message);
+    } finally {
+      setSubmittingReply(false);
     }
   };
 
@@ -2231,31 +2815,33 @@ export default function TasksClientView({
                               {task.checklistItems.filter((i) => i.isCompleted).length}/{task.checklistItems.length})
                             </span>
                           </div>
-                          <div className="space-y-1 pl-1">
-                            {task.checklistItems.map((item) => (
-                              <button
-                                key={item.id}
-                                disabled={!canEditOrReassign || togglingChecklistId === item.id}
-                                onClick={() => handleToggleChecklist(task.id, item.id, item.isCompleted)}
-                                className={`flex items-center gap-2 text-xs text-left group transition-colors ${
-                                  canEditOrReassign ? "cursor-pointer" : "cursor-default"
-                                }`}
-                              >
-                                {item.isCompleted ? (
-                                  <CheckSquare className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                                ) : (
-                                  <Square className="w-3.5 h-3.5 text-[#696E82] group-hover:text-[#5A81FA] shrink-0" />
-                                )}
-                                <span
-                                  className={`${
-                                    item.isCompleted ? "line-through text-[#696E82]" : "text-[#1F1F1F]"
+                            {task.checklistItems.map((item) => {
+                              const isItemAssignee = item.assignedMemberId === currentMembershipId;
+                              const canToggle = Boolean((canEditOrReassign || isItemAssignee) && togglingChecklistId !== item.id);
+                              return (
+                                <button
+                                  key={item.id}
+                                  disabled={!canToggle}
+                                  onClick={() => handleToggleChecklist(task.id, item.id, item.isCompleted)}
+                                  className={`flex items-center gap-2 text-xs text-left group transition-colors ${
+                                    canToggle ? "cursor-pointer" : "cursor-default"
                                   }`}
                                 >
-                                  {item.title}
-                                </span>
-                              </button>
-                            ))}
-                          </div>
+                                  {item.isCompleted ? (
+                                    <CheckSquare className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                  ) : (
+                                    <Square className="w-3.5 h-3.5 text-[#696E82] group-hover:text-[#5A81FA] shrink-0" />
+                                  )}
+                                  <span
+                                    className={`${
+                                      item.isCompleted ? "line-through text-[#696E82]" : "text-[#1F1F1F]"
+                                    }`}
+                                  >
+                                    {item.title}
+                                  </span>
+                                </button>
+                              );
+                            })}
                         </div>
                       )}
                     </div>
@@ -2598,8 +3184,56 @@ export default function TasksClientView({
             </div>
 
             {/* Scrollable Content */}
-            <div className="flex-1 overflow-y-auto p-5 space-y-6 text-xs text-[#1F1F1F]">
-              {/* Meta Grid */}
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto p-5 space-y-5 text-xs text-[#1F1F1F]">
+              {/* 1. ASSIGNMENT ACKNOWLEDGEMENT BANNER */}
+              {(() => {
+                const myAssignment = (drawerTask.assignments || []).find((a) => a.membershipId === currentMembershipId);
+                const isAssigned = myAssignment || drawerTask.assigneeId === currentMembershipId || (drawerTask.assignedMemberIds || []).includes(currentMembershipId);
+                if (!isAssigned) return null;
+
+                const isAcked = Boolean(myAssignment?.acknowledgedAt);
+                if (!isAcked) {
+                  return (
+                    <div className="p-3 bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-300 rounded-xl flex items-center justify-between gap-3 shadow-xs">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="p-1.5 bg-amber-500 text-white rounded-lg">
+                          <AlertCircle className="w-4 h-4 shrink-0" />
+                        </span>
+                        <div className="text-xs">
+                          <span className="font-bold text-amber-950 block">Action Required: Acknowledge Assignment</span>
+                          <span className="text-[11px] text-amber-800">
+                            Please acknowledge receipt of Deliverable v{drawerTask.version || 1} before starting execution.
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleAcknowledgeAssignment(drawerTask.id, drawerTask.version || 1)}
+                        className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-bold text-xs shrink-0 flex items-center gap-1 cursor-pointer transition-colors shadow-xs"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>Acknowledge</span>
+                      </button>
+                    </div>
+                  );
+                }
+                return (
+                  <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between text-xs text-emerald-800">
+                    <div className="flex items-center gap-2">
+                      <CheckCheck className="w-4 h-4 text-emerald-600" />
+                      <span className="font-semibold">
+                        Assignment acknowledged on {new Date(myAssignment!.acknowledgedAt!).toLocaleDateString()} (v{myAssignment!.acknowledgedVersion || 1})
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-emerald-700 font-mono font-bold bg-emerald-100 px-1.5 py-0.5 rounded">
+                      VERIFIED
+                    </span>
+                  </div>
+                );
+              })()}
+
+              {/* 2. META GRID */}
               <div className="grid grid-cols-2 gap-3 p-3 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl">
                 <div>
                   <span className="text-[#696E82] text-[11px] block">Assigned Staff</span>
@@ -2629,6 +3263,13 @@ export default function TasksClientView({
                 </div>
 
                 <div>
+                  <span className="text-[#696E82] text-[11px] block">Designated Reviewer</span>
+                  <div className="font-bold text-[#1F1F1F] mt-0.5">
+                    {drawerTask.reviewer?.user?.fullName || "Studio Leadership (Admin / Owner)"}
+                  </div>
+                </div>
+
+                <div>
                   <span className="text-[#696E82] text-[11px] block">Target Due Date</span>
                   <div className="font-bold text-[#1F1F1F] mt-0.5">
                     {drawerTask.dueDate
@@ -2648,16 +3289,20 @@ export default function TasksClientView({
                     {drawerTask.estimatedHours ? `${Number(drawerTask.estimatedHours)} Hours` : "Not estimated"}
                   </div>
                 </div>
-
-                <div>
-                  <span className="text-[#696E82] text-[11px] block">Created By</span>
-                  <div className="font-medium text-[#1F1F1F] mt-0.5">
-                    {drawerTask.creator?.user?.fullName || "Studio Member"}
-                  </div>
-                </div>
               </div>
 
-              {/* Description */}
+              {/* 3. ACCEPTANCE CRITERIA BOX */}
+              {drawerTask.acceptanceCriteria && (
+                <div className="p-3 bg-[#EBF1FF] border border-[#CEDEFF] rounded-xl text-xs space-y-1">
+                  <h4 className="font-bold text-[#5A81FA] uppercase tracking-wider text-[10px] flex items-center gap-1">
+                    <CheckSquare className="w-3.5 h-3.5" />
+                    <span>Acceptance Criteria & Definition of Done</span>
+                  </h4>
+                  <p className="text-[#1F1F1F] leading-relaxed whitespace-pre-line">{drawerTask.acceptanceCriteria}</p>
+                </div>
+              )}
+
+              {/* 4. DELIVERABLE INSTRUCTIONS & BRIEF */}
               <div>
                 <h4 className="font-bold text-[#1F1F1F] text-xs uppercase tracking-wider mb-1 flex items-center gap-1.5">
                   <FileText className="w-3.5 h-3.5 text-[#5A81FA]" />
@@ -2668,48 +3313,436 @@ export default function TasksClientView({
                 </div>
               </div>
 
-              {/* Checklist */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
+              {/* 5. CHECKLIST ITEMS & WORKFLOW ACTIONS */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
                   <h4 className="font-bold text-[#1F1F1F] text-xs uppercase tracking-wider flex items-center gap-1.5">
                     <CheckSquare className="w-3.5 h-3.5 text-[#5A81FA]" />
-                    <span>Deliverable Checklist</span>
+                    <span>Deliverable Checklist Tasks ({drawerTask.checklistItems.filter((i) => i.isCompleted).length} / {drawerTask.checklistItems.length})</span>
                   </h4>
-                  <span className="text-[11px] font-mono text-[#696E82]">
-                    {drawerTask.checklistItems.filter((i) => i.isCompleted).length} / {drawerTask.checklistItems.length}
-                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSubmissionSelectedItems(drawerTask.checklistItems.map((ci) => ci.id));
+                      setSubmissionModal({ task: drawerTask });
+                    }}
+                    className="px-2.5 py-1 bg-[#5A81FA] hover:bg-[#426EE8] text-white text-[11px] font-bold rounded-lg shadow-xs flex items-center gap-1 cursor-pointer transition-colors"
+                  >
+                    <Send className="w-3 h-3" />
+                    <span>Submit for Review</span>
+                  </button>
                 </div>
 
                 {drawerTask.checklistItems.length === 0 ? (
                   <p className="text-xs text-[#696E82] italic">No checklist items defined.</p>
                 ) : (
-                  <div className="space-y-1.5">
+                  <div className="space-y-2">
                     {drawerTask.checklistItems.map((item) => (
-                      <button
+                      <div
                         key={item.id}
-                        onClick={() => handleToggleChecklist(drawerTask.id, item.id, item.isCompleted)}
-                        className="w-full flex items-center gap-2 p-2 bg-[#F8F9FD] hover:bg-white border border-[#E2E6F0] rounded-xl text-left transition-colors cursor-pointer"
+                        className={`p-3 rounded-xl border transition-all space-y-2 ${
+                          item.isBlocked
+                            ? "bg-red-50/60 border-red-300"
+                            : item.isCompleted
+                            ? "bg-emerald-50/40 border-emerald-200"
+                            : "bg-[#F8F9FD] hover:bg-white border-[#E2E6F0]"
+                        }`}
                       >
-                        {item.isCompleted ? (
-                          <CheckSquare className="w-4 h-4 text-emerald-600 shrink-0" />
-                        ) : (
-                          <Square className="w-4 h-4 text-[#696E82] shrink-0" />
+                        <div className="flex items-start justify-between gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleToggleChecklist(drawerTask.id, item.id, item.isCompleted)}
+                            className="flex items-start gap-2 text-left cursor-pointer flex-1 min-w-0"
+                          >
+                            {item.isCompleted ? (
+                              <CheckSquare className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                            ) : (
+                              <Square className="w-4 h-4 text-[#696E82] shrink-0 mt-0.5" />
+                            )}
+                            <div className="min-w-0">
+                              <span
+                                className={`text-xs block ${
+                                  item.isCompleted ? "line-through text-[#696E82]" : "text-[#1F1F1F] font-semibold"
+                                }`}
+                              >
+                                {item.title}
+                              </span>
+                              {item.dueDate && (
+                                <span className="text-[10px] text-[#696E82] block">
+                                  Due: {new Date(item.dueDate).toLocaleDateString()}
+                                </span>
+                              )}
+                            </div>
+                          </button>
+
+                          {/* Status Badge */}
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {item.isBlocked ? (
+                              <span className="px-2 py-0.5 bg-red-100 text-red-800 font-bold text-[10px] rounded border border-red-200">
+                                BLOCKED
+                              </span>
+                            ) : item.status === "IN_REVIEW" ? (
+                              <span className="px-2 py-0.5 bg-amber-100 text-amber-800 font-bold text-[10px] rounded border border-amber-200">
+                                IN REVIEW
+                              </span>
+                            ) : item.status === "IN_PROGRESS" ? (
+                              <span className="px-2 py-0.5 bg-blue-100 text-blue-800 font-bold text-[10px] rounded border border-blue-200">
+                                IN PROGRESS
+                              </span>
+                            ) : item.isCompleted ? (
+                              <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 font-bold text-[10px] rounded border border-emerald-200">
+                                DONE
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 bg-gray-100 text-gray-700 font-medium text-[10px] rounded border border-gray-200">
+                                NOT STARTED
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Prerequisite Indicator */}
+                        {item.prerequisiteItem && (
+                          <div className="text-[10px] text-[#696E82] bg-white p-1.5 rounded-lg border border-[#E2E6F0] flex items-center justify-between">
+                            <span>Prerequisite: <strong>{item.prerequisiteItem.title}</strong></span>
+                            <span className={item.prerequisiteItem.isCompleted ? "text-emerald-700 font-bold" : "text-amber-700 font-medium"}>
+                              {item.prerequisiteItem.isCompleted ? "✓ Completed" : "⏳ Pending completion"}
+                            </span>
+                          </div>
                         )}
-                        <span
-                          className={`text-xs ${
-                            item.isCompleted ? "line-through text-[#696E82]" : "text-[#1F1F1F] font-medium"
-                          }`}
-                        >
-                          {item.title}
-                        </span>
-                      </button>
+
+                        {/* Blocker Alert Banner */}
+                        {item.isBlocked && (
+                          <div className="p-2 bg-red-100/70 border border-red-200 rounded-lg text-xs text-red-900 flex items-center justify-between gap-2">
+                            <div className="min-w-0">
+                              <span className="font-bold">⚠️ Blocked: </span>
+                              <span>{item.blockerReason || "Blocker logged"}</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setBlockerModal({
+                                  taskId: drawerTask.id,
+                                  checklistItemId: item.id,
+                                  title: item.title,
+                                  isResolving: true,
+                                  existingReason: item.blockerReason || undefined,
+                                })
+                              }
+                              className="px-2 py-1 bg-red-700 hover:bg-red-800 text-white text-[10px] font-bold rounded cursor-pointer shrink-0 transition-colors"
+                            >
+                              Resolve Blocker
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Item Action Controls */}
+                        <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-[#E2E6F0]/60">
+                          {/* Start Work button */}
+                          {(!item.status || item.status === "NOT_STARTED") && !item.isCompleted && (
+                            <button
+                              type="button"
+                              onClick={() => handleStartChecklistItem(drawerTask.id, item.id)}
+                              className="px-2 py-1 bg-[#F2F4FF] hover:bg-[#5A81FA] text-[#5A81FA] hover:text-white rounded text-[10px] font-bold transition-colors cursor-pointer flex items-center gap-1"
+                            >
+                              <Play className="w-2.5 h-2.5" />
+                              <span>Start Work</span>
+                            </button>
+                          )}
+
+                          {/* Report Blocker button */}
+                          {!item.isBlocked && !item.isCompleted && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setBlockerModal({
+                                  taskId: drawerTask.id,
+                                  checklistItemId: item.id,
+                                  title: item.title,
+                                  isResolving: false,
+                                })
+                              }
+                              className="px-2 py-1 bg-white hover:bg-red-50 text-red-700 border border-red-200 rounded text-[10px] font-medium transition-colors cursor-pointer flex items-center gap-1"
+                            >
+                              <AlertCircle className="w-2.5 h-2.5 text-red-600" />
+                              <span>Report Blocker</span>
+                            </button>
+                          )}
+
+                          {/* Request Extension button */}
+                          {!item.isCompleted && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setExtensionModal({
+                                  taskId: drawerTask.id,
+                                  checklistItemId: item.id,
+                                  title: item.title,
+                                  currentDueDate: item.dueDate,
+                                })
+                              }
+                              className="px-2 py-1 bg-white hover:bg-amber-50 text-amber-800 border border-amber-200 rounded text-[10px] font-medium transition-colors cursor-pointer flex items-center gap-1"
+                            >
+                              <Clock className="w-2.5 h-2.5 text-amber-600" />
+                              <span>Extend Date</span>
+                            </button>
+                          )}
+
+                          {/* Reopen button */}
+                          {item.isCompleted && isPrivileged && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setReopenModal({
+                                  taskId: drawerTask.id,
+                                  checklistItemId: item.id,
+                                  title: item.title,
+                                })
+                              }
+                              className="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded text-[10px] font-bold transition-colors cursor-pointer flex items-center gap-1 ml-auto"
+                            >
+                              <RotateCcw className="w-2.5 h-2.5" />
+                              <span>Reopen Work</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
                     ))}
                   </div>
                 )}
               </div>
 
-              {/* Comments & Collaboration */}
-              <div className="space-y-3">
+              {/* 6. SUBMISSIONS & REVIEW DECISIONS QUEUE */}
+              {drawerTask.submissions && drawerTask.submissions.length > 0 && (
+                <div className="space-y-3 pt-2 border-t border-[#E2E6F0]">
+                  <h4 className="font-bold text-[#1F1F1F] text-xs uppercase tracking-wider flex items-center gap-1.5">
+                    <Send className="w-3.5 h-3.5 text-[#5A81FA]" />
+                    <span>Versioned Submissions & Reviews ({drawerTask.submissions.length})</span>
+                  </h4>
+
+                  <div className="space-y-2">
+                    {drawerTask.submissions.map((sub) => {
+                      const isPending = sub.status === "PENDING";
+                      // Four-Eyes Rule: Submitters cannot approve their own submission
+                      const isSubmitter = sub.submitterName === contextUserFullName;
+                      const canReview = isPrivileged || drawerTask.reviewerId === currentMembershipId;
+                      const selfApprovalBlocked = canReview && isSubmitter;
+
+                      return (
+                        <div
+                          key={sub.id}
+                          className={`p-3 rounded-xl border space-y-2 text-xs ${
+                            isPending
+                              ? "bg-amber-50/50 border-amber-200 shadow-2xs"
+                              : sub.status === "APPROVED"
+                              ? "bg-emerald-50/50 border-emerald-200"
+                              : "bg-red-50/50 border-red-200"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-[#1F1F1F]">Snapshot v{sub.version}</span>
+                              <span className="text-[#696E82] text-[10px]">by {sub.submitterName}</span>
+                              <span className="text-[10px] text-[#696E82]">
+                                {new Date(sub.createdAt).toLocaleDateString()}
+                              </span>
+                            </div>
+                            <span
+                              className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                sub.status === "APPROVED"
+                                  ? "bg-emerald-100 text-emerald-800"
+                                  : sub.status === "REQUEST_CHANGES"
+                                  ? "bg-orange-100 text-orange-800"
+                                  : "bg-amber-100 text-amber-800"
+                              }`}
+                            >
+                              {sub.status}
+                            </span>
+                          </div>
+
+                          <p className="text-[#1F1F1F] text-xs leading-relaxed">{sub.summary}</p>
+
+                          {/* Evidence Links */}
+                          {sub.evidenceLinks && Array.isArray(sub.evidenceLinks) && sub.evidenceLinks.length > 0 && (
+                            <div className="text-[11px] space-y-0.5">
+                              <span className="font-bold text-[#696E82] block">Attached Deliverable Files / Evidence:</span>
+                              {sub.evidenceLinks.map((link: string, idx: number) => (
+                                <a
+                                  key={idx}
+                                  href={link}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-[#5A81FA] hover:underline block truncate"
+                                >
+                                  🔗 {link}
+                                </a>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Review Feedback if rejected */}
+                          {sub.reviewFeedback && (
+                            <div className="p-2 bg-white rounded-lg border border-red-200 text-red-900 text-xs">
+                              <strong>Reviewer Feedback: </strong>
+                              {sub.reviewFeedback}
+                            </div>
+                          )}
+
+                          {/* Review Action Dock (For Reviewer / Admin) */}
+                          {isPending && canReview && (
+                            <div className="pt-2 border-t border-amber-200 flex flex-wrap items-center justify-between gap-2">
+                              {selfApprovalBlocked ? (
+                                <div className="p-2 bg-amber-100/80 rounded-lg text-[11px] text-amber-950 font-medium w-full">
+                                  🛡️ <strong>Four-Eyes Policy:</strong> You submitted this version. Another designated reviewer or studio admin must perform the review.
+                                </div>
+                              ) : (
+                                <>
+                                  <span className="text-[11px] text-amber-900 font-semibold">Review Decision:</span>
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setReviewDecisionModal({
+                                          submissionId: sub.id,
+                                          taskId: drawerTask.id,
+                                          action: "APPROVE",
+                                        })
+                                      }
+                                      className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold cursor-pointer transition-colors shadow-xs"
+                                    >
+                                      ✓ Approve Submission
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setReviewDecisionModal({
+                                          submissionId: sub.id,
+                                          taskId: drawerTask.id,
+                                          action: "REQUEST_CHANGES",
+                                        })
+                                      }
+                                      className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold cursor-pointer transition-colors shadow-xs"
+                                    >
+                                      Request Changes
+                                    </button>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* 7. CLARIFICATIONS & Q&A THREAD */}
+              <div className="space-y-3 pt-2 border-t border-[#E2E6F0]">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-bold text-[#1F1F1F] text-xs uppercase tracking-wider flex items-center gap-1.5">
+                    <MessageSquare className="w-3.5 h-3.5 text-[#5A81FA]" />
+                    <span>Clarifications & Queries ({drawerTask.clarifications?.length || 0})</span>
+                  </h4>
+                </div>
+
+                {/* Question Input Form */}
+                <form onSubmit={(e) => handleAskClarification(e, drawerTask.id)} className="space-y-2 bg-[#F8F9FD] p-3 rounded-xl border border-[#E2E6F0]">
+                  <textarea
+                    rows={2}
+                    value={clarificationQuestion}
+                    onChange={(e) => setClarificationQuestion(e.target.value)}
+                    placeholder="Ask a question or request clarification regarding specifications, drawings, or requirements..."
+                    className="w-full p-2 bg-white border border-[#E2E6F0] rounded-lg text-xs text-[#1F1F1F] focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
+                  />
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={clarificationUrgency}
+                        onChange={(e) => setClarificationUrgency(e.target.value as any)}
+                        className="p-1 bg-white border border-[#E2E6F0] rounded text-[11px] text-[#696E82]"
+                      >
+                        <option value="NORMAL">Standard Question</option>
+                        <option value="URGENT">Urgent Blocker Query</option>
+                      </select>
+                      {drawerTask.checklistItems.length > 0 && (
+                        <select
+                          value={clarificationItemId}
+                          onChange={(e) => setClarificationItemId(e.target.value)}
+                          className="p-1 bg-white border border-[#E2E6F0] rounded text-[11px] text-[#696E82] max-w-[140px] truncate"
+                        >
+                          <option value="">General (All)</option>
+                          {drawerTask.checklistItems.map((ci) => (
+                            <option key={ci.id} value={ci.id}>
+                              {ci.title}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={submittingClarification || !clarificationQuestion.trim()}
+                      className="px-3 py-1 bg-[#5A81FA] hover:bg-[#426EE8] text-white font-bold rounded-lg text-xs disabled:opacity-50 cursor-pointer transition-colors shadow-xs flex items-center gap-1"
+                    >
+                      <Send className="w-3 h-3" />
+                      <span>Post Query</span>
+                    </button>
+                  </div>
+                </form>
+
+                {/* Clarifications List */}
+                {drawerTask.clarifications && drawerTask.clarifications.length > 0 ? (
+                  <div className="space-y-2">
+                    {drawerTask.clarifications.map((c) => (
+                      <div key={c.id} className="p-3 bg-white border border-[#E2E6F0] rounded-xl space-y-2 text-xs">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-[#1F1F1F]">{c.authorName}</span>
+                          <span className="text-[10px] text-[#696E82]">{new Date(c.createdAt).toLocaleDateString()}</span>
+                        </div>
+                        <p className="text-[#1F1F1F] leading-relaxed">{c.question}</p>
+
+                        {/* Answers / Replies */}
+                        {c.answers && c.answers.length > 0 && (
+                          <div className="space-y-1.5 pl-3 border-l-2 border-[#5A81FA]/30 pt-1">
+                            {c.answers.map((ans) => (
+                              <div key={ans.id} className="p-2 bg-[#F8F9FD] rounded-lg text-xs space-y-0.5">
+                                <div className="flex items-center justify-between text-[10px]">
+                                  <span className="font-bold text-[#5A81FA]">{ans.authorName}</span>
+                                  <span className="text-[#696E82]">{new Date(ans.createdAt).toLocaleDateString()}</span>
+                                </div>
+                                <p className="text-[#1F1F1F]">{ans.message}</p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Reply Action button */}
+                        <div className="pt-1 flex justify-end">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setReplyModal({
+                                clarificationId: c.id,
+                                question: c.question,
+                                taskId: drawerTask.id,
+                              })
+                            }
+                            className="text-[#5A81FA] hover:underline text-[11px] font-semibold cursor-pointer"
+                          >
+                            Reply / Answer →
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-[#696E82] italic">No clarification questions posted yet.</p>
+                )}
+              </div>
+
+              {/* 8. COMMENTS & COLLABORATION */}
+              <div className="space-y-3 pt-2 border-t border-[#E2E6F0]">
                 <h4 className="font-bold text-[#1F1F1F] text-xs uppercase tracking-wider flex items-center gap-1.5">
                   <MessageSquare className="w-3.5 h-3.5 text-[#5A81FA]" />
                   <span>Discussion & Deliverable Notes</span>
@@ -2726,7 +3759,7 @@ export default function TasksClientView({
                   <button
                     type="submit"
                     disabled={submittingComment || !newCommentText.trim()}
-                    className="px-3 py-2 bg-[#5A81FA] hover:bg-[#426EE8] text-white text-xs font-semibold rounded-xl disabled:opacity-50 cursor-pointer flex items-center gap-1"
+                    className="px-3 py-2 bg-[#5A81FA] hover:bg-[#426EE8] text-white text-xs font-semibold rounded-xl disabled:opacity-50 cursor-pointer flex items-center gap-1 shadow-xs"
                   >
                     <Send className="w-3.5 h-3.5" />
                     <span>Send</span>
@@ -2758,9 +3791,9 @@ export default function TasksClientView({
                 </div>
               </div>
 
-              {/* Activity History */}
+              {/* 9. ACTIVITY HISTORY */}
               {drawerTask.activityHistory && drawerTask.activityHistory.length > 0 && (
-                <div className="space-y-2">
+                <div className="space-y-2 pt-2 border-t border-[#E2E6F0]">
                   <h4 className="font-bold text-[#1F1F1F] text-xs uppercase tracking-wider flex items-center gap-1.5">
                     <History className="w-3.5 h-3.5 text-[#5A81FA]" />
                     <span>Audit & Activity Trail</span>
@@ -3460,6 +4493,27 @@ export default function TasksClientView({
                 )}
               </div>
 
+              {/* 3.1 ACCEPTANCE CRITERIA (VOICE/GRAMMAR ASSISTANT OPTED-IN) */}
+              <div id="field-acceptance-criteria">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="font-semibold text-[#1F1F1F]">
+                    Acceptance Criteria & Definition of Done
+                  </label>
+                  <span className="text-[10px] text-[#696E82]">
+                    Speech Assistant enabled
+                  </span>
+                </div>
+                <textarea
+                  id="task-acceptance-criteria-input"
+                  rows={2}
+                  data-enable-assistant="true"
+                  value={taskAcceptanceCriteria}
+                  onChange={(e) => setTaskAcceptanceCriteria(e.target.value)}
+                  placeholder="e.g. Dimensions verified with structural grid, AutoCAD layers comply with studio standards, PDF export stamped with GFC stamp..."
+                  className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] focus:outline-none focus:ring-2 focus:ring-[#5A81FA] transition-all"
+                />
+              </div>
+
               {/* 4. OVERALL PRIORITY */}
               <div>
                 <label className="block font-semibold text-[#1F1F1F] mb-1">
@@ -3518,6 +4572,35 @@ export default function TasksClientView({
                   allowOther={false}
                   error={formErrors.assignees}
                   helperText="Each selected employee will receive an independent checklist section below."
+                />
+              </div>
+
+              {/* 5.1 DESIGNATED REVIEWER (FOUR-EYES ENFORCEMENT) */}
+              <div id="field-reviewer">
+                <SearchableSelect
+                  id="task-reviewer"
+                  label="Designated Reviewer (Four-Eyes Gatekeeper)"
+                  required={false}
+                  placeholder="Select reviewer (must not be an assignee)..."
+                  searchPlaceholder="Search reviewers..."
+                  value={taskReviewerId}
+                  onChange={setTaskReviewerId}
+                  options={[
+                    { value: "", label: "Default: Studio Leadership (Admin / Owner)", subLabel: "Review routed to leads" },
+                    ...members
+                      .filter((m) => !taskAssigneeIds.includes(m.id))
+                      .map((m) => {
+                        const designation = m.employee?.designation ? `${m.employee.designation} (${m.role})` : m.role;
+                        return {
+                          value: m.id,
+                          label: m.user.fullName,
+                          subLabel: designation,
+                          badge: m.employee?.employeeId || undefined,
+                        };
+                      }),
+                  ]}
+                  allowOther={false}
+                  helperText="Four-eyes rule: Selected reviewer cannot be an assignee on this deliverable."
                 />
               </div>
 
@@ -3947,6 +5030,549 @@ export default function TasksClientView({
                 {deletingTask ? <span>Deleting...</span> : <span>Confirm Delete</span>}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==================================================== */}
+      {/* 13. WORKFLOW: BLOCKER MODAL                          */}
+      {/* ==================================================== */}
+      {blockerModal && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white border border-[#E2E6F0] rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-[#E2E6F0] pb-3">
+              <div className="flex items-center gap-2">
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-white ${blockerModal.isResolving ? "bg-emerald-600" : "bg-red-600"}`}>
+                  <AlertCircle className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-[#1F1F1F]">
+                    {blockerModal.isResolving ? "Resolve Blocker" : "Report Work Blocker"}
+                  </h3>
+                  <p className="text-xs text-[#696E82] truncate max-w-[280px]">{blockerModal.title}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setBlockerModal(null)}
+                className="text-[#696E82] hover:text-[#1F1F1F] p-1 rounded-lg hover:bg-[#F2F4FF] cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleRaiseOrResolveBlocker} className="space-y-4 text-xs">
+              {blockerModal.isResolving ? (
+                <div>
+                  <label className="block font-semibold text-[#1F1F1F] mb-1">
+                    Resolution Notes (How was this resolved?)
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={blockerReasonInput}
+                    onChange={(e) => setBlockerReasonInput(e.target.value)}
+                    placeholder="e.g. Received updated structural grid from civil consultant; joinery clearance confirmed."
+                    className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <label className="block font-semibold text-[#1F1F1F] mb-1">
+                      Blocker Category <span className="text-red-600">*</span>
+                    </label>
+                    <select
+                      value={blockerCategory}
+                      onChange={(e) => setBlockerCategory(e.target.value)}
+                      className="w-full p-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F]"
+                    >
+                      <option value="DRAWINGS">Design & Drawing Discrepancy</option>
+                      <option value="SITE_CONDITIONS">Site Condition / Survey Obstacle</option>
+                      <option value="APPROVALS">Pending Approval / Client Gate</option>
+                      <option value="CLIENT">Client Specification Missing</option>
+                      <option value="MATERIALS">Material / Vendor Specification</option>
+                      <option value="INTERNAL">Internal Coordination / Dependencies</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-[#1F1F1F] mb-1">Severity Level</label>
+                    <div className="grid grid-cols-4 gap-2">
+                      {["LOW", "MEDIUM", "HIGH", "CRITICAL"].map((sev) => (
+                        <button
+                          key={sev}
+                          type="button"
+                          onClick={() => setBlockerSeverity(sev)}
+                          className={`p-2 rounded-xl border text-center font-bold text-[10px] cursor-pointer transition-all ${
+                            blockerSeverity === sev
+                              ? "bg-red-50 text-red-800 border-red-300 ring-2 ring-red-400"
+                              : "bg-[#F8F9FD] border-[#E2E6F0] text-[#696E82]"
+                          }`}
+                        >
+                          {sev}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-[#1F1F1F] mb-1">
+                      Detailed Blocker Explanation <span className="text-red-600">*</span>
+                    </label>
+                    <textarea
+                      rows={3}
+                      required
+                      value={blockerReasonInput}
+                      onChange={(e) => setBlockerReasonInput(e.target.value)}
+                      placeholder="Explain what is blocking progress and what input is needed from leadership..."
+                      className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] focus:outline-none focus:ring-2 focus:ring-red-500"
+                    />
+                  </div>
+                </>
+              )}
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-[#E2E6F0]">
+                <button
+                  type="button"
+                  onClick={() => setBlockerModal(null)}
+                  className="px-4 py-2 bg-[#F2F4FF] text-[#696E82] font-semibold rounded-xl cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingBlocker || (!blockerModal.isResolving && !blockerReasonInput.trim())}
+                  className={`px-5 py-2 text-white font-semibold rounded-xl shadow-xs cursor-pointer disabled:opacity-50 ${
+                    blockerModal.isResolving ? "bg-emerald-600 hover:bg-emerald-700" : "bg-red-600 hover:bg-red-700"
+                  }`}
+                >
+                  {submittingBlocker ? "Processing..." : blockerModal.isResolving ? "Mark Resolved" : "Log Blocker"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ==================================================== */}
+      {/* 14. WORKFLOW: DEADLINE EXTENSION MODAL               */}
+      {/* ==================================================== */}
+      {extensionModal && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white border border-[#E2E6F0] rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-[#E2E6F0] pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-amber-500 text-white flex items-center justify-center">
+                  <Clock className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-[#1F1F1F]">Request Due Date Extension</h3>
+                  <p className="text-xs text-[#696E82] truncate max-w-[280px]">{extensionModal.title}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setExtensionModal(null)}
+                className="text-[#696E82] hover:text-[#1F1F1F] p-1 rounded-lg hover:bg-[#F2F4FF] cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleRequestExtension} className="space-y-4 text-xs">
+              <div>
+                <label className="block font-semibold text-[#1F1F1F] mb-1">
+                  Proposed New Deadline <span className="text-red-600">*</span>
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={extensionProposedDate}
+                  onChange={(e) => setExtensionProposedDate(e.target.value)}
+                  className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
+                {extensionModal.currentDueDate && (
+                  <p className="text-[11px] text-[#696E82] mt-1">
+                    Current due date: <strong>{new Date(extensionModal.currentDueDate).toLocaleDateString()}</strong>
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block font-semibold text-[#1F1F1F] mb-1">
+                  Reason for Extension <span className="text-red-600">*</span>
+                </label>
+                <textarea
+                  rows={3}
+                  required
+                  value={extensionReasonInput}
+                  onChange={(e) => setExtensionReasonInput(e.target.value)}
+                  placeholder="Explain why the timeline shifted and steps taken to mitigate delays..."
+                  className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-[#E2E6F0]">
+                <button
+                  type="button"
+                  onClick={() => setExtensionModal(null)}
+                  className="px-4 py-2 bg-[#F2F4FF] text-[#696E82] font-semibold rounded-xl cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingExtension || !extensionProposedDate || !extensionReasonInput.trim()}
+                  className="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-xl shadow-xs cursor-pointer disabled:opacity-50"
+                >
+                  {submittingExtension ? "Submitting..." : "Submit Extension Request"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ==================================================== */}
+      {/* 15. WORKFLOW: VERSIONED SUBMISSION MODAL             */}
+      {/* ==================================================== */}
+      {submissionModal && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white border border-[#E2E6F0] rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-[#E2E6F0] pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-[#5A81FA] text-white flex items-center justify-center shadow-xs">
+                  <Send className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-[#1F1F1F]">Submit Deliverable for Review</h3>
+                  <p className="text-xs text-[#696E82]">Creates an immutable snapshot of completed items and evidence</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSubmissionModal(null)}
+                className="text-[#696E82] hover:text-[#1F1F1F] p-1 rounded-lg hover:bg-[#F2F4FF] cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitVersionedSnapshot} className="space-y-4 text-xs">
+              {/* Acceptance Criteria Snapshot */}
+              {submissionModal.task.acceptanceCriteria && (
+                <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-xl space-y-1">
+                  <span className="font-bold text-blue-950 uppercase text-[10px] block">
+                    Review Gate Acceptance Criteria:
+                  </span>
+                  <p className="text-blue-900 leading-relaxed whitespace-pre-line text-xs">
+                    {submissionModal.task.acceptanceCriteria}
+                  </p>
+                </div>
+              )}
+
+              {/* Checklist Task Selection */}
+              <div>
+                <label className="block font-semibold text-[#1F1F1F] mb-1">
+                  Select Checklist Tasks Included in this Submission:
+                </label>
+                <div className="space-y-1.5 max-h-40 overflow-y-auto border border-[#E2E6F0] rounded-xl p-2 bg-[#F8F9FD]">
+                  {submissionModal.task.checklistItems.map((ci) => {
+                    const isChecked = submissionSelectedItems.includes(ci.id);
+                    return (
+                      <label
+                        key={ci.id}
+                        className="flex items-center gap-2 p-1.5 bg-white rounded-lg border border-[#E2E6F0] hover:bg-[#F2F4FF] cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSubmissionSelectedItems((prev) => [...prev, ci.id]);
+                            } else {
+                              setSubmissionSelectedItems((prev) => prev.filter((id) => id !== ci.id));
+                            }
+                          }}
+                          className="rounded text-[#5A81FA]"
+                        />
+                        <span className="text-xs font-medium text-[#1F1F1F] truncate flex-1">{ci.title}</span>
+                        {ci.isCompleted && (
+                          <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-1.5 rounded">
+                            Done
+                          </span>
+                        )}
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Submission Summary */}
+              <div>
+                <label className="block font-semibold text-[#1F1F1F] mb-1">
+                  Submission Summary / Scope Delivered <span className="text-red-600">*</span>
+                </label>
+                <textarea
+                  rows={3}
+                  required
+                  value={submissionSummary}
+                  onChange={(e) => setSubmissionSummary(e.target.value)}
+                  placeholder="e.g. Completed 1:20 joinery detail sheets A-301 through A-304. Updated column junction waterproofing as requested."
+                  className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
+                />
+              </div>
+
+              {/* Evidence Links */}
+              <div>
+                <label className="block font-semibold text-[#1F1F1F] mb-1">
+                  Drawing / Evidence File URLs (One per line)
+                </label>
+                <textarea
+                  rows={2}
+                  value={submissionEvidenceLinks}
+                  onChange={(e) => setSubmissionEvidenceLinks(e.target.value)}
+                  placeholder="https://drive.google.com/file/...&#10;https://bim360.autodesk.com/..."
+                  className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] focus:outline-none focus:ring-2 focus:ring-[#5A81FA] font-mono text-[11px]"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-[#E2E6F0]">
+                <button
+                  type="button"
+                  onClick={() => setSubmissionModal(null)}
+                  className="px-4 py-2 bg-[#F2F4FF] text-[#696E82] font-semibold rounded-xl cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingSnapshot || !submissionSummary.trim()}
+                  className="px-5 py-2 bg-[#5A81FA] hover:bg-[#426EE8] text-white font-semibold rounded-xl shadow-xs cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>{submittingSnapshot ? "Submitting..." : "Submit Version Snapshot"}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ==================================================== */}
+      {/* 16. WORKFLOW: REVIEW DECISION MODAL                  */}
+      {/* ==================================================== */}
+      {reviewDecisionModal && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white border border-[#E2E6F0] rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-[#E2E6F0] pb-3">
+              <div className="flex items-center gap-2">
+                <div
+                  className={`w-8 h-8 rounded-lg flex items-center justify-center text-white ${
+                    reviewDecisionModal.action === "APPROVE" ? "bg-emerald-600" : "bg-amber-600"
+                  }`}
+                >
+                  {reviewDecisionModal.action === "APPROVE" ? (
+                    <CheckCircle2 className="w-4 h-4" />
+                  ) : (
+                    <RotateCcw className="w-4 h-4" />
+                  )}
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-[#1F1F1F]">
+                    {reviewDecisionModal.action === "APPROVE"
+                      ? "Approve Deliverable Submission"
+                      : "Request Architectural Corrections"}
+                  </h3>
+                  <p className="text-xs text-[#696E82]">Enforcing Four-Eyes Quality Assurance Gate</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReviewDecisionModal(null)}
+                className="text-[#696E82] hover:text-[#1F1F1F] p-1 rounded-lg hover:bg-[#F2F4FF] cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleReviewDecision} className="space-y-4 text-xs">
+              <div>
+                <label className="block font-semibold text-[#1F1F1F] mb-1">
+                  {reviewDecisionModal.action === "APPROVE"
+                    ? "Approval Comments (Optional)"
+                    : "Correction Instructions (Mandatory) *"}
+                </label>
+                <textarea
+                  rows={3}
+                  required={reviewDecisionModal.action === "REQUEST_CHANGES"}
+                  value={reviewFeedbackInput}
+                  onChange={(e) => setReviewFeedbackInput(e.target.value)}
+                  placeholder={
+                    reviewDecisionModal.action === "APPROVE"
+                      ? "e.g. Verified drawings meet all AIA specifications. Ready for client issuance."
+                      : "e.g. Please revise joinery sheet A-302: pergolas require 12mm expansion bolt specifications."
+                  }
+                  className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-[#E2E6F0]">
+                <button
+                  type="button"
+                  onClick={() => setReviewDecisionModal(null)}
+                  className="px-4 py-2 bg-[#F2F4FF] text-[#696E82] font-semibold rounded-xl cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingDecision || (reviewDecisionModal.action === "REQUEST_CHANGES" && !reviewFeedbackInput.trim())}
+                  className={`px-5 py-2 text-white font-semibold rounded-xl shadow-xs cursor-pointer disabled:opacity-50 ${
+                    reviewDecisionModal.action === "APPROVE"
+                      ? "bg-emerald-600 hover:bg-emerald-700"
+                      : "bg-amber-600 hover:bg-amber-700"
+                  }`}
+                >
+                  {submittingDecision
+                    ? "Recording Decision..."
+                    : reviewDecisionModal.action === "APPROVE"
+                    ? "Confirm Approval"
+                    : "Send Requested Changes"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ==================================================== */}
+      {/* 17. WORKFLOW: REOPEN COMPLETED TASK MODAL            */}
+      {/* ==================================================== */}
+      {reopenModal && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white border border-[#E2E6F0] rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-[#E2E6F0] pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-amber-500 text-white flex items-center justify-center">
+                  <RotateCcw className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-[#1F1F1F]">Reopen Completed Task</h3>
+                  <p className="text-xs text-[#696E82] truncate max-w-[280px]">{reopenModal.title}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReopenModal(null)}
+                className="text-[#696E82] hover:text-[#1F1F1F] p-1 rounded-lg hover:bg-[#F2F4FF] cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleReopenItem} className="space-y-4 text-xs">
+              <p className="text-[#696E82]">
+                Studio governance policy requires an audit justification whenever completed work is reopened.
+              </p>
+
+              <div>
+                <label className="block font-semibold text-[#1F1F1F] mb-1">
+                  Reason for Reopening <span className="text-red-600">*</span>
+                </label>
+                <textarea
+                  rows={3}
+                  required
+                  value={reopenReasonInput}
+                  onChange={(e) => setReopenReasonInput(e.target.value)}
+                  placeholder="e.g. Client requested alteration to balcony railing detail after initial milestone sign-off."
+                  className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-[#E2E6F0]">
+                <button
+                  type="button"
+                  onClick={() => setReopenModal(null)}
+                  className="px-4 py-2 bg-[#F2F4FF] text-[#696E82] font-semibold rounded-xl cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingReopen || !reopenReasonInput.trim()}
+                  className="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-xl shadow-xs cursor-pointer disabled:opacity-50"
+                >
+                  {submittingReopen ? "Reopening..." : "Confirm Reopen"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ==================================================== */}
+      {/* 18. WORKFLOW: REPLY TO CLARIFICATION MODAL           */}
+      {/* ==================================================== */}
+      {replyModal && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white border border-[#E2E6F0] rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-[#E2E6F0] pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-[#5A81FA] text-white flex items-center justify-center">
+                  <MessageSquare className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-[#1F1F1F]">Reply to Clarification</h3>
+                  <p className="text-xs text-[#696E82]">Provide guidance to assigned staff</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReplyModal(null)}
+                className="text-[#696E82] hover:text-[#1F1F1F] p-1 rounded-lg hover:bg-[#F2F4FF] cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-3 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-xs space-y-1">
+              <span className="font-bold text-[#696E82] block">Question:</span>
+              <p className="text-[#1F1F1F] leading-relaxed">{replyModal.question}</p>
+            </div>
+
+            <form onSubmit={handleReplyClarification} className="space-y-4 text-xs">
+              <div>
+                <label className="block font-semibold text-[#1F1F1F] mb-1">
+                  Your Answer / Clarification <span className="text-red-600">*</span>
+                </label>
+                <textarea
+                  rows={3}
+                  required
+                  value={replyMessageInput}
+                  onChange={(e) => setReplyMessageInput(e.target.value)}
+                  placeholder="Provide clarification, link approved drawing revision, or confirm specification..."
+                  className="w-full p-2.5 bg-white border border-[#E2E6F0] rounded-xl text-[#1F1F1F] focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-[#E2E6F0]">
+                <button
+                  type="button"
+                  onClick={() => setReplyModal(null)}
+                  className="px-4 py-2 bg-[#F2F4FF] text-[#696E82] font-semibold rounded-xl cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingReply || !replyMessageInput.trim()}
+                  className="px-5 py-2 bg-[#5A81FA] hover:bg-[#426EE8] text-white font-semibold rounded-xl shadow-xs cursor-pointer disabled:opacity-50"
+                >
+                  {submittingReply ? "Posting..." : "Post Answer"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

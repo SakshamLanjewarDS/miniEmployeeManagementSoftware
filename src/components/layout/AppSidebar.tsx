@@ -19,6 +19,7 @@ import {
   Layers,
   Wrench,
   Briefcase,
+  User,
 } from "lucide-react";
 import { PwaInstallButton } from "@/components/pwa/PwaInstallButton";
 
@@ -96,6 +97,11 @@ export function AppSidebar({ context }: AppSidebarProps) {
       name: "Clients & Directory",
       href: `/w/${context.tenantSlug}/directory`,
       icon: Building,
+    },
+    {
+      name: "Profile & Records",
+      href: `/w/${context.tenantSlug}/profile`,
+      icon: User,
     },
   ];
 

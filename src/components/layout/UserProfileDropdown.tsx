@@ -190,6 +190,21 @@ export function UserProfileDropdown({ context }: UserProfileDropdownProps) {
             </div>
           </div>
 
+          {/* Profile & Official Record Link */}
+          <div className="p-3 bg-white border-b border-[#E2E6F0]">
+            <Link
+              href={`/w/${context.tenantSlug}/profile`}
+              onClick={() => setIsOpen(false)}
+              className="w-full py-2 px-3 bg-[#F2F4FF] hover:bg-[#5A81FA] text-[#2C308D] hover:text-white rounded-xl text-xs font-semibold transition-all flex items-center justify-between group"
+            >
+              <div className="flex items-center gap-2">
+                <IdCard className="w-4 h-4 text-[#5A81FA] group-hover:text-white transition-colors" />
+                <span>View Profile & Official Record</span>
+              </div>
+              <span className="text-xs font-bold">→</span>
+            </Link>
+          </div>
+
           {/* Sign Out Action Button */}
           <div className="p-3 bg-[#F8F9FD] flex items-center justify-between">
             <Link

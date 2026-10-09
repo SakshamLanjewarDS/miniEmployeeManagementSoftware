@@ -24,9 +24,18 @@ export async function POST(req: NextRequest) {
       customSiteAddress,
       customSiteLatitude,
       customSiteLongitude,
+      customSiteRadiusMeters,
+      customSiteLandmarkNotes,
+      customSiteGoogleMapsUrl,
       employeeId,
       purpose,
       scheduledTime,
+      inspectionType,
+      priority,
+      taskId,
+      milestoneId,
+      attendeesJson,
+      checklistItemsJson,
     } = body;
 
     if (!projectId) {
@@ -49,9 +58,18 @@ export async function POST(req: NextRequest) {
       customSiteAddress,
       customSiteLatitude: customSiteLatitude ? parseFloat(customSiteLatitude) : undefined,
       customSiteLongitude: customSiteLongitude ? parseFloat(customSiteLongitude) : undefined,
+      customSiteRadiusMeters: customSiteRadiusMeters ? parseFloat(customSiteRadiusMeters) : undefined,
+      customSiteLandmarkNotes,
+      customSiteGoogleMapsUrl,
       employeeId,
       purpose,
       scheduledTime: new Date(scheduledTime),
+      inspectionType,
+      priority,
+      taskId: taskId || undefined,
+      milestoneId: milestoneId || undefined,
+      attendeesJson,
+      checklistItemsJson,
     });
 
     return NextResponse.json({ success: true, visit });

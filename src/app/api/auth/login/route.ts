@@ -33,10 +33,13 @@ export async function POST(req: NextRequest) {
     // Set secure HttpOnly session cookie
     await setSessionCookie(result.sessionToken, result.expiresAt);
 
+    const userRole = result.user?.role?.toLowerCase() || "";
+    const roleDashboard = userRole === "owner" ? "owner" : userRole === "admin" ? "admin" : "employee";
+
     const res = NextResponse.json({
       success: true,
       user: result.user,
-      redirectUrl: `/w/${workspaceSlug}/dashboard`,
+      redirectUrl: `/w/${workspaceSlug}/dashboard/${roleDashboard}`,
     });
 
     res.cookies.set("studio_session_token", result.sessionToken, {

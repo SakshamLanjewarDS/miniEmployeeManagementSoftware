@@ -22,6 +22,7 @@ export async function POST(req: NextRequest) {
       idempotencyKey,
       isLocationUnavailable,
       failureReason,
+      checkInAddress,
     } = body;
 
     const result = await executeSiteCheckIn(ctx, {
@@ -33,6 +34,7 @@ export async function POST(req: NextRequest) {
       idempotencyKey: idempotencyKey || `chk-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
       isLocationUnavailable: Boolean(isLocationUnavailable),
       failureReason,
+      checkInAddress,
     });
 
     return NextResponse.json(result);

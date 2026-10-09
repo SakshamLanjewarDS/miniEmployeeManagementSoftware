@@ -13,7 +13,22 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { visitId, latitude, longitude, accuracyMeters, idempotencyKey, findings, nextActions } = body;
+    const {
+      visitId,
+      latitude,
+      longitude,
+      accuracyMeters,
+      idempotencyKey,
+      findings,
+      nextActions,
+      checkOutAddress,
+      weather,
+      photosJson,
+      snagsJson,
+      checklistItemsJson,
+      contractorSignOff,
+      voiceMemoTranscript,
+    } = body;
 
     const result = await executeSiteCheckOut(ctx, {
       visitId,
@@ -23,6 +38,13 @@ export async function POST(req: NextRequest) {
       idempotencyKey: idempotencyKey || `chkout-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
       findings,
       nextActions,
+      checkOutAddress,
+      weather,
+      photosJson,
+      snagsJson,
+      checklistItemsJson,
+      contractorSignOff,
+      voiceMemoTranscript,
     });
 
     return NextResponse.json(result);

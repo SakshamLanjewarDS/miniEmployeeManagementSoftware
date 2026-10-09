@@ -23,7 +23,18 @@ export default async function VisitsPage({ params }: VisitsPageProps) {
   };
 
   // 1. Execute all queries concurrently with Promise.all for maximum performance
-  const [activeVisit, scheduledVisits, allVisits, sites, projects, teamMembers] = await Promise.all([
+  const [
+    activeVisit,
+    scheduledVisits,
+    allVisits,
+    sites,
+    projects,
+    teamMembers,
+    availableTasks,
+    availableMilestones,
+    contractors,
+    consultants,
+  ] = await Promise.all([
     // Active visit
     prisma.siteVisit.findFirst({
       where: {
@@ -60,6 +71,8 @@ export default async function VisitsPage({ params }: VisitsPageProps) {
       include: {
         site: true,
         project: safeProjectSelect,
+        task: { select: { id: true, title: true, priority: true } },
+        milestone: { select: { id: true, title: true } },
         employee: {
           include: {
             user: true,
@@ -71,7 +84,7 @@ export default async function VisitsPage({ params }: VisitsPageProps) {
         },
       },
       orderBy: { scheduledTime: "desc" },
-      take: 25,
+      take: 40,
     }),
     // Available sites
     prisma.site.findMany({
@@ -92,6 +105,59 @@ export default async function VisitsPage({ params }: VisitsPageProps) {
         employee: { select: { employeeId: true, designation: true } },
       },
       orderBy: { role: "asc" },
+    }),
+    // Active tasks/deliverables
+    prisma.task.findMany({
+      where: {
+        tenantId: ctx.tenantId,
+        status: { notIn: ["COMPLETED", "CANCELLED"] },
+      },
+      select: {
+        id: true,
+        projectId: true,
+        title: true,
+        priority: true,
+        status: true,
+      },
+      orderBy: { createdAt: "desc" },
+    }),
+    // Active milestones
+    prisma.projectMilestone.findMany({
+      where: {
+        tenantId: ctx.tenantId,
+        status: "PENDING",
+      },
+      select: {
+        id: true,
+        projectId: true,
+        title: true,
+        targetDate: true,
+      },
+      orderBy: { targetDate: "asc" },
+    }),
+    // Active contractors
+    prisma.contractor.findMany({
+      where: { tenantId: ctx.tenantId, isActive: true },
+      select: {
+        id: true,
+        name: true,
+        firmName: true,
+        trade: true,
+        contact: true,
+      },
+      orderBy: { name: "asc" },
+    }),
+    // Active consultants
+    prisma.consultant.findMany({
+      where: { tenantId: ctx.tenantId, isActive: true },
+      select: {
+        id: true,
+        name: true,
+        firmName: true,
+        discipline: true,
+        contact: true,
+      },
+      orderBy: { name: "asc" },
     }),
   ]);
 
@@ -130,6 +196,10 @@ export default async function VisitsPage({ params }: VisitsPageProps) {
         availableSites={serializeForClient(sites) as any}
         availableProjects={serializeForClient(projects) as any}
         teamMembers={serializeForClient(teamMembers) as any}
+        availableTasks={serializeForClient(availableTasks) as any}
+        availableMilestones={serializeForClient(availableMilestones) as any}
+        contractors={serializeForClient(contractors.map((c) => ({ ...c, phone: c.contact }))) as any}
+        consultants={serializeForClient(consultants.map((c) => ({ ...c, phone: c.contact }))) as any}
       />
     </div>
   );

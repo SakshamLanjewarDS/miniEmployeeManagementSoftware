@@ -288,30 +288,40 @@ export function TaskCard({
                     </span>
                   </div>
                   <div className="space-y-1 pl-1">
-                    {task.checklistItems.map((item: any) => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        disabled={!canEdit || !onToggleChecklist}
-                        onClick={() => onToggleChecklist?.(task.id, item.id, item.isCompleted)}
-                        className={`flex items-center gap-2 text-xs text-left w-full transition-colors ${
-                          canEdit && onToggleChecklist ? "cursor-pointer" : "cursor-default"
-                        }`}
-                      >
-                        {item.isCompleted ? (
-                          <CheckSquare className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                        ) : (
-                          <Square className="w-3.5 h-3.5 text-[#68758E] shrink-0" />
-                        )}
-                        <span
-                          className={`text-xs ${
-                            item.isCompleted ? "line-through text-[#68758E]" : "text-[#111B35] font-medium"
+                    {task.checklistItems.map((item: any) => {
+                      const isTaskAssignee =
+                        task.assigneeId === currentMembershipId ||
+                        (Array.isArray(task.assignedMemberIds) && task.assignedMemberIds.includes(currentMembershipId)) ||
+                        (Array.isArray(task.assignments) && task.assignments.some((a: any) => a.membershipId === currentMembershipId)) ||
+                        (Array.isArray(assignees) && assignees.some((a: any) => a.id === currentMembershipId));
+                      const isItemAssignee = item.assignedMemberId === currentMembershipId;
+                      const canToggle = Boolean(onToggleChecklist && (canEdit || isPrivileged || isTaskAssignee || isItemAssignee));
+
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          disabled={!canToggle}
+                          onClick={() => onToggleChecklist?.(task.id, item.id, item.isCompleted)}
+                          className={`flex items-center gap-2 text-xs text-left w-full transition-colors ${
+                            canToggle ? "cursor-pointer" : "cursor-default"
                           }`}
                         >
-                          {item.title}
-                        </span>
-                      </button>
-                    ))}
+                          {item.isCompleted ? (
+                            <CheckSquare className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                          ) : (
+                            <Square className="w-3.5 h-3.5 text-[#68758E] shrink-0" />
+                          )}
+                          <span
+                            className={`text-xs ${
+                              item.isCompleted ? "line-through text-[#68758E]" : "text-[#111B35] font-medium"
+                            }`}
+                          >
+                            {item.title}
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               )}

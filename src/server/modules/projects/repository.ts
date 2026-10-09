@@ -255,10 +255,27 @@ export async function findProjectDetail(ctx: TenantContext, projectId: string) {
       expenses: {
         orderBy: { expenseDate: "desc" },
       },
+      milestones: {
+        include: { phase: true },
+        orderBy: { targetDate: "asc" },
+      },
+      changeRequests: {
+        include: {
+          requester: { include: { user: true } },
+          decidedBy: { include: { user: true } },
+        },
+        orderBy: { createdAt: "desc" },
+      },
     },
   });
 
   if (!project) return null;
+
+  const auditEvents = await prisma.auditEvent.findMany({
+    where: { projectId: project.id, tenantId: ctx.tenantId },
+    orderBy: { timestamp: "desc" },
+    take: 30,
+  });
 
   const activeTasks = project.tasks.filter((t) => t.status !== TaskWorkflowStatus.CANCELLED);
   const total = activeTasks.length;
@@ -308,6 +325,7 @@ export async function findProjectDetail(ctx: TenantContext, projectId: string) {
     })),
     taskProgress,
     phaseProgress,
+    auditEvents,
   };
 }
 

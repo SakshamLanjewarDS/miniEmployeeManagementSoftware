@@ -76,6 +76,7 @@ export interface CheckInParams {
   idempotencyKey: string;
   isLocationUnavailable?: boolean;
   failureReason?: string;
+  checkInAddress?: string;
 }
 
 /**
@@ -91,6 +92,7 @@ export async function executeSiteCheckIn(ctx: TenantContext, params: CheckInPara
     idempotencyKey,
     isLocationUnavailable,
     failureReason,
+    checkInAddress,
   } = params;
 
   // 1. Idempotency Check
@@ -215,6 +217,7 @@ export async function executeSiteCheckIn(ctx: TenantContext, params: CheckInPara
       where: { id: visit.id },
       data: {
         operationalState: SiteVisitOperationalState.ACTIVE,
+        checkInAddress: checkInAddress || undefined,
       },
     });
 
@@ -236,13 +239,35 @@ export interface CheckOutParams {
   idempotencyKey: string;
   findings?: string;
   nextActions?: string;
+  checkOutAddress?: string;
+  weather?: string;
+  photosJson?: any;
+  snagsJson?: any;
+  checklistItemsJson?: any;
+  contractorSignOff?: any;
+  voiceMemoTranscript?: string;
 }
 
 /**
  * Execute employee site visit check-out
  */
 export async function executeSiteCheckOut(ctx: TenantContext, params: CheckOutParams) {
-  const { visitId, latitude, longitude, accuracyMeters, idempotencyKey, findings, nextActions } = params;
+  const {
+    visitId,
+    latitude,
+    longitude,
+    accuracyMeters,
+    idempotencyKey,
+    findings,
+    nextActions,
+    checkOutAddress,
+    weather,
+    photosJson,
+    snagsJson,
+    checklistItemsJson,
+    contractorSignOff,
+    voiceMemoTranscript,
+  } = params;
 
   const visit = await prisma.siteVisit.findFirst({
     where: {
@@ -299,6 +324,13 @@ export async function executeSiteCheckOut(ctx: TenantContext, params: CheckOutPa
         findings: findings || visit.findings,
         nextActions: nextActions || visit.nextActions,
         submittedReportTime: serverReceiptTime,
+        checkOutAddress: checkOutAddress || undefined,
+        weather: weather || undefined,
+        photosJson: photosJson || visit.photosJson,
+        snagsJson: snagsJson || visit.snagsJson,
+        checklistItemsJson: checklistItemsJson || visit.checklistItemsJson,
+        contractorSignOff: contractorSignOff || visit.contractorSignOff,
+        voiceMemoTranscript: voiceMemoTranscript || visit.voiceMemoTranscript,
       },
     });
 
@@ -515,9 +547,18 @@ export interface CreateSiteVisitInput {
   customSiteAddress?: string;
   customSiteLatitude?: number;
   customSiteLongitude?: number;
+  customSiteRadiusMeters?: number;
+  customSiteLandmarkNotes?: string;
+  customSiteGoogleMapsUrl?: string;
   employeeId: string;
   purpose: string;
   scheduledTime: Date;
+  inspectionType?: string;
+  priority?: string;
+  taskId?: string;
+  milestoneId?: string;
+  attendeesJson?: any;
+  checklistItemsJson?: any;
 }
 
 /**
@@ -540,6 +581,17 @@ export async function createSiteVisit(ctx: TenantContext, input: CreateSiteVisit
 
   let targetSiteId = input.siteId;
 
+  if (targetSiteId && (input.customSiteRadiusMeters || input.customSiteLandmarkNotes || input.customSiteGoogleMapsUrl)) {
+    await prisma.site.update({
+      where: { id: targetSiteId },
+      data: {
+        ...(input.customSiteRadiusMeters ? { radiusMeters: input.customSiteRadiusMeters } : {}),
+        ...(input.customSiteLandmarkNotes ? { landmarkNotes: input.customSiteLandmarkNotes.trim() } : {}),
+        ...(input.customSiteGoogleMapsUrl ? { googleMapsUrl: input.customSiteGoogleMapsUrl.trim() } : {}),
+      },
+    });
+  }
+
   if (!targetSiteId && input.customSiteName) {
     const site = await prisma.site.create({
       data: {
@@ -549,8 +601,10 @@ export async function createSiteVisit(ctx: TenantContext, input: CreateSiteVisit
         address: input.customSiteAddress?.trim() || "Project Site Location",
         latitude: input.customSiteLatitude || null,
         longitude: input.customSiteLongitude || null,
-        radiusMeters: 150,
+        radiusMeters: input.customSiteRadiusMeters || 150,
         accuracyThresholdMeters: 100,
+        landmarkNotes: input.customSiteLandmarkNotes?.trim() || null,
+        googleMapsUrl: input.customSiteGoogleMapsUrl?.trim() || null,
       },
     });
     targetSiteId = site.id;
@@ -566,9 +620,15 @@ export async function createSiteVisit(ctx: TenantContext, input: CreateSiteVisit
       projectId: input.projectId,
       siteId: targetSiteId,
       employeeId: input.employeeId,
+      taskId: input.taskId || null,
+      milestoneId: input.milestoneId || null,
       purpose: input.purpose.trim(),
+      inspectionType: input.inspectionType || "ROUTINE",
+      priority: input.priority || "MEDIUM",
       scheduledTime: input.scheduledTime,
       operationalState: SiteVisitOperationalState.SCHEDULED,
+      attendeesJson: input.attendeesJson || null,
+      checklistItemsJson: input.checklistItemsJson || null,
     },
     include: {
       site: true,
@@ -619,6 +679,12 @@ export interface UpdateSiteVisitInput {
   siteAddress?: string;
   siteLatitude?: number;
   siteLongitude?: number;
+  weather?: string;
+  checklistItemsJson?: any;
+  snagsJson?: any;
+  photosJson?: any;
+  contractorSignOff?: any;
+  voiceMemoTranscript?: string;
 }
 
 /**
@@ -651,6 +717,12 @@ export async function updateSiteVisit(ctx: TenantContext, input: UpdateSiteVisit
       scheduledTime: input.scheduledTime !== undefined ? input.scheduledTime : visit.scheduledTime,
       findings: input.findings !== undefined ? input.findings : visit.findings,
       nextActions: input.nextActions !== undefined ? input.nextActions : visit.nextActions,
+      weather: input.weather !== undefined ? input.weather : visit.weather,
+      checklistItemsJson: input.checklistItemsJson !== undefined ? input.checklistItemsJson : visit.checklistItemsJson,
+      snagsJson: input.snagsJson !== undefined ? input.snagsJson : visit.snagsJson,
+      photosJson: input.photosJson !== undefined ? input.photosJson : visit.photosJson,
+      contractorSignOff: input.contractorSignOff !== undefined ? input.contractorSignOff : visit.contractorSignOff,
+      voiceMemoTranscript: input.voiceMemoTranscript !== undefined ? input.voiceMemoTranscript : visit.voiceMemoTranscript,
     },
     include: {
       site: true,

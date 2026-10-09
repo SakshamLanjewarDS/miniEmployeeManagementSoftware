@@ -59,11 +59,19 @@ export async function POST(req: NextRequest) {
       code,
       name,
       description,
+      brief,
+      scopeItems,
+      exclusions,
+      acceptanceCriteria,
+      requiredClientInputs,
       primaryClientId,
       projectType,
       siteAddress,
       siteCity,
       googleMapLocation,
+      latitude,
+      longitude,
+      geofenceRadiusMeters,
       projectArchitectId,
       projectManagerId,
       projectCoordinatorId,
@@ -77,24 +85,28 @@ export async function POST(req: NextRequest) {
       currency,
       startDate,
       targetDate,
+      status,
     } = body;
 
-    if (!code || !code.trim()) {
-      return NextResponse.json({ error: "Project code is required (e.g. PRJ-101)" }, { status: 400 });
-    }
-    if (!name || !name.trim()) {
-      return NextResponse.json({ error: "Project name is required" }, { status: 400 });
-    }
+    const { createProjectWithLifecycle } = await import("@/server/modules/projects/lifecycle");
 
-    const project = await createProject(ctx, {
-      code: code.trim(),
-      name: name.trim(),
+    const project = await createProjectWithLifecycle(ctx, {
+      code: code ? code.trim() : "",
+      name: name ? name.trim() : "",
       description: description?.trim() || undefined,
+      brief: brief?.trim() || description?.trim() || undefined,
+      scopeItems,
+      exclusions,
+      acceptanceCriteria: acceptanceCriteria?.trim() || undefined,
+      requiredClientInputs,
       primaryClientId: primaryClientId || undefined,
       projectType: projectType || undefined,
       siteAddress: siteAddress?.trim() || undefined,
       siteCity: siteCity?.trim() || undefined,
       googleMapLocation: googleMapLocation?.trim() || undefined,
+      latitude: latitude !== undefined ? Number(latitude) : undefined,
+      longitude: longitude !== undefined ? Number(longitude) : undefined,
+      geofenceRadiusMeters: geofenceRadiusMeters !== undefined ? Number(geofenceRadiusMeters) : undefined,
       projectArchitectId: projectArchitectId || undefined,
       projectManagerId: projectManagerId || undefined,
       projectCoordinatorId: projectCoordinatorId || undefined,
@@ -108,13 +120,17 @@ export async function POST(req: NextRequest) {
       currency: currency || ctx.currency || "INR",
       startDate: startDate ? new Date(startDate) : undefined,
       targetDate: targetDate ? new Date(targetDate) : undefined,
+      status: status || "ACTIVE",
     });
 
     return NextResponse.json({ success: true, project }, { status: 201 });
   } catch (error: any) {
     console.error("POST /api/projects error:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to create project" },
+      {
+        error: error.message || "Failed to create project",
+        validationErrors: error.validationErrors || undefined,
+      },
       { status: error.status || 400 }
     );
   }

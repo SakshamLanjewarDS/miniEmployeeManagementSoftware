@@ -50,6 +50,31 @@ export function getWorkspaceDayBoundaries(timezone: string = "Asia/Kolkata") {
 export async function getMultiAssignedTaskIds(tenantId: string, membershipId: string): Promise<string[]> {
   if (!tenantId || !membershipId) return [];
 
+  const taskIds = new Set<string>();
+
+  // 1. Check junction task assignments
+  try {
+    const assignments = await prisma.taskAssignment.findMany({
+      where: { tenantId, membershipId },
+      select: { taskId: true },
+    });
+    for (const a of assignments) taskIds.add(a.taskId);
+  } catch (err) {
+    // ignore
+  }
+
+  // 2. Check individual checklist item assignments
+  try {
+    const checklistItems = await prisma.taskChecklistItem.findMany({
+      where: { tenantId, assignedMemberId: membershipId },
+      select: { taskId: true },
+    });
+    for (const c of checklistItems) taskIds.add(c.taskId);
+  } catch (err) {
+    // ignore
+  }
+
+  // 3. Check JSON assignedMemberIds
   try {
     const rows = await prisma.$queryRaw<Array<{ id: string }>>`
       SELECT id FROM tasks 
@@ -60,7 +85,7 @@ export async function getMultiAssignedTaskIds(tenantId: string, membershipId: st
           OR JSON_SEARCH(assignedMemberIds, 'one', ${membershipId}) IS NOT NULL
         )
     `;
-    return rows.map((r) => r.id);
+    for (const r of rows) taskIds.add(r.id);
   } catch (err) {
     try {
       const fallbackRows = await prisma.$queryRaw<Array<{ id: string }>>`
@@ -69,12 +94,13 @@ export async function getMultiAssignedTaskIds(tenantId: string, membershipId: st
           AND assignedMemberIds IS NOT NULL
           AND assignedMemberIds LIKE ${`%${membershipId}%`}
       `;
-      return fallbackRows.map((r) => r.id);
+      for (const r of fallbackRows) taskIds.add(r.id);
     } catch (fallbackErr) {
       console.warn("Could not query multi-assigned task IDs:", fallbackErr);
-      return [];
     }
   }
+
+  return Array.from(taskIds);
 }
 
 export async function findTasks(ctx: TenantContext, params: TaskFilterParams = {}) {
@@ -205,6 +231,100 @@ export async function findTasks(ctx: TenantContext, params: TaskFilterParams = {
           },
         },
       },
+      reviewer: {
+        include: {
+          user: {
+            select: {
+              fullName: true,
+              email: true,
+            },
+          },
+        },
+      },
+      assignments: {
+        include: {
+          membership: {
+            include: {
+              user: {
+                select: {
+                  fullName: true,
+                },
+              },
+            },
+          },
+        },
+      },
+      submissions: {
+        include: {
+          submitter: {
+            include: {
+              user: {
+                select: {
+                  fullName: true,
+                },
+              },
+            },
+          },
+          reviewer: {
+            include: {
+              user: {
+                select: {
+                  fullName: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: { version: "desc" },
+      },
+      extensionRequests: {
+        include: {
+          requester: {
+            include: {
+              user: {
+                select: {
+                  fullName: true,
+                },
+              },
+            },
+          },
+          checklistItem: {
+            select: {
+              id: true,
+              title: true,
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+      },
+      clarifications: {
+        include: {
+          author: {
+            include: {
+              user: {
+                select: {
+                  fullName: true,
+                },
+              },
+            },
+          },
+          answers: {
+            include: {
+              author: {
+                include: {
+                  user: {
+                    select: {
+                      fullName: true,
+                    },
+                  },
+                },
+              },
+            },
+            orderBy: { createdAt: "asc" },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+      },
       checklistItems: {
         include: {
           assignedMember: {
@@ -221,6 +341,14 @@ export async function findTasks(ctx: TenantContext, params: TaskFilterParams = {
                   designation: true,
                 },
               },
+            },
+          },
+          prerequisiteItem: {
+            select: {
+              id: true,
+              title: true,
+              status: true,
+              isCompleted: true,
             },
           },
         },
@@ -259,6 +387,95 @@ export async function findTaskById(ctx: TenantContext, taskId: string) {
           user: true,
         },
       },
+      reviewer: {
+        include: {
+          user: true,
+        },
+      },
+      assignments: {
+        include: {
+          membership: {
+            include: {
+              user: {
+                select: {
+                  fullName: true,
+                },
+              },
+            },
+          },
+        },
+      },
+      submissions: {
+        include: {
+          submitter: {
+            include: {
+              user: {
+                select: {
+                  fullName: true,
+                },
+              },
+            },
+          },
+          reviewer: {
+            include: {
+              user: {
+                select: {
+                  fullName: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: { version: "desc" },
+      },
+      extensionRequests: {
+        include: {
+          requester: {
+            include: {
+              user: {
+                select: {
+                  fullName: true,
+                },
+              },
+            },
+          },
+          checklistItem: {
+            select: {
+              id: true,
+              title: true,
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+      },
+      clarifications: {
+        include: {
+          author: {
+            include: {
+              user: {
+                select: {
+                  fullName: true,
+                },
+              },
+            },
+          },
+          answers: {
+            include: {
+              author: {
+                include: {
+                  user: {
+                    select: {
+                      fullName: true,
+                    },
+                  },
+                },
+              },
+            },
+            orderBy: { createdAt: "asc" },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+      },
       checklistItems: {
         include: {
           assignedMember: {
@@ -275,6 +492,22 @@ export async function findTaskById(ctx: TenantContext, taskId: string) {
                   designation: true,
                 },
               },
+            },
+          },
+          prerequisiteItem: {
+            select: {
+              id: true,
+              title: true,
+              status: true,
+              isCompleted: true,
+            },
+          },
+          dependentItems: {
+            select: {
+              id: true,
+              title: true,
+              status: true,
+              isCompleted: true,
             },
           },
           approvalRequests: {
@@ -297,10 +530,13 @@ export async function findTaskById(ctx: TenantContext, taskId: string) {
 export interface ChecklistItemData {
   title?: string;
   text?: string;
+  description?: string;
+  acceptanceCriteria?: string;
   assignedMemberId: string;
   priority?: TaskPriority;
   dueDate?: Date | string | null;
   sortOrder?: number;
+  prerequisiteItemId?: string;
 }
 
 export interface CreateTaskData {
@@ -308,6 +544,9 @@ export interface CreateTaskData {
   phaseId?: string;
   title?: string;
   description?: string;
+  acceptanceCriteria?: string;
+  reviewerId?: string;
+  referenceFiles?: any;
   assigneeId?: string;
   assigneeIds?: string[];
   priority: TaskPriority;
@@ -325,6 +564,20 @@ export async function createTask(ctx: TenantContext, data: CreateTaskData) {
 
   if (!project) {
     throw new Error("Project not found in this studio workspace");
+  }
+
+  // Lifecycle check: Operational tasks cannot be assigned to Draft, On Hold, Cancelled, or Archived projects
+  if (project.status === "DRAFT") {
+    throw new Error("Cannot assign deliverables to a Draft project. Please activate the project first.");
+  }
+  if (project.status === "ON_HOLD") {
+    throw new Error("Project is currently On Hold. Operational task assignments are paused until the project is resumed.");
+  }
+  if (project.status === "CANCELLED") {
+    throw new Error("Cannot assign deliverables to a Cancelled project.");
+  }
+  if (project.status === "ARCHIVED") {
+    throw new Error("Cannot assign deliverables to an Archived project.");
   }
 
   if (!project.projectType || !project.projectType.trim()) {
@@ -352,6 +605,23 @@ export async function createTask(ctx: TenantContext, data: CreateTaskData) {
     throw new Error("At least one eligible assignee must be selected for the deliverable.");
   }
 
+  // Scratchpad & non-management security: Employees cannot assign other members or bypass management permissions
+  if (!isAdminOrOwner(ctx)) {
+    if (allAssigneeIds.length !== 1 || allAssigneeIds[0] !== ctx.membershipId) {
+      throw new Error("Forbidden: Employees can only create personal tasks assigned to themselves. Management assignments require Studio Owner or Admin permissions.");
+    }
+    const isMember = await prisma.projectMember.findFirst({
+      where: {
+        tenantId: ctx.tenantId,
+        projectId: project.id,
+        membershipId: ctx.membershipId,
+      },
+    });
+    if (!isMember && project.projectArchitectId !== ctx.membershipId && project.projectManagerId !== ctx.membershipId) {
+      throw new Error("Forbidden: You must be an assigned member of this project to create deliverable tasks.");
+    }
+  }
+
   // Validate all assignees exist, are active, and belong to this tenant
   const activeMembers = await prisma.tenantMembership.findMany({
     where: {
@@ -367,6 +637,27 @@ export async function createTask(ctx: TenantContext, data: CreateTaskData) {
   }
 
   const primaryAssigneeId = allAssigneeIds[0] || null;
+
+  // 3b. Validate Reviewer (Four-Eyes Policy)
+  let validatedReviewerId = data.reviewerId || null;
+  if (validatedReviewerId) {
+    if (allAssigneeIds.includes(validatedReviewerId)) {
+      throw new Error("Four-eyes policy violation: A deliverable assignee cannot be designated as its reviewer.");
+    }
+    const reviewer = await prisma.tenantMembership.findFirst({
+      where: {
+        id: validatedReviewerId,
+        tenantId: ctx.tenantId,
+        isActive: true,
+        role: { in: ["OWNER", "ADMIN"] },
+      },
+    });
+    if (!reviewer) {
+      throw new Error("Designated reviewer must be an active Owner or Admin in this studio workspace.");
+    }
+  } else if (isAdminOrOwner(ctx) && !allAssigneeIds.includes(ctx.membershipId)) {
+    validatedReviewerId = ctx.membershipId;
+  }
 
   // 4. Server-side concise title generation if omitted
   let deliverableTitle = (data.title || "").trim();
@@ -424,6 +715,9 @@ export async function createTask(ctx: TenantContext, data: CreateTaskData) {
         phaseId: data.phaseId || null,
         title: deliverableTitle,
         description: brief,
+        acceptanceCriteria: data.acceptanceCriteria?.trim() || null,
+        reviewerId: validatedReviewerId,
+        referenceFiles: data.referenceFiles || null,
         assigneeId: primaryAssigneeId,
         assignedMemberIds: allAssigneeIds.length > 0 ? allAssigneeIds : undefined,
         creatorId: ctx.membershipId,
@@ -435,6 +729,20 @@ export async function createTask(ctx: TenantContext, data: CreateTaskData) {
       },
     });
 
+    // Create employee-level TaskAssignment records for tracking acknowledgements & progress
+    for (const memberId of allAssigneeIds) {
+      await tx.taskAssignment.create({
+        data: {
+          tenantId: ctx.tenantId,
+          taskId: task.id,
+          membershipId: memberId,
+          acknowledgedAt: null,
+          acknowledgedVersion: null,
+          isCompleted: false,
+        },
+      });
+    }
+
     // Create checklist items atomically
     if (checklistInput.length > 0) {
       for (let idx = 0; idx < checklistInput.length; idx++) {
@@ -445,9 +753,12 @@ export async function createTask(ctx: TenantContext, data: CreateTaskData) {
             tenantId: ctx.tenantId,
             taskId: task.id,
             title: itemTitle,
+            description: item.description?.trim() || null,
+            acceptanceCriteria: item.acceptanceCriteria?.trim() || data.acceptanceCriteria?.trim() || null,
             assignedMemberId: item.assignedMemberId || primaryAssigneeId,
             priority: item.priority || data.priority || TaskPriority.MEDIUM,
             dueDate: item.dueDate ? new Date(item.dueDate) : derivedDueDate || null,
+            prerequisiteItemId: item.prerequisiteItemId || null,
             status: TaskWorkflowStatus.NOT_STARTED,
             isCompleted: false,
             sortOrder: item.sortOrder ?? (idx + 1),
@@ -967,8 +1278,7 @@ export async function updateTask(
 
 /**
  * Toggle or update checklist item status:
- * - Studio Boss/Admin can mark checklist completed or incomplete.
- * - Deliverable assignees CANNOT self-approve (four-eyes rule).
+ * - Assigned employees, item assignees, task creator, or Studio Leadership can check/toggle checklist items.
  */
 export async function toggleChecklistItem(
   ctx: TenantContext,
@@ -985,12 +1295,14 @@ export async function toggleChecklistItem(
   const assignedMemberIds = Array.isArray(task.assignedMemberIds)
     ? (task.assignedMemberIds as string[])
     : [];
-  const isAssignee = task.assigneeId === ctx.membershipId || assignedMemberIds.includes(ctx.membershipId);
+  const assignmentMemberIds = Array.isArray(task.assignments)
+    ? task.assignments.map((a: any) => a.membershipId)
+    : [];
+  const isAssignee =
+    task.assigneeId === ctx.membershipId ||
+    assignedMemberIds.includes(ctx.membershipId) ||
+    assignmentMemberIds.includes(ctx.membershipId);
   const isCreator = task.creatorId === ctx.membershipId;
-
-  if (!isPrivileged && !isAssignee && !isCreator) {
-    throw new ForbiddenException("Only assigned employees, the task creator, or Studio Admin/Boss can update checklist items.");
-  }
 
   const item = await prisma.taskChecklistItem.findFirst({
     where: { id: itemId, taskId, tenantId: ctx.tenantId },
@@ -1000,9 +1312,10 @@ export async function toggleChecklistItem(
     throw new Error("Checklist item not found");
   }
 
-  // Four-eyes rule: Deliverable assignees cannot self-approve their work to completed!
-  if (isCompleted && isAssignee && !isPrivileged) {
-    throw new ForbiddenException("Self-approval is forbidden: Deliverable assignees cannot approve their own completed checklist work.");
+  const isItemAssignee = item.assignedMemberId === ctx.membershipId;
+
+  if (!isPrivileged && !isAssignee && !isItemAssignee && !isCreator) {
+    throw new ForbiddenException("Only assigned employees, the task creator, or Studio Admin/Boss can update checklist items.");
   }
 
   return await prisma.taskChecklistItem.update({
@@ -1419,3 +1732,19 @@ export async function deleteTask(ctx: TenantContext, taskId: string) {
     return deleted;
   });
 }
+
+// Re-export task workflow methods
+export {
+  acknowledgeAssignment,
+  startChecklistWork,
+  raiseTaskBlocker,
+  resolveTaskBlocker,
+  askTaskClarification,
+  replyToTaskClarification,
+  validateNoCircularDependencies,
+  requestDeadlineExtension,
+  decideDeadlineExtension,
+  submitTasksForReview,
+  reviewTaskSubmission,
+  reopenChecklistTask,
+} from "./workflow";

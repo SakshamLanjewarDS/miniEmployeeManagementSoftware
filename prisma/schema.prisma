@@ -66,6 +66,10 @@ model Tenant {
   subscriptions     Subscription[]
   tenantExports     TenantExport[]
   deletionRequests  DeletionRequest[]
+  projectTemplates  ProjectTemplate[]
+  projectChangeRequests ProjectChangeRequest[]
+  projectMilestones ProjectMilestone[]
+  profileChangeRequests ProfileChangeRequest[]
 
   @@map("tenants")
 }
@@ -111,6 +115,18 @@ model TenantMembership {
   reviewedVisits   SiteVisit[]      @relation("VisitReviewer")
   notifications    Notification[]   @relation("RecipientNotifications")
   assignedChecklistItems TaskChecklistItem[] @relation("ChecklistItemAssignee")
+  reviewedTasks    Task[]           @relation("TaskReviewer")
+  taskAssignments  TaskAssignment[]
+  submittedTaskSubmissions TaskSubmission[] @relation("SubmissionSubmitter")
+  reviewedTaskSubmissions  TaskSubmission[] @relation("SubmissionReviewer")
+  requestedTaskExtensions  TaskExtensionRequest[] @relation("ExtensionRequester")
+  decidedTaskExtensions    TaskExtensionRequest[] @relation("ExtensionDecider")
+  taskClarifications       TaskClarification[]
+  taskClarificationReplies TaskClarificationReply[]
+  projectChangeRequests    ProjectChangeRequest[]   @relation("ChangeRequestRequester")
+  decidedChangeRequests    ProjectChangeRequest[]   @relation("ChangeRequestDecider")
+  profileChangeRequests    ProfileChangeRequest[]
+  submittedExpenses        Expense[]                @relation("ExpenseSubmitter")
 
   @@unique([tenantId, userId])
   @@index([tenantId, role])
@@ -131,6 +147,8 @@ model Employee {
   reportingManagerId String?
   createdAt          DateTime         @default(now())
   updatedAt          DateTime         @updatedAt
+
+  profileChangeRequests ProfileChangeRequest[]
 
   @@unique([tenantId, employeeId])
   @@index([tenantId, employeeId])
@@ -242,10 +260,12 @@ model Contractor {
 // ==========================================
 
 enum ProjectStatus {
+  DRAFT
   PLANNING
   ACTIVE
   ON_HOLD
   COMPLETED
+  CANCELLED
   ARCHIVED
 }
 
@@ -281,6 +301,22 @@ model Project {
   budget           Decimal?          @db.Decimal(15, 2)
   currency         String            @default("INR") @db.VarChar(10)
   isArchived       Boolean           @default(false)
+  brief            String?           @db.Text
+  scopeItems       Json?
+  exclusions       Json?
+  acceptanceCriteria String?         @db.Text
+  requiredClientInputs Json?
+  holdReason       String?           @db.Text
+  heldAt           DateTime?
+  heldById         String?
+  completionChecklist Json?
+  completedById    String?
+  reopenReason     String?           @db.Text
+  reopenedAt       DateTime?
+  reopenedById     String?
+  cancellationReason String?         @db.Text
+  cancelledAt      DateTime?
+  cancelledById    String?
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
 
@@ -296,6 +332,8 @@ model Project {
   feeMilestones    FeeMilestone[]
   expenses         Expense[]
   approvalRequests ApprovalRequest[]
+  changeRequests   ProjectChangeRequest[]
+  milestones       ProjectMilestone[]
 
   @@unique([tenantId, code])
   @@index([tenantId, status])
@@ -345,6 +383,7 @@ model ProjectPhase {
   updatedAt        DateTime    @updatedAt
 
   tasks            Task[]
+  milestones       ProjectMilestone[]
 
   @@index([tenantId, projectId, sortOrder])
   @@map("project_phases")
@@ -460,6 +499,10 @@ model Task {
   estimatedHours    Decimal?           @db.Decimal(6, 2)
   completionDate    DateTime?
   blockerReason  String?            @db.Text
+  reviewerId        String?
+  reviewer          TenantMembership?  @relation("TaskReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+  acceptanceCriteria String?           @db.Text
+  referenceFiles    Json?
   parentTaskId   String?
   version        Int                @default(1)
   createdAt      DateTime           @default(now())
@@ -471,9 +514,14 @@ model Task {
   siteVisits       SiteVisit[]
   documents        Document[]
   approvalRequests ApprovalRequest[]
+  assignments      TaskAssignment[]
+  submissions      TaskSubmission[]
+  extensionRequests TaskExtensionRequest[]
+  clarifications   TaskClarification[]
 
   @@index([tenantId, projectId, status])
   @@index([tenantId, assigneeId, dueDate])
+  @@index([tenantId, reviewerId])
   @@map("tasks")
 }
 
@@ -483,6 +531,8 @@ model TaskChecklistItem {
   taskId           String
   task             Task                @relation(fields: [taskId], references: [id], onDelete: Cascade)
   title            String              @db.VarChar(255)
+  description      String?             @db.Text
+  acceptanceCriteria String?           @db.Text
   isCompleted      Boolean             @default(false)
   sortOrder        Int                 @default(0)
   completedAt      DateTime?
@@ -492,15 +542,127 @@ model TaskChecklistItem {
   priority         TaskPriority        @default(MEDIUM)
   dueDate          DateTime?
   status           TaskWorkflowStatus  @default(NOT_STARTED)
+  startedAt        DateTime?
+  isBlocked        Boolean             @default(false)
   blockerReason    String?             @db.Text
+  blockerDetails   Json?
+  prerequisiteItemId String?
+  prerequisiteItem TaskChecklistItem?  @relation("ItemDependencies", fields: [prerequisiteItemId], references: [id], onDelete: SetNull)
+  dependentItems   TaskChecklistItem[] @relation("ItemDependencies")
   createdAt        DateTime            @default(now())
   updatedAt        DateTime            @default(now()) @updatedAt
 
-  approvalRequests ApprovalRequest[]
+  approvalRequests  ApprovalRequest[]
+  extensionRequests TaskExtensionRequest[]
+  clarifications    TaskClarification[]
 
   @@index([tenantId, taskId])
   @@index([tenantId, assignedMemberId])
+  @@index([tenantId, prerequisiteItemId])
   @@map("task_checklist_items")
+}
+
+model TaskAssignment {
+  id                  String           @id @default(uuid())
+  tenantId            String
+  taskId              String
+  task                Task             @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  membershipId        String
+  membership          TenantMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  acknowledgedAt      DateTime?
+  acknowledgedVersion Int?
+  isCompleted         Boolean          @default(false)
+  completedAt         DateTime?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  @@unique([taskId, membershipId])
+  @@index([tenantId, membershipId])
+  @@map("task_assignments")
+}
+
+model TaskSubmission {
+  id               String            @id @default(uuid())
+  tenantId         String
+  taskId           String
+  task             Task              @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  submitterId      String
+  submitter        TenantMembership  @relation("SubmissionSubmitter", fields: [submitterId], references: [id], onDelete: Cascade)
+  reviewerId       String?
+  reviewer         TenantMembership? @relation("SubmissionReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+  version          Int               @default(1)
+  summary          String            @db.Text
+  checklistTaskIds Json
+  criteriaSnapshot String?           @db.Text
+  evidenceFiles    Json?
+  evidenceLinks    Json?
+  status           String            @default("PENDING")
+  reviewFeedback   String?           @db.Text
+  decidedAt        DateTime?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  @@index([tenantId, taskId, version])
+  @@index([tenantId, submitterId, status])
+  @@index([tenantId, reviewerId, status])
+  @@map("task_submissions")
+}
+
+model TaskExtensionRequest {
+  id              String            @id @default(uuid())
+  tenantId        String
+  taskId          String
+  task            Task              @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  checklistItemId String
+  checklistItem   TaskChecklistItem @relation(fields: [checklistItemId], references: [id], onDelete: Cascade)
+  requesterId     String
+  requester       TenantMembership  @relation("ExtensionRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  deciderId       String?
+  decider         TenantMembership? @relation("ExtensionDecider", fields: [deciderId], references: [id], onDelete: SetNull)
+  currentDueDate  DateTime?
+  proposedDueDate DateTime
+  reason          String            @db.Text
+  status          String            @default("PENDING")
+  decisionReason  String?           @db.Text
+  decidedAt       DateTime?
+  createdAt       DateTime          @default(now())
+
+  @@index([tenantId, checklistItemId, status])
+  @@index([tenantId, requesterId])
+  @@map("task_extension_requests")
+}
+
+model TaskClarification {
+  id              String                   @id @default(uuid())
+  tenantId        String
+  taskId          String
+  task            Task                     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  checklistItemId String?
+  checklistItem   TaskChecklistItem?       @relation(fields: [checklistItemId], references: [id], onDelete: SetNull)
+  authorId        String
+  author          TenantMembership         @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  question        String                   @db.Text
+  attachments     Json?
+  answers         TaskClarificationReply[]
+  createdAt       DateTime                 @default(now())
+
+  @@index([tenantId, taskId])
+  @@index([tenantId, checklistItemId])
+  @@map("task_clarifications")
+}
+
+model TaskClarificationReply {
+  id              String            @id @default(uuid())
+  tenantId        String
+  clarificationId String
+  clarification   TaskClarification @relation(fields: [clarificationId], references: [id], onDelete: Cascade)
+  authorId        String
+  author          TenantMembership  @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  message         String            @db.Text
+  createdAt       DateTime          @default(now())
+
+  @@index([tenantId, clarificationId])
+  @@map("task_clarification_replies")
 }
 
 model TaskComment {
@@ -548,6 +710,8 @@ model Site {
   longitude               Float?
   radiusMeters            Float       @default(150.0)
   accuracyThresholdMeters Float       @default(100.0)
+  landmarkNotes           String?     @db.Text
+  googleMapsUrl           String?     @db.VarChar(512)
   isActive                Boolean     @default(true)
   createdAt               DateTime    @default(now())
   updatedAt               DateTime    @updatedAt
@@ -584,11 +748,24 @@ model SiteVisit {
   employee            TenantMembership          @relation("VisitEmployee", fields: [employeeId], references: [id], onDelete: Cascade)
   taskId              String?
   task                Task?                     @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  milestoneId         String?
+  milestone           ProjectMilestone?         @relation(fields: [milestoneId], references: [id], onDelete: SetNull)
   purpose             String                    @db.VarChar(255)
+  inspectionType      String?                   @default("ROUTINE") @db.VarChar(64)
+  priority            String?                   @default("MEDIUM") @db.VarChar(32)
   scheduledTime       DateTime
   operationalState    SiteVisitOperationalState @default(SCHEDULED)
+  checkInAddress      String?                   @db.VarChar(255)
+  checkOutAddress     String?                   @db.VarChar(255)
+  weather             String?                   @db.VarChar(64)
   findings            String?                   @db.Text
   nextActions         String?                   @db.Text
+  attendeesJson       Json?
+  checklistItemsJson  Json?
+  photosJson          Json?
+  snagsJson           Json?
+  contractorSignOff   Json?
+  voiceMemoTranscript String?                   @db.Text
   submittedReportTime DateTime?
   reviewerId          String?
   reviewer            TenantMembership?         @relation("VisitReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
@@ -602,6 +779,7 @@ model SiteVisit {
 
   @@index([tenantId, employeeId, operationalState])
   @@index([tenantId, projectId, scheduledTime])
+  @@index([tenantId, inspectionType])
   @@map("site_visits")
 }
 
@@ -819,15 +997,125 @@ model Expense {
   currency      String        @default("INR") @db.VarChar(10)
   expenseDate   DateTime
   status        ExpenseStatus @default(PENDING)
-  vendor        String?       @db.VarChar(191)
+  vendor        String?           @db.VarChar(191)
   receiptFileId String?
   approverId    String?
-  notes         String?       @db.Text
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  submitterId   String?
+  submitter     TenantMembership? @relation("ExpenseSubmitter", fields: [submitterId], references: [id], onDelete: SetNull)
+  notes         String?           @db.Text
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
 
   @@index([tenantId, projectId])
+  @@index([tenantId, submitterId])
   @@map("expenses")
+}
+
+enum ChangeRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model ProjectChangeRequest {
+  id                 String              @id @default(uuid())
+  tenantId           String
+  tenant             Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  projectId          String
+  project            Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  requesterId        String
+  requester          TenantMembership    @relation("ChangeRequestRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  title              String              @db.VarChar(255)
+  reason             String              @db.Text
+  affectedScope      String?             @db.Text
+  scheduleImpactDays Int                 @default(0)
+  feeImpactAmount    Decimal?            @db.Decimal(15, 2)
+  status             ChangeRequestStatus @default(PENDING)
+  decidedById        String?
+  decidedBy          TenantMembership?   @relation("ChangeRequestDecider", fields: [decidedById], references: [id], onDelete: SetNull)
+  decidedAt          DateTime?
+  decisionNotes      String?             @db.Text
+  appliedAt          DateTime?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  @@index([tenantId, projectId, status])
+  @@map("project_change_requests")
+}
+
+enum ProjectMilestoneStatus {
+  PENDING
+  ACHIEVED
+  MISSED
+}
+
+model ProjectMilestone {
+  id                      String                 @id @default(uuid())
+  tenantId                String
+  tenant                  Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  projectId               String
+  project                 Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  phaseId                 String?
+  phase                   ProjectPhase?          @relation(fields: [phaseId], references: [id], onDelete: SetNull)
+  title                   String                 @db.VarChar(255)
+  description             String?                @db.Text
+  targetDate              DateTime
+  actualDate              DateTime?
+  status                  ProjectMilestoneStatus @default(PENDING)
+  isClientSignoffRequired Boolean         @default(false)
+  clientSignedOffAt       DateTime?
+  createdAt               DateTime        @default(now())
+  updatedAt               DateTime        @updatedAt
+
+  siteVisits              SiteVisit[]
+
+  @@index([tenantId, projectId, status])
+  @@map("project_milestones")
+}
+
+model ProjectTemplate {
+  id               String   @id @default(uuid())
+  tenantId         String
+  tenant           Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name             String   @db.VarChar(191)
+  projectType      String   @db.VarChar(100)
+  description      String?  @db.Text
+  phasesJson       Json
+  deliverablesJson Json?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([tenantId, projectType])
+  @@map("project_templates")
+}
+
+enum ProfileChangeRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model ProfileChangeRequest {
+  id           String                     @id @default(uuid())
+  tenantId     String
+  tenant       Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employeeId   String
+  employee     Employee                   @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  requesterId  String
+  requester    TenantMembership           @relation(fields: [requesterId], references: [id], onDelete: Cascade)
+  fieldKey     String                     @db.VarChar(64)
+  oldValue     String?                    @db.Text
+  newValue     String                     @db.Text
+  reason       String?                    @db.Text
+  status       ProfileChangeRequestStatus @default(PENDING)
+  decidedById  String?
+  decidedAt    DateTime?
+  decisionNote String?                    @db.Text
+  createdAt    DateTime                   @default(now())
+  updatedAt    DateTime                   @updatedAt
+
+  @@index([tenantId, employeeId, status])
+  @@map("profile_change_requests")
 }
 
 // ==========================================
