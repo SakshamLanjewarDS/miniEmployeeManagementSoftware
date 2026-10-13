@@ -612,6 +612,27 @@ export async function getAdminDashboardData(ctx: TenantContext): Promise<AdminDa
     }),
   ]);
 
+  // 1. Daily Summary Counts & Active Tasks
+  const activeTasks = allTasks.filter(
+    (t) => t.status !== TaskWorkflowStatus.COMPLETED && t.status !== TaskWorkflowStatus.CANCELLED
+  );
+
+  const tasksDueToday = activeTasks.filter(
+    (t) => t.dueDate && t.dueDate >= startOfToday && t.dueDate <= endOfToday
+  ).length;
+
+  const overdueTasks = activeTasks.filter(
+    (t) => t.dueDate && t.dueDate < startOfToday
+  ).length;
+
+  const pendingSubmissions =
+    pendingSubmissionsData.length +
+    allTasks.filter(
+      (t) =>
+        t.status === TaskWorkflowStatus.IN_REVIEW &&
+        !pendingSubmissionsData.some((sub) => sub.task.id === t.id)
+    ).length;
+
   // 2. Assignment Queue: unassigned deliverables or blocked tasks
   const assignmentQueue = activeTasks
     .filter((t) => !t.assigneeId || Boolean(t.blockerReason) || t.status === TaskWorkflowStatus.NOT_STARTED)
@@ -721,7 +742,7 @@ export async function getAdminDashboardData(ctx: TenantContext): Promise<AdminDa
       status: t.status,
       dueDate: t.dueDate,
     }))
-    .slice(6);
+    .slice(0, 6);
 
   return {
     dailySummary: {
