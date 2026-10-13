@@ -35,7 +35,6 @@ import {
   X,
   Sparkles,
   Calculator,
-  Bell,
 } from "lucide-react";
 import { PwaInstallButton } from "@/components/pwa/PwaInstallButton";
 
@@ -144,11 +143,6 @@ export function AppSidebar({ context }: AppSidebarProps) {
           name: "Dashboard",
           href: `/w/${context.tenantSlug}/dashboard`,
           icon: LayoutDashboard,
-        },
-        {
-          name: "Notifications",
-          href: `/w/${context.tenantSlug}/notifications`,
-          icon: Bell,
         },
         ...(isOwnerOrAdmin
           ? [
