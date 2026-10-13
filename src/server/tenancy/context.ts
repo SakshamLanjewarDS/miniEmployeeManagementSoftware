@@ -115,3 +115,5 @@ export function assertCanManageFinance(context: TenantContext, message = "Forbid
     throw new ForbiddenException(message);
   }
 }
+
+export { getTenantContextFromSession } from "../auth/session";

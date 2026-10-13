@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getTenantContextFromSession } from "@/server/tenancy/context";
+import { getTenantContextFromSession } from "@/server/auth/session";
 import { reviewMaterialSample } from "@/server/modules/materials/service";
 
 export async function PATCH(

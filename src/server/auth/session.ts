@@ -225,3 +225,82 @@ export const getCurrentTenantContext = cache(async (workspaceSlug: string): Prom
     return null;
   }
 });
+
+/**
+ * Resolves current TenantContext directly from session cookies.
+ * When workspaceSlug is omitted, resolves from activeTenantId or the user's primary active membership.
+ */
+export async function getTenantContextFromSession(
+  workspaceSlug?: string
+): Promise<TenantContext | null> {
+  try {
+    const cookieStore = await cookies();
+    const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
+    if (!token) return null;
+
+    if (workspaceSlug) {
+      return await resolveSessionAndTenant(token, workspaceSlug);
+    }
+
+    const session = await prisma.session.findUnique({
+      where: { token },
+      include: {
+        user: {
+          include: {
+            memberships: {
+              where: { isActive: true },
+              include: {
+                tenant: true,
+                employee: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!session || session.revokedAt || session.expiresAt < new Date()) {
+      return null;
+    }
+
+    if (session.user.accountState !== UserAccountState.ACTIVE) {
+      return null;
+    }
+
+    const activeMemberships = session.user.memberships.filter(
+      (m) => m.tenant.lifecycleState === TenantLifecycleState.ACTIVE
+    );
+
+    if (activeMemberships.length === 0) {
+      return null;
+    }
+
+    const membership =
+      (session.activeTenantId &&
+        activeMemberships.find((m) => m.tenantId === session.activeTenantId)) ||
+      activeMemberships[0];
+
+    const tenant = membership.tenant;
+
+    return {
+      tenantId: tenant.id,
+      tenantSlug: tenant.slug,
+      tenantName: tenant.name,
+      userId: session.user.id,
+      userEmail: session.user.email,
+      userFullName: session.user.fullName,
+      membershipId: membership.id,
+      employeeId: membership.employee?.employeeId ?? null,
+      designation: membership.employee?.designation ?? null,
+      department: membership.employee?.department ?? null,
+      phone: membership.employee?.phone ?? null,
+      role: membership.role,
+      hasFinanceAccess: membership.hasFinanceAccess,
+      timezone: tenant.timezone,
+      currency: tenant.currency,
+    };
+  } catch (error) {
+    console.error("getTenantContextFromSession error:", error);
+    return null;
+  }
+}
