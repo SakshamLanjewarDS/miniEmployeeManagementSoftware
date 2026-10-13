@@ -12,6 +12,7 @@
 | **Phase 6** | **Production Hardening**: Isolation tests across 2 tenants, ASVS verification, backup/restore rehearsal, audit logs | ✅ Completed | 10/10 automated tests passing; production build verified with 0 errors |
 | **Phase 7** | **Ultra-Production Employee Workstation**: Focus Mode, Billable Timer & Pomodoro, Velocity Metrics, 1-Click GPS Check-In, GFC Drawing Quick-Viewer, Field Scratchpad | ✅ Completed | Production-grade personal execution enhancements on Employee dashboard |
 | **Phase 8** | **End-to-End Employee Task Workflow & Governance**: 8-chunk lifecycle from Assignment & Acknowledgement, Dependencies & Blockers, Clarifications, Extensions, Snapshot Submissions, Four-Eyes Review, Corrections, to Completion & Leadership Reopening | ✅ Completed | 15/15 integration tests passing in `tests/employee-task-workflow.test.ts`; `tsc --noEmit` 0 errors |
+| **Phase 9** | **Comprehensive Project Lifecycle & Profile Governance (Steps 1 – 6)**: Incomplete Drafts & Commissioning, Member Removal Safeguards, Delivery vs Financial Milestones, Scope Changes with Four-Eyes Approval & Withdrawal, Central Hold Policy, Handover Dossier & Client Acknowledgement, Safe Completion Gates (Active Site Visit Blockers), Selective Reopening, Cancellation Work Disposition, 3-Tier Profile Privacy Isolation, and Official Record Change Requests | ✅ Completed | 20/20 automated tests passing in `tests/project-lifecycle-and-profiles.test.ts`; `tsc --noEmit` 0 errors |
 
 ## Requirements Traceability
 
@@ -43,3 +44,20 @@
 - [x] Strict four-eyes policy review enforcement (Submitter cannot self-review) (Phase 8)
 - [x] Corrections, resubmission loop, and item-level requested changes feedback (Phase 8)
 - [x] Automatic deliverable completion when all items pass, and leadership-only reopening with audit justification (Phase 8)
+- [x] Draft projects saved without required fields; strict commissioning activation gates (Phase 9 - Step 1)
+- [x] Team member removal safeguards blocking removal with active deliverables without explicit reassignment (Phase 9 - Step 2)
+- [x] Separation of physical delivery milestones from financial fee milestones (Phase 9 - Step 3)
+- [x] Four-Eyes Principle on Scope Change Requests (Requesters cannot self-approve) (Phase 9 - Step 4)
+- [x] Reasoned Scope Change Request withdrawal workflow with audit logging (Phase 9 - Step 4)
+- [x] Decoupled, idempotent atomic application of approved scope changes updating schedule & budget (Phase 9 - Step 4)
+- [x] Central Hold Policy blocking new task assignments, timers, and site check-ins while allowing checkouts (Phase 9 - Step 4)
+- [x] Project completion checklist evaluation with active site visits as non-waivable hard gate (Phase 9 - Step 5)
+- [x] Architectural Handover Package dossier compiling approved deliverables, GFC drawings, and milestones (Phase 9 - Step 5)
+- [x] Client handover issuance and formal client acknowledgement recording (Phase 9 - Step 5)
+- [x] Safe project completion with documented leadership exceptions (Phase 9 - Step 5)
+- [x] Selective project & deliverable reopening without historical state wiping (Phase 9 - Step 5)
+- [x] Project cancellation with work disposition (`CANCEL_OPEN_TASKS` / `PRESERVE_SUBMITTED_WORK`) (Phase 9 - Step 5)
+- [x] Reversible project archiving and unarchiving preserving lifecycle status (Phase 9 - Step 5)
+- [x] 3-tier profile privacy isolation: Self Profile, Management Record, Sanitized Directory Profile (Phase 9 - Step 6)
+- [x] Employee self-service profile updates restricted strictly to allowlisted personal fields (Phase 9 - Step 6)
+- [x] Official employment record change requests with Admin/Owner approval and Four-Eyes rule (Phase 9 - Step 6)

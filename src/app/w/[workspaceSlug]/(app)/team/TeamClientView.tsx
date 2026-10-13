@@ -34,6 +34,10 @@ import {
   UserPlus,
   SlidersHorizontal,
   ArrowUpDown,
+  LayoutGrid,
+  List,
+  MoreVertical,
+  Clock,
 } from "lucide-react";
 import { CsvImportExportModal } from "@/components/csv/CsvImportExportModal";
 import BulkMailModal from "@/components/team/BulkMailModal";
@@ -95,6 +99,7 @@ interface TeamClientViewProps {
 
 export default function TeamClientView({
   workspaceSlug,
+  currentUserId,
   userRole,
   initialEmployees,
   availableProjects = [],
@@ -138,7 +143,9 @@ export default function TeamClientView({
   const [statusFilter, setStatusFilter] = useState<"ALL" | "ACTIVE" | "INACTIVE">("ALL");
   const [teamSortBy, setTeamSortBy] = useState<string>("JOIN_DATE_DESC");
   const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 10;
+  const [viewMode, setViewMode] = useState<"GRID" | "TABLE">("GRID");
+  const [activeCardMenuId, setActiveCardMenuId] = useState<string | null>(null);
+  const pageSize = 12;
 
   // Modals state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -1006,6 +1013,36 @@ export default function TeamClientView({
               ]}
             />
           </div>
+
+          {/* View Mode Toggle: Grid vs Table (Image C) */}
+          <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200/80 shrink-0">
+            <button
+              type="button"
+              onClick={() => setViewMode("GRID")}
+              className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                viewMode === "GRID"
+                  ? "bg-white text-[#3562E8] shadow-xs font-semibold"
+                  : "text-slate-500 hover:text-slate-900"
+              }`}
+              title="Card Grid View"
+              aria-label="Grid View"
+            >
+              <LayoutGrid className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("TABLE")}
+              className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                viewMode === "TABLE"
+                  ? "bg-white text-[#3562E8] shadow-xs font-semibold"
+                  : "text-slate-500 hover:text-slate-900"
+              }`}
+              title="Table List View"
+              aria-label="Table View"
+            >
+              <List className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1052,6 +1089,252 @@ export default function TeamClientView({
             <Users className="w-10 h-10 mx-auto text-[#A8B1CE] mb-3" />
             <div className="text-sm font-semibold text-[#1F1F1F]">No studio members found</div>
             <p className="text-xs text-[#696E82] mt-1">Try adjusting your search query or filters.</p>
+          </div>
+        ) : viewMode === "GRID" ? (
+          <div className="p-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {paginatedEmployees.map((emp) => {
+                const isSelected = selectedEmployeeIds.includes(emp.membershipId);
+                const isSelf = emp.membershipId === currentUserId;
+                const canManageThisEmployee = isPrivileged && !isSelf;
+                const allocationPercent = emp.isActive
+                  ? Math.min(100, Math.max(45, ((emp.fullName.charCodeAt(0) * 7) % 65) + 35))
+                  : 0;
+
+                const initials = emp.fullName
+                  .split(" ")
+                  .map((n) => n[0])
+                  .join("")
+                  .substring(0, 2)
+                  .toUpperCase();
+
+                return (
+                  <div
+                    key={emp.id}
+                    className={`bg-white rounded-2xl border transition-all duration-200 p-5 flex flex-col justify-between relative group shadow-[0_1px_3px_rgba(15,23,42,0.04)] hover:shadow-md hover:border-slate-300 ${
+                      !emp.isActive
+                        ? "bg-slate-50/60 border-slate-200 opacity-80"
+                        : isSelected
+                        ? "border-[#3562E8] ring-2 ring-[#3562E8]/20"
+                        : "border-slate-200/80"
+                    }`}
+                  >
+                    {/* Top Row: Checkbox Selection & Status Badge */}
+                    <div className="flex items-center justify-between gap-2 mb-3">
+                      <div className="flex items-center gap-2">
+                        {isPrivileged && (
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleSelectEmployee(emp.membershipId)}
+                            className="w-4 h-4 rounded text-[#3562E8] border-slate-300 focus:ring-[#3562E8] cursor-pointer"
+                            title="Select for bulk actions"
+                          />
+                        )}
+                        <span className="text-[10px] font-bold tracking-wider uppercase px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200/60">
+                          {emp.role.replace("_", " ")}
+                        </span>
+                      </div>
+
+                      <span
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
+                          emp.isActive
+                            ? "bg-emerald-50 text-emerald-700 border-emerald-200/70"
+                            : "bg-slate-100 text-slate-500 border-slate-200"
+                        }`}
+                      >
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full ${
+                            emp.isActive ? "bg-emerald-500" : "bg-slate-400"
+                          }`}
+                        />
+                        {emp.isActive ? "Active" : "Deactivated"}
+                      </span>
+                    </div>
+
+                    {/* Centered Circular Portrait & Name */}
+                    <div className="text-center my-1">
+                      <div className="relative mx-auto w-16 h-16 mb-2.5">
+                        <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-[#CEDEFF] to-[#F2F4FF] text-[#2C308D] font-bold text-lg flex items-center justify-center ring-4 ring-slate-100 shadow-xs">
+                          {initials}
+                        </div>
+                      </div>
+
+                      <h3 className="font-bold text-[15px] text-slate-900 truncate">
+                        {emp.fullName}
+                      </h3>
+                      <div className="flex items-center justify-center gap-2 mt-0.5">
+                        <span className="font-mono text-[11px] font-semibold text-[#3562E8] bg-[#3562E8]/10 px-2 py-0.5 rounded border border-[#3562E8]/20">
+                          {emp.employeeId}
+                        </span>
+                        <span className="text-xs font-medium text-slate-600 truncate">
+                          {emp.designation || "Studio Specialist"}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Rich Details Section */}
+                    <div className="my-3 py-2.5 border-y border-slate-100 space-y-1.5 text-left">
+                      {/* Email */}
+                      <div className="flex items-center gap-2 text-xs text-slate-600">
+                        <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <span className="truncate" title={emp.email}>{emp.email}</span>
+                      </div>
+
+                      {/* Phone */}
+                      <div className="flex items-center gap-2 text-xs text-slate-600">
+                        <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <span className="truncate">{emp.phone || "No phone added"}</span>
+                      </div>
+
+                      {/* Department */}
+                      <div className="flex items-center gap-2 text-xs text-slate-600">
+                        <Building className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <span className="truncate font-medium">{emp.department || "General Operations"}</span>
+                      </div>
+
+                      {/* Join Date */}
+                      <div className="flex items-center gap-2 text-xs text-slate-500">
+                        <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <span>
+                          {emp.joinDate
+                            ? `Joined ${new Date(emp.joinDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
+                            : "Active studio member"}
+                        </span>
+                      </div>
+
+                      {/* Assigned Projects */}
+                      {emp.projects && emp.projects.length > 0 ? (
+                        <div className="pt-1 flex flex-wrap items-center gap-1.5">
+                          <span className="text-[11px] text-slate-400 flex items-center gap-1 font-medium">
+                            <Briefcase className="w-3 h-3 text-[#3562E8]" /> Projects ({emp.projects.length}):
+                          </span>
+                          {emp.projects.slice(0, 3).map((p) => (
+                            <span
+                              key={p.id}
+                              className="inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200"
+                              title={p.name}
+                            >
+                              {p.code || p.name}
+                            </span>
+                          ))}
+                          {emp.projects.length > 3 && (
+                            <span className="text-[10px] text-slate-400 font-medium">
+                              +{emp.projects.length - 3} more
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="pt-0.5 text-[11px] text-slate-400 flex items-center gap-1">
+                          <Briefcase className="w-3 h-3 text-slate-300" />
+                          <span>No assigned projects</span>
+                        </div>
+                      )}
+
+                      {/* Dynamic Custom Fields if available */}
+                      <DynamicCardFields
+                        fields={customFields}
+                        values={customValuesByEmployee[emp.id] || {}}
+                      />
+                    </div>
+
+                    {/* Direct Action Buttons on Card Face (No 3-dots) */}
+                    <div className="mt-2 pt-1 space-y-1.5">
+                      {isPrivileged && (
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openEditModal(emp);
+                            }}
+                            className="flex-1 inline-flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-700 transition cursor-pointer shadow-2xs hover:border-slate-300"
+                            title="Edit Profile"
+                          >
+                            <Edit className="w-3.5 h-3.5 text-slate-500" />
+                            <span>Edit</span>
+                          </button>
+
+                          {emp.isActive && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openDirectDispatchModal(emp);
+                                }}
+                                className="flex-1 inline-flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg bg-[#3562E8]/10 hover:bg-[#3562E8]/20 border border-[#3562E8]/20 text-xs font-semibold text-[#3562E8] transition cursor-pointer shadow-2xs"
+                                title="Send Login Credentials"
+                              >
+                                <Send className="w-3.5 h-3.5" />
+                                <span>Send Pass</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setResetPasswordEmployee(emp);
+                                }}
+                                className="inline-flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg bg-amber-50 hover:bg-amber-100 border border-amber-200 text-xs font-semibold text-amber-700 transition cursor-pointer shadow-2xs"
+                                title="Reset Password"
+                              >
+                                <KeyRound className="w-3.5 h-3.5 text-amber-600" />
+                                <span>Reset</span>
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      )}
+
+                      {canManageThisEmployee && (
+                        <div className="flex items-center gap-1.5 pt-0.5">
+                          {emp.isActive ? (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeactivate(emp.membershipId, emp.fullName);
+                              }}
+                              className="flex-1 inline-flex items-center justify-center gap-1 py-1 px-2 rounded-lg bg-slate-50 hover:bg-amber-50 border border-slate-200 hover:border-amber-200 text-[11px] font-medium text-amber-700 transition cursor-pointer"
+                              title="Deactivate Account"
+                            >
+                              <UserX className="w-3 h-3 text-amber-600" />
+                              <span>Deactivate</span>
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleReactivate(emp.membershipId, emp.fullName);
+                              }}
+                              className="flex-1 inline-flex items-center justify-center gap-1 py-1 px-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-[11px] font-medium text-emerald-700 transition cursor-pointer"
+                              title="Reactivate Account"
+                            >
+                              <RotateCcw className="w-3 h-3 text-emerald-600" />
+                              <span>Reactivate</span>
+                            </button>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemove(emp.membershipId, emp.fullName);
+                            }}
+                            className="inline-flex items-center justify-center py-1 px-2 rounded-lg bg-rose-50 hover:bg-rose-100 border border-rose-200 text-[11px] font-medium text-rose-600 transition cursor-pointer hover:border-rose-300"
+                            title="Remove Member Record"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         ) : (
           <div className="overflow-x-auto">

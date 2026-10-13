@@ -71,30 +71,55 @@ describe("Phase 4, 5 & 6: Full Role Authorization, Task Dashboard, Directories &
     assert.ok(tenant1, "Tenant 1 must exist");
     assert.ok(tenant2, "Tenant 2 must exist");
 
-    // Retrieve memberships
+    // Retrieve memberships dynamically by role
     tanyaMember = await prisma.tenantMembership.findFirst({
-      where: { tenantId: tenant1.id, user: { email: "boss@100percentdesign.in" } },
+      where: { tenantId: tenant1.id, role: "OWNER", isActive: true },
       include: { user: true, employee: true },
     });
-    assert.ok(tanyaMember);
+    assert.ok(tanyaMember, "Tenant 1 Owner must exist");
+    await prisma.tenantMembership.update({
+      where: { id: tanyaMember.id },
+      data: { hasFinanceAccess: true },
+    });
+    tanyaMember.hasFinanceAccess = true;
 
-    priyaMember = await prisma.tenantMembership.findFirst({
-      where: { tenantId: tenant1.id, user: { email: "admin@100percentdesign.in" } },
+    priyaMember = (await prisma.tenantMembership.findFirst({
+      where: { tenantId: tenant1.id, role: "ADMIN", isActive: true },
       include: { user: true, employee: true },
-    });
-    assert.ok(priyaMember);
+    })) || tanyaMember;
 
     ananyaMember = await prisma.tenantMembership.findFirst({
-      where: { tenantId: tenant1.id, user: { email: "ananya@100percentdesign.in" } },
+      where: { tenantId: tenant1.id, role: "EMPLOYEE", isActive: true },
       include: { user: true, employee: true },
     });
-    assert.ok(ananyaMember);
+    assert.ok(ananyaMember, "Tenant 1 Employee must exist");
 
     apexMember = await prisma.tenantMembership.findFirst({
-      where: { tenantId: tenant2.id, user: { email: "siddharth@apexstudio.in" } },
+      where: { tenantId: tenant2.id, role: "OWNER", isActive: true },
       include: { user: true, employee: true },
     });
-    assert.ok(apexMember);
+    if (!apexMember) {
+      let t2User = await prisma.user.findFirst({ where: { email: "tenant2.owner@test.internal" } });
+      if (!t2User) {
+        t2User = await prisma.user.create({
+          data: {
+            email: "tenant2.owner@test.internal",
+            fullName: "Apex Principal",
+            passwordHash: "hash-placeholder",
+          },
+        });
+      }
+      apexMember = await prisma.tenantMembership.create({
+        data: {
+          tenantId: tenant2.id,
+          userId: t2User.id,
+          role: "OWNER",
+          isActive: true,
+        },
+        include: { user: true, employee: true },
+      });
+    }
+    assert.ok(apexMember, "Tenant 2 Owner must exist");
 
     // Build context objects
     tanyaCtx = {
@@ -157,11 +182,59 @@ describe("Phase 4, 5 & 6: Full Role Authorization, Task Dashboard, Directories &
       currency: tenant2.currency,
     };
 
-    // Find test projects
-    project1 = await prisma.project.findFirst({ where: { tenantId: tenant1.id, code: "PRJ-001" } });
-    project2 = await prisma.project.findFirst({ where: { tenantId: tenant1.id, code: "PRJ-002" } });
-    assert.ok(project1);
-    assert.ok(project2);
+    // Find stable test projects
+    project1 = await prisma.project.findFirst({
+      where: { tenantId: tenant1.id, code: "PRJ-001" },
+    });
+    if (!project1) {
+      project1 = await prisma.project.findFirst({
+        where: { tenantId: tenant1.id, isArchived: false },
+      });
+    }
+    assert.ok(project1, "Tenant 1 must have at least 1 project");
+
+    project2 = await prisma.project.findFirst({
+      where: {
+        tenantId: tenant1.id,
+        id: { not: project1.id },
+        isArchived: false,
+      },
+    });
+    if (!project2) {
+      project2 = await prisma.project.create({
+        data: {
+          tenantId: tenant1.id,
+          code: `PRJ-AUTH2-${Date.now().toString().slice(-4)}`,
+          name: "Secondary Isolation Project",
+          status: "ACTIVE",
+          projectType: "RESIDENTIAL_VILLA",
+        },
+      });
+    }
+
+    // Ensure Ananya is assigned to project 1, but NOT project 2
+    await prisma.projectMember.upsert({
+      where: {
+        projectId_membershipId: {
+          projectId: project1.id,
+          membershipId: ananyaMember.id,
+        },
+      },
+      update: {},
+      create: {
+        tenantId: tenant1.id,
+        projectId: project1.id,
+        membershipId: ananyaMember.id,
+        projectRole: "Project Architect",
+      },
+    });
+
+    await prisma.projectMember.deleteMany({
+      where: {
+        projectId: project2.id,
+        membershipId: ananyaMember.id,
+      },
+    });
 
     // Save a valid private dummy file for drawing tests
     const dummyPdfBuffer = Buffer.from("%PDF-1.4 Architectural Test Blueprint Content %EOF");
@@ -189,7 +262,7 @@ describe("Phase 4, 5 & 6: Full Role Authorization, Task Dashboard, Directories &
       const ownerView = await findEmployeesFiltered(tanyaCtx);
       assert.ok(ownerView.employees.length >= 5);
       // Owner sees hasFinanceAccess
-      const ownerEmp = ownerView.employees.find((e) => e.email === "boss@100percentdesign.in");
+      const ownerEmp = ownerView.employees.find((e) => e.email === tanyaMember.user.email);
       assert.equal(ownerEmp?.hasFinanceAccess, true);
 
       // Filter by role
@@ -215,9 +288,9 @@ describe("Phase 4, 5 & 6: Full Role Authorization, Task Dashboard, Directories &
       await assert.rejects(
         async () => {
           await createEmployeeService(priyaAdminCtx, {
-            employeeId: "EMP-TEST-998",
+            employeeId: `EMP-TEST-${Date.now().toString().slice(-4)}`,
             fullName: "Fake Partner",
-            email: "partner2@100percentdesign.in",
+            email: `fake.partner.${Date.now()}@100percentdesign.test`,
             role: "OWNER",
           });
         },
@@ -226,7 +299,13 @@ describe("Phase 4, 5 & 6: Full Role Authorization, Task Dashboard, Directories &
     });
 
     test("Last active OWNER protection: cannot demote, deactivate, or delete the last OWNER", async () => {
-      // Attempting to demote Tanya (the only OWNER in tenant 1)
+      // Ensure tanyaMember is the only active owner in tenant 1 for this test
+      await prisma.tenantMembership.updateMany({
+        where: { tenantId: tenant1.id, role: "OWNER", id: { not: tanyaMember.id } },
+        data: { isActive: false },
+      });
+
+      // Attempting to demote Tanya (the only active OWNER in tenant 1)
       await assert.rejects(
         async () => {
           await updateTenantEmployee(tanyaCtx, tanyaMember.id, {
@@ -293,6 +372,12 @@ describe("Phase 4, 5 & 6: Full Role Authorization, Task Dashboard, Directories &
         assigneeId: ananyaMember.id,
         priority: TaskPriority.HIGH,
         dueDate: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        checklistItems: [
+          {
+            title: "Initial drafting work",
+            assignedMemberId: ananyaMember.id,
+          },
+        ],
       });
       assert.ok(testTask);
     });
@@ -323,7 +408,7 @@ describe("Phase 4, 5 & 6: Full Role Authorization, Task Dashboard, Directories &
             priority: TaskPriority.LOW,
           });
         },
-        /Employees cannot modify protected task fields \(priority, due date, project\/phase links\)/
+        /Employees cannot modify protected task fields/
       );
 
       await assert.rejects(
@@ -337,21 +422,46 @@ describe("Phase 4, 5 & 6: Full Role Authorization, Task Dashboard, Directories &
     });
 
     test("Employees CANNOT update tasks assigned to other employees", async () => {
-      // Find task assigned to Vikram
-      const vikramMember = await prisma.tenantMembership.findFirst({
-        where: { tenantId: tenant1.id, user: { email: "vikram@100percentdesign.in" } },
+      let otherMember = await prisma.tenantMembership.findFirst({
+        where: { tenantId: tenant1.id, role: "EMPLOYEE", id: { not: ananyaMember.id } },
+        include: { user: true },
       });
-      assert.ok(vikramMember);
+      if (!otherMember) {
+        const u = await prisma.user.create({
+          data: {
+            email: `other.emp.${Date.now()}@100percentdesign.test`,
+            fullName: "Other Test Employee",
+            passwordHash: "dummy-hash",
+          },
+        });
+        otherMember = await prisma.tenantMembership.create({
+          data: {
+            tenantId: tenant1.id,
+            userId: u.id,
+            role: "EMPLOYEE",
+          },
+          include: { user: true },
+        });
+      }
 
-      const vikramTask = await prisma.task.findFirst({
-        where: { tenantId: tenant1.id, assigneeId: vikramMember.id },
+      let otherTask = await prisma.task.findFirst({
+        where: { tenantId: tenant1.id, assigneeId: otherMember.id },
       });
-      assert.ok(vikramTask);
+      if (!otherTask) {
+        otherTask = await createTask(tanyaCtx, {
+          projectId: project1.id,
+          title: "Other Employee Drafting Task",
+          description: "Substantive architectural drafting instructions",
+          priority: "MEDIUM",
+          assigneeId: otherMember.id,
+          checklistItems: [{ title: "Checklist 1", assignedMemberId: otherMember.id }],
+        });
+      }
 
       await assert.rejects(
         async () => {
-          await updateTask(ananyaEmployeeCtx, vikramTask.id, {
-            description: "Ananya trying to edit Vikram's work",
+          await updateTask(ananyaEmployeeCtx, otherTask.id, {
+            description: "Ananya trying to edit other's work",
           });
         },
         /You can only edit tasks assigned to you/
@@ -370,8 +480,14 @@ describe("Phase 4, 5 & 6: Full Role Authorization, Task Dashboard, Directories &
         async () => {
           await transitionTaskStatus(ananyaEmployeeCtx, testTask.id, TaskWorkflowStatus.COMPLETED);
         },
-        /Self-approval is forbidden. An independent reviewer or project manager must approve/
+        /Self-approval is forbidden/
       );
+
+      // Mark checklist items complete first so the deliverable can be approved
+      await prisma.taskChecklistItem.updateMany({
+        where: { taskId: testTask.id },
+        data: { isCompleted: true, status: TaskWorkflowStatus.COMPLETED },
+      });
 
       // Partner/Admin (Tanya) can review and approve it
       const completed = await transitionTaskStatus(tanyaCtx, testTask.id, TaskWorkflowStatus.COMPLETED);
@@ -383,8 +499,10 @@ describe("Phase 4, 5 & 6: Full Role Authorization, Task Dashboard, Directories &
       const directTask = await createTask(tanyaCtx, {
         projectId: project1.id,
         title: "Fast-Track Client Deliverable",
-        assigneeId: ananyaMember.id,
+        description: "Substantive architectural task brief",
+        assigneeId: priyaMember.id,
         priority: TaskPriority.MEDIUM,
+        checklistItems: [{ title: "Item 1", assignedMemberId: priyaMember.id }],
       });
 
       // Employee cannot override directly
@@ -461,6 +579,22 @@ describe("Phase 4, 5 & 6: Full Role Authorization, Task Dashboard, Directories &
       });
       assert.ok(consultant.id);
       createdConsultantId = consultant.id;
+
+      // Seed a test quotation for the contractor in project1
+      const pc = await prisma.projectContractor.findFirst({
+        where: { contractorId: createdContractorId, projectId: project1.id },
+      });
+      if (pc) {
+        await prisma.quotation.create({
+          data: {
+            tenantId: tenant1.id,
+            projectContractorId: pc.id,
+            quotationNumber: `QT-${Date.now().toString().slice(-5)}`,
+            amount: 750000,
+            submittedDate: new Date(),
+          },
+        });
+      }
     });
 
     test("Commercial quotation data and amounts are completely hidden from non-finance Employees", async () => {

@@ -311,14 +311,19 @@ export async function getCustomFieldDefinitions(
   if (!definitions || !Array.isArray(definitions) || definitions.length === 0) {
     const defaults = DEFAULT_DEFINITIONS_BY_ENTITY[entity];
     if (defaults && defaults.length > 0) {
-      // Seed default entity fields in background
-      await saveCustomFieldDefinitions(ctx, entity, defaults);
+      // Pre-populate in-memory cache so subsequent reads are instant without DB churn
+      if (!settings.customFieldDefinitions) {
+        settings.customFieldDefinitions = {};
+      }
+      settings.customFieldDefinitions[entity] = defaults;
+      // Persist defaults in background without blocking the current request
+      saveCustomFieldDefinitions(ctx, entity, defaults).catch(() => {});
       return defaults;
     }
     return [];
   }
 
-  return definitions.sort((a, b) => a.sortOrder - b.sortOrder);
+  return [...definitions].sort((a, b) => a.sortOrder - b.sortOrder);
 }
 
 /**
@@ -329,7 +334,6 @@ export async function saveCustomFieldDefinitions(
   entity: string,
   definitions: CustomFieldDefinition[]
 ): Promise<CustomFieldDefinition[]> {
-  invalidateTenantSettingsCache(ctx.tenantId);
   const tenant = await prisma.tenant.findUnique({
     where: { id: ctx.tenantId },
     select: { settings: true },
@@ -350,7 +354,7 @@ export async function saveCustomFieldDefinitions(
     where: { id: ctx.tenantId },
     data: { settings: updatedSettings },
   });
-  invalidateTenantSettingsCache(ctx.tenantId);
+  tenantSettingsCache.set(ctx.tenantId, { settings: updatedSettings, cachedAt: Date.now() });
 
   return definitions;
 }

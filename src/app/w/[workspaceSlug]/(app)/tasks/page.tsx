@@ -254,22 +254,7 @@ export default async function TasksPage({ params, searchParams }: TasksPageProps
         </div>
       )}
 
-      {/* Main Tasks Header */}
-      <div className="border-b border-[#E2E6F0] pb-5">
-        <div className="flex items-center gap-2 text-xs font-semibold text-[#5A81FA] uppercase tracking-wider">
-          <span>Studio Coordination</span>
-          <span>•</span>
-          <span>{effectiveScope === "all" ? "Organization Scope" : "Personal Workspace"}</span>
-        </div>
-        <h1 className="text-2xl font-bold tracking-tight text-[#1F1F1F] mt-1">
-          {effectiveScope === "all" ? "All Studio Deliverables" : "My Assigned Tasks"}
-        </h1>
-        <p className="text-xs text-[#696E82] mt-0.5">
-          {effectiveScope === "all"
-            ? `Studio-wide tasks & architecture deliverables (Access: ${ctx.userFullName} • ${ctx.role})`
-            : `Tasks assigned to ${ctx.userFullName} (${ctx.employeeId || ctx.role})`}
-        </p>
-      </div>
+
 
       {/* Interactive Client Component */}
       <TasksClientView

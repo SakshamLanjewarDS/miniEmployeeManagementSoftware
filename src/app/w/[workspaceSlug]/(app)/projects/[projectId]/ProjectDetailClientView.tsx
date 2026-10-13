@@ -87,6 +87,17 @@ export function ProjectDetailClientView({
   const [cancelReason, setCancelReason] = useState("");
   const [cancelDisposition, setCancelDisposition] = useState("CANCEL_OPEN_TASKS");
 
+  // Handover package modal states
+  const [isIssueHandoverModalOpen, setIsIssueHandoverModalOpen] = useState(false);
+  const [handoverRecipientName, setHandoverRecipientName] = useState(project.primaryClient?.name || "");
+  const [handoverRecipientContact, setHandoverRecipientContact] = useState("");
+  const [handoverIssueNotes, setHandoverIssueNotes] = useState("");
+
+  const [isAcknowledgeHandoverModalOpen, setIsAcknowledgeHandoverModalOpen] = useState(false);
+  const [handoverAckName, setHandoverAckName] = useState(project.primaryClient?.name || "");
+  const [handoverAckEvidence, setHandoverAckEvidence] = useState("");
+  const [handoverAckNotes, setHandoverAckNotes] = useState("");
+
   // Scope change modal
   const [isChangeRequestModalOpen, setIsChangeRequestModalOpen] = useState(false);
   const [changeTitle, setChangeTitle] = useState("");
@@ -127,6 +138,7 @@ export function ProjectDetailClientView({
     { key: "phases", label: `Phases & Milestones (${project.phases.length})` },
     { key: "tasks", label: `Tasks (${project.tasks.length})` },
     { key: "drawings", label: `Drawings & Files (${project.documents.length})` },
+    { key: "handover", label: "Handover Package" },
     { key: "team", label: `Team & Contacts (${project.members.length})` },
     { key: "visits", label: `Site Visits (${project.sites?.reduce((acc: number, s: any) => acc + (s.visits?.length || 0), 0) || 0})` },
     ...(hasFinance ? [{ key: "finance", label: "Finance & Fees" }] : []),
@@ -366,6 +378,146 @@ export function ProjectDetailClientView({
       router.refresh();
     } catch (err: any) {
       setErrorMessage(err.message || "Failed to record decision");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleWithdrawScopeChange = async (requestId: string) => {
+    setIsSubmitting(true);
+    setErrorMessage(null);
+    try {
+      const res = await fetch(`/api/projects/${project.id}/changes?workspaceSlug=${context.tenantSlug}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requestId, action: "WITHDRAW", reason: "Withdrawn by user" }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to withdraw scope change");
+      setSuccessMessage("✓ Scope change request withdrawn.");
+      router.refresh();
+    } catch (err: any) {
+      setErrorMessage(err.message || "Failed to withdraw change");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleApplyScopeChange = async (requestId: string) => {
+    if (!canManage) return;
+    setIsSubmitting(true);
+    setErrorMessage(null);
+    try {
+      const res = await fetch(`/api/projects/${project.id}/changes?workspaceSlug=${context.tenantSlug}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requestId, action: "APPLY" }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to apply scope change");
+      setSuccessMessage("✓ Scope change applied atomically to project schedule & budget!");
+      router.refresh();
+    } catch (err: any) {
+      setErrorMessage(err.message || "Failed to apply change");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleArchiveProject = async () => {
+    if (!canManage) return;
+    setIsSubmitting(true);
+    setErrorMessage(null);
+    try {
+      const res = await fetch(`/api/projects/${project.id}/lifecycle?workspaceSlug=${context.tenantSlug}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "ARCHIVE" }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to archive project");
+      setSuccessMessage("✓ Project archived from active workspace listings.");
+      router.refresh();
+    } catch (err: any) {
+      setErrorMessage(err.message || "Failed to archive project");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleUnarchiveProject = async () => {
+    if (!canManage) return;
+    setIsSubmitting(true);
+    setErrorMessage(null);
+    try {
+      const res = await fetch(`/api/projects/${project.id}/lifecycle?workspaceSlug=${context.tenantSlug}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "UNARCHIVE" }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to unarchive project");
+      setSuccessMessage("✓ Project restored to active workspace listings!");
+      router.refresh();
+    } catch (err: any) {
+      setErrorMessage(err.message || "Failed to unarchive project");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleRecordHandoverIssue = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!canManage || !handoverRecipientName.trim()) return;
+    setIsSubmitting(true);
+    setErrorMessage(null);
+    try {
+      const res = await fetch(`/api/projects/${project.id}/lifecycle?workspaceSlug=${context.tenantSlug}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "RECORD_HANDOVER_ISSUE",
+          recipientName: handoverRecipientName.trim(),
+          recipientContact: handoverRecipientContact.trim() || undefined,
+          notes: handoverIssueNotes.trim() || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to record handover issuance");
+      setSuccessMessage("✓ Architectural handover package issue recorded!");
+      setIsIssueHandoverModalOpen(false);
+      router.refresh();
+    } catch (err: any) {
+      setErrorMessage(err.message || "Failed to record handover issue");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleRecordHandoverAcknowledgement = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!canManage || !handoverAckName.trim() || !handoverAckEvidence.trim()) return;
+    setIsSubmitting(true);
+    setErrorMessage(null);
+    try {
+      const res = await fetch(`/api/projects/${project.id}/lifecycle?workspaceSlug=${context.tenantSlug}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "RECORD_HANDOVER_ACKNOWLEDGE",
+          acknowledgedByName: handoverAckName.trim(),
+          acknowledgementDate: new Date().toISOString(),
+          acknowledgementEvidence: handoverAckEvidence.trim(),
+          notes: handoverAckNotes.trim() || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to record client handover acknowledgement");
+      setSuccessMessage("✓ Client handover acknowledgement officially recorded!");
+      setIsAcknowledgeHandoverModalOpen(false);
+      router.refresh();
+    } catch (err: any) {
+      setErrorMessage(err.message || "Failed to record acknowledgement");
     } finally {
       setIsSubmitting(false);
     }
@@ -735,7 +887,60 @@ export function ProjectDetailClientView({
                       <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                       <span>Close</span>
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsCancelModalOpen(true)}
+                      className="px-2.5 py-1.5 rounded-lg border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-900 text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+                      title="Cancel project with open work disposition"
+                    >
+                      <X className="w-3.5 h-3.5 text-rose-600" />
+                      <span>Cancel</span>
+                    </button>
                   </>
+                )}
+                {project.status === "ON_HOLD" && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setIsResumeModalOpen(true)}
+                      className="px-2.5 py-1.5 rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+                      title="Resume project operations"
+                    >
+                      <PlayCircle className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Resume</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsCancelModalOpen(true)}
+                      className="px-2.5 py-1.5 rounded-lg border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-900 text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+                      title="Cancel project with open work disposition"
+                    >
+                      <X className="w-3.5 h-3.5 text-rose-600" />
+                      <span>Cancel</span>
+                    </button>
+                  </>
+                )}
+                {(project.status === "COMPLETED" || project.status === "CANCELLED") && !project.isArchived && (
+                  <button
+                    type="button"
+                    onClick={handleArchiveProject}
+                    className="px-2.5 py-1.5 rounded-lg border border-gray-300 bg-gray-50 hover:bg-gray-100 text-gray-700 text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+                    title="Archive project from active views"
+                  >
+                    <Lock className="w-3.5 h-3.5 text-gray-600" />
+                    <span>Archive</span>
+                  </button>
+                )}
+                {project.isArchived && (
+                  <button
+                    type="button"
+                    onClick={handleUnarchiveProject}
+                    className="px-2.5 py-1.5 rounded-lg border border-blue-300 bg-blue-50 hover:bg-blue-100 text-blue-900 text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+                    title="Restore project visibility"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Unarchive</span>
+                  </button>
                 )}
                 <button
                   type="button"
@@ -1021,7 +1226,24 @@ export function ProjectDetailClientView({
                                 >
                                   Reject
                                 </button>
+                                <button
+                                  onClick={() => handleWithdrawScopeChange(cr.id)}
+                                  className="px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 text-gray-700 text-[11px] font-semibold cursor-pointer"
+                                >
+                                  Withdraw
+                                </button>
                               </div>
+                            )}
+                            {cr.status === "APPROVED" && !cr.appliedAt && (
+                              <button
+                                onClick={() => handleApplyScopeChange(cr.id)}
+                                className="px-2.5 py-1 rounded bg-[#5A81FA] hover:bg-[#426EE8] text-white text-[11px] font-bold cursor-pointer"
+                              >
+                                Apply Changes
+                              </button>
+                            )}
+                            {cr.status === "APPROVED" && cr.appliedAt && (
+                              <span className="text-[10px] text-emerald-700 font-semibold">✓ Applied</span>
                             )}
                           </td>
                         )}
@@ -1281,6 +1503,194 @@ export function ProjectDetailClientView({
           ) : (
             <p className="text-xs text-[#696E82] italic">No architectural drawings uploaded for this project.</p>
           )}
+        </div>
+      )}
+
+      {/* 5.5 HANDOVER PACKAGE TAB */}
+      {currentTab === "handover" && (
+        <div className="space-y-6">
+          {/* Handover Status & Action Header */}
+          <div className="bg-white border border-[#E2E6F0] rounded-2xl p-6 shadow-2xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#E2E6F0] pb-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-bold text-[#1F1F1F]">Architectural Handover Package Dossier</h3>
+                  <span
+                    className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
+                      project.handoverAcknowledgedAt
+                        ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                        : project.handoverIssuedAt
+                        ? "bg-blue-100 text-blue-800 border border-blue-300"
+                        : "bg-amber-100 text-amber-800 border border-amber-300"
+                    }`}
+                  >
+                    {project.handoverAcknowledgedAt
+                      ? "✓ Client Acknowledged"
+                      : project.handoverIssuedAt
+                      ? "Issued for Client Review"
+                      : "Handover Dossier in Preparation"}
+                  </span>
+                </div>
+                <p className="text-xs text-[#696E82] mt-0.5">
+                  Compilation of approved deliverables, issued-for-construction drawing revisions, and signoff records.
+                </p>
+              </div>
+              {canManage && (
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsIssueHandoverModalOpen(true)}
+                    className="px-3 py-1.5 rounded-xl border border-blue-300 bg-blue-50 hover:bg-blue-100 text-blue-900 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors"
+                  >
+                    <FileCheck2 className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Record Package Issuance</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsAcknowledgeHandoverModalOpen(true)}
+                    className="px-3 py-1.5 rounded-xl border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Record Client Acknowledgement</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Handover Metadata Banner */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+              <div className="p-4 rounded-xl bg-[#F8F9FD] border border-[#E2E6F0] space-y-1.5">
+                <span className="text-[10px] uppercase font-bold text-[#696E82] block">Package Issuance Details</span>
+                {project.handoverIssuedAt ? (
+                  <>
+                    <p className="text-[#1F1F1F]">
+                      Issued on <strong>{new Date(project.handoverIssuedAt).toLocaleDateString()}</strong> to{" "}
+                      <strong>{project.handoverRecipientName || "Primary Client"}</strong>
+                      {project.handoverRecipientContact ? ` (${project.handoverRecipientContact})` : ""}
+                    </p>
+                    {project.handoverIssueNotes && (
+                      <p className="text-[#696E82] italic text-[11px]">Notes: {project.handoverIssueNotes}</p>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-[#696E82] italic">Handover package has not been formally issued to client yet.</p>
+                )}
+              </div>
+
+              <div className="p-4 rounded-xl bg-[#F8F9FD] border border-[#E2E6F0] space-y-1.5">
+                <span className="text-[10px] uppercase font-bold text-[#696E82] block">Client Formal Acknowledgement</span>
+                {project.handoverAcknowledgedAt ? (
+                  <>
+                    <p className="text-emerald-900 font-semibold">
+                      Acknowledged by <strong>{project.handoverAcknowledgedBy || "Client Contact"}</strong> on{" "}
+                      {new Date(project.handoverAcknowledgedAt).toLocaleDateString()}
+                    </p>
+                    {project.handoverAcknowledgementEvidence && (
+                      <p className="text-[#1F1F1F] text-[11px]">
+                        <strong>Evidence:</strong> {project.handoverAcknowledgementEvidence}
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-[#696E82] italic">Pending client receipt and signoff transmittal.</p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Dossier Item Breakdown */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Approved Deliverables */}
+            <div className="bg-white border border-[#E2E6F0] rounded-2xl p-5 shadow-2xs space-y-3">
+              <div className="flex items-center justify-between border-b border-[#E2E6F0] pb-2">
+                <h4 className="text-xs font-bold text-[#1F1F1F] uppercase tracking-wider flex items-center gap-1.5">
+                  <CheckSquare className="w-4 h-4 text-emerald-600" />
+                  <span>Approved Deliverables</span>
+                </h4>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-800">
+                  {project.tasks?.filter((t: any) => t.status === "COMPLETED").length || 0} Complete
+                </span>
+              </div>
+              <div className="space-y-2 max-h-72 overflow-y-auto">
+                {project.tasks?.filter((t: any) => t.status === "COMPLETED").length > 0 ? (
+                  project.tasks
+                    .filter((t: any) => t.status === "COMPLETED")
+                    .map((t: any) => (
+                      <div key={t.id} className="p-2.5 rounded-xl bg-[#F8F9FD] border border-[#E2E6F0] text-xs">
+                        <span className="font-semibold text-[#1F1F1F] block">{t.title}</span>
+                        <span className="text-[10px] text-[#696E82]">Phase: {t.phase?.phaseName || "General"}</span>
+                      </div>
+                    ))
+                ) : (
+                  <p className="text-xs text-[#696E82] italic">No completed deliverables yet.</p>
+                )}
+              </div>
+            </div>
+
+            {/* Issued For Construction Drawings */}
+            <div className="bg-white border border-[#E2E6F0] rounded-2xl p-5 shadow-2xs space-y-3">
+              <div className="flex items-center justify-between border-b border-[#E2E6F0] pb-2">
+                <h4 className="text-xs font-bold text-[#1F1F1F] uppercase tracking-wider flex items-center gap-1.5">
+                  <Layers className="w-4 h-4 text-[#5A81FA]" />
+                  <span>GFC Drawings Dossier</span>
+                </h4>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-50 text-blue-800">
+                  {project.documents?.filter((d: any) => d.status === "ISSUED_FOR_CONSTRUCTION" || d.versions?.some((v: any) => v.purpose === "GFC")).length || 0} Sets
+                </span>
+              </div>
+              <div className="space-y-2 max-h-72 overflow-y-auto">
+                {project.documents?.filter((d: any) => d.status === "ISSUED_FOR_CONSTRUCTION" || d.versions?.some((v: any) => v.purpose === "GFC")).length > 0 ? (
+                  project.documents
+                    .filter((d: any) => d.status === "ISSUED_FOR_CONSTRUCTION" || d.versions?.some((v: any) => v.purpose === "GFC"))
+                    .map((d: any) => {
+                      const latestVer = d.versions?.[d.versions.length - 1];
+                      return (
+                        <div key={d.id} className="p-2.5 rounded-xl bg-[#F8F9FD] border border-[#E2E6F0] text-xs">
+                          <span className="font-mono text-[10px] text-[#5A81FA] block">{d.documentNumber || "DWG"}</span>
+                          <span className="font-semibold text-[#1F1F1F] block">{d.title}</span>
+                          <div className="text-[10px] text-[#696E82] flex justify-between mt-1">
+                            <span>Rev: {latestVer?.revisionNumber !== undefined ? `R${latestVer.revisionNumber}` : "Latest"}</span>
+                            <span className="text-emerald-700 font-bold">{latestVer?.purpose || "GFC"}</span>
+                          </div>
+                        </div>
+                      );
+                    })
+                ) : (
+                  <p className="text-xs text-[#696E82] italic">No GFC drawings issued yet.</p>
+                )}
+              </div>
+            </div>
+
+            {/* Milestones Achieved */}
+            <div className="bg-white border border-[#E2E6F0] rounded-2xl p-5 shadow-2xs space-y-3">
+              <div className="flex items-center justify-between border-b border-[#E2E6F0] pb-2">
+                <h4 className="text-xs font-bold text-[#1F1F1F] uppercase tracking-wider flex items-center gap-1.5">
+                  <Compass className="w-4 h-4 text-emerald-600" />
+                  <span>Milestones Achieved</span>
+                </h4>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-800">
+                  {project.milestones?.filter((m: any) => m.status === "ACHIEVED").length || 0} Achieved
+                </span>
+              </div>
+              <div className="space-y-2 max-h-72 overflow-y-auto">
+                {project.milestones?.filter((m: any) => m.status === "ACHIEVED").length > 0 ? (
+                  project.milestones
+                    .filter((m: any) => m.status === "ACHIEVED")
+                    .map((m: any) => (
+                      <div key={m.id} className="p-2.5 rounded-xl bg-[#F8F9FD] border border-[#E2E6F0] text-xs">
+                        <span className="font-semibold text-[#1F1F1F] block">{m.title}</span>
+                        <div className="text-[10px] text-[#696E82] flex justify-between mt-1">
+                          <span>{m.phase?.phaseName || "Milestone"}</span>
+                          {m.achievedAt && <span>{new Date(m.achievedAt).toLocaleDateString()}</span>}
+                        </div>
+                      </div>
+                    ))
+                ) : (
+                  <p className="text-xs text-[#696E82] italic">No milestones marked as achieved yet.</p>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
@@ -2084,6 +2494,219 @@ export function ProjectDetailClientView({
                 {isSubmitting ? "Processing..." : "Confirm Removal"}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* MODAL: CANCEL PROJECT                                          */}
+      {/* ============================================================== */}
+      {isCancelModalOpen && canManage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white rounded-2xl border border-[#E2E6F0] shadow-2xl max-w-md w-full p-6 space-y-4">
+            <div className="flex justify-between items-center border-b border-[#E2E6F0] pb-3">
+              <h3 className="text-base font-bold text-[#1F1F1F] flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-rose-600" />
+                <span>Cancel Project Operations</span>
+              </h3>
+              <button onClick={() => setIsCancelModalOpen(false)} className="text-[#696E82] hover:text-[#1F1F1F] cursor-pointer">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <form onSubmit={handleCancelProject} className="space-y-4 text-xs">
+              <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-[11px] leading-relaxed">
+                Cancelling a project stops all ongoing operational work. Submitted work, drawings, financial vouchers, and audit trails remain permanently preserved.
+              </div>
+              <div>
+                <label className="font-semibold text-[#1F1F1F] block mb-1">
+                  Cancellation Reason <span className="text-red-600">*</span>
+                </label>
+                <textarea
+                  required
+                  rows={3}
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
+                  placeholder="e.g. Client terminated agreement prior to tender; site acquisition stalled..."
+                  className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-xs focus:ring-2 focus:ring-[#5A81FA] focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="font-semibold text-[#1F1F1F] block mb-1">Disposition of Open Work</label>
+                <select
+                  value={cancelDisposition}
+                  onChange={(e) => setCancelDisposition(e.target.value)}
+                  className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-xs"
+                >
+                  <option value="CANCEL_OPEN_TASKS">Cancel all open deliverable tasks</option>
+                  <option value="PRESERVE_SUBMITTED_WORK">Preserve submitted tasks as reviewed records</option>
+                </select>
+              </div>
+              <div className="flex justify-end gap-2 pt-2 border-t border-[#E2E6F0]">
+                <button
+                  type="button"
+                  onClick={() => setIsCancelModalOpen(false)}
+                  className="px-4 py-2 bg-[#F2F4FF] text-[#696E82] font-semibold rounded-xl text-xs cursor-pointer"
+                >
+                  Close
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting || !cancelReason.trim()}
+                  className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs cursor-pointer disabled:opacity-50"
+                >
+                  {isSubmitting ? "Cancelling..." : "Confirm Cancellation"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* MODAL: RECORD HANDOVER ISSUE                                   */}
+      {/* ============================================================== */}
+      {isIssueHandoverModalOpen && canManage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white rounded-2xl border border-[#E2E6F0] shadow-2xl max-w-md w-full p-6 space-y-4">
+            <div className="flex justify-between items-center border-b border-[#E2E6F0] pb-3">
+              <h3 className="text-base font-bold text-[#1F1F1F] flex items-center gap-2">
+                <FileCheck2 className="w-5 h-5 text-blue-600" />
+                <span>Record Handover Package Issuance</span>
+              </h3>
+              <button onClick={() => setIsIssueHandoverModalOpen(false)} className="text-[#696E82] hover:text-[#1F1F1F] cursor-pointer">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <form onSubmit={handleRecordHandoverIssue} className="space-y-3 text-xs">
+              <p className="text-[#696E82]">
+                Log formal transmission of the architectural handover dossier to the client or developer entity.
+              </p>
+              <div>
+                <label className="font-semibold text-[#1F1F1F] block mb-1">
+                  Recipient Name <span className="text-red-600">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={handoverRecipientName}
+                  onChange={(e) => setHandoverRecipientName(e.target.value)}
+                  placeholder="e.g. Mr. Rajesh Sharma"
+                  className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-xs focus:ring-2 focus:ring-[#5A81FA] focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="font-semibold text-[#1F1F1F] block mb-1">Recipient Contact / Email</label>
+                <input
+                  type="text"
+                  value={handoverRecipientContact}
+                  onChange={(e) => setHandoverRecipientContact(e.target.value)}
+                  placeholder="e.g. rajesh@clientgroup.com / +91 98765 43210"
+                  className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-xs"
+                />
+              </div>
+              <div>
+                <label className="font-semibold text-[#1F1F1F] block mb-1">Transmittal Notes</label>
+                <textarea
+                  rows={2}
+                  value={handoverIssueNotes}
+                  onChange={(e) => setHandoverIssueNotes(e.target.value)}
+                  placeholder="e.g. Handover binder and digital drawing package transferred via cloud drive"
+                  className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-xs"
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2 border-t border-[#E2E6F0]">
+                <button
+                  type="button"
+                  onClick={() => setIsIssueHandoverModalOpen(false)}
+                  className="px-4 py-2 bg-[#F2F4FF] text-[#696E82] font-semibold rounded-xl text-xs cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting || !handoverRecipientName.trim()}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs cursor-pointer disabled:opacity-50"
+                >
+                  {isSubmitting ? "Recording..." : "Record Issuance"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* MODAL: RECORD HANDOVER CLIENT ACKNOWLEDGEMENT                  */}
+      {/* ============================================================== */}
+      {isAcknowledgeHandoverModalOpen && canManage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white rounded-2xl border border-[#E2E6F0] shadow-2xl max-w-md w-full p-6 space-y-4">
+            <div className="flex justify-between items-center border-b border-[#E2E6F0] pb-3">
+              <h3 className="text-base font-bold text-[#1F1F1F] flex items-center gap-2">
+                <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                <span>Record Client Handover Signoff</span>
+              </h3>
+              <button onClick={() => setIsAcknowledgeHandoverModalOpen(false)} className="text-[#696E82] hover:text-[#1F1F1F] cursor-pointer">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <form onSubmit={handleRecordHandoverAcknowledgement} className="space-y-3 text-xs">
+              <p className="text-[#696E82]">
+                Formally record client acknowledgement of deliverables with audit evidence.
+              </p>
+              <div>
+                <label className="font-semibold text-[#1F1F1F] block mb-1">
+                  Acknowledged By (Client Signatory) <span className="text-red-600">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={handoverAckName}
+                  onChange={(e) => setHandoverAckName(e.target.value)}
+                  placeholder="e.g. Mr. Rajesh Sharma (Managing Director)"
+                  className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-xs focus:ring-2 focus:ring-[#5A81FA] focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="font-semibold text-[#1F1F1F] block mb-1">
+                  Acknowledgement Evidence Reference <span className="text-red-600">*</span>
+                </label>
+                <textarea
+                  required
+                  rows={2}
+                  value={handoverAckEvidence}
+                  onChange={(e) => setHandoverAckEvidence(e.target.value)}
+                  placeholder="e.g. Signed completion certificate transmittal doc #TR-2026-041 dated 2026-10-09"
+                  className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-xs"
+                />
+              </div>
+              <div>
+                <label className="font-semibold text-[#1F1F1F] block mb-1">Additional Notes</label>
+                <textarea
+                  rows={2}
+                  value={handoverAckNotes}
+                  onChange={(e) => setHandoverAckNotes(e.target.value)}
+                  placeholder="e.g. Client confirmed satisfaction with all architectural documentation"
+                  className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-xs"
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2 border-t border-[#E2E6F0]">
+                <button
+                  type="button"
+                  onClick={() => setIsAcknowledgeHandoverModalOpen(false)}
+                  className="px-4 py-2 bg-[#F2F4FF] text-[#696E82] font-semibold rounded-xl text-xs cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting || !handoverAckName.trim() || !handoverAckEvidence.trim()}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs cursor-pointer disabled:opacity-50"
+                >
+                  {isSubmitting ? "Recording..." : "Record Acknowledgement"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

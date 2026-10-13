@@ -25,13 +25,11 @@ function findValue(row: Record<string, string>, possibleKeys: string[]): string 
     }
   }
 
-  // Pass 2: Substring / contains match for compound headers
+  // Pass 2: Column header contains target keyword (e.g. 'workemailaddress' contains 'workemail')
   for (const target of possibleKeys) {
     const cleanTarget = target.toLowerCase().replace(/[^a-z0-9]/g, "");
-    if (cleanTarget.length < 3) continue;
-    const found = normalizedKeys.find(
-      (k) => k.clean.includes(cleanTarget) || cleanTarget.includes(k.clean)
-    );
+    if (cleanTarget.length < 4) continue;
+    const found = normalizedKeys.find((k) => k.clean.includes(cleanTarget));
     if (found && row[found.original] !== undefined && row[found.original].trim() !== "") {
       return row[found.original].trim();
     }
@@ -212,7 +210,9 @@ export async function importEmployeesFromCsv(
       } else if (r.includes("ADMIN")) {
         assignedRole = TenantRole.ADMIN;
       } else if (r.includes("PROJECT_MANAGER") || r.includes("MANAGER")) {
-        assignedRole = TenantRole.PROJECT_MANAGER;
+        // Project Manager is a project-level operational responsibility (Project.projectManagerId),
+        // not an account security role. Account security role maps to EMPLOYEE.
+        assignedRole = TenantRole.EMPLOYEE;
       }
     }
 
@@ -1579,9 +1579,9 @@ export function getSampleCsvTemplate(type: string): { filename: string; content:
       return {
         filename: "sample-contractors-vendors-template.csv",
         content: [
-          "Contractor Name,Company Name,Type,Contact,Alternate Contact,Email,Projects,Office Location",
-          'Suresh Patel,Shree Ram Civil LLP,Civil / Masonry,+91 98200 45678,+91 98200 45699,suresh@shreeramcivil.com,Villa Serenita,"Panvel, Navi Mumbai"',
-          'Dinesh Sharma,Prime Modular,Carpentry & Millwork,+91 98190 33445,,dinesh@primemillwork.in,Horizon HQ,"Goregaon West, Mumbai"',
+          "Name,Contact,Email,Firm Name,Trade,Address",
+          'Suresh Patel,+91 98200 45678,suresh@shreeramcivil.com,Shree Ram Civil LLP,Civil / Masonry,"Panvel, Navi Mumbai"',
+          'Dinesh Sharma,+91 98190 33445,dinesh@primemillwork.in,Prime Modular,Carpentry & Millwork,"Goregaon West, Mumbai"',
         ].join("\r\n"),
       };
 
@@ -1589,9 +1589,9 @@ export function getSampleCsvTemplate(type: string): { filename: string; content:
       return {
         filename: "sample-consultants-template.csv",
         content: [
-          "Consultant Name,Company Name,Type of service,Designation,Email,Contact,Alternate Contact,Firm Location,Project",
-          'Dr. Amit Joshi,Joshi Structural Engineers,Structural,Chief Structural Engineer,amit@joshistructures.com,+91 98205 66778,+91 98205 66700,"Nariman Point, Mumbai",Villa Serenita',
-          'Karan Johar,EnviroTech Solutions,MEP / HVAC,Director,karan@envirotechmep.com,+91 98700 98765,,Andheri East Mumbai,Horizon HQ',
+          "Name,Email,Contact,Firm Name,Firm Address,Discipline,Notes",
+          'Dr. Amit Joshi,amit@joshistructures.com,+91 98205 66778,Joshi Structural Engineers,"Nariman Point, Mumbai",Structural,Chief Structural Engineer',
+          'Karan Johar,karan@envirotechmep.com,+91 98700 98765,EnviroTech Solutions,"Andheri East Mumbai",MEP / HVAC,Director',
         ].join("\r\n"),
       };
 

@@ -529,6 +529,22 @@ export async function reviewRevision(
   }
 
   return await prisma.$transaction(async (tx) => {
+    if (decision === "APPROVED") {
+      // Mark all previous approved versions of this document as SUPERSEDED
+      await tx.documentVersion.updateMany({
+        where: {
+          documentId: version.documentId,
+          tenantId: ctx.tenantId,
+          id: { not: revisionId },
+          approvalState: DocumentApprovalState.APPROVED,
+        },
+        data: {
+          approvalState: DocumentApprovalState.SUPERSEDED,
+          supersededById: revisionId,
+        },
+      });
+    }
+
     const newApprovalState =
       decision === "APPROVED" ? DocumentApprovalState.APPROVED : DocumentApprovalState.DRAFT;
 

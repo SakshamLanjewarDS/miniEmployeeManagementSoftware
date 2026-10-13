@@ -13,7 +13,54 @@ const prisma = new PrismaClient();
 const STANDARD_PASSWORD = "Saksham@2003";
 
 async function main() {
-  console.log("🌱 Cleaning up all dummy data and seeding Admin (Saksham Lanjewar)...");
+  // CRITICAL SEED SAFETY SAFEGUARDS (F3 Requirement)
+  // 1. Strict production prohibition - no overrides permitted for demo credential injection
+  if (process.env.NODE_ENV === "production") {
+    console.error("❌ CRITICAL SAFETY BLOCK: Database demo seeding is strictly FORBIDDEN when NODE_ENV=production!");
+    console.error("Known-password demo-account seeding must never run against production environments.");
+    console.error("For legitimate production workspace initialization, use: tsx scripts/init-production.ts");
+    process.exit(1);
+  }
+
+  // 2. Validate database connection host and target database name
+  const dbUrl = process.env.DATABASE_URL || "";
+  if (!dbUrl) {
+    console.error("❌ CRITICAL ERROR: DATABASE_URL is not set.");
+    process.exit(1);
+  }
+
+  const match = dbUrl.match(/@([^:/]+)(?::(\d+))?\/([^?]+)/);
+  const host = match ? match[1] : "unknown";
+  const dbName = match ? match[3] : "unknown";
+
+  const isLocalHost =
+    host === "localhost" ||
+    host === "127.0.0.1" ||
+    host === "::1" ||
+    host === "mysql" ||
+    host === "host.docker.internal";
+
+  if (!isLocalHost) {
+    console.error(`❌ CRITICAL SAFETY BLOCK: Refusing to seed non-local database host '${host}'.`);
+    console.error("Demo seeding is restricted to verified local development targets.");
+    process.exit(1);
+  }
+
+  const lowerDb = dbName.toLowerCase();
+  if (lowerDb.includes("prod") || lowerDb.includes("live") || lowerDb.includes("operational")) {
+    console.error(`❌ CRITICAL SAFETY BLOCK: Database '${dbName}' matches operational naming patterns.`);
+    process.exit(1);
+  }
+
+  // 3. Require explicit development seeding confirmation flag
+  if (process.env.ALLOW_DEVELOPMENT_SEED !== "true" && process.env.CONFIRM_DEV_DATABASE_RESET !== "true") {
+    console.error("❌ SAFETY CONFIRMATION REQUIRED: Seeding will reset studio tables and recreate demo accounts.");
+    console.error("To execute development demo seeding, you must explicitly set:");
+    console.error("  ALLOW_DEVELOPMENT_SEED=true (or CONFIRM_DEV_DATABASE_RESET=true)");
+    process.exit(1);
+  }
+
+  console.log(`🌱 Seeding development demo data to local database '${dbName}' on '${host}'...`);
 
   // 1. Clean existing records completely
   console.log("Cleaning up prior records...");

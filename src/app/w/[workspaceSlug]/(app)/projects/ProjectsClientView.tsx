@@ -811,44 +811,44 @@ export function ProjectsClientView({
     switch (status) {
       case "ACTIVE":
         return (
-          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#F2F4FF] text-[#5A81FA] border border-[#CEDEFF]">
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#F2F4FF] text-[#2448B5] border border-[#CEDEFF]">
             Active Commission
           </span>
         );
       case "DRAFT":
         return (
-          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-300 flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-[#78350F] border border-amber-300 flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-600"></span>
             Draft Setup
           </span>
         );
       case "PLANNING":
         return (
-          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-[#1D4ED8] border border-blue-200">
             Planning / Concept
           </span>
         );
       case "ON_HOLD":
         return (
-          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-[#78350F] border border-amber-300">
             On Hold
           </span>
         );
       case "COMPLETED":
         return (
-          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-[#065F46] border border-emerald-300">
             Completed
           </span>
         );
       case "CANCELLED":
         return (
-          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200">
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-[#9F1239] border border-rose-300">
             Cancelled
           </span>
         );
       case "ARCHIVED":
         return (
-          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 border border-gray-200">
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-[#374151] border border-gray-300">
             Archived
           </span>
         );

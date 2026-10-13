@@ -127,18 +127,24 @@ export function GlobalInputAssistant() {
     });
   }, []);
 
-  // Recalculate on scroll (with capture for inside modal scrolls) or window resize
+  // Recalculate on scroll (with capture for inside modal scrolls) or window resize using requestAnimationFrame
   useEffect(() => {
     if (!activeElement) return;
 
+    let rafId: number | null = null;
     const handleScrollOrResize = () => {
-      updatePosition();
+      if (rafId) return;
+      rafId = window.requestAnimationFrame(() => {
+        updatePosition();
+        rafId = null;
+      });
     };
 
     window.addEventListener("scroll", handleScrollOrResize, true);
     window.addEventListener("resize", handleScrollOrResize);
 
     return () => {
+      if (rafId) window.cancelAnimationFrame(rafId);
       window.removeEventListener("scroll", handleScrollOrResize, true);
       window.removeEventListener("resize", handleScrollOrResize);
     };

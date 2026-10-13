@@ -137,15 +137,29 @@ If deploying to Vercel:
 
 ---
 
-## Default Login Credentials (from Seed)
+## Part 3: Production Security, Database Migrations & Credentials
 
-- **Organization**: `100percentdesign`
-- **Owner / Principal Architect**:
-  - Employee ID: `EMP001` or `admin@100percentdesign.in`
-  - Password: `Password@123`
-- **Project Manager**:
-  - Employee ID: `EMP002` or `pm@100percentdesign.in`
-  - Password: `Password@123`
-- **Employee / Site Architect**:
-  - Employee ID: `EMP003` or `architect@100percentdesign.in`
-  - Password: `Password@123`
+### 1. Database Migrations in Production
+> [!CAUTION]
+> Never use `prisma db push` or `--accept-data-loss` in a production environment. Schema push can cause irreversible data loss and column truncation.
+
+For production database updates, always run reviewed Prisma migrations:
+```bash
+npm run migrate:deploy
+```
+To check migration status:
+```bash
+npm run migrate:status
+```
+
+### 2. Development Seeding vs Production Bootstrapping
+- `npm run db:seed` is strictly an explicit **local development tool**. It wipes existing records and injects local dummy test accounts.
+- The seeding script includes an automated safety block that terminates execution if `NODE_ENV=production` or if connecting to a live database.
+- For initial production setup, use the administrative invitation onboarding flow rather than running demo seeds.
+
+### 3. Credential Rotation & Production Safeguards
+If demo credentials or local passwords were ever used during initial commissioning or staging tests:
+1. Immediately change the Owner and Administrator passwords via the studio Settings / Profile interface.
+2. Generate a fresh, high-entropy `SESSION_SECRET` (at least 64 bytes hex or random string) and configure it as an environment secret.
+3. Verify that all team members use individual, company-issued email addresses with strong passwords.
+4. Rotate any cloud database passwords and verify SSL connection enforcement (`?sslmode=require`).

@@ -59,6 +59,7 @@ import InspectionMapPreview from "./InspectionMapPreview";
 import PhotoEvidenceGallery, { SitePhotoItem } from "./PhotoEvidenceGallery";
 import SnagsTracker, { SnagItem } from "./SnagsTracker";
 import PrintableInspectionReport from "./PrintableInspectionReport";
+import SiteIssuesView from "./SiteIssuesView";
 
 export interface SiteVisitItem {
   id: string;
@@ -332,6 +333,7 @@ export default function VisitsClientView({
 
   const [activeVisit, setActiveVisit] = useState<SiteVisitItem | null>(initialActiveVisit);
   const [allVisits, setAllVisits] = useState<SiteVisitItem[]>(initialAllVisits);
+  const [mainViewTab, setMainViewTab] = useState<"VISITS" | "ISSUES">("VISITS");
 
   const [loading, setLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -1419,7 +1421,47 @@ export default function VisitsClientView({
         )}
       </div>
 
-      {/* Alert Messages */}
+      {/* Combined Modules Switcher: Field Visits & GPS vs Site Issues & Snags */}
+      <div className="flex items-center gap-2 border-b border-[#E2E6F0] pb-2">
+        <button
+          type="button"
+          onClick={() => setMainViewTab("VISITS")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            mainViewTab === "VISITS"
+              ? "bg-[#5A81FA] text-white shadow-xs"
+              : "bg-white text-[#696E82] hover:text-[#1F1F1F] border border-[#E2E6F0]"
+          }`}
+        >
+          <Compass className="w-3.5 h-3.5" />
+          <span>Site Visits & GPS Logs</span>
+          <span
+            className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
+              mainViewTab === "VISITS" ? "bg-white/20 text-white" : "bg-slate-100 text-slate-700"
+            }`}
+          >
+            {allVisits.length}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setMainViewTab("ISSUES")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            mainViewTab === "ISSUES"
+              ? "bg-[#5A81FA] text-white shadow-xs"
+              : "bg-white text-[#696E82] hover:text-[#1F1F1F] border border-[#E2E6F0]"
+          }`}
+        >
+          <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+          <span>Site Issues & Snags Tracker</span>
+        </button>
+      </div>
+
+      {mainViewTab === "ISSUES" ? (
+        <SiteIssuesView workspaceSlug={workspaceSlug} hideHeader={true} />
+      ) : (
+        <>
+          {/* Alert Messages */}
       {statusMessage && (
         <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-xl text-xs flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -2250,6 +2292,8 @@ export default function VisitsClientView({
           )}
         </div>
       </div>
+      </>
+      )}
 
       {/* ======================================================== */}
       {/* MODAL 1: OWNER & ADMIN ASSIGN SITE VISIT MODAL */}

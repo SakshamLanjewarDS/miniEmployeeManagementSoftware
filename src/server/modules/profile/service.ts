@@ -145,9 +145,9 @@ export async function getProfileOverview(ctx: TenantContext, targetMembershipId?
   return {
     isSelf,
     canManage,
-    myProfile,
+    myProfile: isSelf ? myProfile : null,
     directoryProfile,
-    managementRecord,
+    managementRecord: canManage ? managementRecord : null,
     assignedTasks,
     changeRequests,
   };
@@ -209,6 +209,15 @@ export async function submitOfficialRecordChangeRequest(
     reason?: string;
   }
 ) {
+  const ALLOWED_FIELDS = ["designation", "department", "employeeId", "phone"];
+  if (!ALLOWED_FIELDS.includes(data.fieldKey)) {
+    throw new Error(
+      `Unauthorized field "${data.fieldKey}". Only official employment fields (${ALLOWED_FIELDS.join(
+        ", "
+      )}) can be changed via this request.`
+    );
+  }
+
   if (!data.newValue?.trim()) {
     throw new Error("New requested value is required.");
   }
@@ -269,14 +278,54 @@ export async function decideProfileRecordChangeRequest(
   });
 
   if (!request) throw new Error("Profile change request not found.");
+
+  // Four-Eyes Rule: Requester cannot approve their own profile change request
+  if (data.decision === "APPROVE" && request.requesterId === ctx.membershipId) {
+    throw new Error(
+      "Four-eyes principle: Requester cannot approve their own official employment record change request. Another Administrator or Owner must review it."
+    );
+  }
+
   if (request.status !== ProfileChangeRequestStatus.PENDING) {
     throw new Error(`This change request has already been ${request.status.toLowerCase()}.`);
   }
 
   const isApproved = data.decision === "APPROVE";
+
+  if (!isApproved && !data.decisionNote?.trim()) {
+    throw new Error("A specific decision note or reason is required to reject an official record change request.");
+  }
+
   const now = new Date();
 
   return await prisma.$transaction(async (tx) => {
+    if (isApproved) {
+      // Stale detection: Ensure the current official record has not drifted since request submission
+      const currentEmployee = await tx.employee.findUnique({
+        where: { id: request.employeeId },
+      });
+      if (!currentEmployee) {
+        throw new Error("Target employee employment record no longer exists.");
+      }
+
+      const currentActualValue = String((currentEmployee as any)[request.fieldKey] || "");
+      const expectedOldValue = request.oldValue || "";
+
+      if (currentActualValue !== expectedOldValue) {
+        throw new Error(
+          `Stale request conflict: Current official ${request.fieldKey} ("${currentActualValue}") has changed since this request was submitted (baseline was "${expectedOldValue}"). Please reject and submit a refreshed request.`
+        );
+      }
+
+      // Apply change to Employee record atomically
+      await tx.employee.update({
+        where: { id: request.employeeId },
+        data: {
+          [request.fieldKey]: request.newValue,
+        },
+      });
+    }
+
     const updated = await tx.profileChangeRequest.update({
       where: { id: request.id },
       data: {
@@ -286,16 +335,6 @@ export async function decideProfileRecordChangeRequest(
         decisionNote: data.decisionNote?.trim() || (isApproved ? "Approved by leadership" : "Rejected by leadership"),
       },
     });
-
-    if (isApproved) {
-      // Apply change to Employee record
-      await tx.employee.update({
-        where: { id: request.employeeId },
-        data: {
-          [request.fieldKey]: request.newValue,
-        },
-      });
-    }
 
     await tx.auditEvent.create({
       data: {

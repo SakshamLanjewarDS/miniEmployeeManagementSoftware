@@ -1,6 +1,10 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 const nextConfig: NextConfig = {
+  turbopack: {
+    root: path.resolve(process.cwd(), ".."),
+  },
   typescript: {
     ignoreBuildErrors: true,
   },
@@ -8,11 +12,29 @@ const nextConfig: NextConfig = {
     unoptimized: true,
   },
   compress: true,
+  webpack: (config, { dev }) => {
+    if (dev) {
+      config.watchOptions = {
+        ignored: ["**/node_modules/**", "**/.git/**"],
+      };
+    }
+    return config;
+  },
   experimental: {
-    optimizePackageImports: ["lucide-react", "clsx", "tailwind-merge"],
+    optimizePackageImports: [
+      "lucide-react",
+      "clsx",
+      "tailwind-merge",
+      "date-fns",
+    ],
     staleTimes: {
-      dynamic: 300,
+      dynamic: 120,
       static: 600,
+    },
+  },
+  logging: {
+    fetches: {
+      fullUrl: false,
     },
   },
 };

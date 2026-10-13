@@ -94,6 +94,8 @@ export async function revokeSession(token: string): Promise<void> {
   });
 }
 
+export const SESSION_IDLE_TIMEOUT_MS = 4 * 60 * 60 * 1000; // 4 hours idle timeout
+
 /**
  * Revoke all sessions for a user (e.g., upon password reset or account disablement)
  */
@@ -101,6 +103,17 @@ export async function revokeAllUserSessions(userId: string): Promise<void> {
   clearSessionCache();
   await prisma.session.updateMany({
     where: { userId, revokedAt: null },
+    data: { revokedAt: new Date() },
+  });
+}
+
+/**
+ * Revoke all sessions for a specific tenant (e.g. upon tenant-wide security rotation)
+ */
+export async function revokeAllTenantSessions(tenantId: string): Promise<void> {
+  clearSessionCache();
+  await prisma.session.updateMany({
+    where: { activeTenantId: tenantId, revokedAt: null },
     data: { revokedAt: new Date() },
   });
 }

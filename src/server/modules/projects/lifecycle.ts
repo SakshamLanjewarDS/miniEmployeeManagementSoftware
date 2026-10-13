@@ -1,6 +1,7 @@
 import { prisma } from "../../db/prisma";
 import { TenantContext, assertAdminOrOwner } from "../../tenancy/context";
 import { ProjectStatus, PhaseStatus, TaskWorkflowStatus, ProjectMilestoneStatus, ChangeRequestStatus, Prisma } from "@prisma/client";
+import { validateProjectStatusTransition } from "./policy";
 
 /**
  * ============================================================================
@@ -167,15 +168,16 @@ export async function createProjectWithLifecycle(ctx: TenantContext, data: Proje
   assertAdminOrOwner(ctx, "Only Studio Owners or Administrators can create projects.");
 
   const requestedStatus = data.status || ProjectStatus.ACTIVE;
+  const isPreCommission = requestedStatus === ProjectStatus.DRAFT || requestedStatus === ProjectStatus.PLANNING;
   const isDraft = requestedStatus === ProjectStatus.DRAFT;
 
   // 1. If Activating, enforce strict validation
-  if (!isDraft) {
+  if (!isPreCommission) {
     validateStrictProjectActivation(data);
   } else {
-    // Draft requires at least code or name to identify it
+    // Draft or Planning requires at least code or name to identify it
     if (!data.code?.trim() && !data.name?.trim()) {
-      throw new Error("Draft project requires at least a Project Code or Name.");
+      throw new Error(`${requestedStatus} project requires at least a Project Code or Name.`);
     }
   }
 
@@ -386,6 +388,18 @@ export async function activateProject(ctx: TenantContext, projectId: string) {
 
   if (project.status === ProjectStatus.ACTIVE) {
     return { success: true, project, alreadyActive: true };
+  }
+
+  if (project.status === ProjectStatus.COMPLETED || project.status === ProjectStatus.CANCELLED) {
+    throw new Error(
+      `Cannot commission project: Project is currently ${project.status}. Use the reopenProject action to restore closed projects.`
+    );
+  }
+
+  if (project.status === ProjectStatus.ON_HOLD) {
+    throw new Error(
+      "Cannot commission project: Project is currently ON HOLD. Use the resumeProject action to restore held projects."
+    );
   }
 
   // Validate strict activation rules
@@ -736,6 +750,11 @@ export async function requestProjectScopeChange(
     affectedScope?: string;
     scheduleImpactDays?: number;
     feeImpactAmount?: number;
+    currency?: string;
+    estimatedEffortHours?: number;
+    proposedDeliverables?: Array<{ title: string; estimatedHours?: number; dueDate?: string }>;
+    supportingFileIds?: string[];
+    source?: string;
   }
 ) {
   if (!data.title?.trim()) throw new Error("Scope change title is required.");
@@ -756,17 +775,84 @@ export async function requestProjectScopeChange(
       affectedScope: data.affectedScope?.trim() || null,
       scheduleImpactDays: data.scheduleImpactDays || 0,
       feeImpactAmount: data.feeImpactAmount ? new Prisma.Decimal(data.feeImpactAmount) : null,
+      currency: data.currency || project.currency || "INR",
+      estimatedEffortHours: data.estimatedEffortHours ? new Prisma.Decimal(data.estimatedEffortHours) : null,
+      proposedDeliverables: (data.proposedDeliverables || []) as any,
+      supportingFileIds: (data.supportingFileIds || []) as any,
+      source: data.source || "INTERNAL",
       status: ChangeRequestStatus.PENDING,
+      version: 1,
     },
   });
 }
 
+/**
+ * Allows the requester or leadership to withdraw a pending scope change request.
+ */
+export async function withdrawProjectScopeChange(
+  ctx: TenantContext,
+  requestId: string,
+  data: { reason: string }
+) {
+  if (!data.reason?.trim()) {
+    throw new Error("A specific, documented justification reason is required to withdraw a change request.");
+  }
+
+  const request = await prisma.projectChangeRequest.findFirst({
+    where: { id: requestId, tenantId: ctx.tenantId },
+    include: { project: true },
+  });
+  if (!request) throw new Error("Scope change request not found.");
+
+  const isRequester = request.requesterId === ctx.membershipId;
+  const isPrivileged = ctx.role === "OWNER" || ctx.role === "ADMIN";
+  if (!isRequester && !isPrivileged) {
+    throw new Error("Forbidden: Only the original requester or studio leadership can withdraw this change request.");
+  }
+
+  if (request.status !== ChangeRequestStatus.PENDING) {
+    throw new Error(`Cannot withdraw request: Request has already been ${request.status.toLowerCase()}.`);
+  }
+
+  const now = new Date();
+
+  return await prisma.$transaction(async (tx) => {
+    const updated = await tx.projectChangeRequest.update({
+      where: { id: request.id },
+      data: {
+        status: ChangeRequestStatus.REJECTED,
+        decidedById: ctx.membershipId,
+        decidedAt: now,
+        decisionNotes: `[WITHDRAWN] ${data.reason.trim()}`,
+      },
+    });
+
+    await tx.auditEvent.create({
+      data: {
+        tenantId: ctx.tenantId,
+        actorId: ctx.membershipId,
+        projectId: request.projectId,
+        action: "SCOPE_CHANGE_WITHDRAWN",
+        entityType: "ProjectChangeRequest",
+        entityId: request.id,
+        safeChangeSummary: `Withdrew scope change "${request.title}" on project "${request.project.name}": ${data.reason.trim()}`,
+      },
+    }).catch(() => {});
+
+    return updated;
+  });
+}
+
+/**
+ * Decides a project scope change request (approve or reject) with Four-Eyes principle.
+ */
 export async function decideProjectScopeChange(
   ctx: TenantContext,
   requestId: string,
   data: {
     decision: "APPROVE" | "REJECT";
     decisionNotes?: string;
+    autoApply?: boolean;
   }
 ) {
   assertAdminOrOwner(ctx, "Only Studio Owners or Administrators can approve scope changes.");
@@ -776,8 +862,20 @@ export async function decideProjectScopeChange(
     include: { project: true },
   });
   if (!request) throw new Error("Scope change request not found.");
+
+  // Four-Eyes Rule: Requester cannot approve their own change request
+  if (data.decision === "APPROVE" && request.requesterId === ctx.membershipId) {
+    throw new Error(
+      "Four-eyes principle: Requester cannot approve their own scope change request. Another Administrator or Owner must review it."
+    );
+  }
+
   if (request.status !== ChangeRequestStatus.PENDING) {
     throw new Error(`This change request has already been ${request.status.toLowerCase()}.`);
+  }
+
+  if (data.decision === "REJECT" && !data.decisionNotes?.trim()) {
+    throw new Error("A specific decision note or reason is required to reject a scope change request.");
   }
 
   const now = new Date();
@@ -791,12 +889,12 @@ export async function decideProjectScopeChange(
         decidedById: ctx.membershipId,
         decidedAt: now,
         decisionNotes: data.decisionNotes?.trim() || (isApproved ? "Approved by leadership" : "Rejected by leadership"),
-        appliedAt: isApproved ? now : null,
+        appliedAt: isApproved && data.autoApply ? now : null,
       },
     });
 
-    if (isApproved) {
-      // Apply approved changes: adjust target date and budget if applicable
+    if (isApproved && data.autoApply) {
+      // Apply approved changes immediately if requested
       const updates: Prisma.ProjectUpdateInput = {};
 
       if (request.scheduleImpactDays && request.project.targetDate) {
@@ -835,7 +933,166 @@ export async function decideProjectScopeChange(
   });
 }
 
-export async function holdProject(ctx: TenantContext, projectId: string, data: { reason: string }) {
+/**
+ * Explicit, retry-safe controlled application of an approved scope change request.
+ */
+export async function applyProjectScopeChange(ctx: TenantContext, requestId: string) {
+  assertAdminOrOwner(ctx, "Only Studio Owners or Administrators can apply approved scope changes.");
+
+  const request = await prisma.projectChangeRequest.findFirst({
+    where: { id: requestId, tenantId: ctx.tenantId },
+    include: { project: true },
+  });
+  if (!request) throw new Error("Scope change request not found.");
+
+  // Idempotency: prevent double-application
+  if (request.appliedAt) {
+    return { success: true, changeRequest: request, alreadyApplied: true };
+  }
+
+  if (request.status !== ChangeRequestStatus.APPROVED) {
+    throw new Error(`Cannot apply scope change: Request status is ${request.status}, not APPROVED.`);
+  }
+
+  // Four-eyes check on applying
+  if (request.requesterId === ctx.membershipId) {
+    throw new Error(
+      "Four-eyes principle: Requester cannot apply their own scope change request. Another Administrator or Owner must apply it."
+    );
+  }
+
+  // Stale detection: ensure project is active or on-hold
+  if (
+    request.project.status === ProjectStatus.CANCELLED ||
+    request.project.status === ProjectStatus.COMPLETED ||
+    request.project.isArchived
+  ) {
+    throw new Error(`Cannot apply scope change: Project "${request.project.name}" is currently ${request.project.status}.`);
+  }
+
+  const now = new Date();
+
+  return await prisma.$transaction(async (tx) => {
+    const updates: Prisma.ProjectUpdateInput = {};
+
+    if (request.scheduleImpactDays && request.project.targetDate) {
+      const currentTarget = new Date(request.project.targetDate);
+      currentTarget.setDate(currentTarget.getDate() + request.scheduleImpactDays);
+      updates.targetDate = currentTarget;
+    }
+
+    if (request.feeImpactAmount && request.project.budget) {
+      updates.budget = Prisma.Decimal.add(request.project.budget, request.feeImpactAmount);
+    }
+
+    if (Object.keys(updates).length > 0) {
+      await tx.project.update({
+        where: { id: request.projectId },
+        data: updates,
+      });
+    }
+
+    // Link resulting tasks to the change request
+    const createdTasks: any[] = [];
+    if (request.proposedDeliverables && Array.isArray(request.proposedDeliverables)) {
+      for (const deliv of request.proposedDeliverables as Array<{ title?: string; estimatedHours?: number; dueDate?: string }>) {
+        if (!deliv.title) continue;
+        const task = await tx.task.create({
+          data: {
+            tenantId: ctx.tenantId,
+            projectId: request.projectId,
+            title: deliv.title,
+            scopeChangeId: request.id,
+            status: TaskWorkflowStatus.NOT_STARTED,
+            creatorId: ctx.membershipId,
+            estimatedHours: deliv.estimatedHours ? new Prisma.Decimal(deliv.estimatedHours) : null,
+            dueDate: deliv.dueDate ? new Date(deliv.dueDate) : null,
+            description: `Generated from approved scope change: ${request.title}`,
+          },
+        });
+        createdTasks.push(task);
+      }
+    }
+
+    const updatedRequest = await tx.projectChangeRequest.update({
+      where: { id: request.id },
+      data: { appliedAt: now },
+    });
+
+    await tx.auditEvent.create({
+      data: {
+        tenantId: ctx.tenantId,
+        actorId: ctx.membershipId,
+        projectId: request.projectId,
+        action: "SCOPE_CHANGE_APPLIED",
+        entityType: "ProjectChangeRequest",
+        entityId: request.id,
+        safeChangeSummary: `Applied approved scope change "${request.title}" on project "${request.project.name}" (+${request.scheduleImpactDays} days, +${request.feeImpactAmount || 0}, ${createdTasks.length} tasks generated)`,
+      },
+    }).catch(() => {});
+
+    return { success: true, changeRequest: updatedRequest, createdTasksCount: createdTasks.length, alreadyApplied: false };
+  });
+}
+
+/**
+ * Records explicit client confirmation evidence for a scope change request.
+ * Keeps internal approval distinct from client acceptance.
+ */
+export async function recordClientConfirmation(
+  ctx: TenantContext,
+  requestId: string,
+  data: {
+    isClientAccepted: boolean;
+    confirmationNotes?: string;
+    confirmationEvidence?: string;
+  }
+) {
+  assertAdminOrOwner(ctx, "Only Studio Owners or Administrators can record client confirmation for scope changes.");
+
+  const request = await prisma.projectChangeRequest.findFirst({
+    where: { id: requestId, tenantId: ctx.tenantId },
+    include: { project: true },
+  });
+  if (!request) throw new Error("Scope change request not found.");
+
+  const now = new Date();
+  const updated = await prisma.projectChangeRequest.update({
+    where: { id: request.id },
+    data: {
+      isClientAccepted: data.isClientAccepted,
+      clientConfirmedAt: data.isClientAccepted ? now : null,
+      clientConfirmationNotes: data.confirmationNotes?.trim() || null,
+      clientConfirmationEvidence: data.confirmationEvidence?.trim() || null,
+    },
+  });
+
+  await prisma.auditEvent.create({
+    data: {
+      tenantId: ctx.tenantId,
+      actorId: ctx.membershipId,
+      projectId: request.projectId,
+      action: data.isClientAccepted ? "SCOPE_CHANGE_CLIENT_ACCEPTED" : "SCOPE_CHANGE_CLIENT_REJECTED",
+      entityType: "ProjectChangeRequest",
+      entityId: request.id,
+      safeChangeSummary: `Recorded client confirmation for scope change "${request.title}": ${
+        data.isClientAccepted ? "Accepted by client" : "Not accepted by client"
+      }. Notes: ${data.confirmationNotes || "None"}`,
+    },
+  }).catch(() => {});
+
+  return updated;
+}
+
+export async function holdProject(
+  ctx: TenantContext,
+  projectId: string,
+  data: {
+    reason: string;
+    reviewTargetDate?: Date;
+    responsibleContactId?: string;
+  }
+) {
   assertAdminOrOwner(ctx, "Only Studio Owners or Administrators can place a project on hold.");
 
   if (!data.reason?.trim()) {
@@ -852,6 +1109,15 @@ export async function holdProject(ctx: TenantContext, projectId: string, data: {
   }
 
   const now = new Date();
+  const currentChecklist = (project.completionChecklist as any) || {};
+  const holdHistory = Array.isArray(currentChecklist.holdHistory) ? currentChecklist.holdHistory : [];
+  holdHistory.push({
+    heldAt: now.toISOString(),
+    heldById: ctx.membershipId,
+    reason: data.reason.trim(),
+    reviewTargetDate: data.reviewTargetDate ? new Date(data.reviewTargetDate).toISOString() : null,
+    responsibleContactId: data.responsibleContactId || null,
+  });
 
   return await prisma.$transaction(async (tx) => {
     const updated = await tx.project.update({
@@ -861,6 +1127,10 @@ export async function holdProject(ctx: TenantContext, projectId: string, data: {
         holdReason: data.reason.trim(),
         heldAt: now,
         heldById: ctx.membershipId,
+        completionChecklist: {
+          ...currentChecklist,
+          holdHistory,
+        },
       },
     });
 
@@ -872,7 +1142,9 @@ export async function holdProject(ctx: TenantContext, projectId: string, data: {
         action: "PROJECT_HELD",
         entityType: "Project",
         entityId: project.id,
-        safeChangeSummary: `Placed project "${project.name}" on hold: ${data.reason.trim()}`,
+        safeChangeSummary: `Placed project "${project.name}" on hold: ${data.reason.trim()}${
+          data.reviewTargetDate ? ` (Target Review: ${new Date(data.reviewTargetDate).toLocaleDateString()})` : ""
+        }`,
       },
     }).catch(() => {});
 
@@ -883,9 +1155,13 @@ export async function holdProject(ctx: TenantContext, projectId: string, data: {
 export async function resumeProject(
   ctx: TenantContext,
   projectId: string,
-  options: { resumeReason?: string; scheduleAdjustmentDays?: number } = {}
+  options: { resumeReason: string; scheduleAdjustmentDays?: number }
 ) {
   assertAdminOrOwner(ctx, "Only Studio Owners or Administrators can resume a project.");
+
+  if (!options.resumeReason?.trim()) {
+    throw new Error("A specific, documented justification reason is required to resume a project from hold.");
+  }
 
   const project = await prisma.project.findFirst({
     where: { id: projectId, tenantId: ctx.tenantId },
@@ -897,6 +1173,16 @@ export async function resumeProject(
   }
 
   return await prisma.$transaction(async (tx) => {
+    const currentChecklist = (project.completionChecklist as any) || {};
+    const resumeHistory = Array.isArray(currentChecklist.resumeHistory) ? currentChecklist.resumeHistory : [];
+    const now = new Date();
+    const holdDurationDays = project.heldAt
+      ? Math.max(0, Math.round((now.getTime() - new Date(project.heldAt).getTime()) / (1000 * 60 * 60 * 24)))
+      : 0;
+
+    const originalTarget = project.targetDate ? new Date(project.targetDate) : null;
+    let newTarget = originalTarget ? new Date(originalTarget) : null;
+
     const dataUpdates: Prisma.ProjectUpdateInput = {
       status: ProjectStatus.ACTIVE,
       holdReason: null,
@@ -905,15 +1191,43 @@ export async function resumeProject(
     };
 
     // If an explicit schedule adjustment is approved, adjust targetDate
-    if (options.scheduleAdjustmentDays && project.targetDate) {
-      const newTarget = new Date(project.targetDate);
+    if (options.scheduleAdjustmentDays && newTarget) {
       newTarget.setDate(newTarget.getDate() + options.scheduleAdjustmentDays);
       dataUpdates.targetDate = newTarget;
     }
 
-    const updated = await tx.project.update({
-      where: { id: project.id },
+    resumeHistory.push({
+      resumedAt: now.toISOString(),
+      resumedById: ctx.membershipId,
+      resumeReason: options.resumeReason.trim(),
+      holdDurationDays,
+      originalTargetDate: originalTarget ? originalTarget.toISOString() : null,
+      adjustedTargetDate: newTarget ? newTarget.toISOString() : null,
+      scheduleAdjustmentDays: options.scheduleAdjustmentDays || 0,
+    });
+
+    dataUpdates.completionChecklist = {
+      ...currentChecklist,
+      resumeHistory,
+      lastResumeAdjustmentDays: options.scheduleAdjustmentDays || 0,
+    };
+
+    // Atomic conditional update: ensure project is currently ON_HOLD to prevent double date shifts
+    const updateCount = await tx.project.updateMany({
+      where: {
+        id: project.id,
+        tenantId: ctx.tenantId,
+        status: ProjectStatus.ON_HOLD,
+      },
       data: dataUpdates,
+    });
+
+    if (updateCount.count === 0) {
+      throw new Error("Project is not currently on hold or has already been resumed.");
+    }
+
+    const updated = await tx.project.findUniqueOrThrow({
+      where: { id: project.id },
     });
 
     await tx.auditEvent.create({
@@ -924,7 +1238,7 @@ export async function resumeProject(
         action: "PROJECT_RESUMED",
         entityType: "Project",
         entityId: project.id,
-        safeChangeSummary: `Resumed project "${project.name}" from hold${
+        safeChangeSummary: `Resumed project "${project.name}" from hold: ${options.resumeReason.trim()}${
           options.scheduleAdjustmentDays ? ` with ${options.scheduleAdjustmentDays} days schedule adjustment` : ""
         }`,
       },
@@ -936,7 +1250,7 @@ export async function resumeProject(
 
 /**
  * ============================================================================
- * STEP 5: PROJECT CLOSURE & REOPENING
+ * STEP 5: PROJECT CLOSURE, HANDOVER, REOPENING, CANCELLATION & ARCHIVE
  * ============================================================================
  */
 
@@ -978,7 +1292,17 @@ export async function evaluateProjectCompletionChecklist(ctx: TenantContext, pro
   // 4. Milestone completion check
   const pendingMilestones = project.milestones.filter((m) => m.status !== ProjectMilestoneStatus.ACHIEVED);
 
-  // 5. Financial settlement status (Separate from design completion!)
+  // 5. Active site visits check (Mandatory gate: no active visits allowed on closing)
+  const activeSiteVisits = await prisma.siteVisit.findMany({
+    where: {
+      projectId,
+      tenantId: ctx.tenantId,
+      operationalState: "ACTIVE",
+    },
+    select: { id: true, purpose: true, employeeId: true },
+  });
+
+  // 6. Financial settlement status (Separate from design completion!)
   const totalInvoiced = project.feeMilestones.reduce((acc, m) => acc + Number(m.amount), 0);
   const totalPaid = project.feeMilestones.flatMap((m) => m.payments).reduce((acc, p) => acc + Number(p.amount), 0);
   const outstandingBalance = totalInvoiced - totalPaid;
@@ -987,7 +1311,8 @@ export async function evaluateProjectCompletionChecklist(ctx: TenantContext, pro
     openTasks.length === 0 &&
     activeBlockers.length === 0 &&
     unapprovedDrawings.length === 0 &&
-    pendingMilestones.length === 0;
+    pendingMilestones.length === 0 &&
+    activeSiteVisits.length === 0;
 
   return {
     projectId,
@@ -1000,6 +1325,8 @@ export async function evaluateProjectCompletionChecklist(ctx: TenantContext, pro
     unapprovedDrawingsCount: unapprovedDrawings.length,
     pendingMilestonesCount: pendingMilestones.length,
     pendingMilestones: pendingMilestones.map((m) => ({ id: m.id, title: m.title })),
+    activeSiteVisitsCount: activeSiteVisits.length,
+    activeSiteVisits,
     financialSummary: {
       totalInvoiced,
       totalPaid,
@@ -1010,6 +1337,194 @@ export async function evaluateProjectCompletionChecklist(ctx: TenantContext, pro
   };
 }
 
+/**
+ * Handover Package dossier generation for client delivery.
+ */
+export async function getProjectHandoverPackage(ctx: TenantContext, projectId: string) {
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, tenantId: ctx.tenantId },
+    include: {
+      primaryClient: true,
+      tasks: {
+        where: { status: TaskWorkflowStatus.COMPLETED },
+        include: { assignee: { include: { user: true } } },
+      },
+      documents: {
+        include: {
+          versions: {
+            where: { approvalState: "APPROVED" },
+            orderBy: { createdAt: "desc" },
+          },
+        },
+      },
+      milestones: {
+        where: { status: ProjectMilestoneStatus.ACHIEVED },
+      },
+    },
+  });
+  if (!project) throw new Error("Project not found.");
+
+  // Compile latest approved drawing revisions
+  const issuedDrawings = project.documents
+    .map((doc) => {
+      const latestApproved = doc.versions[0];
+      if (!latestApproved) return null;
+      return {
+        documentId: doc.id,
+        title: doc.title,
+        drawingNumber: doc.drawingNumber,
+        discipline: doc.discipline,
+        documentType: doc.documentType,
+        revision: latestApproved.revision,
+        issuePurpose: latestApproved.issuePurpose,
+        approvalState: latestApproved.approvalState,
+        fileId: latestApproved.fileId,
+        approvedAt: latestApproved.updatedAt,
+      };
+    })
+    .filter(Boolean);
+
+  const completionData = (project.completionChecklist as any) || {};
+
+  return {
+    projectId: project.id,
+    projectCode: project.code,
+    projectName: project.name,
+    client: project.primaryClient ? { id: project.primaryClient.id, name: project.primaryClient.name } : null,
+    handoverStatus: project.status === ProjectStatus.COMPLETED ? "COMPLETED" : "IN_PROGRESS",
+    approvedDeliverablesCount: project.tasks.length,
+    approvedDeliverables: project.tasks.map((t) => ({
+      id: t.id,
+      title: t.title,
+      completedAt: t.completionDate,
+      assigneeName: t.assignee?.user.fullName || "Studio Staff",
+    })),
+    issuedDrawingsCount: issuedDrawings.length,
+    issuedDrawings,
+    achievedMilestonesCount: project.milestones.length,
+    achievedMilestones: project.milestones.map((m) => ({
+      id: m.id,
+      title: m.title,
+      actualDate: m.actualDate,
+      clientSignedOffAt: m.clientSignedOffAt,
+    })),
+    handoverMetadata: {
+      issuedTo: completionData.handoverIssuedTo || null,
+      issuedAt: completionData.handoverIssuedAt || null,
+      acknowledgedBy: completionData.handoverAcknowledgedBy || null,
+      acknowledgedAt: completionData.handoverAcknowledgedAt || null,
+      acknowledgementEvidence: completionData.handoverAcknowledgementEvidence || null,
+    },
+  };
+}
+
+/**
+ * Records handover issuance to the client or authorized recipient.
+ */
+export async function recordProjectHandoverIssue(
+  ctx: TenantContext,
+  projectId: string,
+  data: { recipientName: string; recipientContact?: string; notes?: string }
+) {
+  assertAdminOrOwner(ctx, "Only Studio Owners or Administrators can record handover issuance.");
+
+  if (!data.recipientName?.trim()) {
+    throw new Error("Recipient name is required to issue the handover package.");
+  }
+
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, tenantId: ctx.tenantId },
+  });
+  if (!project) throw new Error("Project not found.");
+
+  const currentChecklist = (project.completionChecklist as any) || {};
+  const now = new Date();
+
+  const updatedChecklist = {
+    ...currentChecklist,
+    handoverIssuedTo: data.recipientName.trim(),
+    handoverIssuedContact: data.recipientContact?.trim() || null,
+    handoverIssuedAt: now.toISOString(),
+    handoverIssueNotes: data.notes?.trim() || null,
+  };
+
+  return await prisma.$transaction(async (tx) => {
+    const updated = await tx.project.update({
+      where: { id: project.id },
+      data: { completionChecklist: updatedChecklist },
+    });
+
+    await tx.auditEvent.create({
+      data: {
+        tenantId: ctx.tenantId,
+        actorId: ctx.membershipId,
+        projectId: project.id,
+        action: "PROJECT_HANDOVER_ISSUED",
+        entityType: "Project",
+        entityId: project.id,
+        safeChangeSummary: `Issued architectural handover package for "${project.name}" to ${data.recipientName.trim()}`,
+      },
+    }).catch(() => {});
+
+    return { success: true, project: updated };
+  });
+}
+
+/**
+ * Records client acknowledgement of handover package.
+ */
+export async function recordProjectHandoverAcknowledgement(
+  ctx: TenantContext,
+  projectId: string,
+  data: { acknowledgedByName: string; acknowledgementDate?: Date | string; acknowledgementEvidence: string; notes?: string }
+) {
+  assertAdminOrOwner(ctx, "Only Studio Owners or Administrators can record handover acknowledgement.");
+
+  if (!data.acknowledgedByName?.trim()) {
+    throw new Error("Acknowledged-by contact name is required.");
+  }
+  if (!data.acknowledgementEvidence?.trim()) {
+    throw new Error("Specific acknowledgement evidence reference (e.g. signed letter, transmittal receipt) is required.");
+  }
+
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, tenantId: ctx.tenantId },
+  });
+  if (!project) throw new Error("Project not found.");
+
+  const currentChecklist = (project.completionChecklist as any) || {};
+  const ackDate = data.acknowledgementDate ? new Date(data.acknowledgementDate) : new Date();
+
+  const updatedChecklist = {
+    ...currentChecklist,
+    handoverAcknowledgedBy: data.acknowledgedByName.trim(),
+    handoverAcknowledgedAt: ackDate.toISOString(),
+    handoverAcknowledgementEvidence: data.acknowledgementEvidence.trim(),
+    handoverAcknowledgementNotes: data.notes?.trim() || null,
+  };
+
+  return await prisma.$transaction(async (tx) => {
+    const updated = await tx.project.update({
+      where: { id: project.id },
+      data: { completionChecklist: updatedChecklist },
+    });
+
+    await tx.auditEvent.create({
+      data: {
+        tenantId: ctx.tenantId,
+        actorId: ctx.membershipId,
+        projectId: project.id,
+        action: "PROJECT_HANDOVER_ACKNOWLEDGED",
+        entityType: "Project",
+        entityId: project.id,
+        safeChangeSummary: `Recorded client handover acknowledgement for "${project.name}" by ${data.acknowledgedByName.trim()} (${data.acknowledgementEvidence.trim()})`,
+      },
+    }).catch(() => {});
+
+    return { success: true, project: updated };
+  });
+}
+
 export async function completeProject(
   ctx: TenantContext,
   projectId: string,
@@ -1018,6 +1533,13 @@ export async function completeProject(
   assertAdminOrOwner(ctx, "Only Studio Owners or Administrators can close projects.");
 
   const evaluation = await evaluateProjectCompletionChecklist(ctx, projectId);
+
+  // Mandatory non-waivable gate: Active site visits
+  if (evaluation.activeSiteVisitsCount > 0) {
+    throw new Error(
+      `Cannot close project: There are ${evaluation.activeSiteVisitsCount} active site inspections currently checked in. Check out all site visits before closing the project.`
+    );
+  }
 
   if (!evaluation.canCompleteWithoutExceptions) {
     if (!options.permittedExceptions || options.permittedExceptions.length === 0) {
@@ -1030,6 +1552,18 @@ export async function completeProject(
   const now = new Date();
 
   return await prisma.$transaction(async (tx) => {
+    // Re-verify active site visits inside transaction for concurrency safety
+    const concurrentVisits = await tx.siteVisit.count({
+      where: {
+        projectId,
+        tenantId: ctx.tenantId,
+        operationalState: "ACTIVE",
+      },
+    });
+    if (concurrentVisits > 0) {
+      throw new Error("Cannot close project: An active site inspection was initiated concurrently.");
+    }
+
     const updated = await tx.project.update({
       where: { id: projectId },
       data: {
@@ -1041,13 +1575,14 @@ export async function completeProject(
           actorName: ctx.userFullName,
           openTasksCount: evaluation.openTasksCount,
           activeBlockersCount: evaluation.activeBlockersCount,
+          unapprovedDrawingsCount: evaluation.unapprovedDrawingsCount,
           permittedExceptions: options.permittedExceptions || [],
           financialSummary: evaluation.financialSummary,
         },
       },
     });
 
-    await tx.auditEvent.create({
+    const completionEvent = await tx.auditEvent.create({
       data: {
         tenantId: ctx.tenantId,
         actorId: ctx.membershipId,
@@ -1057,13 +1592,17 @@ export async function completeProject(
         entityId: projectId,
         safeChangeSummary: `Closed architectural project "${evaluation.projectName}" (${evaluation.projectCode}) with verified handover checks.`,
       },
-    }).catch(() => {});
+    }).catch(() => null);
 
-    return { success: true, project: updated, evaluation };
+    return { success: true, project: updated, completionEvent, evaluation };
   });
 }
 
-export async function reopenProject(ctx: TenantContext, projectId: string, data: { reason: string }) {
+export async function reopenProject(
+  ctx: TenantContext,
+  projectId: string,
+  data: { reason: string; reopenTaskIds?: string[]; reopenPhaseIds?: string[] }
+) {
   assertAdminOrOwner(ctx, "Only Studio Owners or Administrators can reopen completed projects.");
 
   if (!data.reason?.trim()) {
@@ -1078,6 +1617,37 @@ export async function reopenProject(ctx: TenantContext, projectId: string, data:
   const now = new Date();
 
   return await prisma.$transaction(async (tx) => {
+    // Selectively reopen specific tasks if designated
+    if (data.reopenTaskIds && data.reopenTaskIds.length > 0) {
+      const validTaskIds = data.reopenTaskIds.filter((id): id is string => Boolean(id));
+      if (validTaskIds.length > 0) {
+        await tx.task.updateMany({
+          where: {
+            id: { in: validTaskIds },
+            projectId: project.id,
+            tenantId: ctx.tenantId,
+          },
+          data: {
+            status: TaskWorkflowStatus.IN_PROGRESS,
+          },
+        });
+      }
+    }
+
+    // Selectively reopen specific phases if designated
+    if (data.reopenPhaseIds && data.reopenPhaseIds.length > 0) {
+      await tx.projectPhase.updateMany({
+        where: {
+          id: { in: data.reopenPhaseIds },
+          projectId: project.id,
+          tenantId: ctx.tenantId,
+        },
+        data: {
+          status: PhaseStatus.IN_PROGRESS,
+        },
+      });
+    }
+
     const updated = await tx.project.update({
       where: { id: project.id },
       data: {
@@ -1096,7 +1666,9 @@ export async function reopenProject(ctx: TenantContext, projectId: string, data:
         action: "PROJECT_REOPENED",
         entityType: "Project",
         entityId: project.id,
-        safeChangeSummary: `Reopened completed project "${project.name}": ${data.reason.trim()}`,
+        safeChangeSummary: `Reopened completed project "${project.name}": ${data.reason.trim()}${
+          data.reopenTaskIds?.length ? ` (${data.reopenTaskIds.length} deliverables selectively reopened)` : ""
+        }`,
       },
     }).catch(() => {});
 
@@ -1191,3 +1763,74 @@ export async function archiveProject(ctx: TenantContext, projectId: string) {
     return updated;
   });
 }
+
+/**
+ * Unarchives a project, restoring visibility to active lists without resetting lifecycle status.
+ */
+export async function unarchiveProject(ctx: TenantContext, projectId: string) {
+  assertAdminOrOwner(ctx, "Only Studio Owners or Administrators can unarchive projects.");
+
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, tenantId: ctx.tenantId },
+  });
+  if (!project) throw new Error("Project not found.");
+
+  return await prisma.$transaction(async (tx) => {
+    const updated = await tx.project.update({
+      where: { id: project.id },
+      data: { isArchived: false },
+    });
+
+    await tx.auditEvent.create({
+      data: {
+        tenantId: ctx.tenantId,
+        actorId: ctx.membershipId,
+        projectId: project.id,
+        action: "PROJECT_UNARCHIVED",
+        entityType: "Project",
+        entityId: project.id,
+        safeChangeSummary: `Unarchived project "${project.name}" (${project.code}), restoring active listing visibility (lifecycle status: ${project.status}).`,
+      },
+    }).catch(() => {});
+
+    return updated;
+  });
+}
+
+/**
+ * Advances a DRAFT project to the formal pre-commissioning PLANNING phase.
+ */
+export async function advanceProjectToPlanning(ctx: TenantContext, projectId: string) {
+  assertAdminOrOwner(ctx, "Only Studio Owners or Administrators can advance projects to planning.");
+
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, tenantId: ctx.tenantId },
+  });
+  if (!project) throw new Error("Project not found in this studio workspace.");
+
+  if (project.status !== ProjectStatus.DRAFT) {
+    throw new Error(`Cannot advance to planning: Project is currently ${project.status}, not DRAFT.`);
+  }
+
+  return await prisma.$transaction(async (tx) => {
+    const updated = await tx.project.update({
+      where: { id: project.id },
+      data: { status: ProjectStatus.PLANNING },
+    });
+
+    await tx.auditEvent.create({
+      data: {
+        tenantId: ctx.tenantId,
+        actorId: ctx.membershipId,
+        projectId: project.id,
+        action: "PROJECT_PLANNING_ADVANCED",
+        entityType: "Project",
+        entityId: project.id,
+        safeChangeSummary: `Advanced draft project "${project.name}" (${project.code}) to pre-commissioning planning phase.`,
+      },
+    }).catch(() => {});
+
+    return { success: true, project: updated };
+  });
+}
+

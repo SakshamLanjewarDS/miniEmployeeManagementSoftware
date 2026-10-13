@@ -451,9 +451,9 @@ export async function updateTenantEmployee(
     }
   }
 
-  // Non-owners / non-admins cannot promote any user to OWNER
-  if (data.role === "OWNER" && !isAdminOrOwner(ctx)) {
-    throw new ForbiddenException("Only an existing Owner/Partner or Administrator can grant Owner privileges.");
+  // Only an existing Owner can grant Owner privileges
+  if (data.role === "OWNER" && ctx.role !== "OWNER") {
+    throw new ForbiddenException("Only an existing Owner/Partner can grant Owner privileges.");
   }
 
   return await prisma.$transaction(async (tx) => {

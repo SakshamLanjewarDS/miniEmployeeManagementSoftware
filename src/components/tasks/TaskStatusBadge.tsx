@@ -22,7 +22,7 @@ export function TaskStatusBadge({
     case "COMPLETED":
       return (
         <span
-          className={`inline-flex items-center font-semibold rounded-full bg-[#ECFDF5] text-[#087F5B] border border-[#A7F3D0] shadow-2xs ${sizeClasses} ${className}`}
+          className={`inline-flex items-center font-semibold rounded-full bg-[#ECFDF5] text-[#065F46] border border-[#A7F3D0] shadow-2xs ${sizeClasses} ${className}`}
         >
           <Check className="w-3.5 h-3.5 stroke-[2.5]" />
           <span>Completed</span>
@@ -33,7 +33,7 @@ export function TaskStatusBadge({
     case "IN_REVIEW":
       return (
         <span
-          className={`inline-flex items-center font-semibold rounded-full bg-[#F5F0FF] text-[#7C3AED] border border-[#DDD0FF] shadow-2xs ${sizeClasses} ${className}`}
+          className={`inline-flex items-center font-semibold rounded-full bg-[#F5F0FF] text-[#5B21B6] border border-[#DDD0FF] shadow-2xs ${sizeClasses} ${className}`}
         >
           <Clock className="w-3.5 h-3.5" />
           <span>Waiting review</span>
@@ -45,7 +45,7 @@ export function TaskStatusBadge({
     case "STARTED":
       return (
         <span
-          className={`inline-flex items-center font-semibold rounded-full bg-[#EBF1FF] text-[#3D56C8] border border-[#CEDEFF] shadow-2xs ${sizeClasses} ${className}`}
+          className={`inline-flex items-center font-semibold rounded-full bg-[#EBF1FF] text-[#2448B5] border border-[#CEDEFF] shadow-2xs ${sizeClasses} ${className}`}
         >
           <Play className="w-3 h-3 fill-current" />
           <span>In progress</span>
@@ -55,7 +55,7 @@ export function TaskStatusBadge({
     case "BLOCKED":
       return (
         <span
-          className={`inline-flex items-center font-semibold rounded-full bg-[#FFF1F3] text-[#C62844] border border-[#FECDD3] shadow-2xs ${sizeClasses} ${className}`}
+          className={`inline-flex items-center font-semibold rounded-full bg-[#FFF1F3] text-[#9F1239] border border-[#FECDD3] shadow-2xs ${sizeClasses} ${className}`}
         >
           <AlertOctagon className="w-3.5 h-3.5" />
           <span>Blocked</span>
@@ -67,7 +67,7 @@ export function TaskStatusBadge({
     default:
       return (
         <span
-          className={`inline-flex items-center font-medium rounded-full bg-[#F3F5FF] text-[#52617C] border border-[#DFE5F2] shadow-2xs ${sizeClasses} ${className}`}
+          className={`inline-flex items-center font-medium rounded-full bg-[#F3F5FF] text-[#374151] border border-[#DFE5F2] shadow-2xs ${sizeClasses} ${className}`}
         >
           <ListTodo className="w-3.5 h-3.5 opacity-70" />
           <span>To do</span>

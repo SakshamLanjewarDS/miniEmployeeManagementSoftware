@@ -130,7 +130,10 @@ export async function startChecklistWork(
   if (task.project?.status === "DRAFT") {
     throw new Error("Cannot start work on a Draft project.");
   }
-  if (task.project?.status === "CANCELLED" || task.project?.status === "ARCHIVED") {
+  if (task.project?.status === "COMPLETED") {
+    throw new Error("Cannot start work on a Completed project.");
+  }
+  if (task.project?.status === "CANCELLED" || task.project?.status === "ARCHIVED" || task.project?.isArchived) {
     throw new Error("Cannot start work on a Cancelled or Archived project.");
   }
 
@@ -664,14 +667,43 @@ export async function decideDeadlineExtension(
   const isApproved = data.decision === "APPROVE";
 
   return await prisma.$transaction(async (tx) => {
-    const updatedRequest = await tx.taskExtensionRequest.update({
-      where: { id: ext.id },
+    // 1. Competing edit / stale date check inside transaction
+    const currentItem = await tx.taskChecklistItem.findUnique({
+      where: { id: ext.checklistItemId },
+      select: { dueDate: true },
+    });
+
+    if (
+      ext.currentDueDate &&
+      currentItem?.dueDate &&
+      ext.currentDueDate.getTime() !== currentItem.dueDate.getTime()
+    ) {
+      throw new Error(
+        "Reconciliation required: The checklist item's due date was modified after this request was submitted. A stale extension cannot overwrite a changed deadline."
+      );
+    }
+
+    // 2. Atomic conditional update: exactly one reviewer can decide a pending extension
+    const updateRes = await tx.taskExtensionRequest.updateMany({
+      where: {
+        id: ext.id,
+        tenantId: ctx.tenantId,
+        status: "PENDING",
+      },
       data: {
         status: isApproved ? "APPROVED" : "REJECTED",
         deciderId: ctx.membershipId,
         decidedAt: now,
         decisionReason: data.decisionReason?.trim() || null,
       },
+    });
+
+    if (updateRes.count === 0) {
+      throw new Error("Conflict: This deadline extension request has already been decided or is no longer pending.");
+    }
+
+    const updatedRequest = await tx.taskExtensionRequest.findUniqueOrThrow({
+      where: { id: ext.id },
     });
 
     if (isApproved) {
@@ -766,8 +798,18 @@ export async function submitTasksForReview(
 
   const task = await prisma.task.findFirst({
     where: { id: data.taskId, tenantId: ctx.tenantId },
+    include: { project: true },
   });
   if (!task) throw new Error("Deliverable not found.");
+
+  if (task.project?.status === "ON_HOLD") {
+    throw new Error(
+      `Cannot submit for review: Project "${task.project.name}" is currently ON HOLD (${task.project.holdReason || "Hold active"}). Deliverable submissions are frozen until the project is resumed.`
+    );
+  }
+  if (task.project?.status === "CANCELLED" || task.project?.status === "ARCHIVED" || task.project?.isArchived) {
+    throw new Error("Cannot submit for review on a Cancelled or Archived project.");
+  }
 
   // Fetch covered items and verify ownership
   const items = await prisma.taskChecklistItem.findMany({
@@ -961,15 +1003,27 @@ export async function reviewTaskSubmission(
   const now = new Date();
 
   return await prisma.$transaction(async (tx) => {
-    // 1. Update submission record
-    const updatedSub = await tx.taskSubmission.update({
-      where: { id: sub.id },
+    // 1. Atomic conditional update: exactly one concurrent decision can win
+    const updateRes = await tx.taskSubmission.updateMany({
+      where: {
+        id: sub.id,
+        tenantId: ctx.tenantId,
+        status: "PENDING",
+      },
       data: {
         status: isApprove ? "APPROVED" : "CHANGES_REQUESTED",
         reviewerId: ctx.membershipId,
         reviewFeedback: data.feedback?.trim() || (isApprove ? "Approved" : "Changes requested"),
         decidedAt: now,
       },
+    });
+
+    if (updateRes.count === 0) {
+      throw new Error("Conflict: This submission has already received a final decision or is no longer pending.");
+    }
+
+    const updatedSub = await tx.taskSubmission.findUniqueOrThrow({
+      where: { id: sub.id },
     });
 
     if (isApprove) {

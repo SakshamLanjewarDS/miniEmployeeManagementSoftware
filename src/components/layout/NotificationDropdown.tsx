@@ -442,11 +442,11 @@ export function NotificationDropdown({ context }: NotificationDropdownProps) {
               <span>Synced • {context.timezone.split("/")[1] || "Kolkata"}</span>
             </span>
             <Link
-              href={`/w/${context.tenantSlug}/tasks`}
+              href={`/w/${context.tenantSlug}/notifications`}
               onClick={() => setIsOpen(false)}
-              className="font-semibold text-[#5A81FA] hover:underline"
+              className="font-semibold text-[#0066FF] hover:underline"
             >
-              Task Dashboard →
+              All Notifications →
             </Link>
           </div>
         </div>

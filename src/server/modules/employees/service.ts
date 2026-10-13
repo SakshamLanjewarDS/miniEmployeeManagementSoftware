@@ -106,8 +106,8 @@ export async function createEmployeeService(ctx: TenantContext, input: unknown) 
 
   const validated = CreateEmployeeSchema.parse(input);
 
-  if (validated.role === "OWNER" && !isAdminOrOwner(ctx)) {
-    throw new ForbiddenException("Only an existing Owner/Partner or Administrator can grant Owner privileges.");
+  if (validated.role === "OWNER" && ctx.role !== "OWNER") {
+    throw new ForbiddenException("Only an existing Owner/Partner can grant Owner privileges.");
   }
 
   return await employeeRepo.createTenantEmployee(ctx, {

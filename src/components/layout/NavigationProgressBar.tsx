@@ -95,10 +95,13 @@ export function NavigationProgressBar() {
     };
   }, []);
 
-  // Universal Predictive Hover & Touch Prefetching:
-  // Starts prefetching any internal link 100-200ms BEFORE the user actually clicks,
-  // ensuring the destination page opens in milliseconds.
+  // Universal Predictive Hover & Touch Prefetching with Intentional Delay & Deduplication:
+  // Starts prefetching internal links when hovered intentionally (>=80ms),
+  // preventing mouse sweeps from flooding the server while still ensuring instant transitions.
   useEffect(() => {
+    const prefetchedUrls = new Set<string>();
+    let prefetchTimeout: NodeJS.Timeout | null = null;
+
     const handlePrefetch = (e: Event) => {
       const target = e.target as HTMLElement | null;
       const anchor = target?.closest("a");
@@ -109,20 +112,32 @@ export function NavigationProgressBar() {
         href.startsWith("/w/") &&
         !href.includes("#") &&
         !href.startsWith("mailto:") &&
-        !href.startsWith("tel:")
+        !href.startsWith("tel:") &&
+        !prefetchedUrls.has(href)
       ) {
-        try {
-          router.prefetch(href);
-        } catch {
-          // Ignore prefetch errors
-        }
+        if (prefetchTimeout) clearTimeout(prefetchTimeout);
+        prefetchTimeout = setTimeout(() => {
+          try {
+            prefetchedUrls.add(href);
+            router.prefetch(href);
+          } catch {
+            // Ignore prefetch errors
+          }
+        }, 80);
       }
     };
 
+    const handleMouseOut = () => {
+      if (prefetchTimeout) clearTimeout(prefetchTimeout);
+    };
+
     document.addEventListener("mouseover", handlePrefetch, { passive: true });
+    document.addEventListener("mouseout", handleMouseOut, { passive: true });
     document.addEventListener("touchstart", handlePrefetch, { passive: true });
     return () => {
+      if (prefetchTimeout) clearTimeout(prefetchTimeout);
       document.removeEventListener("mouseover", handlePrefetch);
+      document.removeEventListener("mouseout", handleMouseOut);
       document.removeEventListener("touchstart", handlePrefetch);
     };
   }, [router]);

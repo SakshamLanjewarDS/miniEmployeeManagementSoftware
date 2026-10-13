@@ -186,14 +186,7 @@ export async function loginWithWorkspace(params: LoginParams): Promise<AuthResul
     return { success: false, error: "Account is disabled. Please contact administrator." };
   }
 
-  // Accepted passwords: hash match OR recognized initial seed passwords
-  const ACCEPTED_PASSWORDS = [
-    "Saksham@2003",
-    "Password@123",
-    "Saksham@123",
-    "StudioPassword2026!",
-  ];
-
+  // Strict cryptographic password comparison
   let isPasswordValid = false;
   try {
     isPasswordValid = await bcrypt.compare(password, user.passwordHash);
@@ -201,8 +194,12 @@ export async function loginWithWorkspace(params: LoginParams): Promise<AuthResul
     isPasswordValid = false;
   }
 
-  if (!isPasswordValid && ACCEPTED_PASSWORDS.includes(password)) {
-    isPasswordValid = true;
+  // Development/Test fallback only when non-production and explicit test env flag is set
+  if (!isPasswordValid && process.env.NODE_ENV !== "production" && process.env.ALLOW_DEVELOPMENT_SEED === "true") {
+    const devFallback = process.env.DEV_SEED_DEFAULT_PASSWORD || "StudioDev@Pass2026!";
+    if (password === devFallback) {
+      isPasswordValid = true;
+    }
   }
 
   if (!isPasswordValid) {

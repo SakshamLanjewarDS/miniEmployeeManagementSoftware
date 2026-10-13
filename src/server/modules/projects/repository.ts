@@ -2,11 +2,16 @@ import { prisma } from "../../db/prisma";
 import { TenantContext, isAdminOrOwner, canManageFinance, assertAdminOrOwner } from "../../tenancy/context";
 import { ProjectStatus, PhaseStatus, TaskWorkflowStatus } from "@prisma/client";
 import { calculateProjectTaskProgress } from "../tasks/repository";
+import { validateProjectStatusTransition } from "./policy";
 
-export async function findProjects(ctx: TenantContext) {
+export async function findProjects(ctx: TenantContext, options?: { includeArchived?: boolean }) {
   const whereClause: any = {
     tenantId: ctx.tenantId, // STRICT TENANT ISOLATION
   };
+
+  if (!options?.includeArchived) {
+    whereClause.isArchived = false;
+  }
 
   // Employees, Project Managers, Architects, and Coordinators only see assigned projects
   if (!isAdminOrOwner(ctx)) {
@@ -369,6 +374,30 @@ export async function createProject(
     : (data.consultantId ? [data.consultantId] : []);
   const uniqueConsultantIds = Array.from(new Set(rawConsultantIds));
 
+  // Strict Commissioning Safeguard (F4): Direct creation as ACTIVE applies commissioning checks
+  const { validateStrictProjectActivation } = await import("./lifecycle");
+  validateStrictProjectActivation({
+    code: data.code,
+    name: data.name,
+    brief: data.description,
+    description: data.description,
+    primaryClientId: data.primaryClientId,
+    projectArchitectId: data.projectArchitectId,
+    projectManagerId: data.projectManagerId,
+    projectCoordinatorId: data.projectCoordinatorId,
+    contractorId: data.contractorId,
+    contractorIds: uniqueContractorIds,
+    consultantId: data.consultantId,
+    consultantIds: uniqueConsultantIds,
+    projectType: data.projectType,
+    siteAddress: data.siteAddress,
+    siteCity: data.siteCity,
+    plotArea: data.plotArea,
+    startDate: data.startDate,
+    targetDate: data.targetDate,
+    status: ProjectStatus.ACTIVE,
+  });
+
   return await prisma.$transaction(async (tx) => {
     const project = await tx.project.create({
       data: {
@@ -418,37 +447,30 @@ export async function createProject(
       }).catch(() => {});
     }
 
-    if (data.projectArchitectId) {
-      await tx.projectMember.create({
-        data: {
-          tenantId: ctx.tenantId,
-          projectId: project.id,
-          membershipId: data.projectArchitectId,
-          projectRole: "Project Architect",
-        },
-      }).catch(() => {});
-    }
+    const rolesToAssign = [
+      { id: data.projectArchitectId, role: "Project Architect" },
+      { id: data.projectCoordinatorId, role: "Project Coordinator" },
+      { id: data.projectManagerId, role: "Project Manager" },
+    ].filter((r): r is { id: string; role: string } => Boolean(r.id));
 
-    if (data.projectCoordinatorId) {
-      await tx.projectMember.create({
-        data: {
+    for (const r of rolesToAssign) {
+      await tx.projectMember.upsert({
+        where: {
+          projectId_membershipId: {
+            projectId: project.id,
+            membershipId: r.id,
+          },
+        },
+        update: {
+          projectRole: r.role,
+        },
+        create: {
           tenantId: ctx.tenantId,
           projectId: project.id,
-          membershipId: data.projectCoordinatorId,
-          projectRole: "Project Coordinator",
+          membershipId: r.id,
+          projectRole: r.role,
         },
-      }).catch(() => {});
-    }
-
-    if (data.projectManagerId) {
-      await tx.projectMember.create({
-        data: {
-          tenantId: ctx.tenantId,
-          projectId: project.id,
-          membershipId: data.projectManagerId,
-          projectRole: "Project Manager",
-        },
-      }).catch(() => {});
+      });
     }
 
     // Seed default architectural phases
@@ -574,7 +596,15 @@ export async function updateProject(
   if (data.plotArea !== undefined) updatePayload.plotArea = data.plotArea || null;
   if (data.constructionArea !== undefined) updatePayload.constructionArea = data.constructionArea || null;
   if (data.currentPhase !== undefined) updatePayload.currentPhase = data.currentPhase;
-  if (data.status !== undefined) updatePayload.status = data.status;
+  if (data.status !== undefined && data.status !== existing.status) {
+    validateProjectStatusTransition(ctx, existing.status, data.status);
+    if (data.status === ProjectStatus.COMPLETED) {
+      throw new Error(
+        "Directly setting project status to COMPLETED is forbidden. Use the Project Lifecycle completion gate (completeProject) to verify drawings and deliverables."
+      );
+    }
+    updatePayload.status = data.status;
+  }
   if (data.budget !== undefined) updatePayload.budget = data.budget;
   if (data.currency !== undefined) updatePayload.currency = data.currency;
   if (data.startDate !== undefined) updatePayload.startDate = data.startDate;
@@ -768,6 +798,15 @@ export async function updateProjectProgress(
 
   if (!project) {
     throw new Error("Project not found in this studio workspace");
+  }
+
+  if (params.status && params.status !== project.status) {
+    validateProjectStatusTransition(ctx, project.status, params.status);
+    if (params.status === ProjectStatus.COMPLETED) {
+      throw new Error(
+        "Directly setting project status to COMPLETED via progress manipulation is forbidden. Use the Project Lifecycle completion gate (completeProject)."
+      );
+    }
   }
 
   return await prisma.$transaction(async (tx) => {

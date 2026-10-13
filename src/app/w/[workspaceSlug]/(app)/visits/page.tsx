@@ -165,16 +165,11 @@ export default async function VisitsPage({ params }: VisitsPageProps) {
     <div className="space-y-6">
       <div className="border-b border-[#E2E6F0] pb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 text-xs font-semibold text-[#5A81FA] uppercase tracking-wider">
-            <span>Field Evidence & Inspections</span>
-            <span>•</span>
-            <span>Site Geolocation</span>
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight text-[#1F1F1F] mt-1">
-            Site Visits & Geolocation Check-In
+          <h1 className="text-2xl font-bold tracking-tight text-[#1F1F1F]">
+            Site Visits & Issues
           </h1>
           <p className="text-xs text-[#696E82] mt-0.5">
-            Real-time GPS location tracking & geofenced check-in/out. Movement trail stored for Owner and Admin review.
+            Real-time GPS inspections, movement verification, and site snag issue management
           </p>
         </div>
 

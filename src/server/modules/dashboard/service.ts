@@ -292,45 +292,49 @@ export async function getOwnerDashboardData(ctx: TenantContext): Promise<OwnerDa
 
   const { startOfToday, endOfToday } = getWorkspaceDayBoundaries(ctx.timezone);
 
-  // 1. Projects Query
-  const projects = await prisma.project.findMany({
-    where: { tenantId: ctx.tenantId },
-    include: {
-      phases: { orderBy: { sortOrder: "asc" } },
-      projectArchitect: {
-        include: { user: { select: { fullName: true } } },
+  // Execute all independent queries concurrently in a single parallel batch
+  const [
+    projects,
+    allTasks,
+    paymentsAgg,
+    expensesAgg,
+    milestonesAgg,
+    contractorCount,
+    pendingApprovals,
+    members,
+    siteVisits,
+    auditEvents,
+  ] = await Promise.all([
+    // 1. Projects Query
+    prisma.project.findMany({
+      where: { tenantId: ctx.tenantId },
+      include: {
+        phases: { orderBy: { sortOrder: "asc" } },
+        projectArchitect: {
+          include: { user: { select: { fullName: true } } },
+        },
+        tasks: {
+          where: { status: { notIn: [TaskWorkflowStatus.COMPLETED, TaskWorkflowStatus.CANCELLED] } },
+          select: { id: true, status: true, dueDate: true, blockerReason: true },
+        },
       },
-      tasks: {
-        where: { status: { notIn: [TaskWorkflowStatus.COMPLETED, TaskWorkflowStatus.CANCELLED] } },
-        select: { id: true, status: true, dueDate: true, blockerReason: true },
+    }),
+    // 2. Tasks Aggregates
+    prisma.task.findMany({
+      where: { tenantId: ctx.tenantId },
+      select: {
+        id: true,
+        status: true,
+        dueDate: true,
+        assigneeId: true,
+        assignedMemberIds: true,
+        title: true,
+        priority: true,
+        projectId: true,
+        project: { select: { code: true, name: true } },
       },
-    },
-  });
-
-  const activeProjects = projects.filter((p) => p.status !== "COMPLETED" && p.status !== "ARCHIVED");
-
-  // 2. Tasks Aggregates
-  const allTasks = await prisma.task.findMany({
-    where: { tenantId: ctx.tenantId },
-    select: {
-      id: true,
-      status: true,
-      dueDate: true,
-      assigneeId: true,
-      assignedMemberIds: true,
-      title: true,
-      priority: true,
-      projectId: true,
-      project: { select: { code: true, name: true } },
-    },
-  });
-
-  const activeTasks = allTasks.filter((t) => t.status !== TaskWorkflowStatus.COMPLETED && t.status !== TaskWorkflowStatus.CANCELLED);
-  const overdueTasksCount = activeTasks.filter((t) => t.dueDate && t.dueDate < startOfToday).length;
-  const pendingReviewsCount = allTasks.filter((t) => t.status === TaskWorkflowStatus.IN_REVIEW).length;
-
-  // 3. Finances Query
-  const [paymentsAgg, expensesAgg, milestonesAgg, contractorCount] = await Promise.all([
+    }),
+    // 3. Finances Query
     prisma.feePayment.aggregate({
       where: { tenantId: ctx.tenantId },
       _sum: { amount: true },
@@ -346,7 +350,50 @@ export async function getOwnerDashboardData(ctx: TenantContext): Promise<OwnerDa
     prisma.projectContractor.count({
       where: { tenantId: ctx.tenantId },
     }),
+    // 5. Approval Inbox
+    prisma.approvalRequest.findMany({
+      where: { tenantId: ctx.tenantId, status: "PENDING" },
+      include: {
+        project: { select: { code: true, name: true } },
+        task: { select: { id: true, title: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 10,
+    }),
+    // 6. Tenant Memberships
+    prisma.tenantMembership.findMany({
+      where: { tenantId: ctx.tenantId, isActive: true },
+      include: {
+        user: { select: { fullName: true } },
+        employee: { select: { designation: true, employeeId: true } },
+      },
+    }),
+    // 8. Upcoming Site Visits
+    prisma.siteVisit.findMany({
+      where: {
+        tenantId: ctx.tenantId,
+        operationalState: { in: ["SCHEDULED", "ACTIVE"] },
+      },
+      include: {
+        project: { select: { code: true, name: true } },
+        site: { select: { name: true } },
+        employee: { include: { user: { select: { fullName: true } } } },
+      },
+      orderBy: { scheduledTime: "asc" },
+      take: 6,
+    }),
+    // 9. Recent Activity
+    prisma.auditEvent.findMany({
+      where: { tenantId: ctx.tenantId },
+      orderBy: { timestamp: "desc" },
+      take: 8,
+    }),
   ]);
+
+  const activeProjects = projects.filter((p) => p.status !== "COMPLETED" && p.status !== "ARCHIVED");
+  const activeTasks = allTasks.filter((t) => t.status !== TaskWorkflowStatus.COMPLETED && t.status !== TaskWorkflowStatus.CANCELLED);
+  const overdueTasksCount = activeTasks.filter((t) => t.dueDate && t.dueDate < startOfToday).length;
+  const pendingReviewsCount = allTasks.filter((t) => t.status === TaskWorkflowStatus.IN_REVIEW).length;
 
   const totalCollections = Number(paymentsAgg._sum.amount || 0);
   const approvedExpenses = Number(expensesAgg._sum.amount || 0);
@@ -378,25 +425,6 @@ export async function getOwnerDashboardData(ctx: TenantContext): Promise<OwnerDa
     })
     .filter((p) => p.delayedCount > 0 || p.blockerCount > 0)
     .slice(0, 8);
-
-  // 5. Approval Inbox
-  const pendingApprovals = await prisma.approvalRequest.findMany({
-    where: { tenantId: ctx.tenantId, status: "PENDING" },
-    include: {
-      project: { select: { code: true, name: true } },
-      task: { select: { id: true, title: true } },
-    },
-    orderBy: { createdAt: "desc" },
-    take: 10,
-  });
-
-  const members = await prisma.tenantMembership.findMany({
-    where: { tenantId: ctx.tenantId, isActive: true },
-    include: {
-      user: { select: { fullName: true } },
-      employee: { select: { designation: true, employeeId: true } },
-    },
-  });
 
   const memberMap = new Map(members.map((m) => [m.id, m]));
 
@@ -461,21 +489,6 @@ export async function getOwnerDashboardData(ctx: TenantContext): Promise<OwnerDa
     }))
     .slice(0, 6);
 
-  // 8. Upcoming Site Visits
-  const siteVisits = await prisma.siteVisit.findMany({
-    where: {
-      tenantId: ctx.tenantId,
-      operationalState: { in: ["SCHEDULED", "ACTIVE"] },
-    },
-    include: {
-      project: { select: { code: true, name: true } },
-      site: { select: { name: true } },
-      employee: { include: { user: { select: { fullName: true } } } },
-    },
-    orderBy: { scheduledTime: "asc" },
-    take: 6,
-  });
-
   const upcomingSiteVisits = siteVisits.map((v) => ({
     id: v.id,
     purpose: v.purpose,
@@ -485,13 +498,6 @@ export async function getOwnerDashboardData(ctx: TenantContext): Promise<OwnerDa
     inspectorName: v.employee?.user?.fullName || "Assigned Architect",
     scheduledTime: v.scheduledTime,
   }));
-
-  // 9. Recent Activity
-  const auditEvents = await prisma.auditEvent.findMany({
-    where: { tenantId: ctx.tenantId },
-    orderBy: { timestamp: "desc" },
-    take: 8,
-  });
 
   return {
     studioSummary: {
@@ -534,30 +540,30 @@ export async function getAdminDashboardData(ctx: TenantContext): Promise<AdminDa
 
   const { startOfToday, endOfToday } = getWorkspaceDayBoundaries(ctx.timezone);
 
-  // 1. Fetch active tasks & items
-  const allTasks = await prisma.task.findMany({
-    where: { tenantId: ctx.tenantId },
-    include: {
-      project: { select: { code: true, name: true, projectType: true } },
-      assignee: { include: { user: { select: { fullName: true } } } },
-      checklistItems: {
-        include: {
-          assignedMember: { include: { user: { select: { fullName: true } } } },
+  // Execute all admin queries concurrently in a single parallel batch
+  const [
+    allTasks,
+    siteVisitsToday,
+    unacknowledgedCount,
+    activeBlockersCount,
+    pendingExtensionsCount,
+    pendingSubmissionsData,
+    projects,
+    members,
+  ] = await Promise.all([
+    prisma.task.findMany({
+      where: { tenantId: ctx.tenantId },
+      include: {
+        project: { select: { code: true, name: true, projectType: true } },
+        assignee: { include: { user: { select: { fullName: true } } } },
+        checklistItems: {
+          include: {
+            assignedMember: { include: { user: { select: { fullName: true } } } },
+          },
         },
       },
-    },
-    orderBy: [{ priority: "desc" }, { dueDate: "asc" }],
-  });
-
-  const activeTasks = allTasks.filter((t) => t.status !== TaskWorkflowStatus.COMPLETED && t.status !== TaskWorkflowStatus.CANCELLED);
-
-  // Counts
-  const tasksDueToday = activeTasks.filter((t) => t.dueDate && t.dueDate >= startOfToday && t.dueDate <= endOfToday).length;
-  const overdueTasks = activeTasks.filter((t) => t.dueDate && t.dueDate < startOfToday).length;
-  const pendingSubmissions = allTasks.filter((t) => t.status === TaskWorkflowStatus.IN_REVIEW).length;
-
-  // Site visits today & Workflow metrics
-  const [siteVisitsToday, unacknowledgedCount, activeBlockersCount, pendingExtensionsCount, pendingSubmissionsData] = await Promise.all([
+      orderBy: [{ priority: "desc" }, { dueDate: "asc" }],
+    }),
     prisma.siteVisit.findMany({
       where: {
         tenantId: ctx.tenantId,
@@ -587,6 +593,22 @@ export async function getAdminDashboardData(ctx: TenantContext): Promise<AdminDa
       },
       orderBy: { createdAt: "asc" },
       take: 12,
+    }),
+    prisma.project.findMany({
+      where: { tenantId: ctx.tenantId, status: { notIn: ["COMPLETED", "ARCHIVED"] } },
+      include: {
+        tasks: { select: { status: true, dueDate: true } },
+        feeMilestones: { where: { status: { not: "PAID" } }, orderBy: { milestoneDate: "asc" }, take: 1 },
+      },
+      take: 8,
+    }),
+    prisma.tenantMembership.findMany({
+      where: { tenantId: ctx.tenantId, isActive: true },
+      include: {
+        user: { select: { fullName: true, email: true } },
+        employee: { select: { designation: true, employeeId: true } },
+      },
+      orderBy: { joinedAt: "asc" },
     }),
   ]);
 
@@ -643,15 +665,6 @@ export async function getAdminDashboardData(ctx: TenantContext): Promise<AdminDa
   const reviewTasks = [...submissionReviewItems, ...taskReviewItems].slice(0, 12);
 
   // 4. Project Delivery Progress
-  const projects = await prisma.project.findMany({
-    where: { tenantId: ctx.tenantId, status: { notIn: ["COMPLETED", "ARCHIVED"] } },
-    include: {
-      tasks: { select: { status: true, dueDate: true } },
-      feeMilestones: { where: { status: { not: "PAID" } }, orderBy: { milestoneDate: "asc" }, take: 1 },
-    },
-    take: 8,
-  });
-
   const projectDelivery = projects.map((p) => {
     const total = p.tasks.length;
     const completed = p.tasks.filter((t) => t.status === TaskWorkflowStatus.COMPLETED).length;
@@ -670,14 +683,6 @@ export async function getAdminDashboardData(ctx: TenantContext): Promise<AdminDa
   });
 
   // 5. Team Work Distribution & Attendance Radar
-  const members = await prisma.tenantMembership.findMany({
-    where: { tenantId: ctx.tenantId, isActive: true },
-    include: {
-      user: { select: { fullName: true, email: true } },
-      employee: { select: { designation: true, employeeId: true } },
-    },
-    orderBy: { joinedAt: "asc" },
-  });
 
   const teamDistribution = members
     .map((m) => {
@@ -753,46 +758,168 @@ export async function getAdminDashboardData(ctx: TenantContext): Promise<AdminDa
  */
 export async function getEmployeeDashboardData(ctx: TenantContext): Promise<EmployeeDashboardData> {
   const { startOfToday, endOfToday } = getWorkspaceDayBoundaries(ctx.timezone);
+  const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 
-  // 1. Fetch deliverables where this employee is primary or multi-assigned
-  const myTasks = await prisma.task.findMany({
-    where: {
-      tenantId: ctx.tenantId,
-      OR: [
-        { assigneeId: ctx.membershipId },
-        { creatorId: ctx.membershipId },
-      ],
-    },
-    include: {
-      project: { select: { id: true, code: true, name: true } },
-      checklistItems: {
-        where: {
-          OR: [
-            { assignedMemberId: ctx.membershipId },
-            { assignedMemberId: null }, // inherited items
-          ],
-        },
-        orderBy: [{ priority: "desc" }, { dueDate: "asc" }],
+  // Execute all independent employee queries concurrently in a single parallel batch
+  const [
+    myTasks,
+    specificChecklistItems,
+    completedHistory,
+    activeOrTodayVisit,
+    siteVisits,
+    latestApprovedVersions,
+    projectsList,
+    notifications,
+    unacknowledgedAssignmentsData,
+    blockedCount,
+    pendingExtensionsCount,
+  ] = await Promise.all([
+    // 1. Deliverables where this employee is primary or creator
+    prisma.task.findMany({
+      where: {
+        tenantId: ctx.tenantId,
+        OR: [
+          { assigneeId: ctx.membershipId },
+          { creatorId: ctx.membershipId },
+        ],
       },
-    },
-    orderBy: [{ priority: "desc" }, { dueDate: "asc" }],
-  });
-
-  // Also query checklist items specifically assigned to this employee across all tasks
-  const specificChecklistItems = await prisma.taskChecklistItem.findMany({
-    where: {
-      tenantId: ctx.tenantId,
-      assignedMemberId: ctx.membershipId,
-    },
-    include: {
-      task: {
-        include: {
-          project: { select: { id: true, code: true, name: true } },
+      include: {
+        project: { select: { id: true, code: true, name: true } },
+        checklistItems: {
+          where: {
+            OR: [
+              { assignedMemberId: ctx.membershipId },
+              { assignedMemberId: null }, // inherited items
+            ],
+          },
+          orderBy: [{ priority: "desc" }, { dueDate: "asc" }],
         },
       },
-    },
-    orderBy: [{ priority: "desc" }, { dueDate: "asc" }],
-  });
+      orderBy: [{ priority: "desc" }, { dueDate: "asc" }],
+    }),
+    // 2. Checklist items specifically assigned to this employee across all tasks
+    prisma.taskChecklistItem.findMany({
+      where: {
+        tenantId: ctx.tenantId,
+        assignedMemberId: ctx.membershipId,
+      },
+      include: {
+        task: {
+          include: {
+            project: { select: { id: true, code: true, name: true } },
+          },
+        },
+      },
+      orderBy: [{ priority: "desc" }, { dueDate: "asc" }],
+    }),
+    // 3. Completed history for productivity metrics
+    prisma.task.findMany({
+      where: {
+        tenantId: ctx.tenantId,
+        OR: [{ assigneeId: ctx.membershipId }, { creatorId: ctx.membershipId }],
+        status: TaskWorkflowStatus.COMPLETED,
+      },
+      select: { dueDate: true, completionDate: true, updatedAt: true },
+      orderBy: { updatedAt: "desc" },
+      take: 30,
+    }),
+    // 4. 1-Click On-Dashboard Active Site Visit / Today's inspection
+    prisma.siteVisit.findFirst({
+      where: {
+        tenantId: ctx.tenantId,
+        employeeId: ctx.membershipId,
+        OR: [
+          { operationalState: "ACTIVE" },
+          { scheduledTime: { gte: startOfToday, lte: endOfToday }, operationalState: "SCHEDULED" },
+        ],
+      },
+      include: {
+        project: { select: { code: true, name: true } },
+        site: true,
+        events: { orderBy: { createdAt: "desc" }, take: 1 },
+      },
+      orderBy: { scheduledTime: "asc" },
+    }),
+    // 5. My scheduled site visits list
+    prisma.siteVisit.findMany({
+      where: {
+        tenantId: ctx.tenantId,
+        employeeId: ctx.membershipId,
+        operationalState: { in: ["SCHEDULED", "ACTIVE"] },
+      },
+      include: {
+        project: { select: { code: true } },
+        site: { select: { name: true } },
+      },
+      orderBy: { scheduledTime: "asc" },
+      take: 5,
+    }),
+    // 6. Latest Approved / GFC Drawings for active projects
+    prisma.documentVersion.findMany({
+      where: {
+        tenantId: ctx.tenantId,
+        approvalState: "APPROVED",
+      },
+      include: {
+        document: {
+          include: {
+            project: { select: { code: true, name: true } },
+          },
+        },
+      },
+      orderBy: { updatedAt: "desc" },
+      take: 6,
+    }),
+    // 7. Active projects list for timer and scratchpad
+    prisma.project.findMany({
+      where: { tenantId: ctx.tenantId, status: { notIn: ["COMPLETED", "ARCHIVED"] } },
+      select: { id: true, code: true, name: true },
+      orderBy: { code: "asc" },
+    }),
+    // 8. My Notifications
+    prisma.notification.findMany({
+      where: {
+        tenantId: ctx.tenantId,
+        recipientId: ctx.membershipId,
+      },
+      orderBy: { createdAt: "desc" },
+      take: 8,
+    }),
+    // 9. Query unacknowledged assignments for this employee
+    prisma.taskAssignment.findMany({
+      where: {
+        tenantId: ctx.tenantId,
+        membershipId: ctx.membershipId,
+        acknowledgedAt: null,
+        task: { status: { notIn: [TaskWorkflowStatus.COMPLETED, TaskWorkflowStatus.CANCELLED] } },
+      },
+      include: {
+        task: {
+          include: {
+            project: { select: { code: true, name: true } },
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    }),
+    // 10. Blocked items count
+    prisma.taskChecklistItem.count({
+      where: {
+        tenantId: ctx.tenantId,
+        assignedMemberId: ctx.membershipId,
+        isBlocked: true,
+        status: { notIn: [TaskWorkflowStatus.COMPLETED, TaskWorkflowStatus.CANCELLED] },
+      },
+    }),
+    // 11. Pending extensions count
+    prisma.taskExtensionRequest.count({
+      where: {
+        tenantId: ctx.tenantId,
+        requesterId: ctx.membershipId,
+        status: "PENDING",
+      },
+    }),
+  ]);
 
   // Flatten into the employee's personal work queue
   const workQueueItems: Array<EmployeeDashboardData["workQueue"][0]> = [];
@@ -907,18 +1034,6 @@ export async function getEmployeeDashboardData(ctx: TenantContext): Promise<Empl
   }));
 
   // Productivity Metrics Calculation
-  const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-  const completedHistory = await prisma.task.findMany({
-    where: {
-      tenantId: ctx.tenantId,
-      OR: [{ assigneeId: ctx.membershipId }, { creatorId: ctx.membershipId }],
-      status: TaskWorkflowStatus.COMPLETED,
-    },
-    select: { dueDate: true, completionDate: true, updatedAt: true },
-    orderBy: { updatedAt: "desc" },
-    take: 30,
-  });
-
   const totalCompleted = completedHistory.length;
   const onTimeCount = completedHistory.filter((t) => {
     if (!t.dueDate) return true;
@@ -948,24 +1063,6 @@ export async function getEmployeeDashboardData(ctx: TenantContext): Promise<Empl
     avgTurnaroundHours: 3.8,
   };
 
-  // 1-Click On-Dashboard Active Site Visit / Today's inspection
-  const activeOrTodayVisit = await prisma.siteVisit.findFirst({
-    where: {
-      tenantId: ctx.tenantId,
-      employeeId: ctx.membershipId,
-      OR: [
-        { operationalState: "ACTIVE" },
-        { scheduledTime: { gte: startOfToday, lte: endOfToday }, operationalState: "SCHEDULED" },
-      ],
-    },
-    include: {
-      project: { select: { code: true, name: true } },
-      site: true,
-      events: { orderBy: { createdAt: "desc" }, take: 1 },
-    },
-    orderBy: { scheduledTime: "asc" },
-  });
-
   const activeSiteInspection = activeOrTodayVisit
     ? {
         id: activeOrTodayVisit.id,
@@ -985,21 +1082,6 @@ export async function getEmployeeDashboardData(ctx: TenantContext): Promise<Empl
       }
     : null;
 
-  // My scheduled site visits list
-  const siteVisits = await prisma.siteVisit.findMany({
-    where: {
-      tenantId: ctx.tenantId,
-      employeeId: ctx.membershipId,
-      operationalState: { in: ["SCHEDULED", "ACTIVE"] },
-    },
-    include: {
-      project: { select: { code: true } },
-      site: { select: { name: true } },
-    },
-    orderBy: { scheduledTime: "asc" },
-    take: 5,
-  });
-
   const mySiteVisits = siteVisits.map((v) => ({
     id: v.id,
     purpose: v.purpose,
@@ -1008,23 +1090,6 @@ export async function getEmployeeDashboardData(ctx: TenantContext): Promise<Empl
     scheduledTime: v.scheduledTime,
     operationalState: v.operationalState,
   }));
-
-  // Latest Approved / GFC Drawings for active projects
-  const latestApprovedVersions = await prisma.documentVersion.findMany({
-    where: {
-      tenantId: ctx.tenantId,
-      approvalState: "APPROVED",
-    },
-    include: {
-      document: {
-        include: {
-          project: { select: { code: true, name: true } },
-        },
-      },
-    },
-    orderBy: { updatedAt: "desc" },
-    take: 6,
-  });
 
   const latestApprovedDrawings = latestApprovedVersions.map((v) => ({
     id: v.id,
@@ -1040,41 +1105,6 @@ export async function getEmployeeDashboardData(ctx: TenantContext): Promise<Empl
     approvedAt: v.updatedAt,
   }));
 
-  // Active projects list for timer and scratchpad
-  const projectsList = await prisma.project.findMany({
-    where: { tenantId: ctx.tenantId, status: { notIn: ["COMPLETED", "ARCHIVED"] } },
-    select: { id: true, code: true, name: true },
-    orderBy: { code: "asc" },
-  });
-
-  // My Notifications
-  const notifications = await prisma.notification.findMany({
-    where: {
-      tenantId: ctx.tenantId,
-      recipientId: ctx.membershipId,
-    },
-    orderBy: { createdAt: "desc" },
-    take: 8,
-  });
-
-  // Query unacknowledged assignments for this employee
-  const unacknowledgedAssignmentsData = await prisma.taskAssignment.findMany({
-    where: {
-      tenantId: ctx.tenantId,
-      membershipId: ctx.membershipId,
-      acknowledgedAt: null,
-      task: { status: { notIn: [TaskWorkflowStatus.COMPLETED, TaskWorkflowStatus.CANCELLED] } },
-    },
-    include: {
-      task: {
-        include: {
-          project: { select: { code: true, name: true } },
-        },
-      },
-    },
-    orderBy: { createdAt: "desc" },
-  });
-
   const unacknowledgedAssignments = unacknowledgedAssignmentsData.map((a) => ({
     id: a.taskId,
     title: a.task.title,
@@ -1084,23 +1114,6 @@ export async function getEmployeeDashboardData(ctx: TenantContext): Promise<Empl
     dueDate: a.task.dueDate,
     version: a.task.version,
   }));
-
-  const blockedCount = await prisma.taskChecklistItem.count({
-    where: {
-      tenantId: ctx.tenantId,
-      assignedMemberId: ctx.membershipId,
-      isBlocked: true,
-      status: { notIn: [TaskWorkflowStatus.COMPLETED, TaskWorkflowStatus.CANCELLED] },
-    },
-  });
-
-  const pendingExtensionsCount = await prisma.taskExtensionRequest.count({
-    where: {
-      tenantId: ctx.tenantId,
-      requesterId: ctx.membershipId,
-      status: "PENDING",
-    },
-  });
 
   return {
     mySummary: {

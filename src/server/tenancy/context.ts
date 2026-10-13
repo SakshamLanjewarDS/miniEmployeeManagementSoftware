@@ -61,11 +61,18 @@ export function isAdmin(context: TenantContext): boolean {
 }
 
 /**
- * OWNER and ADMIN have equal management permissions within their own tenant:
- * Projects, phases, milestones, assignments, tasks, checklists, submissions,
- * reviews, drawings, site visits, employees, accounts, roles, clients,
- * contractors, consultants, finance, custom fields, import/export, announcements,
- * reports, and settings.
+ * Sovereign Tenant Authority: Only OWNER can alter billing, delete tenant,
+ * or manage global integrations and financial locks.
+ */
+export function assertOwnerOnly(context: TenantContext, message = "Forbidden: Studio Owner / Partner privileges required"): void {
+  if (context.role !== TenantRole.OWNER) {
+    throw new ForbiddenException(message);
+  }
+}
+
+/**
+ * Shared studio operational management for OWNER and ADMIN (projects, tasks, employees).
+ * Sovereign tenant configuration and billing remain strictly OWNER exclusive.
  */
 export function isAdminOrOwner(context: TenantContext): boolean {
   return context.role === TenantRole.OWNER || context.role === TenantRole.ADMIN;

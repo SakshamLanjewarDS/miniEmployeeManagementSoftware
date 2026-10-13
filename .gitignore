@@ -33,3 +33,10 @@ next-env.d.ts
 # Local uploads
 storage/uploads/*
 !storage/uploads/.gitkeep
+
+# Sensitive Credential Exports (NEVER COMMIT)
+studio_users_and_passwords.csv
+*credentials*.csv
+*passwords*.csv
+*.key
+

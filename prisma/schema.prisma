@@ -71,6 +71,36 @@ model Tenant {
   projectMilestones ProjectMilestone[]
   profileChangeRequests ProfileChangeRequest[]
 
+  // --- Project 2 Canonical Integrations ---
+  leavePolicy           StudioLeavePolicy?
+  leaveRequests         StudioLeaveRequest[]
+  attendanceRecords     StudioAttendanceRecord[]
+  employeeCompensations StudioEmployeeCompensation[]
+  payrollPeriods        StudioPayrollPeriod[]
+  payrollRecords        StudioPayrollRecord[]
+  payrollAdjustments    StudioPayrollAdjustment[]
+  advanceLoans          StudioAdvanceLoan[]
+  executiveTasks        ExecutiveTask[]
+  executiveTaskAssignments ExecutiveTaskAssignment[]
+  executiveTaskComments ExecutiveTaskComment[]
+  executiveTaskAttachments ExecutiveTaskAttachment[]
+  executiveTaskActivities ExecutiveTaskActivity[]
+  studioMeetings        StudioMeeting[]
+  studioMeetingActionItems StudioMeetingActionItem[]
+  studioVendors         StudioVendor[]
+  studioEmailOutbox     StudioEmailOutbox[]
+  studioExecutiveNotifications StudioExecutiveNotification[]
+  studioImportBatches   StudioImportBatch[]
+  studioSyncConfigs     StudioSyncConfig[]
+  studioSyncRuns        StudioSyncRun[]
+
+  // --- Studio Improvements Programme ---
+  leaveCancellationRequests StudioLeaveCancellationRequest[]
+  siteIssues               StudioSiteIssue[]
+  reminderConfigs          StudioReminderConfig[]
+  reminderLogs             StudioReminderLog[]
+  backupLogs               StudioBackupLog[]
+
   @@map("tenants")
 }
 
@@ -128,6 +158,26 @@ model TenantMembership {
   profileChangeRequests    ProfileChangeRequest[]
   submittedExpenses        Expense[]                @relation("ExpenseSubmitter")
 
+  // --- Project 2 Canonical Integrations ---
+  reviewedLeaves           StudioLeaveRequest[]     @relation("ReviewedLeave")
+  cancelledLeaves          StudioLeaveRequest[]     @relation("CancelledLeave")
+  correctedAttendance      StudioAttendanceRecord[] @relation("CorrectedAttendance")
+  approvedPayrolls         StudioPayrollPeriod[]    @relation("PayrollApprover")
+  calculatedPayrolls       StudioPayrollRecord[]    @relation("PayrollCalculator")
+  authorizedAdjustments    StudioPayrollAdjustment[] @relation("AuthorizedAdjustment")
+  approvedLoans            StudioAdvanceLoan[]      @relation("ApprovedLoan")
+  createdExecutiveTasks    ExecutiveTask[]          @relation("ExecutiveTaskCreator")
+  assignedExecutiveTasks   ExecutiveTaskAssignment[] @relation("ExecutiveTaskAssignee")
+  authoredTaskComments     ExecutiveTaskComment[]   @relation("AuthoredTaskComment")
+  uploadedTaskAttachments  ExecutiveTaskAttachment[] @relation("UploadedTaskAttachment")
+  loggedTaskActivities     ExecutiveTaskActivity[]  @relation("LoggedTaskActivity")
+  createdMeetings          StudioMeeting[]          @relation("CreatedMeeting")
+  assignedActionItems      StudioMeetingActionItem[] @relation("AssignedActionItem")
+  executiveNotifications   StudioExecutiveNotification[] @relation("ExecutiveNotificationRecipient")
+  reviewedCancellations    StudioLeaveCancellationRequest[] @relation("ReviewedCancellation")
+  reportedSiteIssues       StudioSiteIssue[]                @relation("ReportedSiteIssue")
+  verifiedSiteIssues       StudioSiteIssue[]                @relation("VerifiedSiteIssue")
+
   @@unique([tenantId, userId])
   @@index([tenantId, role])
   @@map("tenant_memberships")
@@ -145,10 +195,26 @@ model Employee {
   designation        String?          @db.VarChar(100)
   joinDate           DateTime?
   reportingManagerId String?
+  employmentStatus   String?          @default("ACTIVE") @db.VarChar(32) // ACTIVE, ONBOARDING, OFFBOARDING, DEACTIVATED
+  deactivatedAt      DateTime?
+  deactivationReason String?          @db.Text
+  offboardingHandover Json?
   createdAt          DateTime         @default(now())
   updatedAt          DateTime         @updatedAt
 
   profileChangeRequests ProfileChangeRequest[]
+
+  // --- Project 2 Canonical Integrations ---
+  leaveRequests         StudioLeaveRequest[]
+  attendanceRecords     StudioAttendanceRecord[]
+  compensations         StudioEmployeeCompensation[]
+  payrollRecords        StudioPayrollRecord[]
+  payrollAdjustments    StudioPayrollAdjustment[]
+  advanceLoans          StudioAdvanceLoan[]
+
+  // --- Studio Improvements Programme ---
+  cancellationRequests  StudioLeaveCancellationRequest[]
+  responsibleSiteIssues StudioSiteIssue[]                @relation("ResponsibleSiteIssue")
 
   @@unique([tenantId, employeeId])
   @@index([tenantId, employeeId])
@@ -182,6 +248,10 @@ model TenantInvitation {
   invitedById String
   expiresAt   DateTime
   acceptedAt  DateTime?
+  status      String     @default("PENDING") @db.VarChar(32) // PENDING, ACCEPTED, EXPIRED, REVOKED
+  revokedAt   DateTime?
+  suggestedDepartment String? @db.VarChar(100)
+  suggestedDesignation String? @db.VarChar(100)
   createdAt   DateTime   @default(now())
 
   @@index([tenantId, email])
@@ -317,6 +387,9 @@ model Project {
   cancellationReason String?         @db.Text
   cancelledAt      DateTime?
   cancelledById    String?
+  appliedTemplateId String?          @db.VarChar(64)
+  templateVersion   Int?
+  templateAppliedAt DateTime?
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
 
@@ -334,6 +407,11 @@ model Project {
   approvalRequests ApprovalRequest[]
   changeRequests   ProjectChangeRequest[]
   milestones       ProjectMilestone[]
+
+  // --- Project 2 Canonical Integrations ---
+  executiveTasks   ExecutiveTask[]
+  studioMeetings   StudioMeeting[]
+  siteIssues       StudioSiteIssue[]
 
   @@unique([tenantId, code])
   @@index([tenantId, status])
@@ -504,6 +582,7 @@ model Task {
   acceptanceCriteria String?           @db.Text
   referenceFiles    Json?
   parentTaskId   String?
+  scopeChangeId  String?            @db.VarChar(64)
   version        Int                @default(1)
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
@@ -1030,7 +1109,17 @@ model ProjectChangeRequest {
   affectedScope      String?             @db.Text
   scheduleImpactDays Int                 @default(0)
   feeImpactAmount    Decimal?            @db.Decimal(15, 2)
+  currency           String              @default("INR") @db.VarChar(10)
+  estimatedEffortHours Decimal?          @db.Decimal(6, 2)
+  proposedDeliverables Json?
+  supportingFileIds   Json?
+  source             String              @default("INTERNAL") @db.VarChar(64) // INTERNAL, CLIENT_REQUEST
+  version            Int                 @default(1)
   status             ChangeRequestStatus @default(PENDING)
+  isClientAccepted   Boolean             @default(false)
+  clientConfirmedAt  DateTime?
+  clientConfirmationNotes String?        @db.Text
+  clientConfirmationEvidence String?     @db.Text
   decidedById        String?
   decidedBy          TenantMembership?   @relation("ChangeRequestDecider", fields: [decidedById], references: [id], onDelete: SetNull)
   decidedAt          DateTime?
@@ -1082,6 +1171,11 @@ model ProjectTemplate {
   description      String?  @db.Text
   phasesJson       Json
   deliverablesJson Json?
+  category         String?  @default("Architecture") @db.VarChar(100)
+  status           String   @default("PUBLISHED") @db.VarChar(32) // DRAFT, PUBLISHED, ARCHIVED
+  version          Int      @default(1)
+  checklistsJson   Json?
+  dependenciesJson Json?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
@@ -1260,3 +1354,652 @@ model DeletionRequest {
   @@index([tenantId, status])
   @@map("deletion_requests")
 }
+
+// ==========================================
+// 10. PROJECT 2 INTEGRATION: LEAVE, PAYROLL,
+//     EXECUTIVE WORK, VENDORS, SYNC & OUTBOX
+// ==========================================
+
+model StudioLeavePolicy {
+  id                    String   @id @default(uuid())
+  tenantId              String   @unique
+  tenant                Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  defaultMonthlyPaidDays Decimal  @default(2.0) @db.Decimal(5, 2)
+  shortNoticeHours      Int      @default(24)
+  shortNoticeMode       String   @default("FLAG") @db.VarChar(32) // FLAG, REJECT
+  exemptLeaveTypes      Json?    // ["SICK", "EMERGENCY"]
+  workingMinutesPerDay  Int      @default(480)
+  officeStartTime       String   @default("10:30") @db.VarChar(10)
+  officeEndTime         String   @default("18:30") @db.VarChar(10)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@map("studio_leave_policies")
+}
+
+model StudioLeaveRequest {
+  id                  String            @id @default(uuid())
+  tenantId            String
+  tenant              Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employeeId          String
+  employee            Employee          @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  employeeNameRaw     String?           @db.VarChar(255)
+  employeeEmailRaw    String?           @db.VarChar(255)
+  startDate           DateTime          @db.Date
+  endDate             DateTime          @db.Date
+  startMinutes        Int?              // Minutes from midnight or start of workday
+  endMinutes          Int?
+  totalMinutes        Int?              // Duration for hourly leave
+  days                Decimal           @db.Decimal(6, 3) // 0.125, 0.250, 0.500, 1.000, etc.
+  status              String            @default("PENDING") @db.VarChar(32) // PENDING, APPROVED, REJECTED, CANCELLED
+  leaveType           String            @db.VarChar(64) // CASUAL, SICK, ANNUAL, MATERNITY, LOSS_OF_PAY
+  reason              String?           @db.Text
+  isPaidEligible      Boolean           @default(true) // Eligible for 2.0 paid days allowance
+  isHalfDay           Boolean           @default(false)
+  isHourly            Boolean           @default(false)
+  isShortNotice       Boolean           @default(false)
+  isExemptShortNotice Boolean           @default(false)
+  exemptionReason     String?           @db.Text
+  sessionType         String?           @db.VarChar(32) // FULL_DAY, FIRST_HALF, SECOND_HALF
+  supportingFileId    String?
+  version             Int               @default(1)
+  submittedAt         DateTime          @default(now())
+  reviewedById        String?
+  reviewedBy          TenantMembership? @relation("ReviewedLeave", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt          DateTime?
+  reviewNotes         String?           @db.Text
+  rejectionReason     String?           @db.Text
+  cancelledAt         DateTime?
+  cancelledById       String?
+  cancelledBy         TenantMembership? @relation("CancelledLeave", fields: [cancelledById], references: [id], onDelete: SetNull)
+  cancellationReason  String?           @db.Text
+  sourceSystem        String            @default("MANUAL") @db.VarChar(64) // MANUAL, GOOGLE_SHEETS, CSV_IMPORT
+  sourceRecordId      String?           @db.VarChar(128)
+  deletedAt           DateTime?
+  deletedById         String?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  cancellationRequests StudioLeaveCancellationRequest[]
+
+  @@unique([tenantId, sourceSystem, sourceRecordId])
+  @@index([tenantId, employeeId, startDate])
+  @@index([tenantId, status, startDate])
+  @@map("studio_leave_requests")
+}
+
+model StudioAttendanceRecord {
+  id               String            @id @default(uuid())
+  tenantId         String
+  tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employeeId       String
+  employee         Employee          @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  date             DateTime          @db.Date
+  punchIn          DateTime?
+  punchOut         DateTime?
+  totalMinutes     Int?
+  status           String            @default("PRESENT") @db.VarChar(32) // PRESENT, HALF_DAY, ABSENT, ON_LEAVE, MISSING_PUNCH
+  correctionReason String?           @db.Text
+  correctedById    String?
+  correctedBy      TenantMembership? @relation("CorrectedAttendance", fields: [correctedById], references: [id], onDelete: SetNull)
+  correctedAt      DateTime?
+  sourceSystem     String            @default("MANUAL") @db.VarChar(64)
+  sourceRecordId   String?           @db.VarChar(128)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  @@unique([tenantId, employeeId, date])
+  @@index([tenantId, date, status])
+  @@map("studio_attendance_records")
+}
+
+model StudioEmployeeCompensation {
+  id                  String   @id @default(uuid())
+  tenantId            String
+  tenant              Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employeeId          String
+  employee            Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  effectiveFrom       DateTime @db.Date
+  effectiveTo         DateTime? @db.Date
+  baseMonthlySalary   Decimal  @db.Decimal(12, 2)
+  rateCalculationMode String   @default("FIXED_30") @db.VarChar(32) // FIXED_30, CALENDAR_DAYS, WORKING_DAYS
+  bankName            String?  @db.VarChar(100)
+  accountHolderName   String?  @db.VarChar(191)
+  accountNumber       String?  @db.VarChar(100) // String to preserve leading zeros
+  ifscCode            String?  @db.VarChar(32)
+  upiId               String?  @db.VarChar(100)
+  panNumber           String?  @db.VarChar(32)
+  isCurrent           Boolean  @default(true)
+  notes               String?  @db.Text
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([tenantId, employeeId, isCurrent])
+  @@map("studio_employee_compensations")
+}
+
+model StudioPayrollPeriod {
+  id                 String                    @id @default(uuid())
+  tenantId           String
+  tenant             Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  periodKey          String                    @db.VarChar(32) // "2026-10"
+  year               Int
+  month              Int                       // 1-12
+  monthName          String                    @db.VarChar(32) // "October"
+  state              String                    @default("DRAFT") @db.VarChar(32) // DRAFT, SUBMITTED, APPROVED, LOCKED
+  isLocked           Boolean                   @default(false)
+  lockedAt           DateTime?
+  lockedById         String?
+  approvedAt         DateTime?
+  approvedById       String?
+  approvedBy         TenantMembership?         @relation("PayrollApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  calculationVersion Int                       @default(1)
+  notes              String?                   @db.Text
+  createdAt          DateTime                  @default(now())
+  updatedAt          DateTime                  @updatedAt
+
+  records            StudioPayrollRecord[]
+  adjustments        StudioPayrollAdjustment[]
+
+  @@unique([tenantId, periodKey])
+  @@index([tenantId, state])
+  @@map("studio_payroll_periods")
+}
+
+model StudioPayrollRecord {
+  id                       String              @id @default(uuid())
+  tenantId                 String
+  tenant                   Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  periodId                 String
+  period                   StudioPayrollPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  employeeId               String
+  employee                 Employee            @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  baseSalary               Decimal             @db.Decimal(12, 2)
+  dailyRate                Decimal             @db.Decimal(12, 2)
+  rateCalculationMode      String              @db.VarChar(32)
+  totalApprovedLeaveDays   Decimal             @db.Decimal(6, 3)
+  paidLeaveDays            Decimal             @db.Decimal(6, 3)
+  unpaidLopDays            Decimal             @db.Decimal(6, 3)
+  lopDeductionAmount       Decimal             @db.Decimal(12, 2)
+  allowancesTotal          Decimal             @default(0) @db.Decimal(12, 2)
+  bonusAmount              Decimal             @default(0) @db.Decimal(12, 2)
+  customDeductionsAmount   Decimal             @default(0) @db.Decimal(12, 2)
+  statutoryDeductionsAmount Decimal            @default(0) @db.Decimal(12, 2)
+  advanceRecoveryAmount    Decimal             @default(0) @db.Decimal(12, 2)
+  loanRecoveryAmount       Decimal             @default(0) @db.Decimal(12, 2)
+  grossSalary              Decimal             @db.Decimal(12, 2)
+  totalDeductions          Decimal             @db.Decimal(12, 2)
+  netPayable               Decimal             @db.Decimal(12, 2)
+  excessDeductionLiability Decimal             @default(0) @db.Decimal(12, 2)
+  paymentStatus            String              @default("PENDING") @db.VarChar(32) // PENDING, PROCESSED, PAID
+  paymentReference         String?             @db.VarChar(100)
+  paymentDate              DateTime?
+  earningsBreakdownJson    Json?
+  deductionsBreakdownJson  Json?
+  isLocked                 Boolean             @default(false)
+  calculatedById           String?
+  calculatedBy             TenantMembership?   @relation("PayrollCalculator", fields: [calculatedById], references: [id], onDelete: SetNull)
+  calculatedAt             DateTime            @default(now())
+  notes                    String?             @db.Text
+  createdAt                DateTime            @default(now())
+  updatedAt                DateTime            @updatedAt
+
+  @@unique([tenantId, periodId, employeeId])
+  @@index([tenantId, employeeId, paymentStatus])
+  @@map("studio_payroll_records")
+}
+
+model StudioPayrollAdjustment {
+  id              String              @id @default(uuid())
+  tenantId        String
+  tenant          Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  periodId        String
+  period          StudioPayrollPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  employeeId      String
+  employee        Employee            @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  targetPeriodKey String              @db.VarChar(32)
+  adjustmentType  String              @db.VarChar(32) // RETROACTIVE_LOP, ARREARS, ADVANCE_ADJUSTMENT
+  amount          Decimal             @db.Decimal(12, 2)
+  reason          String              @db.Text
+  authorizedById  String
+  authorizedBy    TenantMembership    @relation("AuthorizedAdjustment", fields: [authorizedById], references: [id], onDelete: Cascade)
+  createdAt       DateTime            @default(now())
+
+  @@index([tenantId, periodId, employeeId])
+  @@map("studio_payroll_adjustments")
+}
+
+model StudioAdvanceLoan {
+  id                    String           @id @default(uuid())
+  tenantId              String
+  tenant                Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employeeId            String
+  employee              Employee         @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  type                  String           @db.VarChar(32) // ADVANCE, LOAN
+  principalAmount       Decimal          @db.Decimal(12, 2)
+  monthlyRecoveryAmount Decimal          @db.Decimal(12, 2)
+  recoveredAmount       Decimal          @default(0) @db.Decimal(12, 2)
+  balanceAmount         Decimal          @db.Decimal(12, 2)
+  disbursedDate         DateTime         @db.Date
+  status                String           @default("ACTIVE") @db.VarChar(32) // ACTIVE, RECOVERED, WAIVED
+  approvedById          String
+  approvedBy            TenantMembership @relation("ApprovedLoan", fields: [approvedById], references: [id], onDelete: Cascade)
+  notes                 String?          @db.Text
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+
+  @@index([tenantId, employeeId, status])
+  @@map("studio_advance_loans")
+}
+
+model ExecutiveTask {
+  id                  String                     @id @default(uuid())
+  tenantId            String
+  tenant              Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  title               String                     @db.VarChar(255)
+  description         String?                    @db.Text
+  projectId           String?
+  project             Project?                   @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  category            String?                    @db.VarChar(100) // Design Review, Client Presentation, Site Coordination, Financial, Legal
+  priority            String                     @default("MEDIUM") @db.VarChar(32) // LOW, MEDIUM, HIGH, URGENT
+  status              String                     @default("TO_DO") @db.VarChar(32) // TO_DO, IN_PROGRESS, WAITING, DONE
+  startDate           DateTime?                  @db.Date
+  dueDate             DateTime?                  @db.Date
+  dueTime             String?                    @db.VarChar(10) // "14:30"
+  creatorId           String
+  creator             TenantMembership           @relation("ExecutiveTaskCreator", fields: [creatorId], references: [id], onDelete: Cascade)
+  completedAt         DateTime?
+  isArchived          Boolean                    @default(false)
+  sourceMeetingId     String?
+  sourceMeeting       StudioMeeting?             @relation(fields: [sourceMeetingId], references: [id], onDelete: SetNull)
+  sourceActionItemId  String?
+  sourceActionItem    StudioMeetingActionItem?   @relation(fields: [sourceActionItemId], references: [id], onDelete: SetNull)
+  createdAt           DateTime                   @default(now())
+  updatedAt           DateTime                   @updatedAt
+
+  assignments         ExecutiveTaskAssignment[]
+  comments            ExecutiveTaskComment[]
+  attachments         ExecutiveTaskAttachment[]
+  activity            ExecutiveTaskActivity[]
+
+  @@index([tenantId, status, dueDate])
+  @@index([tenantId, isArchived, priority])
+  @@index([tenantId, projectId])
+  @@map("executive_tasks")
+}
+
+model ExecutiveTaskAssignment {
+  id         String           @id @default(uuid())
+  tenantId   String
+  tenant     Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  taskId     String
+  task       ExecutiveTask    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  assigneeId String
+  assignee   TenantMembership @relation("ExecutiveTaskAssignee", fields: [assigneeId], references: [id], onDelete: Cascade)
+  assignedAt DateTime         @default(now())
+
+  @@unique([taskId, assigneeId])
+  @@index([tenantId, assigneeId])
+  @@map("executive_task_assignments")
+}
+
+model ExecutiveTaskComment {
+  id        String           @id @default(uuid())
+  tenantId  String
+  tenant    Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  taskId    String
+  task      ExecutiveTask    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    TenantMembership @relation("AuthoredTaskComment", fields: [authorId], references: [id], onDelete: Cascade)
+  content   String           @db.Text
+  createdAt DateTime         @default(now())
+
+  @@index([tenantId, taskId])
+  @@map("executive_task_comments")
+}
+
+model ExecutiveTaskAttachment {
+  id           String           @id @default(uuid())
+  tenantId     String
+  tenant       Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  taskId       String
+  task         ExecutiveTask    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  fileName     String           @db.VarChar(255)
+  originalName String           @db.VarChar(255)
+  fileSize     Int
+  mimeType     String           @db.VarChar(128)
+  storagePath  String           @db.VarChar(512)
+  uploaderId   String
+  uploader     TenantMembership @relation("UploadedTaskAttachment", fields: [uploaderId], references: [id], onDelete: Cascade)
+  createdAt    DateTime         @default(now())
+
+  @@index([tenantId, taskId])
+  @@map("executive_task_attachments")
+}
+
+model ExecutiveTaskActivity {
+  id         String           @id @default(uuid())
+  tenantId   String
+  tenant     Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  taskId     String
+  task       ExecutiveTask    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  actorId    String
+  actor      TenantMembership @relation("LoggedTaskActivity", fields: [actorId], references: [id], onDelete: Cascade)
+  actionType String           @db.VarChar(64) // CREATED, STATUS_CHANGED, PRIORITY_CHANGED, COMMENT_ADDED, ARCHIVED
+  details    String?          @db.Text
+  createdAt  DateTime         @default(now())
+
+  @@index([tenantId, taskId])
+  @@map("executive_task_activity")
+}
+
+model StudioMeeting {
+  id           String                    @id @default(uuid())
+  tenantId     String
+  tenant       Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  title        String                    @db.VarChar(255)
+  meetingDate  DateTime                  @db.Date
+  startTime    String                    @db.VarChar(10) // "11:00"
+  endTime      String                    @db.VarChar(10) // "12:30"
+  meetingType  String                    @db.VarChar(100) // Design Review, Client Presentation, Site Coordination
+  projectId    String?
+  project      Project?                  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  status       String                    @default("SCHEDULED") @db.VarChar(32) // SCHEDULED, COMPLETED, RESCHEDULED, CANCELLED
+  agenda       String?                   @db.Text
+  notes        String?                   @db.Text
+  decisions    String?                   @db.Text
+  creatorId    String
+  creator      TenantMembership          @relation("CreatedMeeting", fields: [creatorId], references: [id], onDelete: Cascade)
+  attendeesJson Json?
+  createdAt    DateTime                  @default(now())
+  updatedAt    DateTime                  @updatedAt
+
+  actionItems  StudioMeetingActionItem[]
+  convertedTasks ExecutiveTask[]
+
+  @@index([tenantId, meetingDate, status])
+  @@map("studio_meetings")
+}
+
+model StudioMeetingActionItem {
+  id              String            @id @default(uuid())
+  tenantId        String
+  tenant          Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  meetingId       String
+  meeting         StudioMeeting     @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  description     String            @db.Text
+  assigneeId      String?
+  assignee        TenantMembership? @relation("AssignedActionItem", fields: [assigneeId], references: [id], onDelete: SetNull)
+  dueDate         DateTime?         @db.Date
+  status          String            @default("PENDING") @db.VarChar(32) // PENDING, CONVERTED_TO_TASK, DONE
+  convertedTaskId String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  convertedTasks  ExecutiveTask[]
+
+  @@index([tenantId, meetingId, status])
+  @@map("studio_meeting_action_items")
+}
+
+model StudioVendor {
+  id                 String    @id @default(uuid())
+  tenantId           String
+  tenant             Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name               String    @db.VarChar(191)
+  companyName        String?   @db.VarChar(191)
+  designation        String?   @db.VarChar(191)
+  industryType       String?   @db.VarChar(255) // Marble, Carpentry, Glass, Lighting, HVAC, Sanitaryware
+  phoneNumber        String?   @db.VarChar(100)
+  email              String?   @db.VarChar(191)
+  websiteUrl         String?   @db.VarChar(500)
+  status             String    @default("ACTIVE") @db.VarChar(32) // ACTIVE, FOLLOW_UP, PARTNERED, INACTIVE
+  purposeOfVisit     String?   @db.Text // Private to Owner/Admin
+  notes              String?   @db.Text // Private to Owner/Admin
+  visitHistoryJson   Json?     // Private to Owner/Admin
+  linkedProjectsJson Json?     // Private to Owner/Admin
+  followupDate       DateTime? @db.Date // Private to Owner/Admin
+  rating             Int?      @default(3) // Private to Owner/Admin
+  sourceSystem       String    @default("MANUAL") @db.VarChar(64)
+  sourceRecordId     String?   @db.VarChar(128)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@unique([tenantId, sourceSystem, sourceRecordId])
+  @@index([tenantId, status, industryType])
+  @@index([tenantId, companyName])
+  @@map("studio_vendors")
+}
+
+model StudioEmailOutbox {
+  id                 String    @id @default(uuid())
+  tenantId           String
+  tenant             Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  recipientUserId    String?
+  recipientEmail     String    @db.VarChar(191)
+  recipientName      String?   @db.VarChar(191)
+  eventType          String    @db.VarChar(64) // LEAVE_APPROVED, LEAVE_REJECTED, TASK_ASSIGNED, TASK_DUE_REMINDER, MEETING_SCHEDULED
+  relatedEntityType  String?   @db.VarChar(64)
+  relatedEntityId    String?   @db.VarChar(64)
+  subject            String    @db.VarChar(255)
+  htmlBody           String    @db.Text
+  textBody           String?   @db.Text
+  status             String    @default("PENDING") @db.VarChar(32) // PENDING, PROCESSING, SENT, FAILED, SIMULATED
+  attempts           Int       @default(0)
+  nextAttemptAt      DateTime?
+  sentAt             DateTime?
+  lastError          String?   @db.Text
+  idempotencyKey     String    @db.VarChar(191)
+  createdAt          DateTime  @default(now())
+
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, status, nextAttemptAt])
+  @@map("studio_email_outbox")
+}
+
+model StudioExecutiveNotification {
+  id                    String           @id @default(uuid())
+  tenantId              String
+  tenant                Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  recipientMembershipId String
+  recipient             TenantMembership @relation("ExecutiveNotificationRecipient", fields: [recipientMembershipId], references: [id], onDelete: Cascade)
+  notificationType      String           @db.VarChar(64) // TASK_ASSIGNED, STATUS_CHANGED, COMMENT_ADDED, OVERDUE, MEETING_SCHEDULED
+  title                 String           @db.VarChar(255)
+  message               String           @db.Text
+  deepLinkUrl           String?          @db.VarChar(255)
+  relatedTaskId         String?
+  relatedMeetingId      String?
+  isRead                Boolean          @default(false)
+  readAt                DateTime?
+  dedupKey              String?          @db.VarChar(191)
+  createdAt             DateTime         @default(now())
+
+  @@index([tenantId, recipientMembershipId, isRead])
+  @@map("studio_executive_notifications")
+}
+
+model StudioImportBatch {
+  id              String            @id @default(uuid())
+  tenantId        String
+  tenant          Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  batchType       String            @db.VarChar(64) // LEAVE, ATTENDANCE, BANK_DETAILS
+  sourceFileName  String            @db.VarChar(255)
+  totalRows       Int
+  validRows       Int               @default(0)
+  invalidRows     Int               @default(0)
+  duplicateRows   Int               @default(0)
+  status          String            @default("STAGED") @db.VarChar(32) // STAGED, COMMITTED, EXPIRED, REJECTED
+  columnMapping   Json?
+  stagedRowsJson  Json?
+  errorReportJson Json?
+  uploaderId      String
+  committedAt     DateTime?
+  expiresAt       DateTime
+  createdAt       DateTime          @default(now())
+
+  @@index([tenantId, status, batchType])
+  @@map("studio_import_batches")
+}
+
+model StudioSyncConfig {
+  id             String          @id @default(uuid())
+  tenantId       String
+  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  syncType       String          @db.VarChar(64) // LEAVE_SHEET, VENDOR_SHEET
+  sheetId        String          @db.VarChar(255)
+  sheetTabName   String          @default("Sheet1") @db.VarChar(100)
+  autoSyncMinutes Int            @default(5)
+  isEnabled      Boolean         @default(false)
+  lastAttemptAt  DateTime?
+  lastSuccessAt  DateTime?
+  lastStatus     String?         @db.VarChar(32)
+  lastError      String?         @db.Text
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  runs           StudioSyncRun[]
+
+  @@unique([tenantId, syncType])
+  @@map("studio_sync_configs")
+}
+
+model StudioSyncRun {
+  id             String           @id @default(uuid())
+  tenantId       String
+  tenant         Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  configId       String
+  config         StudioSyncConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
+  syncType       String           @db.VarChar(64)
+  importedCount  Int              @default(0)
+  updatedCount   Int              @default(0)
+  unchangedCount Int              @default(0)
+  failedCount    Int              @default(0)
+  status         String           @default("SUCCESS") @db.VarChar(32) // SUCCESS, FAILED, PARTIAL
+  errorDetails   String?          @db.Text
+  startedAt      DateTime         @default(now())
+  completedAt    DateTime?
+
+  @@index([tenantId, configId, startedAt])
+  @@map("studio_sync_runs")
+}
+
+// ==========================================
+// 10. STUDIO IMPROVEMENT PROGRAMME MODELS
+// ==========================================
+
+model StudioLeaveCancellationRequest {
+  id              String             @id @default(uuid())
+  tenantId        String
+  tenant          Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  leaveRequestId  String
+  leaveRequest    StudioLeaveRequest @relation(fields: [leaveRequestId], references: [id], onDelete: Cascade)
+  employeeId      String
+  employee        Employee           @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  reason          String             @db.Text
+  status          String             @default("PENDING") @db.VarChar(32) // PENDING, APPROVED, REJECTED
+  reviewedById    String?
+  reviewedBy      TenantMembership?  @relation("ReviewedCancellation", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt      DateTime?
+  rejectionReason String?            @db.Text
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@index([tenantId, leaveRequestId, status])
+  @@index([tenantId, employeeId, status])
+  @@map("studio_leave_cancellation_requests")
+}
+
+model StudioSiteIssue {
+  id                    String            @id @default(uuid())
+  tenantId              String
+  tenant                Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  referenceNumber       String            @db.VarChar(64)
+  projectId             String
+  project               Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  siteLocation          String            @db.VarChar(255)
+  title                 String            @db.VarChar(255)
+  description           String?           @db.Text
+  category              String            @db.VarChar(100)
+  priority              String            @default("MEDIUM") @db.VarChar(32) // LOW, MEDIUM, HIGH, URGENT
+  status                String            @default("OPEN") @db.VarChar(32) // OPEN, ASSIGNED, IN_PROGRESS, READY_FOR_VERIFICATION, CLOSED, REOPENED
+  reporterId            String
+  reporter              TenantMembership  @relation("ReportedSiteIssue", fields: [reporterId], references: [id], onDelete: Cascade)
+  responsibleEmployeeId String?
+  responsibleEmployee   Employee?         @relation("ResponsibleSiteIssue", fields: [responsibleEmployeeId], references: [id], onDelete: SetNull)
+  relatedContractorId   String?
+  relatedDrawingVersionId String?
+  siteVisitId           String?
+  taskId                String?
+  dueDate               DateTime?         @db.Date
+  resolutionNotes       String?           @db.Text
+  evidencePhotosJson    Json?
+  verifierId            String?
+  verifier              TenantMembership? @relation("VerifiedSiteIssue", fields: [verifierId], references: [id], onDelete: SetNull)
+  verifiedAt            DateTime?
+  reopenReason          String?           @db.Text
+  activityJson          Json?
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+
+  @@index([tenantId, projectId, status])
+  @@index([tenantId, responsibleEmployeeId])
+  @@map("studio_site_issues")
+}
+
+model StudioReminderConfig {
+  id                   String   @id @default(uuid())
+  tenantId             String
+  tenant               Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  entityType           String   @db.VarChar(64) // TASK, CHECKLIST, APPROVAL, SITE_ISSUE, DRAWING, SCOPE
+  leadTimeHours        Int      @default(24)
+  escalationDelayHours Int      @default(48)
+  quietHoursStart      String   @default("22:00") @db.VarChar(10)
+  quietHoursEnd        String   @default("08:00") @db.VarChar(10)
+  channel              String   @default("INBOX") @db.VarChar(32)
+  isEnabled            Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([tenantId, entityType])
+  @@map("studio_reminder_configs")
+}
+
+model StudioReminderLog {
+  id          String   @id @default(uuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  entityType  String   @db.VarChar(64)
+  entityId    String   @db.VarChar(128)
+  recipientId String   @db.VarChar(128)
+  dedupKey    String   @db.VarChar(255)
+  stage       String   @default("REMINDER") @db.VarChar(32) // REMINDER, ESCALATION
+  sentAt      DateTime @default(now())
+  channel     String   @default("INBOX") @db.VarChar(32)
+  status      String   @default("SENT") @db.VarChar(32)
+
+  @@unique([tenantId, dedupKey])
+  @@index([tenantId, entityType, entityId])
+  @@map("studio_reminder_logs")
+}
+
+model StudioBackupLog {
+  id                         String    @id @default(uuid())
+  tenantId                   String
+  tenant                     Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  backupIdentifier           String    @db.VarChar(128)
+  timestamp                  DateTime  @default(now())
+  scope                      String    @db.VarChar(64) // FULL, DATABASE_ONLY, ATTACHMENTS_ONLY
+  sizeBytes                  BigInt?
+  checksum                   String?   @db.VarChar(128)
+  status                     String    @default("SUCCESS") @db.VarChar(32) // SUCCESS, FAILED
+  retentionDays              Int       @default(30)
+  verifiedRestoreAt          DateTime?
+  verifiedRestoreDurationMs  Int?
+  verifiedRestoreNotes       String?   @db.Text
+  notes                      String?   @db.Text
+  createdAt                  DateTime  @default(now())
+
+  @@index([tenantId, timestamp, status])
+  @@map("studio_backup_logs")
+}
+

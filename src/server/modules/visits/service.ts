@@ -135,11 +135,32 @@ export async function executeSiteCheckIn(ctx: TenantContext, params: CheckInPara
       id: visitId,
       tenantId: ctx.tenantId,
     },
-    include: { site: true },
+    include: { site: true, project: true },
   });
 
   if (!visit) {
     throw new Error("Site visit record not found in this studio workspace");
+  }
+
+  // Lifecycle check: New site-visit check-ins are blocked on ON_HOLD, DRAFT, CANCELLED, COMPLETED, or ARCHIVED projects
+  if (visit.project) {
+    if (visit.project.status === "ON_HOLD") {
+      throw new Error(
+        `Cannot check in: Project '${visit.project.name}' is currently ON HOLD (${visit.project.holdReason || "Operational work paused"}). New check-ins are suspended until resumed.`
+      );
+    }
+    if (visit.project.status === "DRAFT") {
+      throw new Error(`Cannot check in: Project '${visit.project.name}' is currently in DRAFT status.`);
+    }
+    if (visit.project.status === "CANCELLED") {
+      throw new Error(`Cannot check in: Project '${visit.project.name}' is CANCELLED.`);
+    }
+    if (visit.project.status === "COMPLETED") {
+      throw new Error(`Cannot check in: Project '${visit.project.name}' is COMPLETED.`);
+    }
+    if (visit.project.isArchived) {
+      throw new Error(`Cannot check in: Project '${visit.project.name}' is ARCHIVED.`);
+    }
   }
 
   if (visit.operationalState === SiteVisitOperationalState.ACTIVE) {
@@ -190,8 +211,60 @@ export async function executeSiteCheckIn(ctx: TenantContext, params: CheckInPara
 
   const serverReceiptTime = new Date();
 
-  // 5. Transactional commit: Save event + update visit state
+  // 5. Transactional commit: Save event + update visit state with concurrency safety
   return await prisma.$transaction(async (tx) => {
+    // 1. Transactional row lock on employee membership record to serialize simultaneous check-in attempts
+    await tx.$executeRawUnsafe(
+      "SELECT id FROM tenant_memberships WHERE id = ? FOR UPDATE",
+      ctx.membershipId
+    );
+
+    // 2. Concurrency Guard: Check if employee already has an active visit
+    const concurrentActive = await tx.siteVisit.findFirst({
+      where: {
+        tenantId: ctx.tenantId,
+        employeeId: ctx.membershipId,
+        operationalState: SiteVisitOperationalState.ACTIVE,
+      },
+      include: { site: true, project: true },
+    });
+
+    if (concurrentActive && concurrentActive.id !== visit.id) {
+      throw new Error(
+        `Concurrency Conflict: You currently have an active site visit at '${concurrentActive.site.name}' (${concurrentActive.project.code}). Check out of that visit before checking in elsewhere.`
+      );
+    }
+
+    // Atomic conditional update on the targeted visit
+    const updateCount = await tx.siteVisit.updateMany({
+      where: {
+        id: visit.id,
+        tenantId: ctx.tenantId,
+        operationalState: { not: SiteVisitOperationalState.ACTIVE },
+      },
+      data: {
+        operationalState: SiteVisitOperationalState.ACTIVE,
+        checkInAddress: checkInAddress || undefined,
+      },
+    });
+
+    if (updateCount.count === 0) {
+      throw new Error("This site visit is already active or has already been checked out.");
+    }
+
+    // Post-update verification: Employee cannot have more than 1 active visit across the tenant
+    const totalActiveForEmployee = await tx.siteVisit.count({
+      where: {
+        tenantId: ctx.tenantId,
+        employeeId: ctx.membershipId,
+        operationalState: SiteVisitOperationalState.ACTIVE,
+      },
+    });
+
+    if (totalActiveForEmployee > 1) {
+      throw new Error("Concurrency Conflict: An employee cannot acquire two active site visits simultaneously.");
+    }
+
     const event = await tx.siteVisitEvent.create({
       data: {
         tenantId: ctx.tenantId,
@@ -213,12 +286,8 @@ export async function executeSiteCheckIn(ctx: TenantContext, params: CheckInPara
       },
     });
 
-    const updatedVisit = await tx.siteVisit.update({
+    const updatedVisit = await tx.siteVisit.findUniqueOrThrow({
       where: { id: visit.id },
-      data: {
-        operationalState: SiteVisitOperationalState.ACTIVE,
-        checkInAddress: checkInAddress || undefined,
-      },
     });
 
     return {

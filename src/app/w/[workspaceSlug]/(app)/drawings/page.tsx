@@ -42,18 +42,13 @@ export default async function DrawingsPage({ params, searchParams }: DrawingsPag
   return (
     <div className="space-y-6">
       <div className="border-b border-[#E2E6F0] pb-5">
-        <div className="flex items-center gap-2 text-xs font-semibold text-[#5A81FA] uppercase tracking-wider">
-          <span>{isPrivileged ? "Studio Blueprint Archive" : "Personal Workspace"}</span>
-          <span>•</span>
-          <span>Architectural Revision Control</span>
-        </div>
-        <h1 className="text-2xl font-bold tracking-tight text-[#1F1F1F] mt-1">
+        <h1 className="text-2xl font-bold tracking-tight text-[#1F1F1F]">
           {isPrivileged ? "Company Drawing & Blueprint Library" : "My Project Drawings & Submissions"}
         </h1>
         <p className="text-xs text-[#696E82] mt-0.5">
           {isPrivileged
-            ? `Tenant-wide architectural documentation, atomic revision labeling (R0, R1...), and client approval evidence.`
-            : `Architectural deliverables and sheets for projects assigned to ${ctx.userFullName}. Upload initial revisions, submit for review, and track approvals.`}
+            ? `Tenant-wide architectural documentation, revision labeling (R0, R1...), and client approval evidence.`
+            : `Architectural deliverables and sheets for assigned projects. Upload revisions and track approvals.`}
         </p>
       </div>
 

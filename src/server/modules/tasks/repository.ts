@@ -1,6 +1,7 @@
 import { prisma } from "../../db/prisma";
 import { TenantContext, canApproveWork, isAdminOrOwner, ForbiddenException } from "../../tenancy/context";
 import { TaskPriority, TaskWorkflowStatus } from "@prisma/client";
+import { evaluateTaskCompletionGovernance, getTaskGovernancePolicy } from "./governance";
 
 export interface TaskFilterParams {
   filter?: "TODAY" | "UPCOMING" | "OVERDUE" | "IN_PROGRESS" | "WAITING_REVIEW" | "COMPLETED" | "ALL";
@@ -47,60 +48,81 @@ export function getWorkspaceDayBoundaries(timezone: string = "Asia/Kolkata") {
  * Compatible across TiDB Cloud and MySQL using JSON_CONTAINS, JSON_SEARCH,
  * and LIKE pattern fallback.
  */
+const multiAssignedCache = new Map<string, { ids: string[]; cachedAt: number }>();
+const MULTI_ASSIGN_CACHE_TTL_MS = 10 * 1000; // 10 seconds
+
+export function clearMultiAssignedCache(tenantId?: string) {
+  if (tenantId) {
+    for (const key of multiAssignedCache.keys()) {
+      if (key.startsWith(tenantId + ":")) multiAssignedCache.delete(key);
+    }
+  } else {
+    multiAssignedCache.clear();
+  }
+}
+
 export async function getMultiAssignedTaskIds(tenantId: string, membershipId: string): Promise<string[]> {
   if (!tenantId || !membershipId) return [];
 
+  const cacheKey = `${tenantId}:${membershipId}`;
+  const now = Date.now();
+  const cached = multiAssignedCache.get(cacheKey);
+  if (cached && now - cached.cachedAt < MULTI_ASSIGN_CACHE_TTL_MS) {
+    return cached.ids;
+  }
+
   const taskIds = new Set<string>();
 
-  // 1. Check junction task assignments
-  try {
-    const assignments = await prisma.taskAssignment.findMany({
+  // Run junction assignments, checklist items, and JSON query in parallel for speed
+  await Promise.all([
+    // 1. Check junction task assignments
+    prisma.taskAssignment.findMany({
       where: { tenantId, membershipId },
       select: { taskId: true },
-    });
-    for (const a of assignments) taskIds.add(a.taskId);
-  } catch (err) {
-    // ignore
-  }
+    }).then((assignments) => {
+      for (const a of assignments) taskIds.add(a.taskId);
+    }).catch(() => {}),
 
-  // 2. Check individual checklist item assignments
-  try {
-    const checklistItems = await prisma.taskChecklistItem.findMany({
+    // 2. Check individual checklist item assignments
+    prisma.taskChecklistItem.findMany({
       where: { tenantId, assignedMemberId: membershipId },
       select: { taskId: true },
-    });
-    for (const c of checklistItems) taskIds.add(c.taskId);
-  } catch (err) {
-    // ignore
-  }
+    }).then((checklistItems) => {
+      for (const c of checklistItems) taskIds.add(c.taskId);
+    }).catch(() => {}),
 
-  // 3. Check JSON assignedMemberIds
-  try {
-    const rows = await prisma.$queryRaw<Array<{ id: string }>>`
-      SELECT id FROM tasks 
-      WHERE tenantId = ${tenantId} 
-        AND assignedMemberIds IS NOT NULL
-        AND (
-          JSON_CONTAINS(assignedMemberIds, JSON_QUOTE(${membershipId}))
-          OR JSON_SEARCH(assignedMemberIds, 'one', ${membershipId}) IS NOT NULL
-        )
-    `;
-    for (const r of rows) taskIds.add(r.id);
-  } catch (err) {
-    try {
-      const fallbackRows = await prisma.$queryRaw<Array<{ id: string }>>`
-        SELECT id FROM tasks 
-        WHERE tenantId = ${tenantId} 
-          AND assignedMemberIds IS NOT NULL
-          AND assignedMemberIds LIKE ${`%${membershipId}%`}
-      `;
-      for (const r of fallbackRows) taskIds.add(r.id);
-    } catch (fallbackErr) {
-      console.warn("Could not query multi-assigned task IDs:", fallbackErr);
-    }
-  }
+    // 3. Check JSON assignedMemberIds
+    (async () => {
+      try {
+        const rows = await prisma.$queryRaw<Array<{ id: string }>>`
+          SELECT id FROM tasks 
+          WHERE tenantId = ${tenantId} 
+            AND assignedMemberIds IS NOT NULL
+            AND (
+              JSON_CONTAINS(assignedMemberIds, JSON_QUOTE(${membershipId}))
+              OR JSON_SEARCH(assignedMemberIds, 'one', ${membershipId}) IS NOT NULL
+            )
+        `;
+        for (const r of rows) taskIds.add(r.id);
+      } catch {
+        try {
+          const fallbackRows = await prisma.$queryRaw<Array<{ id: string }>>`
+            SELECT id FROM tasks 
+            WHERE tenantId = ${tenantId} 
+              AND assignedMemberIds IS NOT NULL
+              AND assignedMemberIds LIKE ${`%${membershipId}%`}
+          `;
+          for (const r of fallbackRows) taskIds.add(r.id);
+        } catch (fallbackErr) {
+          console.warn("Could not query multi-assigned task IDs:", fallbackErr);
+        }
+      }
+    })(),
+  ]);
 
-  return Array.from(taskIds);
+  const result = Array.from(taskIds);
+  multiAssignedCache.set(cacheKey, { ids: result, cachedAt: now });
+  return result;
 }
 
 export async function findTasks(ctx: TenantContext, params: TaskFilterParams = {}) {
@@ -566,7 +588,7 @@ export async function createTask(ctx: TenantContext, data: CreateTaskData) {
     throw new Error("Project not found in this studio workspace");
   }
 
-  // Lifecycle check: Operational tasks cannot be assigned to Draft, On Hold, Cancelled, or Archived projects
+  // Lifecycle check: Operational tasks cannot be assigned to Draft, On Hold, Cancelled, Completed, or Archived projects
   if (project.status === "DRAFT") {
     throw new Error("Cannot assign deliverables to a Draft project. Please activate the project first.");
   }
@@ -576,7 +598,10 @@ export async function createTask(ctx: TenantContext, data: CreateTaskData) {
   if (project.status === "CANCELLED") {
     throw new Error("Cannot assign deliverables to a Cancelled project.");
   }
-  if (project.status === "ARCHIVED") {
+  if (project.status === "COMPLETED") {
+    throw new Error("Cannot assign deliverables to a Completed project.");
+  }
+  if (project.status === "ARCHIVED" || project.isArchived) {
     throw new Error("Cannot assign deliverables to an Archived project.");
   }
 
@@ -816,12 +841,19 @@ export async function createTask(ctx: TenantContext, data: CreateTaskData) {
 }
 
 /**
- * Transition task workflow status with strict permission rules:
+ * Configuration flag:
+ * Allow employees/assignees to set task and checklist status to COMPLETED by themselves.
+ * Set to false when restricting back to four-eyes leadership approval.
+ */
+export const ALLOW_EMPLOYEE_SELF_COMPLETION = true;
+
+/**
+ * Transition task workflow status:
  * - NOT_STARTED -> IN_PROGRESS
  * - IN_PROGRESS -> IN_REVIEW (Submit for review)
- * - IN_REVIEW -> COMPLETED (Approve: Forbidden for assignee to self-approve!)
+ * - IN_REVIEW -> COMPLETED (Approve)
  * - IN_REVIEW -> IN_PROGRESS (Request Changes: requires comment)
- * - Any -> COMPLETED (Direct completion override: Admin/Owner only with audit reason)
+ * - Any -> COMPLETED (Allowed for employees/assignees while ALLOW_EMPLOYEE_SELF_COMPLETION is true)
  */
 export async function transitionTaskStatus(
   ctx: TenantContext,
@@ -837,48 +869,152 @@ export async function transitionTaskStatus(
     throw new Error("Task not found in this studio workspace");
   }
 
+  const rawStatus = (newStatus as any);
+  const effectiveNewStatus: TaskWorkflowStatus =
+    rawStatus === "CHANGES_REQUESTED" || rawStatus === "REVISION"
+      ? TaskWorkflowStatus.IN_PROGRESS
+      : (newStatus as TaskWorkflowStatus);
+
+  if (rawStatus === "CHANGES_REQUESTED" || rawStatus === "REVISION") {
+    if (!options.comment) {
+      options.comment = "Revisions requested";
+    }
+  }
+
   const oldStatus = task.status;
-  if (oldStatus === newStatus) {
+  if (oldStatus === effectiveNewStatus && rawStatus !== "CHANGES_REQUESTED" && rawStatus !== "REVISION") {
     return task;
   }
 
   const assignedMemberIds = Array.isArray(task.assignedMemberIds)
     ? (task.assignedMemberIds as string[])
     : [];
-  const isAssignee = task.assigneeId === ctx.membershipId || assignedMemberIds.includes(ctx.membershipId);
+  const assignmentMemberIds = Array.isArray(task.assignments)
+    ? task.assignments.map((a: any) => a.membershipId)
+    : [];
+  const isAssignee =
+    task.assigneeId === ctx.membershipId ||
+    assignedMemberIds.includes(ctx.membershipId) ||
+    assignmentMemberIds.includes(ctx.membershipId);
   const isPrivileged = isAdminOrOwner(ctx);
   const isCreator = task.creatorId === ctx.membershipId;
 
   if (!isPrivileged && !isAssignee && !isCreator) {
+    if (newStatus === TaskWorkflowStatus.COMPLETED && !ALLOW_EMPLOYEE_SELF_COMPLETION) {
+      throw new ForbiddenException(
+        "Direct completion override requires Administrator or Partner authority."
+      );
+    }
     throw new ForbiddenException(
       "Only assigned team members, the task assigner, or Studio Leadership can update deliverable status."
     );
   }
 
-  // Four-eyes rule: Deliverable assignees CANNOT self-approve their work to COMPLETED!
+  // Four-eyes rule: Deliverable assignees CANNOT self-approve governed work to COMPLETED!
   if (newStatus === TaskWorkflowStatus.COMPLETED) {
-    if (isAssignee) {
+    const governance = evaluateTaskCompletionGovernance(ctx, task as any, newStatus);
+    if (!governance.allowed) {
       throw new ForbiddenException(
-        "Self-approval is forbidden: Deliverable assignees cannot approve their own completed work."
-      );
-    }
-    if (!isPrivileged) {
-      throw new ForbiddenException(
-        "Only Studio Leadership (Owner/Admin) can approve deliverable completion."
+        governance.reason ||
+          "Four-Eyes Principle: Deliverable assignees or submitters cannot approve their own governed deliverable."
       );
     }
 
-    // Parent completion condition: Check if checklist items exist. If so, all must be completed/approved!
-    if (task.checklistItems && task.checklistItems.length > 0) {
-      const incompleteItems = task.checklistItems.filter(
-        (item) => item.status !== TaskWorkflowStatus.COMPLETED && !item.isCompleted
-      );
-      if (incompleteItems.length > 0) {
-        throw new Error(
-          `Cannot complete deliverable: All assigned employee checklist items must be completed and approved first (${incompleteItems.length} remaining).`
-        );
+    if (governance.policy === "REVIEW_REQUIRED") {
+      // Direct completion override or completion gate checks
+      if (oldStatus !== TaskWorkflowStatus.IN_REVIEW) {
+        if (options.auditReason?.trim()) {
+          // With documented leadership override, mark remaining checklist items complete
+          if (task.checklistItems && task.checklistItems.length > 0) {
+            await prisma.taskChecklistItem.updateMany({
+              where: { taskId: task.id },
+              data: { isCompleted: true, status: TaskWorkflowStatus.COMPLETED },
+            });
+          }
+        } else {
+          // Without explicit auditReason, check if checklist items are incomplete
+          if (task.checklistItems && task.checklistItems.length > 0) {
+            const incompleteItems = task.checklistItems.filter(
+              (item) => item.status !== TaskWorkflowStatus.COMPLETED && !item.isCompleted
+            );
+            if (incompleteItems.length > 0) {
+              throw new Error(
+                `Cannot complete deliverable: All assigned employee checklist items must be completed and approved first (${incompleteItems.length} remaining). Direct completion override requires a documented audit reason.`
+              );
+            }
+          }
+          // If no checklist items or all checklist items already complete, verify a reason/comment was provided
+          const documentedReason = (options.auditReason || options.comment || "").trim();
+          if (!documentedReason) {
+            throw new Error("Direct completion override requires a documented audit reason.");
+          }
+        }
+      } else {
+        // Standard review completion: Check if checklist items exist. If so, all must be completed/approved!
+        if (task.checklistItems && task.checklistItems.length > 0) {
+          const incompleteItems = task.checklistItems.filter(
+            (item) => item.status !== TaskWorkflowStatus.COMPLETED && !item.isCompleted
+          );
+          if (incompleteItems.length > 0) {
+            throw new Error(
+              `Cannot complete deliverable: All assigned employee checklist items must be completed and approved first (${incompleteItems.length} remaining).`
+            );
+          }
+        }
+      }
+    } else {
+      // When SELF_COMPLETION_ALLOWED:
+      // Mark any remaining incomplete checklist items as completed
+      if (task.checklistItems && task.checklistItems.length > 0) {
+        await prisma.taskChecklistItem.updateMany({
+          where: { taskId: task.id, isCompleted: false },
+          data: {
+            isCompleted: true,
+            status: TaskWorkflowStatus.COMPLETED,
+            completedAt: new Date(),
+            completedById: ctx.membershipId,
+          },
+        });
       }
     }
+
+    // Mark any task assignments as completed
+    await prisma.taskAssignment.updateMany({
+      where: { taskId: task.id },
+      data: {
+        isCompleted: true,
+        completedAt: new Date(),
+      },
+    });
+
+    // Resolve pending approval requests and submissions for this deliverable
+    await prisma.approvalRequest.updateMany({
+      where: {
+        tenantId: ctx.tenantId,
+        taskId: task.id,
+        status: "PENDING",
+      },
+      data: {
+        status: "APPROVED",
+        reviewerId: ctx.membershipId,
+        decidedAt: new Date(),
+        comment: options.comment || `Deliverable completed by ${ctx.userFullName}`,
+      },
+    });
+
+    await prisma.taskSubmission.updateMany({
+      where: {
+        taskId: task.id,
+        tenantId: ctx.tenantId,
+        status: "PENDING",
+      },
+      data: {
+        status: "APPROVED",
+        reviewerId: ctx.membershipId,
+        decidedAt: new Date(),
+        reviewFeedback: options.comment || `Marked completed by ${ctx.userFullName}`,
+      },
+    });
   }
 
   // Reason note helper
@@ -891,8 +1027,8 @@ export async function transitionTaskStatus(
     const updated = await tx.task.update({
       where: { id: taskId },
       data: {
-        status: newStatus,
-        completionDate: newStatus === TaskWorkflowStatus.COMPLETED ? new Date() : null,
+        status: effectiveNewStatus,
+        completionDate: effectiveNewStatus === TaskWorkflowStatus.COMPLETED ? new Date() : null,
         version: { increment: 1 },
       },
     });
@@ -1312,13 +1448,30 @@ export async function toggleChecklistItem(
     throw new Error("Checklist item not found");
   }
 
+  // Project Hold & Lifecycle safeguards
+  if (task.project?.status === "ON_HOLD") {
+    throw new Error(
+      `Cannot update checklist task: Project "${task.project.name}" is currently ON HOLD (${task.project.holdReason || "Paused"}). Operational tasks are paused until resumed.`
+    );
+  }
+  if (task.project?.status === "CANCELLED" || task.project?.status === "ARCHIVED" || task.project?.isArchived) {
+    throw new Error("Cannot update checklist task on a Cancelled or Archived project.");
+  }
+
+  // Blocker safeguard: Cannot complete an item with an active unresolved blocker
+  if (isCompleted && item.isBlocked) {
+    throw new Error(
+      `Cannot complete checklist item "${item.title}": It has an active blocker ("${item.blockerReason || "Blocker active"}"). Resolve the blocker first.`
+    );
+  }
+
   const isItemAssignee = item.assignedMemberId === ctx.membershipId;
 
   if (!isPrivileged && !isAssignee && !isItemAssignee && !isCreator) {
     throw new ForbiddenException("Only assigned employees, the task creator, or Studio Admin/Boss can update checklist items.");
   }
 
-  return await prisma.taskChecklistItem.update({
+  const updatedItem = await prisma.taskChecklistItem.update({
     where: { id: itemId },
     data: {
       isCompleted,
@@ -1327,6 +1480,42 @@ export async function toggleChecklistItem(
       completedById: isCompleted ? ctx.membershipId : null,
     },
   });
+
+  if (isCompleted) {
+    const parentTask = await prisma.task.findUnique({ where: { id: taskId } });
+    const policy = parentTask ? getTaskGovernancePolicy(parentTask as any) : "REVIEW_REQUIRED";
+    const remainingIncomplete = await prisma.taskChecklistItem.count({
+      where: {
+        taskId,
+        tenantId: ctx.tenantId,
+        id: { not: itemId },
+        isCompleted: false,
+      },
+    });
+    if (remainingIncomplete === 0 && parentTask) {
+      if (policy === "SELF_COMPLETION_ALLOWED") {
+        await prisma.task.update({
+          where: { id: taskId },
+          data: {
+            status: TaskWorkflowStatus.COMPLETED,
+            completionDate: new Date(),
+          },
+        });
+        await prisma.taskAssignment.updateMany({
+          where: { taskId },
+          data: { isCompleted: true },
+        });
+      } else if (parentTask.status !== TaskWorkflowStatus.COMPLETED) {
+        // Governed deliverables transition to IN_REVIEW when all checklist items pass
+        await prisma.task.update({
+          where: { id: taskId },
+          data: { status: TaskWorkflowStatus.IN_REVIEW },
+        });
+      }
+    }
+  }
+
+  return updatedItem;
 }
 
 /**
@@ -1401,6 +1590,28 @@ export async function transitionChecklistItemStatus(
     throw new Error("Checklist item not found");
   }
 
+  // Project Hold & Lifecycle safeguards
+  if (task.project?.status === "ON_HOLD") {
+    throw new Error(
+      `Cannot transition checklist item: Project "${task.project.name}" is currently ON HOLD (${task.project.holdReason || "Paused"}). Operational tasks are paused until resumed.`
+    );
+  }
+  if (task.project?.status === "CANCELLED" || task.project?.status === "ARCHIVED" || task.project?.isArchived) {
+    throw new Error("Cannot transition checklist item on a Cancelled or Archived project.");
+  }
+
+  // Blocker safeguards: Cannot complete or submit for review if an active unresolved blocker exists
+  if (newStatus === TaskWorkflowStatus.COMPLETED && item.isBlocked) {
+    throw new Error(
+      `Cannot complete checklist item "${item.title}": It has an active blocker ("${item.blockerReason || "Blocker active"}"). Resolve the blocker first.`
+    );
+  }
+  if (newStatus === TaskWorkflowStatus.IN_REVIEW && item.isBlocked) {
+    throw new Error(
+      `Cannot submit checklist item "${item.title}" for review: It has an active unresolved blocker. Resolve the blocker first.`
+    );
+  }
+
   const isPrivileged = isAdminOrOwner(ctx);
   const assignedMemberIds = Array.isArray(task.assignedMemberIds)
     ? (task.assignedMemberIds as string[])
@@ -1414,14 +1625,11 @@ export async function transitionChecklistItemStatus(
 
   // Four-eyes self-approval rule on checklist items:
   if (newStatus === TaskWorkflowStatus.COMPLETED) {
-    if (isItemAssignee || isDeliverableAssignee) {
+    const governance = evaluateTaskCompletionGovernance(ctx, task as any, newStatus);
+    if (!governance.allowed) {
       throw new ForbiddenException(
-        "Four-eyes policy: Deliverable assignees cannot approve their own completed checklist work."
-      );
-    }
-    if (!isPrivileged) {
-      throw new ForbiddenException(
-        "Four-eyes policy: Only Studio Leadership (Owner/Admin) can approve checklist work."
+        governance.reason ||
+          "Four-eyes policy: Deliverable assignees cannot approve their own completed checklist work."
       );
     }
   }
@@ -1489,6 +1697,45 @@ export async function transitionChecklistItemStatus(
           comment: options.comment || (newStatus === TaskWorkflowStatus.COMPLETED ? "Approved" : "Revisions requested"),
         },
       });
+    }
+
+    // Auto-complete or submit for review based on parent governance policy
+    if (newStatus === TaskWorkflowStatus.COMPLETED) {
+      const remainingIncompleteItems = await tx.taskChecklistItem.count({
+        where: {
+          taskId: task.id,
+          tenantId: ctx.tenantId,
+          id: { not: item.id },
+          status: { notIn: [TaskWorkflowStatus.COMPLETED, TaskWorkflowStatus.CANCELLED] },
+          isCompleted: false,
+        },
+      });
+
+      if (remainingIncompleteItems === 0) {
+        const policy = getTaskGovernancePolicy(task as any);
+        if (policy === "SELF_COMPLETION_ALLOWED") {
+          await tx.task.update({
+            where: { id: task.id },
+            data: {
+              status: TaskWorkflowStatus.COMPLETED,
+              completionDate: new Date(),
+            },
+          });
+          await tx.taskAssignment.updateMany({
+            where: { taskId: task.id },
+            data: {
+              isCompleted: true,
+              completedAt: new Date(),
+            },
+          });
+        } else if (task.status !== TaskWorkflowStatus.COMPLETED) {
+          // Governed tasks require independent review
+          await tx.task.update({
+            where: { id: task.id },
+            data: { status: TaskWorkflowStatus.IN_REVIEW },
+          });
+        }
+      }
     }
 
     // Activity history on parent task

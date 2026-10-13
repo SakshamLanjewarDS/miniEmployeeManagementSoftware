@@ -13,7 +13,32 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { taskId, projectId, durationSeconds, notes } = body;
+    const { taskId, projectId, durationSeconds, notes, action } = body;
+
+    // Check if client is requesting to start a new timer
+    if (action === "START") {
+      let targetProjectId = projectId;
+      if (!targetProjectId && taskId) {
+        const targetTask = await prisma.task.findUnique({
+          where: { id: taskId },
+          select: { projectId: true },
+        });
+        targetProjectId = targetTask?.projectId;
+      }
+      if (targetProjectId) {
+        const proj = await prisma.project.findFirst({
+          where: { id: targetProjectId, tenantId: ctx.tenantId },
+          select: { status: true, name: true, holdReason: true },
+        });
+        if (proj?.status === "ON_HOLD") {
+          return NextResponse.json(
+            { error: `Cannot start timer: Project '${proj.name}' is currently ON HOLD (${proj.holdReason || "Paused"}). New timer starts are blocked until resumed.` },
+            { status: 400 }
+          );
+        }
+      }
+      return NextResponse.json({ success: true, canStart: true });
+    }
 
     if (!taskId && !projectId) {
       return NextResponse.json({ error: "Either Task ID or Project ID is required" }, { status: 400 });
