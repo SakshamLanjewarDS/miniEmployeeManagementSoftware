@@ -105,7 +105,8 @@ export function verifyAndConsumeLeaveActionToken(
     if (usedNonces.size > 10000) {
       const iter = usedNonces.values();
       for (let i = 0; i < 2000; i++) {
-        usedNonces.delete(iter.next().value);
+        const val = iter.next().value;
+        if (val) usedNonces.delete(val);
       }
     }
 

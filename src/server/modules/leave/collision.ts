@@ -46,9 +46,9 @@ export async function getTeamLeaveCalendarMatrix(
   assertAdminOrOwner(context);
 
   const monthKey = `${targetYear}-${String(targetMonth).padStart(2, "0")}`;
-  const firstDay = new Date(targetYear, targetMonth - 1, 1);
-  const lastDay = new Date(targetYear, targetMonth, 0); // Last day of month
-  const totalDaysInMonth = lastDay.getDate();
+  const firstDay = new Date(Date.UTC(targetYear, targetMonth - 1, 1));
+  const lastDay = new Date(Date.UTC(targetYear, targetMonth, 0)); // Last day of month
+  const totalDaysInMonth = lastDay.getUTCDate();
 
   // Query leaves intersecting this month
   const leaves = await prisma.studioLeaveRequest.findMany({
@@ -74,7 +74,7 @@ export async function getTeamLeaveCalendarMatrix(
   // Initialize matrix for each day of the month
   const dayMap = new Map<string, DateAbsenceEntry>();
   for (let d = 1; d <= totalDaysInMonth; d++) {
-    const curDate = new Date(targetYear, targetMonth - 1, d);
+    const curDate = new Date(Date.UTC(targetYear, targetMonth - 1, d));
     const dateStr = formatDateOnly(curDate);
     dayMap.set(dateStr, {
       date: dateStr,

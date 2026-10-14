@@ -90,12 +90,12 @@ export default function OwnerDashboardView({
       {/* ============================================================== */}
       {/* 1. TOP GREETING PANEL (Image A)                                 */}
       {/* ============================================================== */}
-      <div className="bg-white border border-slate-200/80 rounded-3xl p-6 sm:p-8 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="bg-white border border-slate-200/80 rounded-3xl p-4 sm:p-6 lg:p-8 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="space-y-1 min-w-0">
           <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 font-mono">
             {todayDateString}
           </div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-slate-900 tracking-tight">
             Good Morning, {userFullName.split(" ")[0]}
           </h1>
           <p className="text-xs sm:text-sm text-slate-500">
@@ -108,9 +108,9 @@ export default function OwnerDashboardView({
         </div>
 
         {/* Top Right: Sun / Status & Refresh Action */}
-        <div className="flex items-center gap-3 shrink-0">
-          <div className="w-11 h-11 rounded-2xl bg-amber-50 text-amber-500 border border-amber-200/60 flex items-center justify-center shadow-xs">
-            <Sun className="w-6 h-6 animate-spin-slow" />
+        <div className="flex items-center gap-3 shrink-0 self-end sm:self-auto">
+          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-amber-50 text-amber-500 border border-amber-200/60 flex items-center justify-center shadow-xs">
+            <Sun className="w-5 h-5 sm:w-6 sm:h-6 animate-spin-slow" />
           </div>
 
           <button
@@ -128,7 +128,7 @@ export default function OwnerDashboardView({
       {/* ============================================================== */}
       {/* 2. SECTION NAVIGATION PILLS ROW (Image A)                       */}
       {/* ============================================================== */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar text-xs">
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 touch-scroll-x no-scrollbar text-xs">
         {[
           { key: "OVERVIEW", label: "Studio Overview" },
           { key: "ATTENTION", label: `Attention (${data.projectsAttention.length})` },
@@ -152,7 +152,7 @@ export default function OwnerDashboardView({
       {/* ============================================================== */}
       {/* 3. FOUR KPI CARDS (Image A)                                     */}
       {/* ============================================================== */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {/* KPI 1: Active Projects */}
         <Link
           href={`/w/${workspaceSlug}/projects`}
@@ -219,7 +219,7 @@ export default function OwnerDashboardView({
       {/* ============================================================== */}
       {/* 4. PRIMARY HERO CARD (Image A)                                  */}
       {/* ============================================================== */}
-      <div className="bg-white border border-slate-200/80 rounded-3xl p-6 sm:p-7 shadow-xs space-y-4">
+      <div className="bg-white border border-slate-200/80 rounded-3xl p-4 sm:p-6 lg:p-7 shadow-xs space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-[#3562E8] animate-pulse" />
@@ -239,7 +239,7 @@ export default function OwnerDashboardView({
 
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1">
-            <h2 className="text-xl font-bold text-slate-900 tracking-tight">
+            <h2 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">
               {data.projectsAttention.length > 0
                 ? `${data.projectsAttention.length} Projects Require Architectural Attention`
                 : "All Studio Projects Operating on Delivery Target"}
@@ -249,16 +249,16 @@ export default function OwnerDashboardView({
             </p>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 shrink-0 w-full md:w-auto">
             <Link
               href={`/w/${workspaceSlug}/tasks`}
-              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors"
+              className="flex-1 sm:flex-initial text-center px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors"
             >
               Assign Deliverable
             </Link>
             <Link
               href={`/w/${workspaceSlug}/inbox`}
-              className="px-4 py-2 bg-[#3562E8] hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors flex items-center gap-1.5"
+              className="flex-1 sm:flex-initial text-center justify-center px-4 py-2 bg-[#3562E8] hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors flex items-center gap-1.5"
             >
               <Inbox className="w-3.5 h-3.5" />
               <span>Review Inbox ({data.approvalInbox.length})</span>

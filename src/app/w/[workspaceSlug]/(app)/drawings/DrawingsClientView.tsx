@@ -534,10 +534,10 @@ export default function DrawingsClientView({
       )}
 
       {/* Top Filter and Search Bar */}
-      <div className="bg-white border border-[#E2E6F0] rounded-2xl p-4 shadow-xs space-y-3">
+      <div className="bg-white border border-[#E2E6F0] rounded-2xl p-3.5 sm:p-4 shadow-xs space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           {/* Search Box */}
-          <div className="relative flex-1 max-w-md">
+          <div className="relative flex-1 min-w-0 sm:max-w-md">
             <Search className="w-4 h-4 text-[#696E82] absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
@@ -557,10 +557,10 @@ export default function DrawingsClientView({
           </div>
 
           {/* Right Action: Register Drawing */}
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
             <button
               onClick={() => setIsCreateModalOpen(true)}
-              className="px-3.5 py-2 bg-[#5A81FA] hover:bg-[#426EE8] text-white text-xs font-semibold rounded-xl shadow-2xs transition-colors flex items-center gap-1.5 cursor-pointer shrink-0"
+              className="px-3.5 py-2 bg-[#5A81FA] hover:bg-[#426EE8] text-white text-xs font-semibold rounded-xl shadow-2xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer w-full sm:w-auto shrink-0"
             >
               <Plus className="w-4 h-4" />
               <span>Register Drawing (R0)</span>
@@ -701,7 +701,7 @@ export default function DrawingsClientView({
             return (
               <div
                 key={doc.id}
-                className="bg-white border border-[#E2E6F0] rounded-2xl p-5 shadow-xs hover:border-[#5A81FA]/40 transition-all space-y-4"
+                className="bg-white border border-[#E2E6F0] rounded-2xl p-4 sm:p-5 shadow-xs hover:border-[#5A81FA]/40 transition-all space-y-4"
               >
                 {/* Top Row: Meta & Project */}
                 <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">

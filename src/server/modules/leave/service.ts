@@ -584,7 +584,7 @@ export async function approveLeaveRequest(
 ) {
   assertAdminOrOwner(context);
 
-  return await prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const leave = await tx.studioLeaveRequest.findFirst({
       where: {
         id: leaveId,

@@ -53,6 +53,7 @@ import {
   TypologyDot,
   isTypologyMatch,
 } from "@/lib/typology";
+import { broadcastRealtimeEvent, useRealtimeSubscription } from "@/lib/realtime";
 
 export interface TaskItem {
   id: string;
@@ -268,6 +269,15 @@ export default function TasksClientView({
   useEffect(() => {
     setTasks(initialTasks);
   }, [initialTasks]);
+
+  // Real-time dynamic updates across project: periodic revalidation + focus revalidation + cross-tab live events
+  useRealtimeSubscription(
+    ["TASK_UPDATED", "PROJECT_UPDATED"],
+    () => {
+      router.refresh();
+    },
+    { intervalMs: 20000 }
+  );
 
   // Automatically open task details if taskId is present in query parameters
   useEffect(() => {
@@ -1061,6 +1071,8 @@ export default function TasksClientView({
       setTasks((prev) => [createdTask, ...prev]);
       setSuccessMessage(`Deliverable "${createdTask.title}" assigned successfully to ${assignedNames}!`);
       setIsCreateTaskModalOpen(false);
+      broadcastRealtimeEvent("TASK_UPDATED");
+      broadcastRealtimeEvent("NOTIFICATION_UPDATED");
 
       // Reset form
       setTaskDescription("");
@@ -1123,6 +1135,9 @@ export default function TasksClientView({
           setDrawerTask((prev) => (prev ? { ...prev, status: previousStatus } : null));
         }
         setErrorMessage(data.error || "Failed to update task status");
+      } else {
+        broadcastRealtimeEvent("TASK_UPDATED", { taskId, status: newStatus });
+        broadcastRealtimeEvent("NOTIFICATION_UPDATED");
       }
     } catch {
       // Rollback on network error
@@ -1248,6 +1263,9 @@ export default function TasksClientView({
           )
         );
         setErrorMessage(data.error || "Failed to delegate task");
+      } else {
+        broadcastRealtimeEvent("TASK_UPDATED");
+        broadcastRealtimeEvent("NOTIFICATION_UPDATED");
       }
     } catch {
       setTasks((prev) =>
@@ -1453,6 +1471,9 @@ export default function TasksClientView({
           }),
         });
       }
+
+      broadcastRealtimeEvent("TASK_UPDATED");
+      broadcastRealtimeEvent("NOTIFICATION_UPDATED");
     } catch {
       if (previousTask) {
         setTasks((prev) => prev.map((t) => (t.id === taskId ? previousTask : t)));
@@ -1491,6 +1512,9 @@ export default function TasksClientView({
         // Rollback
         setTasks((prev) => [deletedTask, ...prev]);
         setErrorMessage(data.error || "Failed to delete task");
+      } else {
+        broadcastRealtimeEvent("TASK_UPDATED");
+        broadcastRealtimeEvent("NOTIFICATION_UPDATED");
       }
     } catch {
       setTasks((prev) => [deletedTask, ...prev]);
@@ -1633,6 +1657,7 @@ export default function TasksClientView({
             );
           }
         }
+        broadcastRealtimeEvent("TASK_UPDATED");
       }
     } catch (err) {
       console.error("Failed to toggle checklist item", err);
@@ -1754,6 +1779,8 @@ export default function TasksClientView({
               }
             : null
         );
+        broadcastRealtimeEvent("TASK_UPDATED");
+        broadcastRealtimeEvent("NOTIFICATION_UPDATED");
       }
     } catch {
       setTasks((prev) =>
@@ -2217,9 +2244,9 @@ export default function TasksClientView({
   return (
     <div className="space-y-6" suppressHydrationWarning>
       {/* 1. PROFESSIONAL TASKS HEADER */}
-      <div className="bg-white border border-[#E2E6F0] rounded-2xl p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-white border border-[#E2E6F0] rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-[#1F1F1F]">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#1F1F1F]">
             {currentScope === "all" ? "All Studio Deliverables" : "My Assigned Tasks"}
           </h1>
           <p className="text-xs text-[#696E82] mt-0.5">
@@ -2231,7 +2258,7 @@ export default function TasksClientView({
 
         {/* Executive Scope Switcher for Boss / Partner / Admin */}
         {isPrivileged && (
-          <div className="flex items-center gap-1.5 bg-[#F8F9FD] p-1.5 rounded-xl border border-[#E2E6F0] shrink-0">
+          <div className="flex items-center gap-1.5 bg-[#F8F9FD] p-1.5 rounded-xl border border-[#E2E6F0] shrink-0 w-full sm:w-auto overflow-x-auto touch-scroll-x">
             <span className="text-xs font-semibold text-[#696E82] px-2 flex items-center gap-1.5">
               <Users className="w-3.5 h-3.5 text-[#5A81FA]" />
               <span className="hidden sm:inline">Scope:</span>
@@ -2240,7 +2267,7 @@ export default function TasksClientView({
               type="button"
               suppressHydrationWarning
               onClick={() => handleScopeChange("all")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex-1 sm:flex-initial text-center ${
                 currentScope === "all"
                   ? "bg-[#5A81FA] text-white shadow-2xs"
                   : "text-[#696E82] hover:text-[#1F1F1F]"
@@ -2252,7 +2279,7 @@ export default function TasksClientView({
               type="button"
               suppressHydrationWarning
               onClick={() => handleScopeChange("my")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex-1 sm:flex-initial text-center ${
                 currentScope === "my"
                   ? "bg-[#5A81FA] text-white shadow-2xs"
                   : "text-[#696E82] hover:text-[#1F1F1F]"
@@ -2266,7 +2293,7 @@ export default function TasksClientView({
 
       {/* 2. SUMMARY METRIC CARDS (5 Interactive Cards) */}
       {metrics && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-3.5">
           {/* Card 1: Due Today */}
           <button
             type="button"
@@ -2356,7 +2383,7 @@ export default function TasksClientView({
             type="button"
             suppressHydrationWarning
             onClick={() => handleMetricCardClick("COMPLETED")}
-            className={`p-4 rounded-2xl border text-left transition-all cursor-pointer shadow-2xs ${
+            className={`p-4 rounded-2xl border text-left transition-all cursor-pointer shadow-2xs col-span-2 sm:col-span-1 ${
               selectedStatusCategory === "COMPLETED"
                 ? "bg-emerald-50 border-emerald-500 ring-2 ring-emerald-500/20"
                 : "bg-white border-[#E2E6F0] hover:border-emerald-200"
@@ -2400,10 +2427,10 @@ export default function TasksClientView({
       )}
 
       {/* 3. MULTI-DIMENSION FILTER BAR (SEARCH, DUE DATE, STATUS, PRIORITY, PROJECT) */}
-      <div className="bg-white border border-[#E2E6F0] rounded-2xl p-4 shadow-xs space-y-3">
+      <div className="bg-white border border-[#E2E6F0] rounded-2xl p-3.5 sm:p-4 shadow-xs space-y-3">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           {/* Search Input */}
-          <div className="relative flex-1 min-w-[240px]">
+          <div className="relative flex-1 min-w-0 sm:min-w-[240px]">
             <Search className="w-4 h-4 text-[#696E82] absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
@@ -2425,7 +2452,7 @@ export default function TasksClientView({
           </div>
 
           {/* Right Action buttons: Assign Task & View Switcher */}
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
             {(userRole === "OWNER" || userRole === "ADMIN") && (
               <button
                 type="button"
@@ -2989,7 +3016,7 @@ export default function TasksClientView({
 
       {/* 5. KANBAN BOARD WITH DRAG AND DROP (5 STATUS COLUMNS) */}
       {view === "kanban" && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="flex lg:grid gap-4 overflow-x-auto lg:overflow-x-visible pb-4 lg:pb-0 touch-scroll-x lg:grid-cols-5 snap-x snap-mandatory lg:snap-none">
           {[
             {
               statuses: ["TODO", "NOT_STARTED"],
@@ -3033,7 +3060,7 @@ export default function TasksClientView({
                 key={col.title}
                 onDragOver={handleDragOver}
                 onDrop={() => handleDropOnColumn(col.dropStatus as any)}
-                className={`bg-white border border-[#E2E6F0] rounded-2xl p-3.5 flex flex-col min-h-[500px] transition-colors ${col.bg}`}
+                className={`bg-white border border-[#E2E6F0] rounded-2xl p-3.5 flex flex-col min-h-[480px] lg:min-h-[500px] w-[285px] sm:w-[320px] lg:w-auto shrink-0 snap-center transition-colors ${col.bg}`}
               >
                 <div className={`flex items-center justify-between pb-3 border-b-2 ${col.color} mb-3`}>
                   <div className="flex items-center gap-2">
@@ -3194,17 +3221,20 @@ export default function TasksClientView({
       {/* ==================================================== */}
       {drawerTask && (
         <div
-          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-in fade-in duration-150"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Task Details"
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-2.5 sm:p-6 overflow-y-auto animate-in fade-in duration-150"
           onClick={() => setDrawerTask(null)}
         >
           <div
-            className="bg-white rounded-3xl sm:rounded-[28px] border border-slate-100 w-full max-w-2xl max-h-[92vh] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 relative my-auto"
+            className="bg-white rounded-2xl sm:rounded-[28px] border border-slate-100 w-full max-w-2xl max-h-[94vh] sm:max-h-[92vh] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 relative my-auto"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header (Matching Image B) */}
-            <div className="p-6 sm:p-7 pb-4 bg-white flex items-start justify-between gap-4 border-b border-slate-100/80">
+            <div className="p-4 sm:p-7 pb-3 sm:pb-4 bg-white flex items-start justify-between gap-3 sm:gap-4 border-b border-slate-100/80">
               <div className="space-y-1.5 min-w-0 flex-1">
-                <h2 className="text-2xl font-bold text-slate-900 tracking-tight leading-tight">
+                <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight leading-tight">
                   {drawerTask.title}
                 </h2>
                 <div className="flex flex-wrap items-center gap-2 pt-0.5">
@@ -3213,7 +3243,7 @@ export default function TasksClientView({
                     <span className="font-mono text-xs font-bold text-[#c026d3] bg-[#fdf2f8] border border-[#fbcfe8] px-2 py-0.5 rounded">
                       {drawerTask.project.code}
                     </span>
-                    <span className="text-xs font-bold text-slate-700">{drawerTask.project.name}</span>
+                    <span className="text-xs font-bold text-slate-700 truncate max-w-[150px] sm:max-w-none">{drawerTask.project.name}</span>
                   </div>
                   {drawerTask.project.projectType && (
                     <TypologyBadge typology={drawerTask.project.projectType} size="xs" />
@@ -3227,7 +3257,7 @@ export default function TasksClientView({
               </div>
 
               {/* Action Icons: Edit, Delete, Close (Matching Image B) */}
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
                 {(isPrivileged || isTaskAssignedToMe(drawerTask) || drawerTask.creatorId === currentMembershipId || drawerTask.creator?.id === currentMembershipId) && (
                   <button
                     type="button"
@@ -3262,7 +3292,7 @@ export default function TasksClientView({
             </div>
 
             {/* Scrollable Content */}
-            <div className="flex-1 overflow-y-auto px-6 sm:px-7 py-6 space-y-6 text-xs text-[#1F1F1F]">
+            <div className="flex-1 overflow-y-auto px-4 sm:px-7 py-4 sm:py-6 space-y-6 text-xs text-[#1F1F1F]">
               {/* Segmented Stage Progress Bar (Matching Image B) */}
               {(() => {
                 const normStatus = (drawerTask.status || "TODO").toUpperCase();
@@ -4252,10 +4282,10 @@ export default function TasksClientView({
             </div>
 
             {/* Bottom Actions inside Modal matching Image B */}
-            <div className="p-5 border-t border-slate-100 bg-white flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
+            <div className="p-3.5 sm:p-5 border-t border-slate-100 bg-white flex flex-wrap items-center justify-between gap-3 pb-safe">
+              <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
                 <span className="text-xs font-semibold text-slate-500">Status:</span>
-                <div className="min-w-[150px]">
+                <div className="min-w-[150px] flex-1 sm:flex-initial">
                   <SearchableDropdown
                     size="sm"
                     optionType="status"
@@ -4290,18 +4320,18 @@ export default function TasksClientView({
               </div>
 
               {/* Cancel & Save Changes buttons (Matching Image B) */}
-              <div className="flex items-center gap-2.5 ml-auto">
+              <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end sm:ml-auto">
                 <button
                   type="button"
                   onClick={() => setDrawerTask(null)}
-                  className="px-5 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer shadow-2xs"
+                  className="px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer shadow-2xs"
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
                   onClick={() => setDrawerTask(null)}
-                  className="px-5 py-2.5 rounded-xl bg-[#6366F1] hover:bg-[#4F46E5] text-white text-sm font-semibold shadow-sm transition-colors cursor-pointer"
+                  className="px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl bg-[#6366F1] hover:bg-[#4F46E5] text-white text-xs sm:text-sm font-semibold shadow-sm transition-colors cursor-pointer"
                 >
                   Save changes
                 </button>

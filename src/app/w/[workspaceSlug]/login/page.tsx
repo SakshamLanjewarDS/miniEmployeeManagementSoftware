@@ -113,7 +113,7 @@ export default function WorkspaceLoginPage() {
             ----------------------------------------------------------------------- */}
         <div className="lg:col-span-6 xl:col-span-6 flex flex-col gap-5 sm:gap-6">
           {/* A. TRANSLUCENT LOGIN CARD */}
-          <div className="relative w-full rounded-[32px] sm:rounded-[36px] bg-white/75 backdrop-blur-2xl border border-white/90 shadow-[0_20px_50px_-15px_rgba(44,48,141,0.1),0_0_0_1px_rgba(255,255,255,0.8)_inset] p-7 sm:p-9 lg:p-10 transition-all duration-300">
+          <div className="relative w-full rounded-[28px] sm:rounded-[36px] bg-white/75 backdrop-blur-2xl border border-white/90 shadow-[0_20px_50px_-15px_rgba(44,48,141,0.1),0_0_0_1px_rgba(255,255,255,0.8)_inset] p-5 sm:p-8 lg:p-10 transition-all duration-300">
             {/* Top Light-Catching Edge Highlight */}
             <div className="absolute inset-x-8 top-0 h-[1.5px] bg-gradient-to-r from-transparent via-white to-transparent opacity-80" />
 
@@ -269,7 +269,7 @@ export default function WorkspaceLoginPage() {
           </div>
 
           {/* B. LOWER BRAND CARD (DARK SURFACE COMPONENT) */}
-          <div className="relative w-full rounded-[28px] sm:rounded-[32px] bg-[#0B122B] text-white border border-white/10 shadow-[0_18px_40px_-12px_rgba(11,18,43,0.35)] p-6 sm:p-7 overflow-hidden">
+          <div className="relative w-full rounded-[24px] sm:rounded-[32px] bg-[#0B122B] text-white border border-white/10 shadow-[0_18px_40px_-12px_rgba(11,18,43,0.35)] p-5 sm:p-7 overflow-hidden">
             {/* Subtle Gradient Glass Sheen */}
             <div className="absolute top-0 right-0 w-[240px] h-[160px] bg-gradient-to-bl from-[#3562E8]/25 via-[#2C308D]/15 to-transparent rounded-full blur-2xl pointer-events-none" />
 
@@ -315,7 +315,7 @@ export default function WorkspaceLoginPage() {
             RIGHT COLUMN (Col 7-12): TALL FROSTED FEATURE PANEL
             ----------------------------------------------------------------------- */}
         <div className="lg:col-span-6 xl:col-span-6 flex flex-col justify-between">
-          <div className="relative h-full w-full rounded-[32px] sm:rounded-[40px] bg-white/55 backdrop-blur-2xl border border-white/90 shadow-[0_25px_60px_-20px_rgba(44,48,141,0.12),0_0_0_1px_rgba(255,255,255,0.7)_inset] p-7 sm:p-9 lg:p-10 flex flex-col justify-between overflow-hidden min-h-[580px] lg:min-h-full">
+          <div className="relative h-full w-full rounded-[28px] sm:rounded-[40px] bg-white/55 backdrop-blur-2xl border border-white/90 shadow-[0_25px_60px_-20px_rgba(44,48,141,0.12),0_0_0_1px_rgba(255,255,255,0.7)_inset] p-5 sm:p-8 lg:p-10 flex flex-col justify-between overflow-hidden min-h-0 lg:min-h-full">
             {/* Top Light-Catching Edge Highlight */}
             <div className="absolute inset-x-10 top-0 h-[1.5px] bg-gradient-to-r from-transparent via-white to-transparent opacity-80" />
 

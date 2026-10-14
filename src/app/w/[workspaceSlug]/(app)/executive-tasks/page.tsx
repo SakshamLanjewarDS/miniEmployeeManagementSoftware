@@ -198,12 +198,12 @@ export default function ExecutiveTasksPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           {/* View Mode Toggle */}
           <div className="flex items-center bg-white border border-[#E2E6F0] rounded-xl p-1 shadow-2xs">
             <button
               onClick={() => setViewMode("table")}
-              className={`px-3 py-1 text-xs font-semibold rounded-lg transition-colors ${
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors cursor-pointer min-h-[36px] ${
                 viewMode === "table" ? "bg-[#5A81FA] text-white" : "text-[#696E82] hover:text-[#1F1F1F]"
               }`}
             >
@@ -211,7 +211,7 @@ export default function ExecutiveTasksPage() {
             </button>
             <button
               onClick={() => setViewMode("kanban")}
-              className={`px-3 py-1 text-xs font-semibold rounded-lg transition-colors ${
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors cursor-pointer min-h-[36px] ${
                 viewMode === "kanban" ? "bg-[#5A81FA] text-white" : "text-[#696E82] hover:text-[#1F1F1F]"
               }`}
             >
@@ -221,7 +221,7 @@ export default function ExecutiveTasksPage() {
 
           <button
             onClick={() => setIsCreateOpen(true)}
-            className="flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-xl bg-[#5A81FA] text-white hover:bg-[#4870EB] shadow-xs transition-all"
+            className="flex items-center justify-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-xl bg-[#5A81FA] text-white hover:bg-[#4870EB] shadow-xs transition-all w-full sm:w-auto min-h-[38px] cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>New Deliverable</span>
@@ -413,13 +413,13 @@ export default function ExecutiveTasksPage() {
         </div>
       ) : (
         /* Kanban Board View */
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="flex md:grid gap-4 overflow-x-auto touch-scroll-x md:grid-cols-4 snap-x snap-mandatory md:snap-none pb-2">
           {(["TO_DO", "IN_PROGRESS", "WAITING", "DONE"] as const).map((colStatus) => {
             const colTasks = tasks.filter((t) => t.status === colStatus);
             const colTitle = colStatus.replace("_", " ");
 
             return (
-              <div key={colStatus} className="bg-[#F8F9FD] rounded-3xl p-3 border border-[#E2E6F0] space-y-3">
+              <div key={colStatus} className="bg-[#F8F9FD] rounded-3xl p-3 border border-[#E2E6F0] space-y-3 w-[285px] sm:w-[320px] md:w-auto shrink-0 snap-center">
                 <div className="flex items-center justify-between px-2 py-1">
                   <span className="text-xs font-bold text-[#1F1F1F] uppercase tracking-wider">{colTitle}</span>
                   <span className="text-xs font-mono font-bold bg-white px-2 py-0.5 rounded-full border border-[#E2E6F0] text-[#696E82]">
@@ -566,20 +566,24 @@ export default function ExecutiveTasksPage() {
 
       {/* Create Deliverable Modal */}
       {isCreateOpen && (
-        <div className="fixed inset-0 z-50 bg-[#0B122B]/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-[#0B122B]/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
           <form
             onSubmit={handleCreateTask}
-            className="bg-white rounded-3xl max-w-lg w-full p-6 border border-[#E2E6F0] shadow-xl space-y-4"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="create-deliv-title"
+            className="bg-white rounded-2xl sm:rounded-3xl max-w-lg w-full p-5 sm:p-6 border border-[#E2E6F0] shadow-xl space-y-4 max-h-[92vh] overflow-y-auto"
           >
             <div className="flex items-center justify-between border-b border-[#E2E6F0] pb-3">
               <div>
-                <h3 className="text-base font-bold text-[#1F1F1F]">Create Executive Deliverable</h3>
+                <h3 id="create-deliv-title" className="text-base font-bold text-[#1F1F1F]">Create Executive Deliverable</h3>
                 <p className="text-xs text-[#696E82]">Leadership deliverable tracking</p>
               </div>
               <button
                 type="button"
                 onClick={() => setIsCreateOpen(false)}
-                className="p-1 text-[#696E82] hover:bg-gray-100 rounded-lg"
+                className="w-8 h-8 flex items-center justify-center text-[#696E82] hover:bg-gray-100 rounded-lg cursor-pointer"
+                aria-label="Close dialog"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -598,7 +602,7 @@ export default function ExecutiveTasksPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="font-semibold text-[#1F1F1F] block mb-1">Category</label>
                   <select

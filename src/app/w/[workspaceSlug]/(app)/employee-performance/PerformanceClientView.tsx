@@ -148,7 +148,7 @@ export function PerformanceClientView({ context }: PerformanceClientViewProps) {
       <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           {/* Period Preset Selector */}
-          <div className="flex flex-wrap items-center gap-1.5 text-xs font-medium bg-slate-100/80 p-1 rounded-xl">
+          <div className="flex items-center gap-1.5 text-xs font-medium bg-slate-100/80 p-1 rounded-xl overflow-x-auto touch-scroll-x max-w-full">
             {[
               { id: "TODAY", label: "Today" },
               { id: "THIS_WEEK", label: "This Week" },
@@ -160,7 +160,7 @@ export function PerformanceClientView({ context }: PerformanceClientViewProps) {
                 key={p.id}
                 type="button"
                 onClick={() => setPreset(p.id)}
-                className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
+                className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer shrink-0 whitespace-nowrap min-h-[36px] ${
                   preset === p.id
                     ? "bg-white text-slate-900 font-bold shadow-xs"
                     : "text-slate-600 hover:text-slate-900"
@@ -172,11 +172,11 @@ export function PerformanceClientView({ context }: PerformanceClientViewProps) {
           </div>
 
           {/* Department Filter & Search */}
-          <div className="flex items-center gap-2 flex-1 max-w-md justify-end">
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto flex-1 max-w-full sm:max-w-md justify-start sm:justify-end">
             <select
               value={department}
               onChange={(e) => setDepartment(e.target.value)}
-              className="px-3 py-1.5 text-xs rounded-xl border border-slate-200 bg-white text-slate-700 font-medium cursor-pointer"
+              className="px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white text-slate-700 font-medium cursor-pointer min-h-[36px]"
             >
               <option value="ALL">All Departments</option>
               <option value="Architecture">Architecture</option>
@@ -186,14 +186,14 @@ export function PerformanceClientView({ context }: PerformanceClientViewProps) {
               <option value="Administration">Administration</option>
             </select>
 
-            <form onSubmit={handleSearchSubmit} className="relative flex-1">
+            <form onSubmit={handleSearchSubmit} className="relative flex-1 min-w-[180px]">
               <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
               <input
                 type="text"
                 placeholder="Search architect name or ID..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-8 pr-3 py-1.5 text-xs rounded-xl border border-slate-200 bg-white placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-[#3562E8]"
+                className="w-full pl-8 pr-3 py-2 text-xs rounded-xl border border-slate-200 bg-white placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-[#3562E8] min-h-[36px]"
               />
             </form>
           </div>
@@ -431,8 +431,8 @@ export function PerformanceClientView({ context }: PerformanceClientViewProps) {
           </span>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-slate-700">
+        <div className="overflow-x-auto touch-scroll-x">
+          <table className="w-full text-left text-xs text-slate-700 min-w-[720px]">
             <thead className="bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-500 border-b border-slate-200">
               <tr>
                 <th className="py-3 px-4">Employee</th>
@@ -531,11 +531,16 @@ export function PerformanceClientView({ context }: PerformanceClientViewProps) {
           />
 
           {/* Drawer Panel */}
-          <div className="relative w-full max-w-lg bg-white h-full shadow-2xl flex flex-col z-10">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="perf-drawer-title"
+            className="relative w-full max-w-lg bg-white h-full shadow-2xl flex flex-col z-10"
+          >
             {/* Drawer Header */}
             <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/50">
               <div>
-                <h3 className="text-base font-bold text-slate-900">{selectedEmployee.name}</h3>
+                <h3 id="perf-drawer-title" className="text-base font-bold text-slate-900">{selectedEmployee.name}</h3>
                 <div className="text-xs text-slate-500 font-mono mt-0.5">
                   {selectedEmployee.code} • {selectedEmployee.designation} ({selectedEmployee.department})
                 </div>
@@ -543,14 +548,15 @@ export function PerformanceClientView({ context }: PerformanceClientViewProps) {
               <button
                 type="button"
                 onClick={() => setSelectedEmployee(null)}
-                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl"
+                className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl cursor-pointer"
+                aria-label="Close drawer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {/* Drawer Tabs */}
-            <div className="flex border-b border-slate-200 bg-white px-4 text-xs font-semibold">
+            <div className="flex border-b border-slate-200 bg-white px-3 sm:px-4 text-xs font-semibold overflow-x-auto touch-scroll-x">
               {[
                 { id: "overview", label: "Overview" },
                 { id: "delivery", label: "Delivery" },
@@ -561,7 +567,7 @@ export function PerformanceClientView({ context }: PerformanceClientViewProps) {
                   key={t.id}
                   type="button"
                   onClick={() => setDrawerTab(t.id as any)}
-                  className={`py-3 px-3 border-b-2 font-medium transition-colors cursor-pointer ${
+                  className={`py-3 px-3 border-b-2 font-medium transition-colors cursor-pointer shrink-0 whitespace-nowrap min-h-[40px] ${
                     drawerTab === t.id
                       ? "border-[#3562E8] text-[#3562E8] font-bold"
                       : "border-transparent text-slate-500 hover:text-slate-900"

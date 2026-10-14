@@ -212,14 +212,14 @@ export default function IntegrationsHealthPage() {
   };
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto px-4 sm:px-6 py-6">
+    <div className="space-y-6 max-w-7xl mx-auto px-3.5 sm:px-6 py-4 sm:py-6">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-[#0B122B] tracking-tight">
+          <h1 className="text-xl sm:text-2xl font-bold text-[#0B122B] tracking-tight">
             Integration & Job Health Dashboard
           </h1>
-          <p className="text-sm text-slate-500 mt-1">
+          <p className="text-xs sm:text-sm text-slate-500 mt-1">
             Real-time status, data freshness, queue backlogs, and diagnostic controls for all studio
             connectors.
           </p>
@@ -228,16 +228,16 @@ export default function IntegrationsHealthPage() {
         <button
           onClick={fetchHealth}
           disabled={loading}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-[#5A81FA] text-white hover:bg-[#4870e8] rounded-lg shadow-sm transition disabled:opacity-50"
+          className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium bg-[#5A81FA] text-white hover:bg-[#4870e8] rounded-lg shadow-sm transition disabled:opacity-50 w-full sm:w-auto min-h-[38px] cursor-pointer"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
-          Refresh Diagnostics
+          <span>Refresh Diagnostics</span>
         </button>
       </div>
 
       {/* Top Metrics Row */}
       {data && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
           <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm">
             <div className="text-xs font-medium text-slate-500">Overall Studio Health</div>
             <div className="mt-1.5">
@@ -339,7 +339,7 @@ export default function IntegrationsHealthPage() {
               </div>
 
               {/* Action Buttons */}
-              <div className="mt-5 pt-3 border-t border-slate-100 flex items-center justify-between gap-2 text-xs">
+              <div className="mt-5 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs">
                 {c.actionsAllowed.includes("MANUAL_SYNC") && (
                   <button
                     onClick={() =>
@@ -400,8 +400,8 @@ export default function IntegrationsHealthPage() {
             <span className="text-xs text-slate-400">Bounded & sanitized runs</span>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
+          <div className="overflow-x-auto touch-scroll-x">
+            <table className="w-full text-left border-collapse text-xs min-w-[580px]">
               <thead>
                 <tr className="bg-slate-50/70 border-b border-slate-200/80 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
                   <th className="py-3 px-4">Connector</th>

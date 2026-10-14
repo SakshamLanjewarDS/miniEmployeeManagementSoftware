@@ -16,6 +16,7 @@ import {
   X,
   Check,
 } from "lucide-react";
+import { broadcastRealtimeEvent, useRealtimeSubscription } from "@/lib/realtime";
 
 export default function AttendanceManagementPage() {
   const params = useParams();
@@ -40,8 +41,8 @@ export default function AttendanceManagementPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
 
-  const fetchAttendance = async () => {
-    setLoading(true);
+  const fetchAttendance = async (silent = false) => {
+    if (!silent) setLoading(true);
     setError(null);
     try {
       const q = new URLSearchParams({
@@ -57,15 +58,18 @@ export default function AttendanceManagementPage() {
       setRecords(data.records || []);
       setSummary(data.summary || null);
     } catch (err: any) {
-      setError(err.message);
+      if (!silent) setError(err.message);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
   useEffect(() => {
     fetchAttendance();
   }, [workspaceSlug, selectedDate, statusFilter]);
+
+  // Real-time dynamic updates: visible polling + tab focus revalidation + cross-tab live events
+  useRealtimeSubscription(["ATTENDANCE_UPDATED"], () => fetchAttendance(true), { intervalMs: 20000 });
 
   const handleCorrectSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -91,6 +95,8 @@ export default function AttendanceManagementPage() {
       setActionSuccess("Attendance punch audited and corrected successfully.");
       setCorrectingRecord(null);
       fetchAttendance();
+      broadcastRealtimeEvent("ATTENDANCE_UPDATED");
+      broadcastRealtimeEvent("NOTIFICATION_UPDATED");
     } catch (err: any) {
       alert(err.message);
     } finally {
@@ -108,27 +114,27 @@ export default function AttendanceManagementPage() {
             <span>/</span>
             <span className="font-semibold text-[#1F1F1F]">Staff Attendance</span>
           </div>
-          <h1 className="text-2xl font-bold text-[#1F1F1F] tracking-tight">Studio Attendance & Punch Logs</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-[#1F1F1F] tracking-tight">Studio Attendance & Punch Logs</h1>
           <p className="text-xs text-[#696E82] mt-0.5">
             Owner/Admin restricted • Incomplete punch reporting • Audited time corrections
           </p>
         </div>
 
         {/* Date Selector */}
-        <div className="flex items-center gap-3">
-          <div className="flex items-center bg-white border border-[#E2E6F0] rounded-2xl p-1 shadow-2xs">
-            <span className="px-3 text-xs font-semibold text-[#696E82]">Select Date:</span>
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full md:w-auto">
+          <div className="flex items-center bg-white border border-[#E2E6F0] rounded-2xl p-1 shadow-2xs flex-1 sm:flex-initial">
+            <span className="px-2.5 sm:px-3 text-xs font-semibold text-[#696E82] whitespace-nowrap">Select Date:</span>
             <input
               type="date"
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
-              className="px-3 py-1.5 text-xs font-mono font-bold text-[#1F1F1F] bg-[#F8F9FD] rounded-xl border border-[#E2E6F0] focus:outline-none focus:border-[#5A81FA]"
+              className="px-2 sm:px-3 py-1.5 text-xs font-mono font-bold text-[#1F1F1F] bg-[#F8F9FD] rounded-xl border border-[#E2E6F0] focus:outline-none focus:border-[#5A81FA] w-full"
             />
           </div>
 
           <button
             onClick={() => setSelectedDate(todayStr)}
-            className="px-3 py-2 text-xs font-semibold rounded-xl bg-white border border-[#E2E6F0] text-[#1F1F1F] hover:bg-[#F8F9FE] shadow-2xs"
+            className="px-3.5 py-2 text-xs font-semibold rounded-xl bg-white border border-[#E2E6F0] text-[#1F1F1F] hover:bg-[#F8F9FE] shadow-2xs cursor-pointer"
           >
             Today
           </button>
@@ -141,7 +147,7 @@ export default function AttendanceManagementPage() {
             <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
             <span>{actionSuccess}</span>
           </span>
-          <button onClick={() => setActionSuccess(null)}>
+          <button onClick={() => setActionSuccess(null)} className="cursor-pointer">
             <X className="w-4 h-4 text-emerald-700" />
           </button>
         </div>
@@ -176,7 +182,7 @@ export default function AttendanceManagementPage() {
             <div className="text-xl font-extrabold text-rose-600 mt-1 font-mono">{summary.absentCount}</div>
             <div className="text-[10px] text-[#696E82]">Unexcused absence</div>
           </div>
-          <div className="p-3.5 bg-[#FFFBEB] rounded-2xl border border-amber-200 shadow-2xs">
+          <div className="p-3.5 bg-[#FFFBEB] rounded-2xl border border-amber-200 shadow-2xs col-span-2 md:col-span-1">
             <div className="text-[10px] text-amber-800 font-semibold uppercase tracking-wider">Missing Punch</div>
             <div className="text-xl font-extrabold text-amber-700 mt-1 font-mono">{summary.missingPunchCount}</div>
             <div className="text-[10px] text-amber-700">Requires review</div>
@@ -302,10 +308,15 @@ export default function AttendanceManagementPage() {
 
       {/* Audited Correction Modal */}
       {correctingRecord && (
-        <div className="fixed inset-0 z-50 bg-[#0B122B]/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Audited Punch Correction"
+          className="fixed inset-0 z-50 bg-[#0B122B]/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4"
+        >
           <form
             onSubmit={handleCorrectSubmit}
-            className="bg-white rounded-3xl max-w-md w-full p-6 border border-[#E2E6F0] shadow-xl space-y-4"
+            className="bg-white rounded-2xl sm:rounded-3xl max-w-md w-full p-4 sm:p-6 border border-[#E2E6F0] shadow-xl space-y-4 max-h-[92vh] overflow-y-auto"
           >
             <div className="flex items-center justify-between border-b border-[#E2E6F0] pb-3">
               <div>

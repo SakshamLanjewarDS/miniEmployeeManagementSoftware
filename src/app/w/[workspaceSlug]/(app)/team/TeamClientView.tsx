@@ -894,14 +894,14 @@ export default function TeamClientView({
 
           {/* Add Employee & CSV Buttons (Privileged only) */}
           {isPrivileged && (
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
               <button
                 type="button"
                 suppressHydrationWarning
                 onClick={fetchFreshEmployees}
                 disabled={isRefreshing}
                 title="Synchronize live changes with database"
-                className="p-2 bg-white border border-[#E2E6F0] hover:bg-[#F8F9FD] rounded-xl text-[#696E82] hover:text-[#1F1F1F] transition-all shadow-xs cursor-pointer flex items-center gap-1.5 text-xs font-semibold"
+                className="p-2 bg-white border border-[#E2E6F0] hover:bg-[#F8F9FD] rounded-xl text-[#696E82] hover:text-[#1F1F1F] transition-all shadow-xs cursor-pointer flex items-center justify-center gap-1.5 text-xs font-semibold"
               >
                 <RotateCcw className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin text-[#5A81FA]" : "text-[#696E82]"}`} />
                 <span className="hidden sm:inline text-[11px]">{isRefreshing ? "Syncing..." : "Sync Live"}</span>
@@ -910,7 +910,7 @@ export default function TeamClientView({
                 type="button"
                 suppressHydrationWarning
                 onClick={() => setIsBulkMailModalOpen(true)}
-                className="bg-white border border-[#E2E6F0] text-[#1F1F1F] hover:bg-[#F8F9FD] hover:border-[#EA4335] px-3.5 py-2 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-2 shadow-xs shrink-0 cursor-pointer"
+                className="bg-white border border-[#E2E6F0] text-[#1F1F1F] hover:bg-[#F8F9FD] hover:border-[#EA4335] px-3.5 py-2 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-2 shadow-xs shrink-0 cursor-pointer flex-1 sm:flex-initial"
                 title="Send personalized bulk mail (leave notices, festive greetings, circulars)"
               >
                 <Mail className="w-3.5 h-3.5 text-[#EA4335]" />
@@ -925,7 +925,7 @@ export default function TeamClientView({
                 type="button"
                 suppressHydrationWarning
                 onClick={() => setCustomFieldsModalOpen(true)}
-                className="bg-white border border-[#E2E6F0] text-slate-700 hover:bg-[#F8F9FD] px-3.5 py-2 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 shadow-2xs shrink-0 cursor-pointer"
+                className="bg-white border border-[#E2E6F0] text-slate-700 hover:bg-[#F8F9FD] px-3.5 py-2 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 shadow-2xs shrink-0 cursor-pointer flex-1 sm:flex-initial"
                 title="Configure dynamic fields for Team & Employees without changing code"
               >
                 <SlidersHorizontal className="w-3.5 h-3.5 text-[#5A81FA]" />
@@ -935,7 +935,7 @@ export default function TeamClientView({
                 type="button"
                 suppressHydrationWarning
                 onClick={() => setIsCsvModalOpen(true)}
-                className="bg-white border border-[#CEDEFF] text-[#2C308D] hover:bg-[#F2F4FF] px-3.5 py-2 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-2 shadow-xs shrink-0 cursor-pointer"
+                className="bg-white border border-[#CEDEFF] text-[#2C308D] hover:bg-[#F2F4FF] px-3.5 py-2 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-2 shadow-xs shrink-0 cursor-pointer flex-1 sm:flex-initial"
                 title="Bulk import studio team employees from CSV"
               >
                 <FileSpreadsheet className="w-3.5 h-3.5 text-[#5A81FA]" />
@@ -945,7 +945,7 @@ export default function TeamClientView({
                 type="button"
                 suppressHydrationWarning
                 onClick={openAddEmployeeModal}
-                className="bg-[#5A81FA] text-white px-3.5 py-2 rounded-xl text-xs font-semibold hover:bg-[#426EE8] transition-all flex items-center justify-center gap-2 shadow-xs shrink-0 cursor-pointer"
+                className="bg-[#5A81FA] text-white px-3.5 py-2 rounded-xl text-xs font-semibold hover:bg-[#426EE8] transition-all flex items-center justify-center gap-2 shadow-xs shrink-0 cursor-pointer w-full sm:w-auto"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Add Employee</span>
@@ -1091,8 +1091,8 @@ export default function TeamClientView({
             <p className="text-xs text-[#696E82] mt-1">Try adjusting your search query or filters.</p>
           </div>
         ) : viewMode === "GRID" ? (
-          <div className="p-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div className="p-3.5 sm:p-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
               {paginatedEmployees.map((emp) => {
                 const isSelected = selectedEmployeeIds.includes(emp.membershipId);
                 const isSelf = emp.membershipId === currentUserId;
@@ -1111,7 +1111,7 @@ export default function TeamClientView({
                 return (
                   <div
                     key={emp.id}
-                    className={`bg-white rounded-2xl border transition-all duration-200 p-5 flex flex-col justify-between relative group shadow-[0_1px_3px_rgba(15,23,42,0.04)] hover:shadow-md hover:border-slate-300 ${
+                    className={`bg-white rounded-2xl border transition-all duration-200 p-4 sm:p-5 flex flex-col justify-between relative group shadow-[0_1px_3px_rgba(15,23,42,0.04)] hover:shadow-md hover:border-slate-300 ${
                       !emp.isActive
                         ? "bg-slate-50/60 border-slate-200 opacity-80"
                         : isSelected

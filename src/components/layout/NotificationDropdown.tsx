@@ -16,6 +16,7 @@ import {
   Clock,
   X,
 } from "lucide-react";
+import { broadcastRealtimeEvent, useRealtimeSubscription } from "@/lib/realtime";
 
 interface NotificationItem {
   id: string;
@@ -172,30 +173,22 @@ export function NotificationDropdown({ context }: NotificationDropdownProps) {
     }
   };
 
-  // Background polling every 45 seconds + immediate check on tab focus
+  // Initial notification load
   useEffect(() => {
     fetchNotifications(true);
-
-    const intervalId = setInterval(() => {
-      if (document.visibilityState === "visible") {
-        fetchNotifications(false);
-      }
-    }, 45000);
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        fetchNotifications(false);
-      }
-    };
-
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-
     return () => {
-      clearInterval(intervalId);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
       if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
     };
   }, [context.tenantSlug]);
+
+  // Real-time dynamic notifications subscription: 15s visible poll + tab focus + cross-module broadcasts
+  useRealtimeSubscription(
+    ["NOTIFICATION_UPDATED", "TASK_UPDATED", "LEAVE_UPDATED", "VENDOR_UPDATED", "PROJECT_UPDATED"],
+    () => {
+      fetchNotifications(false);
+    },
+    { intervalMs: 15000 }
+  );
 
   // Handle clicking outside to close dropdown
   useEffect(() => {
@@ -241,6 +234,7 @@ export function NotificationDropdown({ context }: NotificationDropdownProps) {
             notificationId,
           }),
         });
+        broadcastRealtimeEvent("NOTIFICATION_UPDATED");
       }
     } catch (err) {
       console.error("Failed to mark as read:", err);
@@ -261,6 +255,7 @@ export function NotificationDropdown({ context }: NotificationDropdownProps) {
           markAll: true,
         }),
       });
+      broadcastRealtimeEvent("NOTIFICATION_UPDATED");
     } catch (err) {
       console.error("Failed to mark all as read:", err);
     }

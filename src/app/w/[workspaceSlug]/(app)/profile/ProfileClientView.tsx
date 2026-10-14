@@ -196,23 +196,23 @@ export function ProfileClientView({ context, initialData }: ProfileClientViewPro
       {/* ============================================================== */}
       {/* 1. HERO PROFILE CARD (Image D Layout)                           */}
       {/* ============================================================== */}
-      <div className="bg-white border border-slate-200/80 rounded-3xl p-6 sm:p-8 shadow-xs flex flex-col md:flex-row items-start md:items-center gap-6 sm:gap-8">
+      <div className="bg-white border border-slate-200/80 rounded-3xl p-4 sm:p-6 md:p-8 shadow-xs flex flex-col md:flex-row items-start md:items-center gap-5 sm:gap-8">
         {/* Large Rounded Rectangular Portrait (Image D) */}
-        <div className="w-32 h-32 sm:w-44 sm:h-44 rounded-3xl bg-gradient-to-tr from-[#CEDEFF] via-[#F2F4FF] to-white border border-slate-200/80 flex items-center justify-center shrink-0 shadow-sm relative overflow-hidden group">
-          <span className="font-bold text-4xl sm:text-5xl text-[#2C308D] tracking-tight">
+        <div className="w-24 h-24 sm:w-36 sm:h-36 md:w-44 md:h-44 rounded-2xl sm:rounded-3xl bg-gradient-to-tr from-[#CEDEFF] via-[#F2F4FF] to-white border border-slate-200/80 flex items-center justify-center shrink-0 shadow-sm relative overflow-hidden group">
+          <span className="font-bold text-3xl sm:text-4xl md:text-5xl text-[#2C308D] tracking-tight">
             {initials}
           </span>
           <div className="absolute inset-0 bg-blue-600/5 opacity-0 group-hover:opacity-100 transition-opacity" />
         </div>
 
         {/* Profile Details & Metadata (Image D) */}
-        <div className="flex-1 min-w-0 space-y-3">
-          <div className="flex items-start justify-between gap-4">
+        <div className="flex-1 min-w-0 space-y-3 w-full">
+          <div className="flex items-start justify-between gap-3 flex-wrap sm:flex-nowrap">
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-slate-900 tracking-tight">
                 {initialData.myProfile?.fullName || context.userFullName}
               </h1>
-              <p className="text-sm font-semibold text-slate-500 mt-0.5">
+              <p className="text-xs sm:text-sm font-semibold text-slate-500 mt-0.5">
                 {initialData.directoryProfile?.designation || (context.role === "OWNER" ? "Principal Architect & Owner" : "Studio Architect")}
               </p>
             </div>
@@ -220,11 +220,11 @@ export function ProfileClientView({ context, initialData }: ProfileClientViewPro
             <button
               type="button"
               onClick={() => setIsRequestModalOpen(true)}
-              className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+              className="px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 min-h-[38px]"
               title="Request Official Record Change"
             >
               <Sparkles className="w-3.5 h-3.5 text-[#3562E8]" />
-              <span className="hidden sm:inline">Request Record Change</span>
+              <span>Request Record Change</span>
             </button>
           </div>
 
@@ -340,10 +340,10 @@ export function ProfileClientView({ context, initialData }: ProfileClientViewPro
         {/* LEFT / MAIN COLUMN (~70%): Tabs & Structured Details */}
         <div className="lg:col-span-2 space-y-6">
           {/* Profile Tiers Navigation Tabs */}
-          <div className="bg-white border border-slate-200/80 rounded-2xl p-2 shadow-xs flex items-center gap-2 text-xs">
+          <div className="bg-white border border-slate-200/80 rounded-2xl p-1.5 sm:p-2 shadow-xs flex items-center gap-1.5 sm:gap-2 text-xs overflow-x-auto touch-scroll-x">
             <button
               onClick={() => setActiveTab("my-profile")}
-              className={`px-4 py-2 rounded-xl font-bold transition-all cursor-pointer ${
+              className={`px-3 sm:px-4 py-2 rounded-xl font-bold transition-all cursor-pointer shrink-0 whitespace-nowrap min-h-[36px] ${
                 activeTab === "my-profile"
                   ? "bg-[#3562E8] text-white shadow-xs"
                   : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
@@ -353,7 +353,7 @@ export function ProfileClientView({ context, initialData }: ProfileClientViewPro
             </button>
             <button
               onClick={() => setActiveTab("directory")}
-              className={`px-4 py-2 rounded-xl font-bold transition-all cursor-pointer ${
+              className={`px-3 sm:px-4 py-2 rounded-xl font-bold transition-all cursor-pointer shrink-0 whitespace-nowrap min-h-[36px] ${
                 activeTab === "directory"
                   ? "bg-[#3562E8] text-white shadow-xs"
                   : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
@@ -364,13 +364,13 @@ export function ProfileClientView({ context, initialData }: ProfileClientViewPro
             {canManage && (
               <button
                 onClick={() => setActiveTab("management")}
-                className={`px-4 py-2 rounded-xl font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                className={`px-3 sm:px-4 py-2 rounded-xl font-bold transition-all cursor-pointer shrink-0 whitespace-nowrap min-h-[36px] flex items-center gap-1.5 ${
                   activeTab === "management"
                     ? "bg-[#2C308D] text-white shadow-xs"
                     : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
                 }`}
               >
-                <Shield className="w-3.5 h-3.5 text-amber-400" />
+                <Shield className="w-3.5 h-3.5 text-amber-400 shrink-0" />
                 <span>Management Record (HR)</span>
               </button>
             )}
@@ -695,14 +695,20 @@ export function ProfileClientView({ context, initialData }: ProfileClientViewPro
 
       {/* Official Record Change Request Modal */}
       {isRequestModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-4">
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="change-record-title"
+            className="bg-white rounded-2xl max-w-md w-full p-5 sm:p-6 shadow-2xl border border-slate-100 space-y-4 max-h-[92vh] overflow-y-auto"
+          >
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-base font-bold text-slate-900">Request Official Record Change</h3>
+              <h3 id="change-record-title" className="text-base font-bold text-slate-900">Request Official Record Change</h3>
               <button
                 type="button"
                 onClick={() => setIsRequestModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 cursor-pointer"
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer min-h-[36px]"
+                aria-label="Close dialog"
               >
                 <X className="w-5 h-5" />
               </button>

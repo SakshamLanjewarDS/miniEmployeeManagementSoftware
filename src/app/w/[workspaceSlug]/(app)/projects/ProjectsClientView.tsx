@@ -938,12 +938,12 @@ export function ProjectsClientView({
 
         {/* Action Header Button: ONLY for Owner and Admin */}
         {canManage ? (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
             <button
               type="button"
               suppressHydrationWarning
               onClick={() => setCustomFieldsModalOpen(true)}
-              className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-white hover:bg-[#F8F9FD] border border-[#E2E6F0] text-[#1F1F1F] text-xs font-semibold shadow-2xs hover:shadow-xs transition-all cursor-pointer shrink-0"
+              className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-white hover:bg-[#F8F9FD] border border-[#E2E6F0] text-[#1F1F1F] text-xs font-semibold shadow-2xs hover:shadow-xs transition-all cursor-pointer flex-1 sm:flex-initial justify-center"
               title="Add or remove form fields without writing code"
             >
               <SlidersHorizontal className="w-4 h-4 text-[#5A81FA]" />
@@ -954,7 +954,7 @@ export function ProjectsClientView({
               type="button"
               suppressHydrationWarning
               onClick={() => setCsvModalOpen(true)}
-              className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-white hover:bg-[#F8F9FD] border border-[#E2E6F0] text-[#1F1F1F] text-xs font-semibold shadow-2xs hover:shadow-xs transition-all cursor-pointer shrink-0"
+              className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-white hover:bg-[#F8F9FD] border border-[#E2E6F0] text-[#1F1F1F] text-xs font-semibold shadow-2xs hover:shadow-xs transition-all cursor-pointer flex-1 sm:flex-initial justify-center"
               title="Bulk import projects or export data to CSV"
             >
               <FileSpreadsheet className="w-4 h-4 text-[#5A81FA]" />
@@ -968,7 +968,7 @@ export function ProjectsClientView({
                 setErrorMessage(null);
                 setIsCreateModalOpen(true);
               }}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#5A81FA] hover:bg-[#426EE8] text-white text-xs font-bold shadow-md hover:shadow-lg transition-all cursor-pointer shrink-0"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#5A81FA] hover:bg-[#426EE8] text-white text-xs font-bold shadow-md hover:shadow-lg transition-all cursor-pointer w-full sm:w-auto justify-center"
             >
               <Plus className="w-4 h-4 text-white" />
               <span>Create New Project</span>
@@ -1491,13 +1491,13 @@ export function ProjectsClientView({
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
           {filteredProjects.map((p) => {
             const isSelected = selectedProjectIds.includes(p.id);
             return (
               <div
                 key={p.id}
-                className={`bg-white border rounded-2xl p-6 shadow-2xs hover:shadow-md transition-all flex flex-col justify-between space-y-4 group relative ${
+                className={`bg-white border rounded-2xl p-4 sm:p-6 shadow-2xs hover:shadow-md transition-all flex flex-col justify-between space-y-4 group relative ${
                   isSelected
                     ? "border-[#5A81FA] ring-2 ring-[#5A81FA]/25 bg-[#F2F4FF]/30"
                     : "border-[#E2E6F0] hover:border-[#5A81FA]/50"

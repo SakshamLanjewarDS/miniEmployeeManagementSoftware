@@ -223,7 +223,9 @@ export function TaskStatusDropdown({
       {/* FLOATING DROPDOWN POPUP (Matching exact screenshot with 2-line item layout and icons) */}
       {isOpen && (
         <div
-          className={`absolute left-0 sm:left-auto sm:right-0 w-60 bg-white rounded-2xl shadow-[0_12px_36px_rgba(15,23,42,0.14)] border border-slate-200/90 p-2 z-50 text-xs animate-in fade-in zoom-in-95 duration-100 ${
+          role="listbox"
+          aria-label="Change status"
+          className={`absolute left-0 sm:left-auto sm:right-0 w-60 max-w-[calc(100vw-2rem)] bg-white rounded-2xl shadow-[0_12px_36px_rgba(15,23,42,0.14)] border border-slate-200/90 p-2 z-50 text-xs animate-in fade-in zoom-in-95 duration-100 ${
             openUpward ? "bottom-full mb-1.5" : "top-full mt-1.5"
           }`}
           onClick={(e) => e.stopPropagation()}

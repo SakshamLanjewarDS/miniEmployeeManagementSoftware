@@ -602,16 +602,21 @@ export function AppSidebar({ context }: AppSidebarProps) {
 
       {/* Mobile Drawer Overlay */}
       {isMobileOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden">
+        <div
+          className="fixed inset-0 z-50 lg:hidden"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Studio Main Navigation Drawer"
+        >
           {/* Backdrop Blur */}
           <div
-            className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs transition-opacity"
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity duration-200"
             onClick={() => setIsMobileOpen(false)}
             aria-hidden="true"
           />
 
           {/* Drawer Slide Panel */}
-          <div className="fixed inset-y-0 left-0 w-[290px] p-3 max-w-[85vw] flex flex-col z-50">
+          <div className="fixed inset-y-0 left-0 w-[300px] max-w-[85vw] p-2.5 sm:p-3 flex flex-col z-50 pt-safe pb-safe animate-in slide-in-from-left duration-250">
             {sidebarContent}
           </div>
         </div>

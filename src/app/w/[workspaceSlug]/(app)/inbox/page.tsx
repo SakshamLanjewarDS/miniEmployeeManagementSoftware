@@ -341,10 +341,10 @@ export default function OwnerDecisionInboxPage() {
       {/* Tabs and Controls */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-3 rounded-xl border border-slate-200 shadow-xs">
         {/* Segmented Tab Buttons */}
-        <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg">
+        <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg overflow-x-auto touch-scroll-x max-w-full">
           <button
             onClick={() => setActiveTab("all-authorized")}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-md transition ${
+            className={`px-3 py-1.5 text-xs font-semibold rounded-md transition whitespace-nowrap ${
               activeTab === "all-authorized"
                 ? "bg-white text-slate-900 shadow-xs"
                 : "text-slate-600 hover:text-slate-900"
@@ -565,19 +565,24 @@ export default function OwnerDecisionInboxPage() {
 
       {/* Slide-Over Drawer for Detailed Inspection */}
       {selectedItem && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex justify-end transition-opacity">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Decision Inspection"
+          className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex justify-end transition-opacity"
+        >
           <div className="w-full max-w-xl bg-white h-full shadow-2xl flex flex-col justify-between overflow-y-auto">
             {/* Drawer Header */}
-            <div className="p-5 border-b border-slate-200 flex items-center justify-between">
+            <div className="p-4 sm:p-5 border-b border-slate-200 flex items-center justify-between">
               <div>
                 <span className="text-xs font-semibold text-blue-600 uppercase tracking-wider">
                   {selectedItem.typeLabel}
                 </span>
-                <h3 className="text-lg font-bold text-slate-900 mt-0.5">{selectedItem.title}</h3>
+                <h3 className="text-base sm:text-lg font-bold text-slate-900 mt-0.5">{selectedItem.title}</h3>
               </div>
               <button
                 onClick={() => setSelectedItem(null)}
-                className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg transition"
+                className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg transition cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -781,20 +786,20 @@ export default function OwnerDecisionInboxPage() {
             </div>
 
             {/* Drawer Footer Actions */}
-            <div className="p-4 border-t border-slate-200 bg-slate-50/50 flex items-center justify-between gap-3">
+            <div className="p-3.5 sm:p-4 border-t border-slate-200 bg-slate-50/50 flex flex-wrap items-center justify-between gap-3 pb-safe">
               <button
                 onClick={() => setSelectedItem(null)}
-                className="px-4 py-2 text-xs font-medium text-slate-600 hover:text-slate-900 transition"
+                className="px-4 py-2 text-xs font-medium text-slate-600 hover:text-slate-900 transition cursor-pointer"
               >
                 Close
               </button>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
                 {selectedItem.type === "TASK_BLOCKER" ? (
                   <button
                     onClick={() => handleExecuteDecision(selectedItem, "RESOLVE_BLOCKER")}
                     disabled={isSubmitting}
-                    className="px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-xs transition"
+                    className="px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-xs transition cursor-pointer flex-1 sm:flex-initial"
                   >
                     Unblock Deliverable
                   </button>
@@ -812,7 +817,7 @@ export default function OwnerDecisionInboxPage() {
                         )
                       }
                       disabled={isSubmitting}
-                      className="px-3.5 py-2 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg transition"
+                      className="px-3.5 py-2 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg transition cursor-pointer flex-1 sm:flex-initial"
                     >
                       {selectedItem.type === "DEADLINE_EXTENSION" ||
                       selectedItem.type === "LEAVE_APPLICATION" ||
@@ -824,9 +829,9 @@ export default function OwnerDecisionInboxPage() {
                     <button
                       onClick={() => handleExecuteDecision(selectedItem, "APPROVE")}
                       disabled={isSubmitting || !selectedItem.canApprove}
-                      className={`px-4 py-2 text-xs font-semibold rounded-lg shadow-xs transition inline-flex items-center gap-1.5 ${
+                      className={`px-4 py-2 text-xs font-semibold rounded-lg shadow-xs transition inline-flex items-center justify-center gap-1.5 flex-1 sm:flex-initial ${
                         selectedItem.canApprove
-                          ? "text-white bg-blue-600 hover:bg-blue-700"
+                          ? "text-white bg-blue-600 hover:bg-blue-700 cursor-pointer"
                           : "text-slate-400 bg-slate-200 cursor-not-allowed"
                       }`}
                     >

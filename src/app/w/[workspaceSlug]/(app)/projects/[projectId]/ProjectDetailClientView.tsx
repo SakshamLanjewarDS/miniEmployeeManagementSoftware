@@ -806,7 +806,7 @@ export function ProjectDetailClientView({
       {/* ============================================================== */}
       {/* PROJECT HEADER CARD                                           */}
       {/* ============================================================== */}
-      <div className="bg-white border border-[#E2E6F0] rounded-2xl p-6 shadow-2xs space-y-4">
+      <div className="bg-white border border-[#E2E6F0] rounded-2xl p-4 sm:p-6 shadow-2xs space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1">
             <div className="flex items-center gap-2 flex-wrap">
@@ -837,15 +837,15 @@ export function ProjectDetailClientView({
             <div className="flex items-center gap-3 mt-1.5">
               <ProjectProfileCircle typology={project.projectType} name={project.name} size="lg" />
               <div>
-                <h1 className="text-2xl font-bold tracking-tight text-[#1F1F1F]">{project.name}</h1>
+                <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#1F1F1F]">{project.name}</h1>
                 <p className="text-xs text-[#696E82] line-clamp-1">{project.brief || project.description || "Architectural project commission."}</p>
               </div>
             </div>
           </div>
 
           {/* Quick Metrics & Lifecycle Actions */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-            <div className="flex items-center gap-4 bg-[#F8F9FD] p-3 rounded-xl border border-[#E2E6F0] shrink-0 text-xs">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            <div className="flex items-center gap-3 sm:gap-4 bg-[#F8F9FD] p-2.5 sm:p-3 rounded-xl border border-[#E2E6F0] shrink-0 text-xs justify-around sm:justify-start">
               <div>
                 <span className="text-[10px] text-[#696E82] uppercase font-bold block">Deliverables</span>
                 <span className="text-sm font-bold text-[#1F1F1F]">{project.taskProgress?.percentage || 0}%</span>
@@ -957,7 +957,7 @@ export function ProjectDetailClientView({
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex items-center gap-1 overflow-x-auto border-t border-[#E2E6F0] pt-3 scrollbar-none">
+        <div className="flex items-center gap-1 overflow-x-auto touch-scroll-x border-t border-[#E2E6F0] pt-3 scrollbar-none pb-0.5">
           {tabs.map((t) => (
             <Link
               key={t.key}

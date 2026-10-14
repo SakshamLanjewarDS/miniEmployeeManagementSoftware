@@ -83,20 +83,20 @@ export function daysToMinutes(days: number): number {
 }
 
 /**
- * Normalizes date to Date object at local 00:00:00
+ * Normalizes date to Date object at UTC 00:00:00 for @db.Date fields
  */
 export function parseDateOnly(dateInput: string | Date): Date {
   if (dateInput instanceof Date) {
-    return new Date(dateInput.getFullYear(), dateInput.getMonth(), dateInput.getDate());
+    return new Date(Date.UTC(dateInput.getUTCFullYear(), dateInput.getUTCMonth(), dateInput.getUTCDate()));
   }
   const parts = dateInput.split("T")[0].split("-");
-  return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+  return new Date(Date.UTC(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10)));
 }
 
 export function formatDateOnly(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
+  const y = date.getUTCFullYear();
+  const m = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(date.getUTCDate()).padStart(2, "0");
   return `${y}-${m}-${d}`;
 }
 
@@ -135,15 +135,15 @@ export function allocateDaysAcrossMonths(
   const current = new Date(start);
 
   while (current <= end) {
-    const y = current.getFullYear();
-    const m = current.getMonth() + 1;
+    const y = current.getUTCFullYear();
+    const m = current.getUTCMonth() + 1;
     let existing = monthsSpanned.find((entry) => entry.year === y && entry.month === m);
     if (!existing) {
       existing = { year: y, month: m, daysInMonth: 0 };
       monthsSpanned.push(existing);
     }
     existing.daysInMonth += 1;
-    current.setDate(current.getDate() + 1);
+    current.setUTCDate(current.getUTCDate() + 1);
   }
 
   // If spans single month, entire quantity belongs to that month
@@ -221,13 +221,12 @@ export function evaluateShortNotice(
     officeMinutes = startMinutes;
   }
 
+  const y = startDay.getUTCFullYear();
+  const m = startDay.getUTCMonth();
+  const d = startDay.getUTCDate();
+  // Target office time in IST (+5:30) converted to UTC
   const targetStartTime = new Date(
-    startDay.getFullYear(),
-    startDay.getMonth(),
-    startDay.getDate(),
-    Math.floor(officeMinutes / 60),
-    officeMinutes % 60,
-    0
+    Date.UTC(y, m, d, Math.floor(officeMinutes / 60), officeMinutes % 60, 0) - (5.5 * 60 * 60 * 1000)
   );
 
   const diffMs = targetStartTime.getTime() - subDate.getTime();

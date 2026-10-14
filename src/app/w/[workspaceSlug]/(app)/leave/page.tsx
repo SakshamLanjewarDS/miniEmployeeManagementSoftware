@@ -30,6 +30,7 @@ import {
   Code,
   Copy,
 } from "lucide-react";
+import { broadcastRealtimeEvent, useRealtimeSubscription } from "@/lib/realtime";
 
 export default function LeaveManagementPage() {
   const params = useParams();
@@ -58,9 +59,37 @@ export default function LeaveManagementPage() {
   const [syncLoading, setSyncLoading] = useState(false);
   const [isAppsScriptModalOpen, setIsAppsScriptModalOpen] = useState(false);
   const [copiedScript, setCopiedScript] = useState(false);
-  const [webhookUrlInput, setWebhookUrlInput] = useState("");
+  const [webhookUrlInput, setWebhookUrlInput] = useState(
+    "https://script.google.com/macros/s/AKfycbw28LoETUSD3jbnDIxMZqBSPoggKLw_iHen4cFkUMm6Ayq6VukjcPwij5YoJRPRS198RA/exec"
+  );
   const [savingWebhook, setSavingWebhook] = useState(false);
   const [webhookSaveMessage, setWebhookSaveMessage] = useState<string | null>(null);
+
+  const formatLocalDate = (dateVal: string | Date | null | undefined) => {
+    if (!dateVal) return "";
+    const s = typeof dateVal === "string" ? dateVal : dateVal.toISOString();
+    const [y, m, d] = s.slice(0, 10).split("-").map(Number);
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    return `${months[m - 1]} ${d}`;
+  };
+
+  const formatDuration = (rec: any) => {
+    if (!rec) return "";
+    if (rec.isHourly) {
+      if (rec.totalMinutes) {
+        if (rec.totalMinutes >= 60) {
+          return `${(rec.totalMinutes / 60).toFixed(1).replace(/\.0$/, "")} Hr(s)`;
+        }
+        return `${rec.totalMinutes} min`;
+      }
+      const hrs = Number(rec.days || 0) * 8;
+      return `${hrs.toFixed(1).replace(/\.0$/, "")} Hr(s)`;
+    }
+    if (rec.isHalfDay) {
+      return "0.5 Day";
+    }
+    return `${Number(rec.days)} Day(s)`;
+  };
 
   // Create on behalf modal state
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -141,6 +170,8 @@ export default function LeaveManagementPage() {
       );
       fetchLeaves();
       fetchSyncStatus();
+      broadcastRealtimeEvent("LEAVE_UPDATED");
+      broadcastRealtimeEvent("NOTIFICATION_UPDATED");
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -169,6 +200,8 @@ export default function LeaveManagementPage() {
       setIsReviewOpen(false);
       fetchLeaves();
       fetchSyncStatus();
+      broadcastRealtimeEvent("LEAVE_UPDATED");
+      broadcastRealtimeEvent("NOTIFICATION_UPDATED");
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -176,8 +209,8 @@ export default function LeaveManagementPage() {
     }
   };
 
-  const fetchLeaves = async () => {
-    setLoading(true);
+  const fetchLeaves = async (silent = false) => {
+    if (!silent) setLoading(true);
     setError(null);
     try {
       const queryParams = new URLSearchParams({
@@ -198,9 +231,9 @@ export default function LeaveManagementPage() {
       }
       setRecords(data.records || []);
     } catch (err: any) {
-      setError(err.message);
+      if (!silent) setError(err.message);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -216,23 +249,29 @@ export default function LeaveManagementPage() {
     }
   };
 
+  // Initial load
   useEffect(() => {
     fetchLeaves();
     fetchEmployees();
     fetchSyncStatus();
+  }, [workspaceSlug, statusFilter, leaveTypeFilter]);
 
-    // 24/7 background live sync polling (every 60 seconds)
-    const interval = setInterval(() => {
+  // Real-time dynamic updates: visible 20s polling + tab focus revalidation + cross-tab live events
+  useRealtimeSubscription(
+    ["LEAVE_UPDATED"],
+    () => {
+      // Background re-sync with Google Sheet if auto sync enabled, and fetch latest records
       fetch(`/api/integrations/google-sheets/sync?workspaceSlug=${workspaceSlug}&auto=true&syncType=LEAVE_SHEET`)
         .then((r) => r.json())
         .then((d) => {
           if (d.leaveSheet) setSyncStatus(d.leaveSheet);
         })
         .catch(() => {});
-    }, 60000);
-
-    return () => clearInterval(interval);
-  }, [workspaceSlug, statusFilter, leaveTypeFilter]);
+      fetchLeaves(true);
+      fetchSyncStatus();
+    },
+    { intervalMs: 20000 }
+  );
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -255,6 +294,8 @@ export default function LeaveManagementPage() {
       setIsReviewOpen(false);
       setReviewNotes("");
       fetchLeaves();
+      broadcastRealtimeEvent("LEAVE_UPDATED");
+      broadcastRealtimeEvent("NOTIFICATION_UPDATED");
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -278,6 +319,8 @@ export default function LeaveManagementPage() {
       setIsReviewOpen(false);
       setRejectionReason("");
       fetchLeaves();
+      broadcastRealtimeEvent("LEAVE_UPDATED");
+      broadcastRealtimeEvent("NOTIFICATION_UPDATED");
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -317,6 +360,8 @@ export default function LeaveManagementPage() {
         days: 1.0,
       });
       fetchLeaves();
+      broadcastRealtimeEvent("LEAVE_UPDATED");
+      broadcastRealtimeEvent("NOTIFICATION_UPDATED");
     } catch (err: any) {
       alert(err.message);
     } finally {
@@ -341,16 +386,16 @@ export default function LeaveManagementPage() {
             <span>/</span>
             <span className="font-semibold text-[#1F1F1F]">Staff Leaves & Attendance</span>
           </div>
-          <h1 className="text-2xl font-bold text-[#1F1F1F] tracking-tight">Studio Leave Management</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-[#1F1F1F] tracking-tight">Studio Leave Management</h1>
           <p className="text-xs text-[#696E82] mt-0.5">
             Policy: 2.0 eligible paid days/month • Chronological consumption • Unpaid Loss of Pay (LOP)
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           <Link
             href={`/w/${workspaceSlug}/leave/calendar`}
-            className="flex items-center gap-2 px-3 py-2 text-xs font-semibold rounded-xl bg-white border border-[#E2E6F0] text-[#1F1F1F] hover:bg-[#F8F9FE] shadow-2xs transition-all"
+            className="flex items-center justify-center gap-2 px-3 py-2 text-xs font-semibold rounded-xl bg-white border border-[#E2E6F0] text-[#1F1F1F] hover:bg-[#F8F9FE] shadow-2xs transition-all flex-1 sm:flex-initial"
           >
             <Calendar className="w-3.5 h-3.5 text-[#5A81FA]" />
             <span>Team Absence Calendar</span>
@@ -360,7 +405,7 @@ export default function LeaveManagementPage() {
             type="button"
             suppressHydrationWarning
             onClick={() => setIsCreateOpen(true)}
-            className="flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-xl bg-[#5A81FA] text-white hover:bg-[#4870EB] shadow-xs transition-all"
+            className="flex items-center justify-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-xl bg-[#5A81FA] text-white hover:bg-[#4870EB] shadow-xs transition-all flex-1 sm:flex-initial cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Apply on Behalf</span>
@@ -436,12 +481,12 @@ export default function LeaveManagementPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto shrink-0">
           <button
             type="button"
             suppressHydrationWarning
             onClick={() => setIsAppsScriptModalOpen(true)}
-            className="px-3 py-1.5 text-xs font-semibold rounded-xl bg-white border border-[#E2E6F0] text-[#1F1F1F] hover:bg-[#F8F9FE] shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer"
+            className="px-3 py-1.5 text-xs font-semibold rounded-xl bg-white border border-[#E2E6F0] text-[#1F1F1F] hover:bg-[#F8F9FE] shadow-2xs flex items-center justify-center gap-1.5 transition-all cursor-pointer flex-1 sm:flex-initial"
           >
             <Code className="w-3.5 h-3.5 text-[#5A81FA]" />
             <span>Two-Way Script</span>
@@ -451,7 +496,7 @@ export default function LeaveManagementPage() {
             suppressHydrationWarning
             onClick={handleManualSync}
             disabled={syncLoading}
-            className="px-3.5 py-1.5 text-xs font-semibold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs flex items-center gap-1.5 transition-all disabled:opacity-50 cursor-pointer"
+            className="px-3.5 py-1.5 text-xs font-semibold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs flex items-center justify-center gap-1.5 transition-all disabled:opacity-50 cursor-pointer flex-1 sm:flex-initial"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${syncLoading ? "animate-spin" : ""}`} />
             <span>{syncLoading ? "Syncing..." : "Sync Live Sheet"}</span>
@@ -560,14 +605,9 @@ export default function LeaveManagementPage() {
               const empName = rec.employeeNameRaw || rec.employee?.membership?.user?.fullName || "Staff Member";
               const empId = rec.employee?.employeeId || "EMP";
               const dept = rec.employee?.department || "Studio";
-              const startStr = new Date(rec.startDate).toLocaleDateString("en-US", {
-                month: "short",
-                day: "numeric",
-              });
-              const endStr = new Date(rec.endDate).toLocaleDateString("en-US", {
-                month: "short",
-                day: "numeric",
-              });
+              const startStr = formatLocalDate(rec.startDate);
+              const endStr = formatLocalDate(rec.endDate);
+              const durationStr = formatDuration(rec);
               const appliedTime = new Date(rec.submittedAt).toLocaleTimeString("en-US", {
                 hour: "numeric",
                 minute: "2-digit",
@@ -603,13 +643,25 @@ export default function LeaveManagementPage() {
                       {startStr} {startStr !== endStr ? `— ${endStr}` : ""}
                     </div>
                     <div className="text-[11px] text-[#696E82] flex items-center gap-1.5 mt-0.5">
-                      <span className="font-semibold text-[#5A81FA]">{Number(rec.days)} Day(s)</span>
+                      <span className="font-semibold text-[#5A81FA]">{durationStr}</span>
                       <span>•</span>
                       <span>{rec.leaveType}</span>
                       {rec.isShortNotice && (
                         <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">
                           Short Notice
                         </span>
+                      )}
+                      {rec.supportingFileId && (
+                        <a
+                          href={rec.supportingFileId}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-[#5A81FA] hover:underline flex items-center gap-0.5"
+                          title="View Certificate / Attachment"
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                          <span>Doc</span>
+                        </a>
                       )}
                     </div>
                   </div>
@@ -703,14 +755,16 @@ export default function LeaveManagementPage() {
               <div className="flex items-center justify-between">
                 <span className="text-[#696E82]">Duration:</span>
                 <span className="font-mono font-bold text-[#5A81FA]">
-                  {Number(selectedLeave.days)} Day(s) ({selectedLeave.leaveType})
+                  {formatDuration(selectedLeave)} ({selectedLeave.leaveType})
                 </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-[#696E82]">Dates:</span>
                 <span className="font-mono text-[#1F1F1F]">
-                  {new Date(selectedLeave.startDate).toLocaleDateString()} to{" "}
-                  {new Date(selectedLeave.endDate).toLocaleDateString()}
+                  {formatLocalDate(selectedLeave.startDate)}
+                  {selectedLeave.startDate !== selectedLeave.endDate
+                    ? ` to ${formatLocalDate(selectedLeave.endDate)}`
+                    : ""}
                 </span>
               </div>
               <div>

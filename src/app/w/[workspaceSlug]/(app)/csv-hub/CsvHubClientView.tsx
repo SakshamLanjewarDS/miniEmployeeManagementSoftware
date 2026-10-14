@@ -187,7 +187,7 @@ export function CsvHubClientView({ workspaceSlug, userRole }: CsvHubClientViewPr
 
         <button
           onClick={() => openModal("employees")}
-          className="bg-[#5A81FA] hover:bg-[#426EE8] text-white px-4 py-2.5 rounded-xl text-xs font-semibold shadow-xs flex items-center gap-2 shrink-0 transition-all cursor-pointer self-start md:self-auto"
+          className="bg-[#5A81FA] hover:bg-[#426EE8] text-white px-4 py-2.5 rounded-xl text-xs font-semibold shadow-xs flex items-center justify-center gap-2 shrink-0 transition-all cursor-pointer w-full sm:w-auto min-h-[40px]"
         >
           <Upload className="w-4 h-4" />
           <span>Launch Quick Import / Export</span>
@@ -281,18 +281,18 @@ export function CsvHubClientView({ workspaceSlug, userRole }: CsvHubClientViewPr
               </div>
 
               {/* Actions */}
-              <div className="pt-4 border-t border-[#E2E6F0] flex flex-wrap items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
+              <div className="pt-4 border-t border-[#E2E6F0] flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                <div className="flex flex-wrap items-center gap-2">
                   <button
                     onClick={() => handleDownloadTemplate(card.type)}
-                    className="bg-white border border-[#E2E6F0] hover:bg-[#F8F9FD] text-[#1F1F1F] px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors"
+                    className="bg-white border border-[#E2E6F0] hover:bg-[#F8F9FD] text-[#1F1F1F] px-2.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer min-h-[36px]"
                   >
                     <Download className="w-3.5 h-3.5 text-[#5A81FA]" />
                     <span>Sample Template</span>
                   </button>
                   <button
                     onClick={() => handleExport(card.type)}
-                    className="bg-white border border-[#E2E6F0] hover:bg-[#F8F9FD] text-[#696E82] hover:text-[#1F1F1F] px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                    className="bg-white border border-[#E2E6F0] hover:bg-[#F8F9FD] text-[#696E82] hover:text-[#1F1F1F] px-2.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer min-h-[36px]"
                   >
                     <FileText className="w-3.5 h-3.5" />
                     <span>Export CSV</span>
@@ -301,7 +301,7 @@ export function CsvHubClientView({ workspaceSlug, userRole }: CsvHubClientViewPr
 
                 <button
                   onClick={() => openModal(card.type)}
-                  className="bg-[#5A81FA] hover:bg-[#426EE8] text-white px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-xs transition-colors"
+                  className="bg-[#5A81FA] hover:bg-[#426EE8] text-white px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 shadow-xs transition-colors cursor-pointer w-full sm:w-auto min-h-[36px]"
                 >
                   <Upload className="w-3.5 h-3.5" />
                   <span>Import CSV</span>

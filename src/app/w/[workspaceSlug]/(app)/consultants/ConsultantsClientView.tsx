@@ -604,13 +604,13 @@ export default function ConsultantsClientView({
           </div>
 
           {/* Right Action: Add Consultant & CSV (Owner/Admin Only) */}
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
             {isPrivileged ? (
               <>
                 <button
                   type="button"
                   onClick={() => setCustomFieldsModalOpen(true)}
-                  className="px-3.5 py-2 bg-white border border-[#E2E6F0] hover:bg-[#F8F9FD] text-slate-700 text-xs font-semibold rounded-xl shadow-2xs transition-colors flex items-center gap-1.5 cursor-pointer shrink-0"
+                  className="px-3.5 py-2 bg-white border border-[#E2E6F0] hover:bg-[#F8F9FD] text-slate-700 text-xs font-semibold rounded-xl shadow-2xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer flex-1 sm:flex-initial"
                   title="Configure dynamic form fields for Consultant Directory without code"
                 >
                   <SlidersHorizontal className="w-3.5 h-3.5 text-[#5A81FA]" />
@@ -618,7 +618,7 @@ export default function ConsultantsClientView({
                 </button>
                 <button
                   onClick={() => setIsCsvModalOpen(true)}
-                  className="px-3.5 py-2 bg-white border border-[#CEDEFF] hover:bg-[#F2F4FF] text-[#2C308D] text-xs font-semibold rounded-xl shadow-2xs transition-colors flex items-center gap-1.5 cursor-pointer shrink-0"
+                  className="px-3.5 py-2 bg-white border border-[#CEDEFF] hover:bg-[#F2F4FF] text-[#2C308D] text-xs font-semibold rounded-xl shadow-2xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer flex-1 sm:flex-initial"
                 >
                   <FileSpreadsheet className="w-4 h-4 text-[#5A81FA]" />
                   <span>Import / Export CSV</span>
@@ -628,7 +628,7 @@ export default function ConsultantsClientView({
                     setCustomFieldValues({});
                     setIsCreateModalOpen(true);
                   }}
-                  className="px-3.5 py-2 bg-[#5A81FA] hover:bg-[#426EE8] text-white text-xs font-semibold rounded-xl shadow-2xs transition-colors flex items-center gap-1.5 cursor-pointer shrink-0"
+                  className="px-3.5 py-2 bg-[#5A81FA] hover:bg-[#426EE8] text-white text-xs font-semibold rounded-xl shadow-2xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer w-full sm:w-auto"
                 >
                   <Plus className="w-4 h-4" />
                   <span>Add Consultant</span>

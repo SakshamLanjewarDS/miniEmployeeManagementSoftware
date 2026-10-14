@@ -784,10 +784,10 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
           <div
             className={`absolute ${
               align === "right" ? "right-0" : "left-0"
-            } top-full mt-1.5 w-full bg-white border border-[#DFE5F2] rounded-2xl shadow-[0_12px_32px_-4px_rgba(17,27,53,0.12),0_4px_12px_-2px_rgba(17,27,53,0.06)] z-50 overflow-hidden text-xs animate-in fade-in-50 zoom-in-95 duration-150 p-2 ${popoverClassName}`}
+            } top-full mt-1.5 w-full max-w-[calc(100vw-1.5rem)] bg-white border border-[#DFE5F2] rounded-2xl shadow-[0_12px_32px_-4px_rgba(17,27,53,0.12),0_4px_12px_-2px_rgba(17,27,53,0.06)] z-50 overflow-hidden text-xs animate-in fade-in-50 zoom-in-95 duration-150 p-2 ${popoverClassName}`}
             style={{
-              minWidth: minWidth ?? "260px",
-              maxWidth: maxWidth,
+              minWidth: minWidth ?? "min(260px, calc(100vw - 1.5rem))",
+              maxWidth: maxWidth || "calc(100vw - 1.5rem)",
             }}
             role="listbox"
           >

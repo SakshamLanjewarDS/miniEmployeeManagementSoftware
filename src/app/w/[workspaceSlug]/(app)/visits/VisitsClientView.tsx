@@ -1422,11 +1422,11 @@ export default function VisitsClientView({
       </div>
 
       {/* Combined Modules Switcher: Field Visits & GPS vs Site Issues & Snags */}
-      <div className="flex items-center gap-2 border-b border-[#E2E6F0] pb-2">
+      <div className="flex items-center gap-2 border-b border-[#E2E6F0] pb-2 overflow-x-auto touch-scroll-x">
         <button
           type="button"
           onClick={() => setMainViewTab("VISITS")}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
             mainViewTab === "VISITS"
               ? "bg-[#5A81FA] text-white shadow-xs"
               : "bg-white text-[#696E82] hover:text-[#1F1F1F] border border-[#E2E6F0]"
@@ -1446,7 +1446,7 @@ export default function VisitsClientView({
         <button
           type="button"
           onClick={() => setMainViewTab("ISSUES")}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
             mainViewTab === "ISSUES"
               ? "bg-[#5A81FA] text-white shadow-xs"
               : "bg-white text-[#696E82] hover:text-[#1F1F1F] border border-[#E2E6F0]"
@@ -1496,7 +1496,7 @@ export default function VisitsClientView({
       {/* SECTION 1: ACTIVE VISIT (Currently On-Site) */}
       {/* ======================================================== */}
       {activeVisit && (
-        <div className="bg-white border-2 border-[#5A81FA] rounded-2xl shadow-sm p-6 relative overflow-hidden space-y-5">
+        <div className="bg-white border-2 border-[#5A81FA] rounded-2xl shadow-sm p-4 sm:p-6 relative overflow-hidden space-y-5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[#E2E6F0]">
             <div className="space-y-1">
               <div className="flex items-center gap-2 flex-wrap">
@@ -1510,7 +1510,7 @@ export default function VisitsClientView({
                   Active On-Site Inspection
                 </span>
               </div>
-              <h2 className="text-xl font-bold text-[#1F1F1F]">{activeVisit.purpose}</h2>
+              <h2 className="text-lg sm:text-xl font-bold text-[#1F1F1F]">{activeVisit.purpose}</h2>
               <div className="text-xs text-[#696E82] flex items-center gap-1.5 flex-wrap">
                 <MapPin className="w-3.5 h-3.5 text-[#5A81FA]" />
                 <span className="font-medium text-[#1F1F1F]">{activeVisit.site.name}</span>
@@ -1528,12 +1528,12 @@ export default function VisitsClientView({
             </div>
 
             {/* ONE-CLICK EXIT SITE BUTTON */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 w-full sm:w-auto">
               <button
                 type="button"
                 disabled={loading}
                 onClick={handleOneClickExitSite}
-                className="px-6 py-3 bg-rose-700 hover:bg-rose-800 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer self-start sm:self-auto hover:scale-[1.02] active:scale-95 disabled:opacity-50"
+                className="px-5 sm:px-6 py-2.5 sm:py-3 bg-rose-700 hover:bg-rose-800 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer w-full sm:w-auto hover:scale-[1.02] active:scale-95 disabled:opacity-50 min-h-[44px]"
               >
                 <LogOut className="w-4 h-4" />
                 <span>EXIT SITE (Check-Out)</span>

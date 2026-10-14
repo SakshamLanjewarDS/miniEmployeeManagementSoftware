@@ -20,6 +20,8 @@ export const DEFAULT_VENDOR_SHEET_ID = "1lOYNw1fk9xjSL61SZuox2gB1VRwW3ldQR460h5D
 export const DEFAULT_LEAVE_CSV_URL = `https://docs.google.com/spreadsheets/d/${DEFAULT_LEAVE_SHEET_ID}/export?format=csv`;
 export const DEFAULT_VENDOR_CSV_URL = `https://docs.google.com/spreadsheets/d/${DEFAULT_VENDOR_SHEET_ID}/export?format=csv`;
 
+export const DEFAULT_LEAVE_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbw28LoETUSD3jbnDIxMZqBSPoggKLw_iHen4cFkUMm6Ayq6VukjcPwij5YoJRPRS198RA/exec";
+
 /**
  * Splits CSV lines while respecting quoted fields and multi-line content.
  */
@@ -79,41 +81,144 @@ function parseCsvRows(csvText: string): string[][] {
 }
 
 /**
- * Parses dates formatted as DD/MM/YYYY (Indian standard), YYYY-MM-DD, or ISO strings
+ * Parses calendar dates (From Date, To Date, Leave Date) as Date object at UTC 00:00:00 for @db.Date fields.
+ * This completely prevents timezone shifts (e.g. IST midnight UTC-5h30m showing previous day).
  */
-function parseSheetDate(str: string): Date | null {
+export function parseSheetDateOnly(str: string): Date | null {
   if (!str || !str.trim()) return null;
   const clean = str.trim();
 
-  // Handle ISO formatted dates
-  if (clean.indexOf("T") !== -1) {
-    const isoDate = new Date(clean);
-    if (!isNaN(isoDate.getTime())) return isoDate;
+  // If ISO string like 2026-10-12 or 2026-10-12T...
+  if (clean.includes("T")) {
+    const parts = clean.split("T")[0].split("-");
+    if (parts.length === 3) {
+      const y = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10);
+      const d = parseInt(parts[2], 10);
+      if (y && m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+        return new Date(Date.UTC(y, m - 1, d, 0, 0, 0));
+      }
+    }
   }
 
-  // Check for DD/MM/YYYY or YYYY-MM-DD with optional time
-  const match = clean.match(/^(\d{1,4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,4})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/);
+  const match = clean.match(
+    /^(\d{1,4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,4})/
+  );
+
   if (match) {
     const p1 = parseInt(match[1], 10);
     const p2 = parseInt(match[2], 10);
     const p3 = parseInt(match[3], 10);
-    const hours = match[4] ? parseInt(match[4], 10) : 0;
-    const mins = match[5] ? parseInt(match[5], 10) : 0;
-    const secs = match[6] ? parseInt(match[6], 10) : 0;
+
+    let year = 0;
+    let month = 0;
+    let day = 0;
 
     if (p1 >= 1000) {
       // YYYY-MM-DD
-      const res = new Date(p1, p2 - 1, p3, hours, mins, secs);
-      return isNaN(res.getTime()) ? null : res;
+      year = p1;
+      month = p2;
+      day = p3;
     } else if (p3 >= 1000) {
-      // DD/MM/YYYY (Indian Standard Google Form Format)
-      const res = new Date(p3, p2 - 1, p1, hours, mins, secs);
-      return isNaN(res.getTime()) ? null : res;
+      year = p3;
+      if (p1 > 12) {
+        // DD/MM/YYYY (e.g. 21/09/2026)
+        day = p1;
+        month = p2;
+      } else if (p2 > 12) {
+        // MM/DD/YYYY (e.g. 09/21/2026)
+        month = p1;
+        day = p2;
+      } else {
+        // Both <= 12: In Google Sheets/Forms default export format, p1 is month, p2 is day
+        month = p1;
+        day = p2;
+      }
+    }
+
+    if (year && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      return new Date(Date.UTC(year, month - 1, day, 0, 0, 0));
+    }
+  }
+
+  const fallback = new Date(clean);
+  if (!isNaN(fallback.getTime())) {
+    return new Date(Date.UTC(fallback.getFullYear(), fallback.getMonth(), fallback.getDate(), 0, 0, 0));
+  }
+  return null;
+}
+
+/**
+ * Parses timestamp strings from Google Sheet (IST: UTC+5:30) into exact UTC Date object
+ */
+export function parseSheetTimestamp(str: string): Date | null {
+  if (!str || !str.trim()) return null;
+  const clean = str.trim();
+
+  // If already an ISO string with explicit timezone
+  if (clean.includes("Z") || (clean.includes("T") && (clean.includes("+") || clean.includes("-")))) {
+    const d = new Date(clean);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  const match = clean.match(
+    /^(\d{1,4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,4})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?\s*(AM|PM)?)?/i
+  );
+
+  if (match) {
+    const p1 = parseInt(match[1], 10);
+    const p2 = parseInt(match[2], 10);
+    const p3 = parseInt(match[3], 10);
+    let hours = match[4] ? parseInt(match[4], 10) : 0;
+    const mins = match[5] ? parseInt(match[5], 10) : 0;
+    const secs = match[6] ? parseInt(match[6], 10) : 0;
+    const meridiem = match[7]?.toUpperCase();
+
+    if (meridiem === "PM" && hours < 12) hours += 12;
+    if (meridiem === "AM" && hours === 12) hours = 0;
+
+    let year = 0;
+    let month = 0;
+    let day = 0;
+
+    if (p1 >= 1000) {
+      year = p1;
+      month = p2;
+      day = p3;
+    } else if (p3 >= 1000) {
+      year = p3;
+      if (p1 > 12) {
+        day = p1;
+        month = p2;
+      } else if (p2 > 12) {
+        month = p1;
+        day = p2;
+      } else {
+        month = p1;
+        day = p2;
+      }
+    }
+
+    if (year && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      // Indian Standard Time (IST) is UTC+5:30. Convert IST to UTC
+      const utcTime = Date.UTC(year, month - 1, day, hours, mins, secs) - (5.5 * 60 * 60 * 1000);
+      return new Date(utcTime);
     }
   }
 
   const fallback = new Date(clean);
   return isNaN(fallback.getTime()) ? null : fallback;
+}
+
+/**
+ * Parses dates formatted as M/D/YYYY, DD/MM/YYYY, YYYY-MM-DD, or ISO strings
+ */
+export function parseSheetDate(str: string): Date | null {
+  if (!str || !str.trim()) return null;
+  if (/\d+:\d+/.test(str)) {
+    return parseSheetTimestamp(str);
+  }
+  return parseSheetDateOnly(str);
 }
 
 /**
@@ -274,6 +379,11 @@ export async function syncLiveLeaveSheet(
         isEnabled: true,
       },
     });
+  } else if (config.sheetId === "MANUAL_TEST_SHEET") {
+    config = await prisma.studioSyncConfig.update({
+      where: { id: config.id },
+      data: { sheetId: DEFAULT_LEAVE_SHEET_ID },
+    });
   }
 
   let importedCount = 0;
@@ -305,9 +415,16 @@ export async function syncLiveLeaveSheet(
     const colName = findCol("employee name") >= 0 ? findCol("employee name") : 1;
     const colDept = findCol("department") >= 0 ? findCol("department") : 2;
     const colLeaveType = findCol("leave type") >= 0 ? findCol("leave type") : 3;
-    const colEmail = findCol("email") >= 0 ? findCol("email") : 8;
+    const colRegularReason = headers.findIndex((h, idx) => h.includes("reason") && idx < 7) >= 0
+      ? headers.findIndex((h, idx) => h.includes("reason") && idx < 7)
+      : 4;
     const colFromDate = findCol("from date") >= 0 ? findCol("from date") : 5;
     const colToDate = findCol("to date") >= 0 ? findCol("to date") : 6;
+    const colMedicalCert = findCol("medical certificate") >= 0 ? findCol("medical certificate") : 7;
+    const colEmail = findCol("email") >= 0 ? findCol("email") : 8;
+    const colHourlyReason = headers.findIndex((h, idx) => h.includes("reason") && idx >= 7) >= 0
+      ? headers.findIndex((h, idx) => h.includes("reason") && idx >= 7)
+      : 9;
     const colHourlyDate = findCol("leave date") >= 0 ? findCol("leave date") : 10;
     const colFromTime = findCol("from time") >= 0 ? findCol("from time") : 11;
     const colToTime = findCol("to time") >= 0 ? findCol("to time") : 12;
@@ -322,24 +439,29 @@ export async function syncLiveLeaveSheet(
 
       const timestampRaw = row[colTimestamp] || "";
       const emailRaw = row[colEmail] || "";
-      const nameRaw = row[colName] || "";
-      const deptRaw = row[colDept] || "";
-      const leaveTypeRaw = row[colLeaveType] || "";
-      const statusRaw = row[colStatus] || "";
-      const processedByRaw = row[colProcessedBy] || "";
-      const actionDateRaw = row[colActionDate] || "";
+      const nameRaw = (row[colName] || "").trim();
+      const deptRaw = (row[colDept] || "").trim();
+      const leaveTypeRaw = (row[colLeaveType] || "").trim();
+      const statusRaw = (row[colStatus] || "").trim();
+      const processedByRaw = (row[colProcessedBy] || "").trim();
+      const actionDateRaw = (row[colActionDate] || "").trim();
+      const medicalCertRaw = (row[colMedicalCert] || "").trim();
 
       if (!timestampRaw && !emailRaw) continue;
 
       // Unique stable identifier for this sheet submission
       const sourceRecordId = `LEAVE_${cleanIdentifier(timestampRaw)}_${cleanIdentifier(emailRaw)}`;
 
-      // Reason handling (standard leave has reason at col 4, hourly has at col 9)
-      const reasonRaw = (row[4] || row[9] || "").trim();
-
       // Determine leave typology & mode
       const isHourly = /few hours|hourly/i.test(leaveTypeRaw);
       const isHalfDay = /half[- ]day/i.test(leaveTypeRaw);
+
+      // Reason handling: if hourly, prefer hourly reason column; otherwise regular reason
+      const reasonRaw = (
+        isHourly
+          ? (row[colHourlyReason] || row[colRegularReason] || row[9] || row[4] || "")
+          : (row[colRegularReason] || row[colHourlyReason] || row[4] || row[9] || "")
+      ).trim();
 
       let leaveType = "CASUAL";
       if (/sick/i.test(leaveTypeRaw)) leaveType = "SICK";
@@ -357,33 +479,39 @@ export async function syncLiveLeaveSheet(
       let days = new Decimal(1.0);
 
       if (isHourly) {
-        startDate = parseSheetDate(row[colHourlyDate] || row[colFromDate]) || parseSheetDate(timestampRaw);
+        startDate = parseSheetDateOnly(row[colHourlyDate] || row[colFromDate]) || parseSheetDateOnly(timestampRaw);
         endDate = startDate;
         startMinutes = parseSheetTimeMinutes(row[colFromTime]);
         endMinutes = parseSheetTimeMinutes(row[colToTime]);
         if (startMinutes !== null && endMinutes !== null) {
-          totalMinutes = Math.max(15, endMinutes - startMinutes);
+          totalMinutes = Math.max(0, endMinutes - startMinutes);
+          if (totalMinutes === 0) totalMinutes = 60; // fallback if identical times entered
           days = new Decimal(Number((totalMinutes / (8 * 60)).toFixed(3)));
         } else {
           totalMinutes = 120;
           days = new Decimal(0.25);
         }
       } else if (isHalfDay) {
-        startDate = parseSheetDate(row[colFromDate]) || parseSheetDate(timestampRaw);
-        endDate = parseSheetDate(row[colToDate]) || startDate;
+        startDate = parseSheetDateOnly(row[colFromDate]) || parseSheetDateOnly(timestampRaw);
+        endDate = parseSheetDateOnly(row[colToDate]) || startDate;
         days = new Decimal(0.5);
       } else {
-        startDate = parseSheetDate(row[colFromDate]) || parseSheetDate(timestampRaw);
-        endDate = parseSheetDate(row[colToDate]) || startDate;
+        startDate = parseSheetDateOnly(row[colFromDate]) || parseSheetDateOnly(timestampRaw);
+        endDate = parseSheetDateOnly(row[colToDate]) || startDate;
         if (startDate && endDate) {
-          const diffMs = endDate.getTime() - startDate.getTime();
-          const diffDays = Math.max(1, Math.round(diffMs / (1000 * 60 * 60 * 24)) + 1);
-          days = new Decimal(diffDays);
+          if (endDate < startDate) {
+            endDate = startDate;
+            days = new Decimal(1.0);
+          } else {
+            const diffMs = endDate.getTime() - startDate.getTime();
+            const diffDays = Math.max(1, Math.round(diffMs / (1000 * 60 * 60 * 24)) + 1);
+            days = new Decimal(diffDays);
+          }
         }
       }
 
       if (!startDate) {
-        startDate = parseSheetDate(timestampRaw) || new Date();
+        startDate = parseSheetDateOnly(timestampRaw) || new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0));
       }
       if (!endDate) {
         endDate = startDate;
@@ -434,8 +562,8 @@ export async function syncLiveLeaveSheet(
         deptRaw
       );
 
-      const submittedAt = parseSheetDate(timestampRaw) || new Date();
-      const reviewedAt = parseSheetDate(actionDateRaw);
+      const submittedAt = parseSheetTimestamp(timestampRaw) || now;
+      const reviewedAt = parseSheetTimestamp(actionDateRaw);
 
       if (!existing) {
         // Create new record
@@ -456,6 +584,7 @@ export async function syncLiveLeaveSheet(
             reason: reasonRaw || "Google Form submission",
             isHalfDay,
             isHourly,
+            supportingFileId: medicalCertRaw || null,
             submittedAt,
             reviewedAt,
             reviewNotes: processedByRaw ? `Processed by ${processedByRaw}` : null,
@@ -466,11 +595,16 @@ export async function syncLiveLeaveSheet(
         });
         importedCount++;
       } else {
-        // Update if status or dates changed
+        // Update if dates, status, or counts changed
         const shouldUpdate =
           existing.status !== mappedStatus ||
           existing.days.toNumber() !== days.toNumber() ||
-          existing.startDate.toISOString().slice(0, 10) !== startDate.toISOString().slice(0, 10);
+          existing.startDate.toISOString().slice(0, 10) !== startDate.toISOString().slice(0, 10) ||
+          existing.endDate.toISOString().slice(0, 10) !== endDate.toISOString().slice(0, 10) ||
+          existing.submittedAt.toISOString().slice(0, 10) !== submittedAt.toISOString().slice(0, 10) ||
+          existing.leaveType !== leaveType ||
+          existing.reason !== (reasonRaw || existing.reason) ||
+          (medicalCertRaw && existing.supportingFileId !== medicalCertRaw);
 
         if (shouldUpdate) {
           await prisma.studioLeaveRequest.update({
@@ -485,6 +619,8 @@ export async function syncLiveLeaveSheet(
               days,
               leaveType,
               reason: reasonRaw || existing.reason,
+              supportingFileId: medicalCertRaw || existing.supportingFileId,
+              submittedAt,
               reviewedAt: reviewedAt || existing.reviewedAt,
               reviewNotes: processedByRaw ? `Processed by ${processedByRaw}` : existing.reviewNotes,
               rejectionReason: isRejectedInSheet ? statusRaw : existing.rejectionReason,
@@ -755,7 +891,9 @@ export async function pushLeaveActionToGoogleSheet(
       webhookUrl = settings.googleSheetsLeaveWebhookUrl || settings.googleSheetsWebhookUrl;
     }
 
-    if (!webhookUrl) return;
+    if (!webhookUrl) {
+      webhookUrl = DEFAULT_LEAVE_WEBHOOK_URL;
+    }
 
     let startDateFormatted: string | undefined = undefined;
     if (payload.startDate) {

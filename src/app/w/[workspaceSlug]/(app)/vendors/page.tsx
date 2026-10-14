@@ -26,6 +26,7 @@ import {
   Edit3,
   RefreshCw,
 } from "lucide-react";
+import { broadcastRealtimeEvent, useRealtimeSubscription } from "@/lib/realtime";
 
 export default function VendorManagementPage() {
   const params = useParams();
@@ -116,6 +117,7 @@ export default function VendorManagementPage() {
       );
       fetchVendors();
       fetchSyncStatus();
+      broadcastRealtimeEvent("VENDOR_UPDATED");
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -143,6 +145,7 @@ export default function VendorManagementPage() {
       setActionSuccess(`Vendor "${name}" deleted with tombstone protection (never resurrected on sync).`);
       fetchVendors();
       fetchSyncStatus();
+      broadcastRealtimeEvent("VENDOR_UPDATED");
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -187,6 +190,7 @@ export default function VendorManagementPage() {
       setIsEditOpen(false);
       setActionSuccess(`Vendor "${editForm.companyName || editForm.name}" updated successfully.`);
       fetchVendors();
+      broadcastRealtimeEvent("VENDOR_UPDATED");
     } catch (err: any) {
       alert(err.message);
     } finally {
@@ -194,8 +198,8 @@ export default function VendorManagementPage() {
     }
   };
 
-  const fetchVendors = async () => {
-    setLoading(true);
+  const fetchVendors = async (silent = false) => {
+    if (!silent) setLoading(true);
     setError(null);
     try {
       const q = new URLSearchParams({
@@ -211,28 +215,33 @@ export default function VendorManagementPage() {
 
       setVendors(data.vendors || []);
     } catch (err: any) {
-      setError(err.message);
+      if (!silent) setError(err.message);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
+  // Initial load
   useEffect(() => {
     fetchVendors();
     fetchSyncStatus();
+  }, [workspaceSlug, industryFilter, statusFilter]);
 
-    // 24/7 background live sync polling (every 60 seconds)
-    const interval = setInterval(() => {
+  // Real-time dynamic updates: visible polling + tab focus revalidation + cross-tab live events
+  useRealtimeSubscription(
+    ["VENDOR_UPDATED"],
+    () => {
       fetch(`/api/integrations/google-sheets/sync?workspaceSlug=${workspaceSlug}&auto=true&syncType=VENDOR_SHEET`)
         .then((r) => r.json())
         .then((d) => {
           if (d.vendorSheet) setSyncStatus(d.vendorSheet);
         })
         .catch(() => {});
-    }, 60000);
-
-    return () => clearInterval(interval);
-  }, [workspaceSlug, industryFilter, statusFilter]);
+      fetchVendors(true);
+      fetchSyncStatus();
+    },
+    { intervalMs: 20000 }
+  );
 
   const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -265,6 +274,13 @@ export default function VendorManagementPage() {
         rating: 4,
       });
       fetchVendors();
+      broadcastRealtimeEvent("VENDOR_UPDATED");
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
     } catch (err: any) {
       alert(err.message);
     } finally {
@@ -282,7 +298,7 @@ export default function VendorManagementPage() {
             <span>/</span>
             <span className="font-semibold text-[#1F1F1F]">Vendors & Visitors</span>
           </div>
-          <h1 className="text-2xl font-bold text-[#1F1F1F] tracking-tight">Vendor & Visitor CRM</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-[#1F1F1F] tracking-tight">Vendor & Visitor CRM</h1>
           <p className="text-xs text-[#696E82] mt-0.5">
             Architectural procurement • Visitor tracking • Confidential notes & quality ratings
           </p>
@@ -290,7 +306,7 @@ export default function VendorManagementPage() {
 
         <button
           onClick={() => setIsAddOpen(true)}
-          className="flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-xl bg-[#5A81FA] text-white hover:bg-[#4870EB] shadow-xs transition-all"
+          className="flex items-center justify-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-xl bg-[#5A81FA] text-white hover:bg-[#4870EB] shadow-xs transition-all w-full md:w-auto cursor-pointer"
         >
           <Plus className="w-3.5 h-3.5" />
           <span>Add Vendor / Visitor</span>
@@ -303,7 +319,7 @@ export default function VendorManagementPage() {
             <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
             <span>{actionSuccess}</span>
           </span>
-          <button onClick={() => setActionSuccess(null)}>✕</button>
+          <button onClick={() => setActionSuccess(null)} className="cursor-pointer">✕</button>
         </div>
       )}
 
@@ -353,10 +369,10 @@ export default function VendorManagementPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto shrink-0">
           <button
             onClick={() => setIsAppsScriptModalOpen(true)}
-            className="px-3 py-1.5 text-xs font-semibold rounded-xl bg-white border border-[#E2E6F0] text-[#1F1F1F] hover:bg-[#F8F9FE] shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer"
+            className="px-3 py-1.5 text-xs font-semibold rounded-xl bg-white border border-[#E2E6F0] text-[#1F1F1F] hover:bg-[#F8F9FE] shadow-2xs flex items-center justify-center gap-1.5 transition-all cursor-pointer flex-1 sm:flex-initial"
           >
             <Code className="w-3.5 h-3.5 text-[#5A81FA]" />
             <span>Two-Way Script</span>
@@ -364,7 +380,7 @@ export default function VendorManagementPage() {
           <button
             onClick={handleManualSync}
             disabled={syncLoading}
-            className="px-3.5 py-1.5 text-xs font-semibold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs flex items-center gap-1.5 transition-all disabled:opacity-50 cursor-pointer"
+            className="px-3.5 py-1.5 text-xs font-semibold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs flex items-center justify-center gap-1.5 transition-all disabled:opacity-50 cursor-pointer flex-1 sm:flex-initial"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${syncLoading ? "animate-spin" : ""}`} />
             <span>{syncLoading ? "Syncing..." : "Sync Live Sheet"}</span>

@@ -286,10 +286,10 @@ export default function DailyEmployeeWorkDashboard() {
         <div className="lg:col-span-2 space-y-4">
           {/* Tabs & Filters */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-[#E2E6F0] shadow-2xs">
-            <div className="flex items-center gap-1 p-1 bg-[#F8F9FE] rounded-xl border border-[#E2E6F0]">
+            <div className="flex items-center gap-1 p-1 bg-[#F8F9FE] rounded-xl border border-[#E2E6F0] overflow-x-auto touch-scroll-x">
               <button
                 onClick={() => setActiveTab("awaiting-action")}
-                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors cursor-pointer ${
+                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors cursor-pointer shrink-0 whitespace-nowrap min-h-[36px] ${
                   activeTab === "awaiting-action"
                     ? "bg-[#5A81FA] text-white shadow-2xs"
                     : "text-[#696E82] hover:text-[#1F1F1F]"
@@ -299,7 +299,7 @@ export default function DailyEmployeeWorkDashboard() {
               </button>
               <button
                 onClick={() => setActiveTab("waiting-others")}
-                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors cursor-pointer ${
+                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors cursor-pointer shrink-0 whitespace-nowrap min-h-[36px] ${
                   activeTab === "waiting-others"
                     ? "bg-slate-800 text-white shadow-2xs"
                     : "text-[#696E82] hover:text-[#1F1F1F]"
@@ -309,15 +309,15 @@ export default function DailyEmployeeWorkDashboard() {
               </button>
             </div>
 
-            <div className="flex items-center gap-2">
-              <div className="relative">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative flex-1 sm:flex-initial">
                 <Search className="w-3.5 h-3.5 text-[#696E82] absolute left-2.5 top-2.5" />
                 <input
                   type="text"
                   placeholder="Filter tasks..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-8 pr-3 py-1.5 text-xs rounded-xl border border-[#E2E6F0] bg-white focus:outline-none focus:border-[#5A81FA] w-36 sm:w-44"
+                  className="pl-8 pr-3 py-1.5 text-xs rounded-xl border border-[#E2E6F0] bg-white focus:outline-none focus:border-[#5A81FA] w-full sm:w-44"
                 />
               </div>
 
@@ -425,7 +425,7 @@ export default function DailyEmployeeWorkDashboard() {
                       </div>
 
                       {/* Quick Actions for Employee */}
-                      <div className="flex flex-wrap sm:flex-col items-end gap-1.5 shrink-0 pt-2 sm:pt-0">
+                      <div className="flex flex-wrap sm:flex-col items-stretch sm:items-end gap-1.5 shrink-0 pt-2 sm:pt-0 w-full sm:w-auto">
                         {task.isAwaitingAck && (
                           <button
                             onClick={() => handleAcknowledge(task.id)}
@@ -594,16 +594,22 @@ export default function DailyEmployeeWorkDashboard() {
 
       {/* ================= MODAL: REQUEST EXTENSION ================= */}
       {extensionModalOpen && selectedTask && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="bg-white rounded-3xl border border-[#E2E6F0] shadow-xl w-full max-w-md overflow-hidden my-8">
-            <div className="flex items-center justify-between p-5 border-b border-[#E2E6F0]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-3 sm:p-4 overflow-y-auto">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="extension-modal-title"
+            className="bg-white rounded-2xl sm:rounded-3xl border border-[#E2E6F0] shadow-xl w-full max-w-md overflow-hidden my-auto max-h-[92vh] overflow-y-auto"
+          >
+            <div className="flex items-center justify-between p-4 sm:p-5 border-b border-[#E2E6F0]">
               <div>
-                <h3 className="text-base font-bold text-[#1F1F1F]">Request Deadline Extension</h3>
+                <h3 id="extension-modal-title" className="text-base font-bold text-[#1F1F1F]">Request Deadline Extension</h3>
                 <p className="text-xs text-[#696E82]">{selectedTask.title}</p>
               </div>
               <button
                 onClick={() => setExtensionModalOpen(false)}
-                className="p-1 rounded-xl hover:bg-[#F8F9FE] text-[#696E82] cursor-pointer"
+                className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-[#F8F9FE] text-[#696E82] cursor-pointer"
+                aria-label="Close dialog"
               >
                 <X className="w-5 h-5" />
               </button>

@@ -480,8 +480,8 @@ export default function WorkloadCapacityPage() {
             No employees found matching the selected filters.
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+          <div className="overflow-x-auto touch-scroll-x">
+            <table className="w-full text-left border-collapse min-w-[640px]">
               <thead>
                 <tr className="bg-slate-50/70 border-b border-slate-200/80 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
                   <th className="py-3 px-4">Talent</th>
@@ -596,11 +596,16 @@ export default function WorkloadCapacityPage() {
       {/* Employee Detail Drawer */}
       {selectedEmployee && (
         <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex justify-end">
-          <div className="bg-white w-full max-w-2xl h-full shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-right duration-200">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="emp-drawer-title"
+            className="bg-white w-full max-w-2xl h-full shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-right duration-200"
+          >
             {/* Drawer Header */}
-            <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+            <div className="px-4 sm:px-6 py-4 sm:py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
               <div>
-                <h3 className="text-base font-bold text-[#0B122B]">
+                <h3 id="emp-drawer-title" className="text-base font-bold text-[#0B122B]">
                   {selectedEmployee.fullName}
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
@@ -610,14 +615,15 @@ export default function WorkloadCapacityPage() {
               </div>
               <button
                 onClick={() => setSelectedEmployee(null)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition"
+                className="w-9 h-9 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+                aria-label="Close drawer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {/* Summary Row inside Drawer */}
-            <div className="grid grid-cols-3 gap-3 p-4 bg-slate-50/30 border-b border-slate-100 text-center">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 p-3.5 sm:p-4 bg-slate-50/30 border-b border-slate-100 text-center">
               <div className="p-2.5 bg-white rounded-lg border border-slate-200/60 shadow-xs">
                 <div className="text-[11px] text-slate-400 font-medium">Available Capacity</div>
                 <div className="text-base font-bold text-slate-800 mt-0.5">
@@ -728,15 +734,21 @@ export default function WorkloadCapacityPage() {
 
       {/* Adjust Schedule / Reassign Modal */}
       {adjustModalOpen && adjustTask && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 space-y-4">
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="adjust-workload-title"
+            className="bg-white rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-slate-100 space-y-4 max-h-[92vh] overflow-y-auto"
+          >
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-base font-bold text-[#0B122B]">
+              <h3 id="adjust-workload-title" className="text-base font-bold text-[#0B122B]">
                 Adjust Workload: {adjustTask.title}
               </h3>
               <button
                 onClick={() => setAdjustModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600"
+                className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer"
+                aria-label="Close dialog"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -761,7 +773,7 @@ export default function WorkloadCapacityPage() {
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-slate-700 font-medium mb-1">New Start Date:</label>
                   <input

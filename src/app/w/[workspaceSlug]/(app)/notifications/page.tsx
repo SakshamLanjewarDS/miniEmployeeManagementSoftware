@@ -271,9 +271,9 @@ export default function NotificationsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F3F4F6] py-4 sm:py-8 px-3 sm:px-4 flex justify-center">
-      {/* Mobile/Tablet Card Frame matching Image A */}
-      <div className="w-full max-w-md bg-white rounded-3xl shadow-sm border border-slate-200/80 overflow-hidden flex flex-col min-h-[640px]">
+    <div className="py-2 sm:py-6 px-1 sm:px-4 flex justify-center">
+      {/* Mobile/Tablet/Desktop Card Frame */}
+      <div className="w-full max-w-2xl bg-white rounded-2xl sm:rounded-3xl shadow-sm border border-slate-200/80 overflow-hidden flex flex-col min-h-[500px]">
         {/* ============================================================== */}
         {/* TOP APP BAR: Back Button + "Notification" + "2 NEW" Pill Badge */}
         {/* ============================================================== */}

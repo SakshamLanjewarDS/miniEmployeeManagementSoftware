@@ -23,7 +23,7 @@
 
 const ADMIN_EMAIL = "designadmin08@gmail.com";
 const SHEET_NAME = "Form Responses 1";
-const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyzqlxv43RAdfl-R0r1MSjCXtODP80J5W0pUSvYpoayXlvyemivDUA737ZQLaQAEdmy8w/exec";
+const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbw28LoETUSD3jbnDIxMZqBSPoggKLw_iHen4cFkUMm6Ayq6VukjcPwij5YoJRPRS198RA/exec";
 
 
 // ==========================================================

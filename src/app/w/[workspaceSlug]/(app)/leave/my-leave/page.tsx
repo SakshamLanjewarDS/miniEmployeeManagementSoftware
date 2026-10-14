@@ -23,6 +23,7 @@ import {
   CalendarDays,
   ShieldAlert,
 } from "lucide-react";
+import { broadcastRealtimeEvent, useRealtimeSubscription } from "@/lib/realtime";
 
 interface LeavePreviewData {
   requestedDays: number;
@@ -82,14 +83,22 @@ export default function EmployeeMyLeavePage() {
   const [preview, setPreview] = useState<LeavePreviewData | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
 
+  const formatLocalDate = (dateVal: string | Date | null | undefined) => {
+    if (!dateVal) return "";
+    const s = typeof dateVal === "string" ? dateVal : dateVal.toISOString();
+    const [y, m, d] = s.slice(0, 10).split("-").map(Number);
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    return `${months[m - 1]} ${d}`;
+  };
+
   // History search and filter
   const [historySearch, setHistorySearch] = useState("");
   const [historyStatusFilter, setHistoryStatusFilter] = useState("ALL");
   const [historyPage, setHistoryPage] = useState(1);
   const historyPageSize = 5;
 
-  const fetchMyLeave = async () => {
-    setLoading(true);
+  const fetchMyLeave = async (silent = false) => {
+    if (!silent) setLoading(true);
     setError(null);
     try {
       const q = new URLSearchParams({
@@ -105,15 +114,18 @@ export default function EmployeeMyLeavePage() {
       }
       setData(json);
     } catch (err: any) {
-      setError(err.message);
+      if (!silent) setError(err.message);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
   useEffect(() => {
     fetchMyLeave();
   }, [workspaceSlug, currentYear, currentMonth]);
+
+  // Real-time dynamic updates: visible polling + tab focus revalidation + cross-tab live events
+  useRealtimeSubscription(["LEAVE_UPDATED"], () => fetchMyLeave(true), { intervalMs: 20000 });
 
   // Dynamic preview fetch whenever form data changes
   useEffect(() => {
@@ -221,6 +233,8 @@ export default function EmployeeMyLeavePage() {
           : "Leave application submitted successfully for studio review.",
       });
       fetchMyLeave();
+      broadcastRealtimeEvent("LEAVE_UPDATED");
+      broadcastRealtimeEvent("NOTIFICATION_UPDATED");
     } catch (err: any) {
       setActionMessage({ type: "error", text: err.message });
     } finally {
@@ -265,6 +279,8 @@ export default function EmployeeMyLeavePage() {
       setIsEditModalOpen(false);
       setActionMessage({ type: "success", text: "Pending leave application updated (version incremented)." });
       fetchMyLeave();
+      broadcastRealtimeEvent("LEAVE_UPDATED");
+      broadcastRealtimeEvent("NOTIFICATION_UPDATED");
     } catch (err: any) {
       setActionMessage({ type: "error", text: err.message });
     } finally {
@@ -289,6 +305,8 @@ export default function EmployeeMyLeavePage() {
       }
       setActionMessage({ type: "success", text: "Leave request withdrawn successfully." });
       fetchMyLeave();
+      broadcastRealtimeEvent("LEAVE_UPDATED");
+      broadcastRealtimeEvent("NOTIFICATION_UPDATED");
     } catch (err: any) {
       setActionMessage({ type: "error", text: err.message });
     } finally {
@@ -324,6 +342,8 @@ export default function EmployeeMyLeavePage() {
         text: "Cancellation request submitted. The leave remains active until leadership approves.",
       });
       fetchMyLeave();
+      broadcastRealtimeEvent("LEAVE_UPDATED");
+      broadcastRealtimeEvent("NOTIFICATION_UPDATED");
     } catch (err: any) {
       setActionMessage({ type: "error", text: err.message });
     } finally {
@@ -609,14 +629,8 @@ export default function EmployeeMyLeavePage() {
             ) : (
               <div className="divide-y divide-[#E2E6F0]">
                 {pendingRequests.map((req: any) => {
-                  const startStr = new Date(req.startDate).toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                  });
-                  const endStr = new Date(req.endDate).toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                  });
+                  const startStr = formatLocalDate(req.startDate);
+                  const endStr = formatLocalDate(req.endDate);
 
                   return (
                     <div
@@ -702,14 +716,8 @@ export default function EmployeeMyLeavePage() {
             ) : (
               <div className="divide-y divide-[#E2E6F0]">
                 {approvedRequests.map((req: any) => {
-                  const startStr = new Date(req.startDate).toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                  });
-                  const endStr = new Date(req.endDate).toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                  });
+                  const startStr = formatLocalDate(req.startDate);
+                  const endStr = formatLocalDate(req.endDate);
 
                   const hasPendingCancel = req.cancellationRequests?.some((c: any) => c.status === "PENDING");
 
@@ -920,7 +928,7 @@ export default function EmployeeMyLeavePage() {
               >
                 <div>
                   <span className="font-mono font-semibold text-[#1F1F1F]">
-                    {new Date(h.startDate).toLocaleDateString()} — {new Date(h.endDate).toLocaleDateString()}
+                    {formatLocalDate(h.startDate)} {formatLocalDate(h.startDate) !== formatLocalDate(h.endDate) ? `— ${formatLocalDate(h.endDate)}` : ""}
                   </span>
                   <span className="text-[#696E82] ml-2 font-mono">
                     ({Number(h.days)} Day(s), {h.leaveType})
@@ -1384,8 +1392,8 @@ export default function EmployeeMyLeavePage() {
             <form onSubmit={handleCancelSubmit} className="p-5 space-y-4 text-xs">
               <div className="p-3 bg-[#F8F9FD] rounded-2xl border border-[#E2E6F0] space-y-1">
                 <div className="font-bold text-[#1F1F1F]">
-                  {new Date(selectedRecord.startDate).toLocaleDateString()} —{" "}
-                  {new Date(selectedRecord.endDate).toLocaleDateString()}
+                  {formatLocalDate(selectedRecord.startDate)}
+                  {formatLocalDate(selectedRecord.startDate) !== formatLocalDate(selectedRecord.endDate) ? ` — ${formatLocalDate(selectedRecord.endDate)}` : ""}
                 </div>
                 <div className="text-[11px] text-[#696E82]">
                   {Number(selectedRecord.days)} Day(s) • {selectedRecord.leaveType}
@@ -1455,8 +1463,8 @@ export default function EmployeeMyLeavePage() {
                 <div>
                   <span className="text-[#696E82] block text-[11px]">Dates</span>
                   <span className="font-bold font-mono">
-                    {new Date(selectedRecord.startDate).toLocaleDateString()} —{" "}
-                    {new Date(selectedRecord.endDate).toLocaleDateString()}
+                    {formatLocalDate(selectedRecord.startDate)}
+                    {formatLocalDate(selectedRecord.startDate) !== formatLocalDate(selectedRecord.endDate) ? ` — ${formatLocalDate(selectedRecord.endDate)}` : ""}
                   </span>
                 </div>
 

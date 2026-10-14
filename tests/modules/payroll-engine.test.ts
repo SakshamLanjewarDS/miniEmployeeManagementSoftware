@@ -71,4 +71,33 @@ describe("Payroll Calculation Engine Tests (Tests 13–15)", () => {
     assert.equal(result.netPayable, 0.0);
     assert.equal(result.excessDeductionLiability, 2000.0);
   });
+
+  // Test: Specification Verification Example (Section 8)
+  test("TEST-PAY-VERIFICATION: ₹55,000 base, 30 days, 8h workday, 2.5 unpaid days + 2 unpaid hours", () => {
+    const result = calculateEmployeePayroll(
+      {
+        employeeId: "EMP-014",
+        baseSalary: 55000,
+        rateCalculationMode: "FIXED_30",
+        approvedUnpaidLopDays: 2.5,
+        totalApprovedLeaveDays: 4.5,
+        paidLeaveDays: 2.0,
+        unpaidLeaveHours: 2,
+        configuredWorkdayHours: 8,
+      },
+      2026,
+      10
+    );
+
+    assert.equal(result.dailyRate, 1833.33);
+    assert.equal(result.hourlyRate, 229.17);
+    assert.equal(result.dayDeductionAmount, 4583.33);
+    assert.equal(result.hourDeductionAmount, 458.33);
+    assert.equal(result.lopDeductionAmount, 5041.67);
+    assert.equal(result.roundingAdjustmentAmount, 0.01);
+    assert.equal(result.grossSalary, 55000.00);
+    assert.equal(result.totalDeductions, 5041.67);
+    assert.equal(result.netPayable, 49958.33);
+    assert.equal(result.excessDeductionLiability, 0.0);
+  });
 });

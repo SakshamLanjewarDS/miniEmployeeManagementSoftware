@@ -139,7 +139,7 @@ export default function StudioMeetingsPage() {
 
         <button
           onClick={() => setIsScheduleOpen(true)}
-          className="flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-xl bg-[#5A81FA] text-white hover:bg-[#4870EB] shadow-xs transition-all"
+          className="flex items-center justify-center gap-2 px-3.5 py-2.5 text-xs font-semibold rounded-xl bg-[#5A81FA] text-white hover:bg-[#4870EB] shadow-xs transition-all w-full sm:w-auto min-h-[40px] cursor-pointer"
         >
           <Plus className="w-3.5 h-3.5" />
           <span>Schedule Meeting</span>
@@ -270,20 +270,24 @@ export default function StudioMeetingsPage() {
 
       {/* Schedule Meeting Modal */}
       {isScheduleOpen && (
-        <div className="fixed inset-0 z-50 bg-[#0B122B]/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-[#0B122B]/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
           <form
             onSubmit={handleScheduleSubmit}
-            className="bg-white rounded-3xl max-w-lg w-full p-6 border border-[#E2E6F0] shadow-xl space-y-4"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="schedule-modal-title"
+            className="bg-white rounded-2xl sm:rounded-3xl max-w-lg w-full p-5 sm:p-6 border border-[#E2E6F0] shadow-xl space-y-4 max-h-[92vh] overflow-y-auto"
           >
             <div className="flex items-center justify-between border-b border-[#E2E6F0] pb-3">
               <div>
-                <h3 className="text-base font-bold text-[#1F1F1F]">Schedule Studio Meeting</h3>
+                <h3 id="schedule-modal-title" className="text-base font-bold text-[#1F1F1F]">Schedule Studio Meeting</h3>
                 <p className="text-xs text-[#696E82]">Leadership design & coordination review</p>
               </div>
               <button
                 type="button"
                 onClick={() => setIsScheduleOpen(false)}
-                className="p-1 text-[#696E82] hover:bg-gray-100 rounded-lg"
+                className="w-8 h-8 flex items-center justify-center text-[#696E82] hover:bg-gray-100 rounded-lg cursor-pointer"
+                aria-label="Close dialog"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -298,11 +302,11 @@ export default function StudioMeetingsPage() {
                   value={form.title}
                   onChange={(e) => setForm({ ...form, title: e.target.value })}
                   placeholder="e.g. Architectural Phase 2 Review"
-                  className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] focus:outline-none focus:border-[#5A81FA]"
+                  className="w-full px-3 py-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] focus:outline-none focus:border-[#5A81FA]"
                 />
               </div>
 
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
                 <div>
                   <label className="font-semibold text-[#1F1F1F] block mb-1">Date *</label>
                   <input
@@ -310,7 +314,7 @@ export default function StudioMeetingsPage() {
                     required
                     value={form.meetingDate}
                     onChange={(e) => setForm({ ...form, meetingDate: e.target.value })}
-                    className="w-full px-2.5 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F]"
+                    className="w-full px-2.5 py-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F]"
                   />
                 </div>
                 <div>
@@ -319,7 +323,7 @@ export default function StudioMeetingsPage() {
                     type="time"
                     value={form.startTime}
                     onChange={(e) => setForm({ ...form, startTime: e.target.value })}
-                    className="w-full px-2.5 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F]"
+                    className="w-full px-2.5 py-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F]"
                   />
                 </div>
                 <div>
@@ -328,7 +332,7 @@ export default function StudioMeetingsPage() {
                     type="time"
                     value={form.endTime}
                     onChange={(e) => setForm({ ...form, endTime: e.target.value })}
-                    className="w-full px-2.5 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F]"
+                    className="w-full px-2.5 py-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F]"
                   />
                 </div>
               </div>

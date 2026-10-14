@@ -64,6 +64,14 @@ export default function EmployeeDossierPage() {
     "July", "August", "September", "October", "November", "December",
   ];
 
+  const formatLocalDate = (dateVal: string | Date | null | undefined) => {
+    if (!dateVal) return "";
+    const s = typeof dateVal === "string" ? dateVal : dateVal.toISOString();
+    const [y, m, d] = s.slice(0, 10).split("-").map(Number);
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    return `${months[m - 1]} ${d}`;
+  };
+
   const handlePrevMonth = () => {
     if (currentMonth === 1) {
       setCurrentMonth(12);
@@ -247,7 +255,7 @@ export default function EmployeeDossierPage() {
               <div key={req.id} className="py-3.5 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
                 <div>
                   <div className="font-bold text-[#1F1F1F] font-mono">
-                    {new Date(req.startDate).toLocaleDateString()} — {new Date(req.endDate).toLocaleDateString()}
+                    {formatLocalDate(req.startDate)} {formatLocalDate(req.startDate) !== formatLocalDate(req.endDate) ? `— ${formatLocalDate(req.endDate)}` : ""}
                   </div>
                   <div className="text-[11px] text-[#696E82] flex items-center gap-2 mt-0.5">
                     <span>{req.leaveType}</span>

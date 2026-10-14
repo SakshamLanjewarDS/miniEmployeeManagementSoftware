@@ -632,12 +632,12 @@ export default function EmployeeDashboardView({
       {/* ============================================================== */}
       {/* 1. TOP GREETING PANEL (Image A)                                 */}
       {/* ============================================================== */}
-      <div className="bg-white border border-slate-200/80 rounded-3xl p-6 sm:p-8 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="bg-white border border-slate-200/80 rounded-3xl p-4 sm:p-6 lg:p-8 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="space-y-1 min-w-0">
           <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 font-mono">
             {todayDateString}
           </div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-slate-900 tracking-tight">
             Good Morning, {userFullName.split(" ")[0]}
           </h1>
           <p className="text-xs sm:text-sm text-slate-500">
@@ -650,12 +650,12 @@ export default function EmployeeDashboardView({
         </div>
 
         {/* Top Right: Sun / Status & Actions */}
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 shrink-0 self-end sm:self-auto">
           {/* Next-Up Focus Cockpit Trigger */}
           <button
             type="button"
             onClick={() => setIsFocusMode(!isFocusMode)}
-            className={`px-3.5 py-2 rounded-2xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
+            className={`px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-2xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
               isFocusMode
                 ? "bg-slate-900 text-white border-slate-900 shadow-sm"
                 : "bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200/80"
@@ -665,15 +665,15 @@ export default function EmployeeDashboardView({
             <span>{isFocusMode ? "Exit Focus" : "Focus Mode"}</span>
           </button>
 
-          <div className="w-11 h-11 rounded-2xl bg-amber-50 text-amber-500 border border-amber-200/60 flex items-center justify-center shadow-xs">
-            <Sun className="w-6 h-6 animate-spin-slow" />
+          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-amber-50 text-amber-500 border border-amber-200/60 flex items-center justify-center shadow-xs">
+            <Sun className="w-5 h-5 sm:w-6 sm:h-6 animate-spin-slow" />
           </div>
 
           <button
             type="button"
             onClick={handleRefresh}
             disabled={isRefreshing}
-            className="p-2.5 bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-slate-800 rounded-2xl border border-slate-200/80 transition-colors cursor-pointer"
+            className="p-2 sm:p-2.5 bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-slate-800 rounded-2xl border border-slate-200/80 transition-colors cursor-pointer"
             title="Refresh my workspace"
           >
             <RefreshCw className={`w-4 h-4 ${isRefreshing ? "animate-spin text-[#3562E8]" : ""}`} />
@@ -700,7 +700,7 @@ export default function EmployeeDashboardView({
       {/* ============================================================== */}
       {/* 2. SECTION NAVIGATION PILLS ROW (Image A)                       */}
       {/* ============================================================== */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar text-xs">
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 touch-scroll-x no-scrollbar text-xs">
         {[
           { key: "MY_DAY", label: "My Day" },
           { key: "QUEUE", label: `Work Queue (${data.workQueue.length})` },
@@ -725,7 +725,7 @@ export default function EmployeeDashboardView({
       {/* ============================================================== */}
       {/* 3. FOUR KPI CARDS (Image A)                                     */}
       {/* ============================================================== */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {/* KPI 1: In Progress */}
         <button
           type="button"

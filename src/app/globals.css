@@ -138,3 +138,55 @@ a, button, input, select, textarea {
     scroll-behavior: auto !important;
   }
 }
+
+/* =========================================================================
+   MOBILE RESPONSIVENESS & TOUCH ERGONOMICS (WCAG 2.2 AA)
+   ========================================================================= */
+
+/* Prevent iOS Safari auto-zoom on focus by enforcing >= 16px font size on inputs */
+@media (max-width: 767px) {
+  input[type="text"],
+  input[type="number"],
+  input[type="email"],
+  input[type="password"],
+  input[type="search"],
+  input[type="tel"],
+  input[type="url"],
+  input[type="date"],
+  input[type="time"],
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* Safe Area Insets for Modern Mobile Notches & Dynamic Home Bars */
+.pb-safe {
+  padding-bottom: max(12px, env(safe-area-inset-bottom, 12px));
+}
+
+.pt-safe {
+  padding-top: max(12px, env(safe-area-inset-top, 12px));
+}
+
+/* Smooth Touch Momentum Scrolling for Tables, Kanban, and Tabs */
+.touch-scroll-x {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+
+/* Accessible Minimum Touch Target Size (44x44px per WCAG 2.5.5 / 2.5.8) */
+.touch-target {
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Mobile responsive tabular number container */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+

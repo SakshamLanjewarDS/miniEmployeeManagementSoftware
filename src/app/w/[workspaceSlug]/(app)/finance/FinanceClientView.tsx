@@ -79,7 +79,7 @@ export default function FinanceClientView({
   initialMilestones,
 }: FinanceClientViewProps) {
   // Executive viewport mode
-  const [viewportMode, setViewportMode] = useState<"mobile" | "tablet" | "desktop">("mobile");
+  const [viewportMode, setViewportMode] = useState<"mobile" | "tablet" | "desktop">("desktop");
 
   // State mode: Reference 0 Data (matching the screenshot exactly) vs Populated Illustrative Example
   const [dataMode, setDataMode] = useState<"reference-zero" | "populated-example">("reference-zero");
