@@ -1,0 +1,82 @@
+================================================================================
+                    COMMERCIAL VALUATION & PRICING SPECIFICATION
+               AEC Studio Operations, Workload & Payroll Platform
+================================================================================
+
+1. DIRECT SALE & ENTERPRISE LICENSING (ONE-TIME)
+--------------------------------------------------------------------------------
+MODEL                     USA MARKET (USD)          INDIA MARKET (INR)
+--------------------------------------------------------------------------------
+Full IP & Source Code     $35,000 - $75,000         ₹18,00,000 - ₹35,00,000
+(Complete Copyright)      (Replacement: $65k+)      (Replacement: ₹20L+)
+
+Enterprise White-Label    $8,500 - $18,000          ₹2,50,000 - ₹6,00,000
+(Dedicated Instance)      + $2,500/yr AMC           + ₹60,000/yr AMC
+
+Turnkey Deployment        $15,000 - $30,000         ₹4,50,000 - ₹10,00,000
+(Software + Data Migr.)   (Includes 3mo support)    (Includes 3mo support)
+
+
+2. SAAS SUBSCRIPTION TIERS (RECURRING MULTI-TENANT)
+--------------------------------------------------------------------------------
+TIER / TEAM SIZE          USA (MONTHLY / ANNUAL)    INDIA (MONTHLY / ANNUAL)
+--------------------------------------------------------------------------------
+STUDIO STARTER            $79/mo  |  $790/yr        ₹2,499/mo  |  ₹24,999/yr
+(Up to 8 Members)         (Save 17% on Annual)      (Save 17% on Annual)
+Includes: Core Tasks, Projects, Attendance, Drawings Log, Directory, Mobile App.
+
+STUDIO PRO [Flagship]     $189/mo |  $1,890/yr      ₹5,999/mo  |  ₹59,999/yr
+(Up to 25 Members)        (~$157/mo effective)      (~₹4,999/mo effective)
+Includes: Starter + GPS Site Visits, Capacity Workload, Payroll & Deductions,
+          2-Way Google Sheets Sync (24/7 background), CSV Data Hub.
+
+FIRM ENTERPRISE           $379/mo |  $3,790/yr      ₹12,499/mo |  ₹1,24,999/yr
+(Up to 60 Members)        (~$315/mo effective)      (~₹10,416/mo effective)
+Includes: Pro + Four-Eyes Decision Inbox, Employee Performance Dossier,
+          Priority SLA, Custom Integrations, Dedicated Onboarding.
+
+EXTRA SEAT ADD-ON         $8 / user / month         ₹199 / user / month
+(Beyond 60 members)       ($75 / user / year)       (₹1,999 / user / year)
+
+
+3. DEDICATED MAINTENANCE & SUPPORT CONTRACTS (AMC / RETAINER)
+--------------------------------------------------------------------------------
+Applicable for clients running their own private/on-premise deployment or bespoke setup:
+
+TIER                      USA (MONTHLY / YEARLY)    INDIA (MONTHLY / YEARLY)
+--------------------------------------------------------------------------------
+TIER 1: STANDARD SUPPORT  $199/mo | $1,990/yr       ₹4,999/mo  | ₹49,999/yr
+• Automated Daily Cloud DB Backups & Disaster Recovery drills.
+• Server health, SSL certificates & uptime monitoring (99.9% target).
+• Next.js/Prisma security patches & bug fixes (48h resolution SLA).
+
+TIER 2: PRIORITY DEVOPS   $449/mo | $4,490/yr       ₹11,999/mo | ₹1,19,999/yr
+• Everything in Tier 1 + 24-hour priority response SLA.
+• Up to 6 hours/month of custom developer tweaks or report modifications.
+• Google Sheets API / OAuth token rotation & third-party sync maintenance.
+• Quarterly database vacuuming and performance optimization.
+
+TIER 3: ENTERPRISE VIP    $999/mo | $9,990/yr       ₹24,999/mo | ₹2,49,999/yr
+• Everything in Tier 2 + Dedicated Slack/WhatsApp direct developer hotline.
+• 4-hour critical incident response SLA (24/7 coverage).
+• Up to 15 hours/month of bespoke feature development & workflow redesign.
+• Bi-annual employee & admin training refreshers.
+
+
+4. COMPETITIVE ADVANTAGE & VALUE METRICS
+--------------------------------------------------------------------------------
+• Market Disruption: Monograph/BQE charge $45-$75/user/mo in US ($750+/mo for 10
+  staff). Your flat Studio Pro ($189/mo) delivers 60%+ client savings.
+• Zero Operational Waste: Eliminates separate subscriptions for Attendance, Task
+  Trackers, WhatsApp site logs, and payroll spreadsheets.
+• 90%+ Gross Margin: Multi-tenant serverless infrastructure costs < $50/mo.
+
+
+5. YEAR-1 RUN-RATE TARGET (30 CLIENTS)
+--------------------------------------------------------------------------------
+• India (12 Pro + 8 Starter):     ₹9,20,000 INR  (~$11,000 USD)
+• USA (7 Pro + 3 Starter):        $15,600 USD    (~₹13,00,000 INR)
+• Custom Rollouts & AMC (2-3):    $18,000 USD    (~₹15,00,000 INR)
+--------------------------------------------------------------------------------
+PROJECTED YEAR-1 ARR:             ~$44,600 USD   (~₹37,20,000 INR)
+================================================================================
