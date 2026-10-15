@@ -2,6 +2,7 @@ import { prisma } from "../../db/prisma";
 import { TenantContext, canApproveWork, isAdminOrOwner, ForbiddenException } from "../../tenancy/context";
 import { TaskPriority, TaskWorkflowStatus } from "@prisma/client";
 import { evaluateTaskCompletionGovernance, getTaskGovernancePolicy } from "./governance";
+import { sendDevicePushNotification, sendDevicePushToRoles } from "../notifications/push";
 
 export interface TaskFilterParams {
   filter?: "TODAY" | "UPCOMING" | "OVERDUE" | "IN_PROGRESS" | "WAITING_REVIEW" | "COMPLETED" | "ALL";
@@ -819,6 +820,19 @@ export async function createTask(ctx: TenantContext, data: CreateTaskData) {
             isRead: false,
           })),
         });
+
+        recipientIds.forEach((recipientId) => {
+          sendDevicePushNotification(
+            recipientId,
+            {
+              title: "New Task Assigned",
+              message: `${ctx.userFullName || "Leadership"} assigned: "${task.title}" (${project.code})`,
+              link: `/w/${ctx.tenantSlug}/tasks?taskId=${task.id}`,
+              tag: `task-assigned-${task.id}`,
+            },
+            ctx.tenantId
+          ).catch(() => {});
+        });
       } catch (err) {
         console.error("Failed to create task assignment notifications:", err);
       }
@@ -1072,6 +1086,27 @@ export async function transitionTaskStatus(
             isRead: false,
           },
         });
+        sendDevicePushNotification(
+          task.creatorId,
+          {
+            title: "Task Waiting for Review",
+            message: `${ctx.userFullName} submitted "${task.title}" for review.`,
+            link: `/w/${ctx.tenantSlug}/tasks?taskId=${task.id}`,
+            tag: `task-review-${task.id}`,
+          },
+          ctx.tenantId
+        ).catch(() => {});
+        sendDevicePushToRoles(
+          ctx.tenantId,
+          ["OWNER", "ADMIN"],
+          {
+            title: "Task Waiting for Review",
+            message: `${ctx.userFullName} submitted "${task.title}" for review.`,
+            link: `/w/${ctx.tenantSlug}/tasks?taskId=${task.id}`,
+            tag: `task-review-${task.id}`,
+          },
+          ctx.membershipId
+        ).catch(() => {});
       } catch (e) {
         console.error("Failed to create review notification:", e);
       }
@@ -1100,6 +1135,18 @@ export async function transitionTaskStatus(
               isRead: false,
             })),
           });
+          Array.from(notifyRecipients).forEach((recipientId) => {
+            sendDevicePushNotification(
+              recipientId,
+              {
+                title: "Task Completed 🎉",
+                message: `${ctx.userFullName} approved and marked "${task.title}" as Completed!`,
+                link: `/w/${ctx.tenantSlug}/tasks?taskId=${task.id}`,
+                tag: `task-completed-${task.id}`,
+              },
+              ctx.tenantId
+            ).catch(() => {});
+          });
         } catch (e) {
           console.error("Failed to create completion notifications:", e);
         }
@@ -1125,6 +1172,18 @@ export async function transitionTaskStatus(
               link: `/w/${ctx.tenantSlug}/tasks?taskId=${task.id}`,
               isRead: false,
             })),
+          });
+          Array.from(notifyRecipients).forEach((recipientId) => {
+            sendDevicePushNotification(
+              recipientId,
+              {
+                title: "Task Revisions Requested",
+                message: `${ctx.userFullName} requested corrections on "${task.title}": ${options.comment || "See comments"}`,
+                link: `/w/${ctx.tenantSlug}/tasks?taskId=${task.id}`,
+                tag: `task-revisions-${task.id}`,
+              },
+              ctx.tenantId
+            ).catch(() => {});
           });
         } catch (e) {
           console.error("Failed to create changes requested notifications:", e);
@@ -1281,6 +1340,16 @@ export async function reassignTask(
             isRead: false,
           },
         });
+        sendDevicePushNotification(
+          newAssigneeMembershipId,
+          {
+            title: "Task Reassigned to You",
+            message: `${ctx.userFullName} assigned task "${task.title}" to you.`,
+            link: `/w/${ctx.tenantSlug}/tasks?taskId=${task.id}`,
+            tag: `task-reassigned-${task.id}`,
+          },
+          ctx.tenantId
+        ).catch(() => {});
       } catch (err) {
         console.error("Failed to create task reassignment notification:", err);
       }

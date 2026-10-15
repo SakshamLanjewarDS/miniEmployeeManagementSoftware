@@ -31,6 +31,17 @@ export async function POST(req: NextRequest) {
     }
 
     const lockedPeriod = await finalizeAndLockPayrollPeriod(ctx, year, month);
+
+    const { dispatchNotificationToRoles } = await import("@/server/modules/notifications/dispatch");
+    dispatchNotificationToRoles({
+      tenantId: ctx.tenantId,
+      roles: ["OWNER", "ADMIN"],
+      title: "Monthly Payroll Locked & Finalized 🔒",
+      message: `Payroll period ${year}-${String(month).padStart(2, "0")} was locked and finalized by ${ctx.userFullName}.`,
+      link: `/w/${ctx.tenantSlug}/payroll`,
+      tag: `payroll-locked-${year}-${month}`,
+    }).catch(() => {});
+
     return NextResponse.json({ success: true, period: lockedPeriod });
   } catch (err: any) {
     return NextResponse.json(

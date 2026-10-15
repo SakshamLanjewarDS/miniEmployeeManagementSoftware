@@ -1,5 +1,5 @@
-// 100% DESIGN Studio OS — Service Worker for PWA Installation and Asset Caching
-const CACHE_NAME = "studio-os-v2";
+// 100% DESIGN Studio OS — Service Worker for PWA, Offline Shell & Background Push Notifications
+const CACHE_NAME = "studio-os-v3";
 const STATIC_ASSETS = [
   "/manifest.json",
   "/favicon.ico",
@@ -84,5 +84,78 @@ self.addEventListener("fetch", (event) => {
         return networkResponse;
       });
     })
+  );
+});
+
+// ==========================================
+// BACKGROUND DEVICE PUSH NOTIFICATIONS
+// ==========================================
+self.addEventListener("push", (event) => {
+  let data = {
+    title: "100% DESIGN Studio OS",
+    message: "New studio notification received",
+    link: "/w",
+    icon: "/icons/icon-192.png",
+    badge: "/icons/favicon-32x32.png",
+    tag: "studio-os-notification",
+  };
+
+  if (event.data) {
+    try {
+      const parsed = event.data.json();
+      data = { ...data, ...parsed };
+    } catch {
+      data.message = event.data.text();
+    }
+  }
+
+  const notificationOptions = {
+    body: data.message,
+    icon: data.icon || "/icons/icon-192.png",
+    badge: data.badge || "/icons/favicon-32x32.png",
+    tag: data.tag || "studio-os-alert",
+    renotify: true,
+    vibrate: [200, 100, 200],
+    data: {
+      url: data.link || "/w",
+      timestamp: Date.now(),
+    },
+    actions: [
+      { action: "open", title: "Open" },
+      { action: "dismiss", title: "Dismiss" },
+    ],
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(data.title, notificationOptions)
+  );
+});
+
+// Handle notification interaction (Clicking notification opens the exact page)
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+
+  if (event.action === "dismiss") {
+    return;
+  }
+
+  const targetUrl = event.notification.data?.url || "/w";
+
+  event.waitUntil(
+    clients
+      .matchAll({ type: "window", includeUncontrolled: true })
+      .then((windowClients) => {
+        // If an app window is already open, focus it and navigate
+        for (const client of windowClients) {
+          if ("focus" in client) {
+            client.navigate(targetUrl);
+            return client.focus();
+          }
+        }
+        // Otherwise, launch a new window
+        if (clients.openWindow) {
+          return clients.openWindow(targetUrl);
+        }
+      })
   );
 });

@@ -7,6 +7,7 @@ import {
   isAdminOrOwner,
 } from "../../tenancy/context";
 import { enqueueLeaveDecisionNotification } from "../notifications/email";
+import { dispatchNotification, dispatchNotificationToRoles } from "../notifications/dispatch";
 
 export interface LeaveCancellationRequestInput {
   leaveRequestId: string;
@@ -90,18 +91,28 @@ export async function requestLeaveCancellation(
     );
   }
 
-  // 6. Create cancellation request
-  const cancellation = await prisma.studioLeaveCancellationRequest.create({
-    data: {
-      tenantId: context.tenantId,
-      leaveRequestId: leave.id,
-      employeeId: leave.employeeId,
-      reason: input.reason.trim(),
-      status: "PENDING",
-    },
-  });
+    // 6. Create cancellation request
+    const cancellation = await prisma.studioLeaveCancellationRequest.create({
+      data: {
+        tenantId: context.tenantId,
+        leaveRequestId: leave.id,
+        employeeId: leave.employeeId,
+        reason: input.reason.trim(),
+        status: "PENDING",
+      },
+    });
 
-  return cancellation;
+    dispatchNotificationToRoles({
+      tenantId: context.tenantId,
+      roles: ["OWNER", "ADMIN"],
+      title: "Leave Cancellation Requested",
+      message: `${leave.employee?.fullName || context.userFullName} requested cancellation of approved leave: "${input.reason.trim()}".`,
+      link: `/w/${context.tenantSlug}/leave`,
+      tag: `leave-cancel-${cancellation.id}`,
+      excludeMembershipId: context.membershipId,
+    }).catch(() => {});
+
+    return cancellation;
 }
 
 /**
@@ -202,6 +213,17 @@ export async function reviewLeaveCancellation(
       endDate: cancellation.leaveRequest.endDate.toISOString().split("T")[0],
       notes: "Your leave cancellation request was approved.",
     });
+
+    if (cancellation.employee?.membershipId) {
+      dispatchNotification({
+        tenantId: context.tenantId,
+        recipientId: cancellation.employee.membershipId,
+        title: input.decision === "APPROVE" ? "Leave Cancellation Approved" : "Leave Cancellation Declined",
+        message: `Your leave cancellation request was ${input.decision === "APPROVE" ? "approved and days restored." : `declined: ${input.rejectionReason || "Operational requirements."}`}`,
+        link: `/w/${context.tenantSlug}/leave/my-leave`,
+        tag: `leave-cancel-decision-${cancellation.id}`,
+      }).catch(() => {});
+    }
 
     return {
       cancellation: updatedCancellation,

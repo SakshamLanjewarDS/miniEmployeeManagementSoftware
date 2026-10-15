@@ -7,6 +7,7 @@ import {
   ForbiddenException,
 } from "../../tenancy/context";
 import { DocumentApprovalState, ApprovalStatus, ApprovalTargetType } from "@prisma/client";
+import { dispatchNotification, dispatchNotificationToRoles } from "../notifications/dispatch";
 
 export interface FindDrawingsParams {
   projectId?: string;
@@ -379,7 +380,7 @@ export async function submitRevisionForReview(
     throw new Error(`Cannot submit revision currently in ${version.approvalState} state.`);
   }
 
-  return await prisma.$transaction(async (tx) => {
+  const res = await prisma.$transaction(async (tx) => {
     const updatedVersion = await tx.documentVersion.update({
       where: { id: revisionId },
       data: {
@@ -417,6 +418,29 @@ export async function submitRevisionForReview(
       approvalRequest: approvalReq,
     };
   });
+
+  dispatchNotificationToRoles({
+    tenantId: ctx.tenantId,
+    roles: ["OWNER", "ADMIN"],
+    title: "Drawing Submitted for Architectural Review",
+    message: `${ctx.userFullName} submitted revision ${version.revision} for "${version.document.title}". Pending review.`,
+    link: `/w/${ctx.tenantSlug}/drawings`,
+    tag: `drawing-rev-${version.id}`,
+    excludeMembershipId: ctx.membershipId,
+  }).catch(() => {});
+
+  if (reviewerId && reviewerId !== ctx.membershipId) {
+    dispatchNotification({
+      tenantId: ctx.tenantId,
+      recipientId: reviewerId,
+      title: "Drawing Revision Assigned for Review",
+      message: `${ctx.userFullName} assigned revision ${version.revision} of "${version.document.title}" to you for architectural check.`,
+      link: `/w/${ctx.tenantSlug}/drawings`,
+      tag: `drawing-rev-${version.id}`,
+    }).catch(() => {});
+  }
+
+  return res;
 }
 
 /**
@@ -528,7 +552,7 @@ export async function reviewRevision(
     throw new Error("A comment detailing required architectural corrections is mandatory when requesting changes.");
   }
 
-  return await prisma.$transaction(async (tx) => {
+  const res = await prisma.$transaction(async (tx) => {
     if (decision === "APPROVED") {
       // Mark all previous approved versions of this document as SUPERSEDED
       await tx.documentVersion.updateMany({
@@ -597,6 +621,17 @@ export async function reviewRevision(
 
     return updatedVersion;
   });
+
+  dispatchNotification({
+    tenantId: ctx.tenantId,
+    recipientId: version.uploaderId,
+    title: decision === "APPROVED" ? "Drawing Revision Approved 🎉" : "Drawing Revision - Corrections Requested",
+    message: `${ctx.userFullName} ${decision === "APPROVED" ? "approved" : "requested corrections on"} revision ${version.revision} of "${version.document.title}".${comment ? ` Remarks: ${comment}` : ""}`,
+    link: `/w/${ctx.tenantSlug}/drawings`,
+    tag: `drawing-decision-${version.id}`,
+  }).catch(() => {});
+
+  return res;
 }
 
 /**
@@ -628,7 +663,7 @@ export async function recordClientApproval(
     throw new Error("Drawing revision not found.");
   }
 
-  return await prisma.$transaction(async (tx) => {
+  const res = await prisma.$transaction(async (tx) => {
     const clientApproval = await tx.approvalRequest.create({
       data: {
         tenantId: ctx.tenantId,
@@ -660,6 +695,17 @@ export async function recordClientApproval(
 
     return clientApproval;
   });
+
+  dispatchNotification({
+    tenantId: ctx.tenantId,
+    recipientId: version.uploaderId,
+    title: input.status === "APPROVED" ? "Client Approved Drawing (GFC Ready) 🏛️" : "Client Changes Needed on Drawing",
+    message: `Client ${input.status.toLowerCase()} recorded for revision ${version.revision} of "${version.document.title}".`,
+    link: `/w/${ctx.tenantSlug}/drawings`,
+    tag: `drawing-client-${version.id}`,
+  }).catch(() => {});
+
+  return res;
 }
 
 /**

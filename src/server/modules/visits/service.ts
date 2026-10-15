@@ -6,6 +6,8 @@ import {
   GeofenceAssessment,
   SiteVisitReviewDecision,
 } from "@prisma/client";
+import { sendDevicePushNotification } from "../notifications/push";
+import { dispatchNotification } from "../notifications/dispatch";
 
 /**
  * Calculates Haversine great-circle distance between two GPS coordinates in meters.
@@ -508,7 +510,7 @@ export async function reviewSiteVisit(
   decision: SiteVisitReviewDecision,
   comment?: string
 ) {
-  return await prisma.siteVisit.update({
+  const updated = await prisma.siteVisit.update({
     where: { id: visitId },
     data: {
       reviewDecision: decision,
@@ -516,7 +518,21 @@ export async function reviewSiteVisit(
       reviewerId: ctx.membershipId,
       reviewedAt: new Date(),
     },
+    include: {
+      site: true,
+    },
   });
+
+  dispatchNotification({
+    tenantId: ctx.tenantId,
+    recipientId: updated.employeeId,
+    title: decision === SiteVisitReviewDecision.APPROVED ? "Site Visit Report Approved 🎉" : "Site Visit Report - Action Needed",
+    message: `${ctx.userFullName} reviewed your visit to '${updated.site.name}': ${decision}.${comment ? ` Note: ${comment}` : ""}`,
+    link: `/w/${ctx.tenantSlug}/visits`,
+    tag: `visit-review-${visitId}`,
+  }).catch(() => {});
+
+  return updated;
 }
 
 /**
@@ -731,6 +747,17 @@ export async function createSiteVisit(ctx: TenantContext, input: CreateSiteVisit
         isRead: false,
       },
     });
+
+    sendDevicePushNotification(
+      input.employeeId,
+      {
+        title: "New Site Visit Assigned 📍",
+        message: `You were assigned to visit '${visit.site.name}' for ${visit.project.code}: "${visit.purpose}"`,
+        link: `/w/${ctx.tenantSlug}/visits`,
+        tag: `visit-${visit.id}`,
+      },
+      ctx.tenantId
+    ).catch(() => {});
   } catch (err) {
     console.error("Failed to create site visit assignment notification:", err);
   }

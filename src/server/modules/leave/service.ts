@@ -1,5 +1,6 @@
 import { prisma } from "../../db/prisma";
 import { TenantContext, assertAdminOrOwner, assertTenantAccess, ForbiddenException } from "../../tenancy/context";
+import { dispatchNotification, dispatchNotificationToRoles } from "../notifications/dispatch";
 import {
   calculateMonthlyLeaveSummary,
   evaluateShortNotice,
@@ -292,6 +293,18 @@ export async function createLeaveRequest(context: TenantContext, input: CreateLe
       sourceSystem: "MANUAL",
     },
   });
+
+  if (status === "PENDING") {
+    dispatchNotificationToRoles({
+      tenantId: context.tenantId,
+      roles: ["OWNER", "ADMIN"],
+      title: "New Leave Application Submitted",
+      message: `${employee.fullName || context.userFullName} applied for ${daysQuantity} day(s) of ${input.leaveType} leave (${input.startDate} to ${input.endDate}).`,
+      link: `/w/${context.tenantSlug}/leave`,
+      tag: `leave-sub-${newRecord.id}`,
+      excludeMembershipId: context.membershipId,
+    }).catch(() => {});
+  }
 
   return newRecord;
 }
@@ -686,6 +699,17 @@ export async function approveLeaveRequest(
     return updated;
   });
 
+  if (result.employee?.membershipId) {
+    dispatchNotification({
+      tenantId: context.tenantId,
+      recipientId: result.employee.membershipId,
+      title: "Leave Request Approved 🎉",
+      message: `Your request for ${result.days.toString()} day(s) of ${result.leaveType} leave was approved by ${context.userFullName}.`,
+      link: `/w/${context.tenantSlug}/leave/my-leave`,
+      tag: `leave-approved-${result.id}`,
+    }).catch(() => {});
+  }
+
   // Outbound push to Google Sheets (non-blocking)
   import("../integrations/google-sheets-sync").then((mod) => {
     const targetEmail = result.employeeEmailRaw || result.employee?.membership?.user?.email;
@@ -796,6 +820,17 @@ export async function rejectLeaveRequest(
 
     return updated;
   });
+
+  if (result.employee?.membershipId) {
+    dispatchNotification({
+      tenantId: context.tenantId,
+      recipientId: result.employee.membershipId,
+      title: "Leave Request Not Approved",
+      message: `Your request for ${result.days.toString()} day(s) of ${result.leaveType} leave was not approved: ${rejectionReason || "Operational requirements."}`,
+      link: `/w/${context.tenantSlug}/leave/my-leave`,
+      tag: `leave-rejected-${result.id}`,
+    }).catch(() => {});
+  }
 
   // Outbound push to Google Sheets (non-blocking)
   import("../integrations/google-sheets-sync").then((mod) => {

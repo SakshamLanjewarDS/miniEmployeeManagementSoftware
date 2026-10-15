@@ -100,6 +100,7 @@ model Tenant {
   reminderConfigs          StudioReminderConfig[]
   reminderLogs             StudioReminderLog[]
   backupLogs               StudioBackupLog[]
+  devicePushSubscriptions  DevicePushSubscription[]
 
   @@map("tenants")
 }
@@ -177,6 +178,7 @@ model TenantMembership {
   reviewedCancellations    StudioLeaveCancellationRequest[] @relation("ReviewedCancellation")
   reportedSiteIssues       StudioSiteIssue[]                @relation("ReportedSiteIssue")
   verifiedSiteIssues       StudioSiteIssue[]                @relation("VerifiedSiteIssue")
+  devicePushSubscriptions  DevicePushSubscription[]
 
   @@unique([tenantId, userId])
   @@index([tenantId, role])
@@ -1248,6 +1250,23 @@ model Notification {
 
   @@index([tenantId, recipientId, isRead])
   @@map("notifications")
+}
+
+model DevicePushSubscription {
+  id           String           @id @default(uuid())
+  tenantId     String
+  tenant       Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  membershipId String
+  membership   TenantMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  endpoint     String           @db.Text
+  p256dh       String           @db.Text
+  auth         String           @db.VarChar(128)
+  userAgent    String?          @db.VarChar(255)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@index([tenantId, membershipId])
+  @@map("device_push_subscriptions")
 }
 
 model NotificationOutbox {

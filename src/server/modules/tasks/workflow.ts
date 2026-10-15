@@ -1,6 +1,7 @@
 import { prisma } from "@/server/db/prisma";
 import { TenantContext, isAdminOrOwner, ForbiddenException } from "@/server/tenancy/context";
 import { TaskWorkflowStatus, TaskPriority, Prisma } from "@prisma/client";
+import { sendDevicePushNotification, sendDevicePushToRoles } from "../notifications/push";
 
 /**
  * ----------------------------------------------------------------------------
@@ -331,6 +332,18 @@ export async function raiseTaskBlocker(
           isRead: false,
         })),
       });
+
+      sendDevicePushToRoles(
+        ctx.tenantId,
+        ["OWNER", "ADMIN"],
+        {
+          title: "⚠️ Blocker Reported on Task",
+          message: `${ctx.userFullName} reported a blocker on "${item.title}" (${task.title}): ${data.reason.trim()}`,
+          link: `/w/${ctx.tenantSlug}/tasks?taskId=${task.id}`,
+          tag: `task-blocker-${task.id}`,
+        },
+        ctx.membershipId
+      ).catch(() => {});
     }
 
     return updated;
@@ -400,6 +413,16 @@ export async function resolveTaskBlocker(
           isRead: false,
         },
       });
+      sendDevicePushNotification(
+        item.assignedMemberId,
+        {
+          title: "Blocker Resolved",
+          message: `${ctx.userFullName} resolved blocker on "${item.title}": ${data.resolutionNotes.trim()}`,
+          link: `/w/${ctx.tenantSlug}/tasks?taskId=${task.id}`,
+          tag: `task-blocker-resolved-${task.id}`,
+        },
+        ctx.tenantId
+      ).catch(() => {});
     }
 
     return updated;
@@ -625,6 +648,17 @@ export async function requestDeadlineExtension(
           isRead: false,
         })),
       });
+      sendDevicePushToRoles(
+        ctx.tenantId,
+        ["OWNER", "ADMIN"],
+        {
+          title: "Deadline Extension Requested",
+          message: `${ctx.userFullName} requested extension for "${item.title}" (${task.title}) to ${proposedDate.toLocaleDateString()}`,
+          link: `/w/${ctx.tenantSlug}/tasks?taskId=${task.id}`,
+          tag: `task-ext-${ext.id}`,
+        },
+        ctx.membershipId
+      ).catch(() => {});
     }
 
     return ext;
@@ -743,6 +777,16 @@ export async function decideDeadlineExtension(
         isRead: false,
       },
     });
+    sendDevicePushNotification(
+      ext.requesterId,
+      {
+        title: `Deadline Extension ${isApproved ? "Approved" : "Declined"}`,
+        message: `${ctx.userFullName} ${isApproved ? "approved" : "declined"} your extension request for "${ext.checklistItem.title}".`,
+        link: `/w/${ctx.tenantSlug}/tasks?taskId=${ext.taskId}`,
+        tag: `task-ext-decision-${ext.id}`,
+      },
+      ctx.tenantId
+    ).catch(() => {});
 
     return updatedRequest;
   });
@@ -952,6 +996,17 @@ export async function submitTasksForReview(
           isRead: false,
         })),
       });
+      sendDevicePushToRoles(
+        ctx.tenantId,
+        ["OWNER", "ADMIN"],
+        {
+          title: "Deliverable Work Waiting for Review",
+          message: `${ctx.userFullName} submitted ${items.length} task(s) on "${task.title}" for review.`,
+          link: `/w/${ctx.tenantSlug}/tasks?taskId=${task.id}`,
+          tag: `task-sub-${submission.id}`,
+        },
+        ctx.membershipId
+      ).catch(() => {});
     }
 
     return submission;
@@ -1111,6 +1166,16 @@ export async function reviewTaskSubmission(
           isRead: false,
         },
       });
+      sendDevicePushNotification(
+        sub.submitterId,
+        {
+          title: "Work Approved & Completed 🎉",
+          message: `${ctx.userFullName} approved your submission (v${sub.version}) on "${sub.task.title}".`,
+          link: `/w/${ctx.tenantSlug}/tasks?taskId=${sub.taskId}`,
+          tag: `task-sub-approved-${sub.id}`,
+        },
+        ctx.tenantId
+      ).catch(() => {});
     } else {
       // 5. Request Changes: move covered items back to IN_PROGRESS / CHANGES_REQUESTED
       await tx.taskChecklistItem.updateMany({
@@ -1148,6 +1213,16 @@ export async function reviewTaskSubmission(
           isRead: false,
         },
       });
+      sendDevicePushNotification(
+        sub.submitterId,
+        {
+          title: "Corrections Requested on Submitted Work",
+          message: `${ctx.userFullName} requested corrections on "${sub.task.title}": "${data.feedback?.trim()}"`,
+          link: `/w/${ctx.tenantSlug}/tasks?taskId=${sub.taskId}`,
+          tag: `task-sub-changes-${sub.id}`,
+        },
+        ctx.tenantId
+      ).catch(() => {});
     }
 
     return updatedSub;

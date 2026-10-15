@@ -15,8 +15,10 @@ import {
   ExternalLink,
   Clock,
   X,
+  Smartphone,
 } from "lucide-react";
 import { broadcastRealtimeEvent, useRealtimeSubscription } from "@/lib/realtime";
+import { getDevicePushStatus, registerDevicePush, PushStatus } from "@/lib/push-notifications";
 
 interface NotificationItem {
   id: string;
@@ -79,10 +81,39 @@ export function NotificationDropdown({ context }: NotificationDropdownProps) {
   const [unreadCount, setUnreadCount] = useState(0);
   const [activeToast, setActiveToast] = useState<NotificationItem | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [pushStatus, setPushStatus] = useState<PushStatus | null>(null);
+  const [pushLoading, setPushLoading] = useState(false);
+  const [pushMsg, setPushMsg] = useState<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      getDevicePushStatus(context.tenantSlug).then(setPushStatus).catch(() => {});
+    }
+  }, [isOpen, context.tenantSlug]);
+
+  const handleEnablePush = async () => {
+    setPushLoading(true);
+    setPushMsg(null);
+    try {
+      const res = await registerDevicePush(context.tenantSlug);
+      if (res.success) {
+        playNotificationChime();
+        setPushMsg("Device alerts enabled! Test alert sent.");
+        const updated = await getDevicePushStatus(context.tenantSlug);
+        setPushStatus(updated);
+      } else {
+        setPushMsg(res.error || "Failed to enable notifications");
+      }
+    } catch (err: any) {
+      setPushMsg(err.message || "Failed to enable notifications");
+    } finally {
+      setPushLoading(false);
+    }
+  };
 
   const dropdownRef = useRef<HTMLDivElement>(null);
   const knownNotificationIdsRef = useRef<Set<string>>(new Set());
@@ -430,6 +461,57 @@ export function NotificationDropdown({ context }: NotificationDropdownProps) {
               </span>
             </div>
           </div>
+
+          {/* DEVICE PUSH NOTIFICATION PROMPT / STATUS BANNER */}
+          {pushStatus && (
+            <div className="px-5 py-2.5 bg-slate-50 border-b border-slate-100">
+              {pushStatus.isSubscribed ? (
+                <div className="flex items-center justify-between text-xs py-1">
+                  <div className="flex items-center gap-2 text-emerald-700 font-semibold">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span>Device Push Notifications Active</span>
+                  </div>
+                  <span className="text-[10px] font-bold text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full">
+                    LIVE OS ALERTS
+                  </span>
+                </div>
+              ) : pushStatus.permission === "denied" ? (
+                <div className="text-[11px] text-amber-700 bg-amber-50 p-2 rounded-lg border border-amber-200">
+                  ⚠️ Device notifications blocked in browser. Allow in site settings to receive instant alerts.
+                </div>
+              ) : (
+                <div className="p-3 bg-gradient-to-r from-blue-50 to-indigo-50/70 border border-blue-200/60 rounded-xl flex items-center justify-between gap-3 shadow-2xs">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-8 h-8 rounded-lg bg-[#0066FF] text-white flex items-center justify-center shrink-0 shadow-2xs">
+                      <Smartphone className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-slate-900 truncate">
+                        Enable Instant Device Alerts
+                      </p>
+                      <p className="text-[11px] text-slate-500 leading-tight">
+                        Receive instant push notifications for task reviews, leaves & assignments
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleEnablePush}
+                    disabled={pushLoading}
+                    className="px-3 py-1.5 bg-[#0066FF] hover:bg-[#0052CC] text-white text-xs font-bold rounded-lg shadow-xs transition-colors shrink-0 cursor-pointer disabled:opacity-60"
+                  >
+                    {pushLoading ? "Enabling..." : "Turn On"}
+                  </button>
+                </div>
+              )}
+
+              {pushMsg && (
+                <p className="text-[10px] font-medium text-[#0066FF] mt-1.5">
+                  {pushMsg}
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Notifications Scroll Region */}
           <div className="flex-1 overflow-y-auto divide-y divide-slate-100/80">

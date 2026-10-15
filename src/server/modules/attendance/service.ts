@@ -1,6 +1,7 @@
 import { prisma } from "../../db/prisma";
 import { TenantContext, assertAdminOrOwner } from "../../tenancy/context";
 import { parseDateOnly, formatDateOnly } from "../leave/policy";
+import { dispatchNotification } from "../notifications/dispatch";
 
 export interface AttendanceFilterOptions {
   date?: string; // YYYY-MM-DD
@@ -155,7 +156,7 @@ export async function correctAttendancePunch(
     totalMinutes = Math.round((pOut.getTime() - pIn.getTime()) / (1000 * 60));
   }
 
-  return await prisma.studioAttendanceRecord.update({
+  const updated = await prisma.studioAttendanceRecord.update({
     where: { id: record.id },
     data: {
       punchIn: pIn,
@@ -166,5 +167,21 @@ export async function correctAttendancePunch(
       correctedById: context.membershipId,
       correctedAt: new Date(),
     },
+    include: {
+      employee: true,
+    },
   });
+
+  if (updated.employee?.membershipId) {
+    dispatchNotification({
+      tenantId: context.tenantId,
+      recipientId: updated.employee.membershipId,
+      title: "Attendance Regularisation Recorded ⏱️",
+      message: `Your punch on ${formatDateOnly(record.date)} was adjusted by ${context.userFullName}. Reason: ${input.correctionReason}`,
+      link: `/w/${context.tenantSlug}/attendance`,
+      tag: `attendance-${record.id}`,
+    }).catch(() => {});
+  }
+
+  return updated;
 }
