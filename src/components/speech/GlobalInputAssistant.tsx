@@ -55,6 +55,11 @@ function updateNativeInputValue(
 }
 
 export function GlobalInputAssistant() {
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   const [activeElement, setActiveElement] = useState<
     HTMLInputElement | HTMLTextAreaElement | null
   >(null);
@@ -461,6 +466,10 @@ export function GlobalInputAssistant() {
     };
   }, []);
 
+  if (!isMounted) {
+    return null;
+  }
+
   return (
     <>
       {/* 1. Attached Floating Micro-Toolbar on Focused Text Field */}
@@ -658,6 +667,7 @@ export function GlobalInputAssistant() {
       <div className="fixed bottom-5 left-5 z-40 hidden md:block">
         <button
           type="button"
+          suppressHydrationWarning
           onClick={() => setShowGuideModal(true)}
           className="flex items-center gap-2 px-3 py-1.5 bg-white/90 hover:bg-white border border-[#E2E6F0] hover:border-[#5A81FA] text-[#1F1F1F] rounded-full shadow-md hover:shadow-lg text-xs font-semibold transition-all cursor-pointer group"
           title="Voice to Text & Auto-Correct Grammar Information"

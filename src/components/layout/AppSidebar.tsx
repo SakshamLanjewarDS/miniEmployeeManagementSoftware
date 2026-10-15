@@ -333,12 +333,14 @@ export function AppSidebar({ context }: AppSidebarProps) {
       <aside
         className="w-[78px] shrink-0 h-screen sticky top-0 z-30 p-2.5 hidden lg:flex flex-col"
         aria-label="Studio Navigation (Collapsed)"
+        suppressHydrationWarning
       >
         <div className="h-full bg-white rounded-3xl border border-slate-200/80 shadow-xs flex flex-col justify-between py-3.5 px-2">
           {/* Top: Logo & Expand Trigger */}
           <div className="flex flex-col items-center gap-3">
             <button
               type="button"
+              suppressHydrationWarning
               onClick={toggleCollapse}
               title="Expand Sidebar"
               className="p-2 text-slate-500 hover:text-[#3562E8] hover:bg-slate-100 rounded-2xl transition-all cursor-pointer"
@@ -451,6 +453,7 @@ export function AppSidebar({ context }: AppSidebarProps) {
         {/* Collapse toggle (Desktop) or Close toggle (Mobile) */}
         <button
           type="button"
+          suppressHydrationWarning
           onClick={() => {
             if (isMobileOpen) setIsMobileOpen(false);
             else toggleCollapse();
@@ -596,6 +599,7 @@ export function AppSidebar({ context }: AppSidebarProps) {
       <aside
         className="w-[276px] shrink-0 h-screen sticky top-0 z-30 p-2.5 hidden lg:block"
         aria-label="Studio Navigation"
+        suppressHydrationWarning
       >
         {sidebarContent}
       </aside>
