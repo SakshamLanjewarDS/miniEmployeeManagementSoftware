@@ -94,13 +94,14 @@ export async function registerDevicePush(workspaceSlug: string): Promise<{
     }
 
     // 2. Fetch VAPID public key
+    const DEFAULT_VAPID_PUBLIC_KEY =
+      "BOCY-mlARuHqbMwBsULCjmcPkgjFL56Lo0vyAj7L1spdlhLocvfIGQgZx3P_gQApPREy6yFPAKOWAQEtCAP-wEg";
+
     const statusRes = await fetch(`/api/notifications/push-subscribe?workspaceSlug=${workspaceSlug}`);
     const statusData = await statusRes.json();
-    const vapidPublicKey = statusData.publicKey || process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+    const vapidPublicKey =
+      statusData.publicKey || process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || DEFAULT_VAPID_PUBLIC_KEY;
 
-    if (!vapidPublicKey) {
-      return { success: false, error: "VAPID Public Key not configured on server." };
-    }
 
     // 3. Ensure service worker is registered & ready
     let reg = await navigator.serviceWorker.getRegistration();

@@ -23,8 +23,11 @@ export async function GET(req: NextRequest) {
       },
     });
 
+    const DEFAULT_VAPID_PUBLIC_KEY =
+      "BOCY-mlARuHqbMwBsULCjmcPkgjFL56Lo0vyAj7L1spdlhLocvfIGQgZx3P_gQApPREy6yFPAKOWAQEtCAP-wEg";
+
     return NextResponse.json({
-      publicKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || null,
+      publicKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || DEFAULT_VAPID_PUBLIC_KEY,
       isSubscribed: count > 0,
       activeDeviceCount: count,
     });

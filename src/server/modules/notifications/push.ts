@@ -1,8 +1,13 @@
 import webpush from "web-push";
 import { prisma } from "../../db/prisma";
 
-const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-const privateKey = process.env.VAPID_PRIVATE_KEY;
+export const DEFAULT_VAPID_PUBLIC_KEY =
+  "BOCY-mlARuHqbMwBsULCjmcPkgjFL56Lo0vyAj7L1spdlhLocvfIGQgZx3P_gQApPREy6yFPAKOWAQEtCAP-wEg";
+export const DEFAULT_VAPID_PRIVATE_KEY =
+  "6kKtbNI1dueRZI4lu46GGosuqtuYnlfdkAzfTNx8w0o";
+
+const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || DEFAULT_VAPID_PUBLIC_KEY;
+const privateKey = process.env.VAPID_PRIVATE_KEY || DEFAULT_VAPID_PRIVATE_KEY;
 const subject = process.env.VAPID_SUBJECT || "mailto:admin@100percentdesign.in";
 
 let isVapidReady = false;
