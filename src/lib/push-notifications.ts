@@ -103,22 +103,31 @@ export async function registerDevicePush(workspaceSlug: string): Promise<{
       statusData.publicKey || process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || DEFAULT_VAPID_PUBLIC_KEY;
 
 
-    // 3. Ensure service worker is registered & ready
+    // 3. Ensure service worker is registered, updated & ready
     let reg = await navigator.serviceWorker.getRegistration();
     if (!reg) {
       reg = await navigator.serviceWorker.register("/sw.js");
+    } else {
+      await reg.update().catch(() => {});
     }
-    await navigator.serviceWorker.ready;
+    reg = await navigator.serviceWorker.ready;
+    await reg.update().catch(() => {});
 
-    // 4. Subscribe to Push Manager
+    // 4. Renew subscription with current VAPID key
     let subscription = await reg.pushManager.getSubscription();
-    if (!subscription) {
-      const convertedVapidKey = urlBase64ToUint8Array(vapidPublicKey);
-      subscription = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: convertedVapidKey,
-      });
+    if (subscription) {
+      try {
+        await subscription.unsubscribe();
+      } catch (e) {
+        console.warn("[Push] Failed to clean up prior subscription:", e);
+      }
     }
+
+    const convertedVapidKey = urlBase64ToUint8Array(vapidPublicKey);
+    subscription = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: convertedVapidKey,
+    });
 
     // 5. Send subscription to our server
     const subscribeRes = await fetch("/api/notifications/push-subscribe", {

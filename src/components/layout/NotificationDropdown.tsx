@@ -115,6 +115,27 @@ export function NotificationDropdown({ context }: NotificationDropdownProps) {
     }
   };
 
+  const handleTestPush = async () => {
+    setPushLoading(true);
+    setPushMsg(null);
+    try {
+      const res = await fetch("/api/notifications/test-push", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          workspaceSlug: context.tenantSlug,
+          delaySeconds: 3,
+        }),
+      });
+      const data = await res.json();
+      setPushMsg(data.message || "Test scheduled in 3 seconds! Minimize or close now.");
+    } catch {
+      setPushMsg("Failed to schedule test push");
+    } finally {
+      setPushLoading(false);
+    }
+  };
+
   const dropdownRef = useRef<HTMLDivElement>(null);
   const knownNotificationIdsRef = useRef<Set<string>>(new Set());
   const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -466,13 +487,23 @@ export function NotificationDropdown({ context }: NotificationDropdownProps) {
           {pushStatus && (
             <div className="px-5 py-2.5 bg-slate-50 border-b border-slate-100">
               {pushStatus.isSubscribed ? (
-                <div className="flex items-center justify-between text-xs py-1">
-                  <div className="flex items-center gap-2 text-emerald-700 font-semibold">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                    <span>Device Push Notifications Active</span>
+                <div className="flex flex-col gap-1.5 py-1">
+                  <div className="flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2 text-emerald-700 font-semibold">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                      <span>Device Notifications Active</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleTestPush}
+                      disabled={pushLoading}
+                      className="text-[11px] font-bold text-[#0066FF] hover:underline cursor-pointer disabled:opacity-50"
+                    >
+                      {pushLoading ? "Scheduling..." : "Test Background (3s)"}
+                    </button>
                   </div>
-                  <span className="text-[10px] font-bold text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full">
-                    LIVE OS ALERTS
+                  <span className="text-[10px] text-slate-500">
+                    Active for this device. Click &apos;Test Background&apos;, then minimize window to verify.
                   </span>
                 </div>
               ) : pushStatus.permission === "denied" ? (

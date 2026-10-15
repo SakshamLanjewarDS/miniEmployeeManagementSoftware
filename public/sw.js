@@ -113,8 +113,10 @@ self.addEventListener("push", (event) => {
     body: data.message,
     icon: data.icon || "/icons/icon-192.png",
     badge: data.badge || "/icons/favicon-32x32.png",
-    tag: data.tag || "studio-os-alert",
+    tag: data.tag || `studio-os-${Date.now()}`,
     renotify: true,
+    requireInteraction: true,
+    silent: false,
     vibrate: [200, 100, 200],
     data: {
       url: data.link || "/w",
