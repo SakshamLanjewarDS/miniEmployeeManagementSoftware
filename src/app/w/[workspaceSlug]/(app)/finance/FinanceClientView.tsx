@@ -36,8 +36,10 @@ import {
   CheckCircle2,
   X,
   Search,
+  SlidersHorizontal,
 } from "lucide-react";
 import { SearchableDropdown } from "@/components/ui/SearchableDropdown";
+import { MobileFilterDrawer } from "@/components/ui/MobileFilterDrawer";
 
 export interface FeeMilestoneItem {
   id: string;
@@ -190,6 +192,21 @@ export default function FinanceClientView({
   const [milestoneSearch, setMilestoneSearch] = useState("");
   const [milestoneStatusFilter, setMilestoneStatusFilter] = useState<string>("ALL");
   const [milestoneSortBy, setMilestoneSortBy] = useState<string>("DATE_ASC");
+  const [isMobileMilestoneFilterOpen, setIsMobileMilestoneFilterOpen] = useState(false);
+
+  const activeMilestoneFilterCount = useMemo(() => {
+    let count = 0;
+    if (milestoneSearch.trim()) count++;
+    if (milestoneStatusFilter !== "ALL") count++;
+    if (milestoneSortBy !== "DATE_ASC") count++;
+    return count;
+  }, [milestoneSearch, milestoneStatusFilter, milestoneSortBy]);
+
+  const handleClearMilestoneFilters = () => {
+    setMilestoneSearch("");
+    setMilestoneStatusFilter("ALL");
+    setMilestoneSortBy("DATE_ASC");
+  };
 
   // Mounting state to prevent browser extension hydration attribute mismatches (e.g. fdprocessedid)
   const [isMounted, setIsMounted] = useState(false);
@@ -687,33 +704,170 @@ export default function FinanceClientView({
               /* SCREEN 3: Populated Milestone State */
               <div className="space-y-3">
                 {/* Search, Filter, and Sort Toolbar */}
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-2.5 p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-xs">
-                  {/* Search Box */}
-                  <div className="relative flex-1 max-w-sm">
-                    <Search className="w-3.5 h-3.5 text-[#64748B] absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="text"
-                      value={milestoneSearch}
-                      onChange={(e) => setMilestoneSearch(e.target.value)}
-                      placeholder="Search milestone or project..."
-                      className="w-full pl-8 pr-7 py-1.5 bg-white border border-[#E2E6F0] rounded-lg text-xs text-[#0F172A] placeholder-[#64748B] focus:outline-none focus:ring-1 focus:ring-[#5A81FA]"
-                    />
-                    {milestoneSearch && (
+                <div className="flex flex-col gap-2.5 p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-xs">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-2.5">
+                    {/* Search Box & Mobile Filter Button */}
+                    <div className="flex items-center gap-2 flex-1 max-w-md">
+                      <div className="relative flex-1">
+                        <Search className="w-3.5 h-3.5 text-[#64748B] absolute left-3 top-1/2 -translate-y-1/2" />
+                        <input
+                          type="text"
+                          value={milestoneSearch}
+                          onChange={(e) => setMilestoneSearch(e.target.value)}
+                          placeholder="Search milestone or project..."
+                          className="w-full pl-8 pr-7 py-1.5 bg-white border border-[#E2E6F0] rounded-lg text-xs text-[#0F172A] placeholder-[#64748B] focus:outline-none focus:ring-1 focus:ring-[#5A81FA]"
+                        />
+                        {milestoneSearch && (
+                          <button
+                            onClick={() => setMilestoneSearch("")}
+                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Mobile Filter Button */}
                       <button
-                        onClick={() => setMilestoneSearch("")}
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                        type="button"
+                        onClick={() => setIsMobileMilestoneFilterOpen(true)}
+                        className={`md:hidden px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 shrink-0 border cursor-pointer ${
+                          activeMilestoneFilterCount > 0
+                            ? "bg-blue-50 border-[#3562E8] text-[#3562E8] font-bold shadow-xs"
+                            : "bg-white border-[#E2E6F0] text-slate-700 hover:bg-[#F8F9FD]"
+                        }`}
+                        title="Open all filters"
                       >
-                        <X className="w-3.5 h-3.5" />
+                        <SlidersHorizontal className="w-3.5 h-3.5 text-[#3562E8]" />
+                        <span>Filters</span>
+                        {activeMilestoneFilterCount > 0 && (
+                          <span className="w-5 h-5 rounded-full bg-[#3562E8] text-white text-[10px] font-mono font-bold flex items-center justify-center">
+                            {activeMilestoneFilterCount}
+                          </span>
+                        )}
                       </button>
-                    )}
+                    </div>
+
+                    {/* Desktop Filter and Sort Selectors (hidden on mobile, visible on md and up) */}
+                    <div className="hidden md:flex flex-wrap items-center gap-2">
+                      {/* Status Filter */}
+                      <div className="min-w-[140px]">
+                        <SearchableDropdown
+                          size="sm"
+                          optionType="status"
+                          value={milestoneStatusFilter}
+                          onChange={setMilestoneStatusFilter}
+                          placeholder="All Statuses"
+                          searchable={false}
+                          clearable={false}
+                          options={[
+                            { value: "ALL", label: "All Statuses" },
+                            { value: "PENDING", label: "Pending", subLabel: "Not yet invoiced" },
+                            { value: "INVOICED", label: "Invoiced", subLabel: "Invoice raised" },
+                            { value: "PAID", label: "Paid", subLabel: "Funds received" },
+                          ]}
+                        />
+                      </div>
+
+                      {/* Sort Filter */}
+                      <div className="min-w-[190px]">
+                        <SearchableDropdown
+                          size="sm"
+                          value={milestoneSortBy}
+                          onChange={setMilestoneSortBy}
+                          placeholder="Sort By"
+                          searchable={false}
+                          clearable={false}
+                          options={[
+                            { value: "DATE_ASC", label: "Target Date (Earliest First)" },
+                            { value: "DATE_DESC", label: "Target Date (Latest First)" },
+                            { value: "ALPHA_TITLE_ASC", label: "Title (A → Z)" },
+                            { value: "ALPHA_TITLE_DESC", label: "Title (Z → A)" },
+                            { value: "ALPHA_PROJECT_ASC", label: "Project Code (A → Z)" },
+                            { value: "AMOUNT_DESC", label: "Amount (Highest First)" },
+                            { value: "AMOUNT_ASC", label: "Amount (Lowest First)" },
+                          ]}
+                        />
+                      </div>
+
+                      {activeMilestoneFilterCount > 0 && (
+                        <button
+                          onClick={handleClearMilestoneFilters}
+                          className="text-[11px] text-[#5A81FA] hover:underline font-semibold px-1 cursor-pointer"
+                        >
+                          Reset
+                        </button>
+                      )}
+                    </div>
                   </div>
 
-                  {/* Filter and Sort Selectors */}
-                  <div className="flex flex-wrap items-center gap-2">
-                    {/* Status Filter */}
-                    <div className="min-w-[140px]">
+                  {/* Mobile View: 1-Tap Quick Filter Carousel */}
+                  <div className="md:hidden flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none -mx-1 px-1 pt-1 border-t border-slate-200/60">
+                    <button
+                      type="button"
+                      onClick={() => setMilestoneStatusFilter("ALL")}
+                      className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-colors shrink-0 ${
+                        milestoneStatusFilter === "ALL"
+                          ? "bg-[#3562E8] text-white shadow-xs"
+                          : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
+                      }`}
+                    >
+                      All ({activeMilestones.length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMilestoneStatusFilter((prev) => (prev === "PENDING" ? "ALL" : "PENDING"))}
+                      className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-colors shrink-0 flex items-center gap-1 ${
+                        milestoneStatusFilter === "PENDING"
+                          ? "bg-amber-600 text-white shadow-xs"
+                          : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
+                      }`}
+                    >
+                      <Clock className="w-3 h-3" />
+                      <span>Pending</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMilestoneStatusFilter((prev) => (prev === "INVOICED" ? "ALL" : "INVOICED"))}
+                      className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-colors shrink-0 flex items-center gap-1 ${
+                        milestoneStatusFilter === "INVOICED"
+                          ? "bg-[#3562E8] text-white shadow-xs"
+                          : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
+                      }`}
+                    >
+                      <span>Invoiced</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMilestoneStatusFilter((prev) => (prev === "PAID" ? "ALL" : "PAID"))}
+                      className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-colors shrink-0 flex items-center gap-1 ${
+                        milestoneStatusFilter === "PAID"
+                          ? "bg-emerald-600 text-white shadow-xs"
+                          : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
+                      }`}
+                    >
+                      <CheckCircle2 className="w-3 h-3" />
+                      <span>Paid</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Mobile Filter Drawer for Finance */}
+                <MobileFilterDrawer
+                  isOpen={isMobileMilestoneFilterOpen}
+                  onClose={() => setIsMobileMilestoneFilterOpen(false)}
+                  title="Filter Milestones"
+                  activeCount={activeMilestoneFilterCount}
+                  onReset={handleClearMilestoneFilters}
+                  resultCount={filteredAndSortedMilestones.length}
+                >
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">
+                        Milestone Status
+                      </label>
                       <SearchableDropdown
-                        size="sm"
+                        size="md"
                         optionType="status"
                         value={milestoneStatusFilter}
                         onChange={setMilestoneStatusFilter}
@@ -726,13 +880,16 @@ export default function FinanceClientView({
                           { value: "INVOICED", label: "Invoiced", subLabel: "Invoice raised" },
                           { value: "PAID", label: "Paid", subLabel: "Funds received" },
                         ]}
+                        className="w-full"
                       />
                     </div>
 
-                    {/* Sort Filter */}
-                    <div className="min-w-[190px]">
+                    <div>
+                      <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">
+                        Sort Order
+                      </label>
                       <SearchableDropdown
-                        size="sm"
+                        size="md"
                         value={milestoneSortBy}
                         onChange={setMilestoneSortBy}
                         placeholder="Sort By"
@@ -747,23 +904,11 @@ export default function FinanceClientView({
                           { value: "AMOUNT_DESC", label: "Amount (Highest First)" },
                           { value: "AMOUNT_ASC", label: "Amount (Lowest First)" },
                         ]}
+                        className="w-full"
                       />
                     </div>
-
-                    {(milestoneSearch || milestoneStatusFilter !== "ALL" || milestoneSortBy !== "DATE_ASC") && (
-                      <button
-                        onClick={() => {
-                          setMilestoneSearch("");
-                          setMilestoneStatusFilter("ALL");
-                          setMilestoneSortBy("DATE_ASC");
-                        }}
-                        className="text-[11px] text-[#5A81FA] hover:underline font-semibold px-1 cursor-pointer"
-                      >
-                        Reset
-                      </button>
-                    )}
                   </div>
-                </div>
+                </MobileFilterDrawer>
 
                 {filteredAndSortedMilestones.length === 0 ? (
                   <div className="p-6 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-center space-y-1 text-slate-500 text-xs">

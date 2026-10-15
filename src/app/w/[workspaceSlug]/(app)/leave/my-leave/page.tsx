@@ -880,10 +880,10 @@ export default function EmployeeMyLeavePage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
             {/* Search Input */}
-            <div className="relative">
-              <Search className="w-3.5 h-3.5 text-[#696E82] absolute left-2.5 top-2.5" />
+            <div className="relative flex-1 sm:flex-initial">
+              <Search className="w-3.5 h-3.5 text-[#696E82] absolute left-2.5 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 placeholder="Search reason or type..."
@@ -892,18 +892,18 @@ export default function EmployeeMyLeavePage() {
                   setHistorySearch(e.target.value);
                   setHistoryPage(1);
                 }}
-                className="pl-8 pr-3 py-1.5 text-xs rounded-xl border border-[#E2E6F0] bg-white focus:outline-none focus:border-[#5A81FA]"
+                className="w-full sm:w-48 pl-8 pr-3 py-2 sm:py-1.5 text-xs rounded-xl border border-[#E2E6F0] bg-white focus:outline-none focus:border-[#5A81FA]"
               />
             </div>
 
-            {/* Status Filter */}
+            {/* Desktop Status Filter Dropdown */}
             <select
               value={historyStatusFilter}
               onChange={(e) => {
                 setHistoryStatusFilter(e.target.value);
                 setHistoryPage(1);
               }}
-              className="px-2.5 py-1.5 text-xs rounded-xl border border-[#E2E6F0] bg-white focus:outline-none focus:border-[#5A81FA]"
+              className="hidden sm:block px-2.5 py-1.5 text-xs rounded-xl border border-[#E2E6F0] bg-white focus:outline-none focus:border-[#5A81FA]"
             >
               <option value="ALL">All Statuses</option>
               <option value="PENDING">Pending</option>
@@ -911,6 +911,36 @@ export default function EmployeeMyLeavePage() {
               <option value="REJECTED">Rejected</option>
               <option value="CANCELLED">Cancelled</option>
             </select>
+
+            {/* Mobile 1-Tap Status Carousel */}
+            <div className="sm:hidden flex items-center gap-1.5 overflow-x-auto touch-scroll-x scrollbar-none pb-0.5 pt-1">
+              {[
+                { id: "ALL", label: "All" },
+                { id: "PENDING", label: "Pending" },
+                { id: "APPROVED", label: "Approved" },
+                { id: "REJECTED", label: "Rejected" },
+                { id: "CANCELLED", label: "Cancelled" },
+              ].map((pill) => {
+                const active = historyStatusFilter === pill.id;
+                return (
+                  <button
+                    key={pill.id}
+                    type="button"
+                    onClick={() => {
+                      setHistoryStatusFilter(pill.id);
+                      setHistoryPage(1);
+                    }}
+                    className={`px-3 py-1.5 rounded-full text-[11px] font-semibold whitespace-nowrap shrink-0 transition-colors ${
+                      active
+                        ? "bg-[#5A81FA] text-white shadow-xs"
+                        : "bg-[#F8F9FD] text-[#696E82] border border-[#E2E6F0] hover:bg-slate-100"
+                    }`}
+                  >
+                    {pill.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
 

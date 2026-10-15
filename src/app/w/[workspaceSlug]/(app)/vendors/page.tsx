@@ -27,6 +27,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { broadcastRealtimeEvent, useRealtimeSubscription } from "@/lib/realtime";
+import MobileFilterDrawer from "@/components/ui/MobileFilterDrawer";
 
 export default function VendorManagementPage() {
   const params = useParams();
@@ -39,6 +40,10 @@ export default function VendorManagementPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [industryFilter, setIndustryFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
+
+  // Active filter count for mobile badge
+  const mobileActiveFilterCount = (industryFilter ? 1 : 0) + (statusFilter ? 1 : 0);
 
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [form, setForm] = useState({
@@ -383,47 +388,141 @@ export default function VendorManagementPage() {
       </div>
 
       {/* Filter Bar */}
-      <div className="p-3 bg-white rounded-2xl border border-[#E2E6F0] shadow-2xs flex flex-wrap items-center justify-between gap-3">
-        <div className="relative flex-1 min-w-[240px]">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#696E82]" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && fetchVendors()}
-            placeholder="Search by vendor, company, materials, or private notes..."
-            className="w-full pl-9 pr-3 py-1.5 text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:outline-none focus:border-[#5A81FA] text-[#1F1F1F]"
-          />
+      <div className="p-3 bg-white rounded-2xl border border-[#E2E6F0] shadow-2xs space-y-2.5">
+        <div className="flex items-center gap-2">
+          {/* Main Search Input */}
+          <div className="relative flex-1">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#696E82]" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && fetchVendors()}
+              placeholder="Search vendor, materials, notes..."
+              className="w-full pl-9 pr-3 py-2 sm:py-1.5 text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:outline-none focus:border-[#5A81FA] text-[#1F1F1F]"
+            />
+          </div>
+
+          {/* Mobile Filter Button */}
+          <button
+            type="button"
+            onClick={() => setIsMobileFilterOpen(true)}
+            className="sm:hidden relative flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-[#E2E6F0] bg-white text-xs font-semibold text-[#1F1F1F] active:scale-95 transition-all shrink-0"
+            aria-label="Open filter sidebar"
+          >
+            <Filter className="w-3.5 h-3.5 text-[#5A81FA]" />
+            <span>Filters</span>
+            {mobileActiveFilterCount > 0 && (
+              <span className="w-4 h-4 rounded-full bg-[#5A81FA] text-white text-[10px] font-bold flex items-center justify-center ml-0.5">
+                {mobileActiveFilterCount}
+              </span>
+            )}
+          </button>
+
+          {/* Desktop Filter Dropdowns */}
+          <div className="hidden sm:flex items-center gap-2">
+            <select
+              value={industryFilter}
+              onChange={(e) => setIndustryFilter(e.target.value)}
+              className="px-2.5 py-1.5 text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] focus:outline-none focus:border-[#5A81FA]"
+            >
+              <option value="">All Categories</option>
+              <option value="Marble & Granite">Marble & Granite</option>
+              <option value="Carpentry & Veneers">Carpentry & Veneers</option>
+              <option value="Glass & Aluminium">Glass & Aluminium</option>
+              <option value="Architectural Lighting">Lighting</option>
+              <option value="HVAC & Automation">HVAC & Automation</option>
+              <option value="Sanitaryware & Tiles">Sanitaryware</option>
+            </select>
+
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="px-2.5 py-1.5 text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] focus:outline-none focus:border-[#5A81FA]"
+            >
+              <option value="">All Statuses</option>
+              <option value="ACTIVE">Active</option>
+              <option value="PARTNERED">Partnered</option>
+              <option value="FOLLOW_UP">Follow Up</option>
+              <option value="INACTIVE">Inactive</option>
+            </select>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <select
-            value={industryFilter}
-            onChange={(e) => setIndustryFilter(e.target.value)}
-            className="px-2.5 py-1.5 text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] focus:outline-none focus:border-[#5A81FA]"
-          >
-            <option value="">All Categories</option>
-            <option value="Marble & Granite">Marble & Granite</option>
-            <option value="Carpentry & Veneers">Carpentry & Veneers</option>
-            <option value="Glass & Aluminium">Glass & Aluminium</option>
-            <option value="Architectural Lighting">Lighting</option>
-            <option value="HVAC & Automation">HVAC & Automation</option>
-            <option value="Sanitaryware & Tiles">Sanitaryware</option>
-          </select>
-
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-2.5 py-1.5 text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] focus:outline-none focus:border-[#5A81FA]"
-          >
-            <option value="">All Statuses</option>
-            <option value="ACTIVE">Active</option>
-            <option value="PARTNERED">Partnered</option>
-            <option value="FOLLOW_UP">Follow Up</option>
-            <option value="INACTIVE">Inactive</option>
-          </select>
+        {/* Mobile Horizontal Quick Status Carousel (1-tap access) */}
+        <div className="sm:hidden flex items-center gap-1.5 overflow-x-auto touch-scroll-x scrollbar-none pb-0.5 pt-0.5">
+          {[
+            { id: "", label: "All" },
+            { id: "ACTIVE", label: "Active" },
+            { id: "PARTNERED", label: "Partnered" },
+            { id: "FOLLOW_UP", label: "Follow Up" },
+            { id: "INACTIVE", label: "Inactive" },
+          ].map((pill) => {
+            const active = statusFilter === pill.id;
+            return (
+              <button
+                key={pill.id}
+                type="button"
+                onClick={() => setStatusFilter(pill.id)}
+                className={`px-3 py-1.5 rounded-full text-[11px] font-semibold whitespace-nowrap shrink-0 transition-colors ${
+                  active
+                    ? "bg-[#5A81FA] text-white shadow-xs"
+                    : "bg-[#F8F9FD] text-[#696E82] border border-[#E2E6F0] hover:bg-slate-100"
+                }`}
+              >
+                {pill.label}
+              </button>
+            );
+          })}
         </div>
       </div>
+
+      {/* Mobile Filter Drawer / Bottom Sheet */}
+      <MobileFilterDrawer
+        isOpen={isMobileFilterOpen}
+        onClose={() => setIsMobileFilterOpen(false)}
+        title="Vendor Filters"
+        activeCount={mobileActiveFilterCount}
+        onReset={() => {
+          setIndustryFilter("");
+          setStatusFilter("");
+        }}
+        resultsCount={vendors.length}
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-[#1F1F1F] mb-1.5">Material & Trade Category</label>
+            <select
+              value={industryFilter}
+              onChange={(e) => setIndustryFilter(e.target.value)}
+              className="w-full px-3 py-2 text-xs bg-white border border-[#E2E6F0] rounded-xl text-[#1F1F1F] focus:outline-none focus:border-[#5A81FA]"
+            >
+              <option value="">All Categories</option>
+              <option value="Marble & Granite">Marble & Granite</option>
+              <option value="Carpentry & Veneers">Carpentry & Veneers</option>
+              <option value="Glass & Aluminium">Glass & Aluminium</option>
+              <option value="Architectural Lighting">Architectural Lighting</option>
+              <option value="HVAC & Automation">HVAC & Automation</option>
+              <option value="Sanitaryware & Tiles">Sanitaryware & Tiles</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-[#1F1F1F] mb-1.5">Engagement Status</label>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="w-full px-3 py-2 text-xs bg-white border border-[#E2E6F0] rounded-xl text-[#1F1F1F] focus:outline-none focus:border-[#5A81FA]"
+            >
+              <option value="">All Statuses</option>
+              <option value="ACTIVE">Active</option>
+              <option value="PARTNERED">Partnered</option>
+              <option value="FOLLOW_UP">Follow Up</option>
+              <option value="INACTIVE">Inactive</option>
+            </select>
+          </div>
+        </div>
+      </MobileFilterDrawer>
 
       {/* Vendors Grid */}
       {loading ? (

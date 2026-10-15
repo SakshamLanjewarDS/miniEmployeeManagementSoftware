@@ -23,6 +23,8 @@ import {
   Send,
 } from "lucide-react";
 
+import MobileFilterDrawer from "@/components/ui/MobileFilterDrawer";
+
 export default function ExecutiveTasksPage() {
   const params = useParams();
   const workspaceSlug = (params?.workspaceSlug as string) || "100percentdesign";
@@ -37,6 +39,10 @@ export default function ExecutiveTasksPage() {
   const [priorityFilter, setPriorityFilter] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [viewMode, setViewMode] = useState<"table" | "kanban">("table");
+  const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
+
+  // Active filters count for mobile indicator
+  const mobileActiveFilterCount = (statusFilter ? 1 : 0) + (priorityFilter ? 1 : 0);
 
   // Drawer & Modals
   const [selectedTask, setSelectedTask] = useState<any | null>(null);
@@ -268,44 +274,136 @@ export default function ExecutiveTasksPage() {
       )}
 
       {/* Filter Bar */}
-      <div className="p-3 bg-white rounded-2xl border border-[#E2E6F0] shadow-2xs flex flex-wrap items-center justify-between gap-3">
-        <div className="relative flex-1 min-w-[240px]">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#696E82]" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search deliverables, specs, or categories..."
-            className="w-full pl-9 pr-3 py-1.5 text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:outline-none focus:border-[#5A81FA] text-[#1F1F1F]"
-          />
+      <div className="p-3 bg-white rounded-2xl border border-[#E2E6F0] shadow-2xs space-y-2.5">
+        <div className="flex items-center gap-2">
+          {/* Main Search Input */}
+          <div className="relative flex-1">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#696E82]" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search deliverables, specs, or categories..."
+              className="w-full pl-9 pr-3 py-2 sm:py-1.5 text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:outline-none focus:border-[#5A81FA] text-[#1F1F1F]"
+            />
+          </div>
+
+          {/* Mobile Filter Button */}
+          <button
+            type="button"
+            onClick={() => setIsMobileFilterOpen(true)}
+            className="sm:hidden relative flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-[#E2E6F0] bg-white text-xs font-semibold text-[#1F1F1F] active:scale-95 transition-all shrink-0"
+            aria-label="Open filter sidebar"
+          >
+            <Filter className="w-3.5 h-3.5 text-[#5A81FA]" />
+            <span>Filters</span>
+            {mobileActiveFilterCount > 0 && (
+              <span className="w-4 h-4 rounded-full bg-[#5A81FA] text-white text-[10px] font-bold flex items-center justify-center ml-0.5">
+                {mobileActiveFilterCount}
+              </span>
+            )}
+          </button>
+
+          {/* Desktop Filter Dropdowns */}
+          <div className="hidden sm:flex items-center gap-2">
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="px-2.5 py-1.5 text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] focus:outline-none focus:border-[#5A81FA]"
+            >
+              <option value="">All Statuses</option>
+              <option value="TO_DO">To Do</option>
+              <option value="IN_PROGRESS">In Progress</option>
+              <option value="WAITING">Waiting</option>
+              <option value="DONE">Done</option>
+            </select>
+
+            <select
+              value={priorityFilter}
+              onChange={(e) => setPriorityFilter(e.target.value)}
+              className="px-2.5 py-1.5 text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] focus:outline-none focus:border-[#5A81FA]"
+            >
+              <option value="">All Priorities</option>
+              <option value="LOW">Low</option>
+              <option value="MEDIUM">Medium</option>
+              <option value="HIGH">High</option>
+              <option value="URGENT">Urgent</option>
+            </select>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-2.5 py-1.5 text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] focus:outline-none focus:border-[#5A81FA]"
-          >
-            <option value="">All Statuses</option>
-            <option value="TO_DO">To Do</option>
-            <option value="IN_PROGRESS">In Progress</option>
-            <option value="WAITING">Waiting</option>
-            <option value="DONE">Done</option>
-          </select>
-
-          <select
-            value={priorityFilter}
-            onChange={(e) => setPriorityFilter(e.target.value)}
-            className="px-2.5 py-1.5 text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] focus:outline-none focus:border-[#5A81FA]"
-          >
-            <option value="">All Priorities</option>
-            <option value="LOW">Low</option>
-            <option value="MEDIUM">Medium</option>
-            <option value="HIGH">High</option>
-            <option value="URGENT">Urgent</option>
-          </select>
+        {/* Mobile Horizontal Quick Status Carousel (1-tap access) */}
+        <div className="sm:hidden flex items-center gap-1.5 overflow-x-auto touch-scroll-x scrollbar-none pb-0.5 pt-0.5">
+          {[
+            { id: "", label: "All" },
+            { id: "TO_DO", label: "To Do" },
+            { id: "IN_PROGRESS", label: "In Progress" },
+            { id: "WAITING", label: "Waiting" },
+            { id: "DONE", label: "Done" },
+          ].map((pill) => {
+            const active = statusFilter === pill.id;
+            return (
+              <button
+                key={pill.id}
+                type="button"
+                onClick={() => setStatusFilter(pill.id)}
+                className={`px-3 py-1.5 rounded-full text-[11px] font-semibold whitespace-nowrap shrink-0 transition-colors ${
+                  active
+                    ? "bg-[#5A81FA] text-white shadow-xs"
+                    : "bg-[#F8F9FD] text-[#696E82] border border-[#E2E6F0] hover:bg-slate-100"
+                }`}
+              >
+                {pill.label}
+              </button>
+            );
+          })}
         </div>
       </div>
+
+      {/* Mobile Filter Drawer / Bottom Sheet */}
+      <MobileFilterDrawer
+        isOpen={isMobileFilterOpen}
+        onClose={() => setIsMobileFilterOpen(false)}
+        title="Executive Filters"
+        activeCount={mobileActiveFilterCount}
+        onReset={() => {
+          setStatusFilter("");
+          setPriorityFilter("");
+        }}
+        resultsCount={tasks.length}
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-[#1F1F1F] mb-1.5">Deliverable Status</label>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="w-full px-3 py-2 text-xs bg-white border border-[#E2E6F0] rounded-xl text-[#1F1F1F] focus:outline-none focus:border-[#5A81FA]"
+            >
+              <option value="">All Statuses</option>
+              <option value="TO_DO">To Do</option>
+              <option value="IN_PROGRESS">In Progress</option>
+              <option value="WAITING">Waiting</option>
+              <option value="DONE">Done</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-[#1F1F1F] mb-1.5">Priority Level</label>
+            <select
+              value={priorityFilter}
+              onChange={(e) => setPriorityFilter(e.target.value)}
+              className="w-full px-3 py-2 text-xs bg-white border border-[#E2E6F0] rounded-xl text-[#1F1F1F] focus:outline-none focus:border-[#5A81FA]"
+            >
+              <option value="">All Priorities</option>
+              <option value="LOW">Low</option>
+              <option value="MEDIUM">Medium</option>
+              <option value="HIGH">High</option>
+              <option value="URGENT">Urgent</option>
+            </select>
+          </div>
+        </div>
+      </MobileFilterDrawer>
 
       {/* Main View: Table or Kanban */}
       {viewMode === "table" ? (

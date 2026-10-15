@@ -47,6 +47,7 @@ import { CustomFieldsManagerModal } from "@/components/custom-fields/CustomField
 import { DynamicFormFields } from "@/components/custom-fields/DynamicFormFields";
 import { DynamicCardFields } from "@/components/custom-fields/DynamicCardFields";
 import { SearchableDropdown, SearchableSelect } from "@/components/ui/SearchableDropdown";
+import { MobileFilterDrawer } from "@/components/ui/MobileFilterDrawer";
 import {
   getAllTypologies,
   ProjectProfileCircle,
@@ -202,6 +203,7 @@ export function ProjectsClientView({
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [phaseFilter, setPhaseFilter] = useState<string>("ALL");
   const [isAdvancedFilterOpen, setIsAdvancedFilterOpen] = useState(false);
+  const [isMobileProjectFilterOpen, setIsMobileProjectFilterOpen] = useState(false);
   const [typologyFilter, setTypologyFilter] = useState<string>("ALL");
   const [architectFilter, setArchitectFilter] = useState<string>("ALL");
   const [managerFilter, setManagerFilter] = useState<string>("ALL");
@@ -984,121 +986,219 @@ export function ProjectsClientView({
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="bg-white border border-[#E2E6F0] rounded-2xl p-4 shadow-2xs space-y-3" suppressHydrationWarning>
+      <div className="bg-white border border-[#E2E6F0] rounded-2xl p-3.5 sm:p-4 shadow-2xs space-y-3" suppressHydrationWarning>
         <div className="flex flex-col md:flex-row items-center gap-3">
-          {/* Search Box */}
-          <div className="relative flex-1 w-full">
-            <Search className="w-4 h-4 text-[#696E82] absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              suppressHydrationWarning
-              placeholder="Search by project name, code (e.g. PRJ-001), client, or site..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:outline-none focus:border-[#5A81FA] focus:ring-1 focus:ring-[#5A81FA] transition-colors"
-            />
-          </div>
+          {/* Search Box & Mobile Filter Button */}
+          <div className="flex items-center gap-2 flex-1 w-full">
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 text-[#696E82] absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                suppressHydrationWarning
+                placeholder="Search by project name, code (e.g. PRJ-001), client, or site..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-7 py-2 text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:outline-none focus:border-[#5A81FA] focus:ring-1 focus:ring-[#5A81FA] transition-colors"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  suppressHydrationWarning
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#696E82] hover:text-[#1F1F1F] p-0.5"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
 
-          {/* Status Filter */}
-          <div className="min-w-[145px] w-full md:w-auto">
-            <SearchableDropdown
-              size="sm"
-              optionType="status"
-              value={statusFilter}
-              onChange={setStatusFilter}
-              placeholder="All Statuses"
-              searchable={false}
-              clearable={false}
-              options={[
-                { value: "ALL", label: `All Statuses (${initialProjects.length})` },
-                { value: "ACTIVE", label: "Active" },
-                { value: "DRAFT", label: "Draft Setup" },
-                { value: "PLANNING", label: "Planning" },
-                { value: "ON_HOLD", label: "On Hold" },
-                { value: "COMPLETED", label: "Completed" },
-                { value: "CANCELLED", label: "Cancelled" },
-                { value: "ARCHIVED", label: "Archived" },
-              ]}
-            />
-          </div>
-
-          {/* Phase Filter */}
-          <div className="min-w-[155px] w-full md:w-auto">
-            <SearchableDropdown
-              size="sm"
-              optionType="phase"
-              value={phaseFilter}
-              onChange={setPhaseFilter}
-              placeholder="All Phases"
-              searchPlaceholder="Search phases..."
-              clearable={false}
-              options={[
-                { value: "ALL", label: "All Phases" },
-                ...ARCHITECTURAL_PHASES.map((ph) => ({ value: ph, label: ph })),
-              ]}
-            />
-          </div>
-
-          {/* Sort By Filter (Date, Day & Alphabetical Order) */}
-          <div className="min-w-[200px] w-full md:w-auto">
-            <SearchableDropdown
-              size="sm"
-              value={projectSortBy}
-              onChange={setProjectSortBy}
-              placeholder="Sort projects..."
-              searchable={false}
-              clearable={false}
-              options={[
-                { value: "CREATED_DESC", label: "Sort: Date (Newest First)" },
-                { value: "CREATED_ASC", label: "Sort: Date (Oldest First)" },
-                { value: "TARGET_DATE_ASC", label: "Sort: Target Date (Earliest Day)" },
-                { value: "TARGET_DATE_DESC", label: "Sort: Target Date (Latest Day)" },
-                { value: "ALPHA_NAME_ASC", label: "Sort: Name (A → Z)" },
-                { value: "ALPHA_NAME_DESC", label: "Sort: Name (Z → A)" },
-                { value: "ALPHA_CODE_ASC", label: "Sort: Code (A → Z)" },
-                { value: "ALPHA_CODE_DESC", label: "Sort: Code (Z → A)" },
-              ]}
-            />
-          </div>
-
-          {/* Advanced Filters Toggle Button */}
-          <button
-            type="button"
-            suppressHydrationWarning
-            onClick={() => setIsAdvancedFilterOpen(!isAdvancedFilterOpen)}
-            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer shrink-0 ${
-              isAdvancedFilterOpen || activeFiltersCount > 0
-                ? "bg-[#5A81FA] text-white border-[#5A81FA] shadow-2xs"
-                : "bg-[#F8F9FD] text-[#1F1F1F] border-[#E2E6F0] hover:bg-white"
-            }`}
-          >
-            <SlidersHorizontal className="w-3.5 h-3.5" />
-            <span>Filters</span>
-            {activeFiltersCount > 0 && (
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-[#CEDEFF] text-[#2C308D]">
-                {activeFiltersCount}
-              </span>
-            )}
-            {isAdvancedFilterOpen ? (
-              <ChevronUp className="w-3.5 h-3.5" />
-            ) : (
-              <ChevronDown className="w-3.5 h-3.5" />
-            )}
-          </button>
-
-          {/* Quick Reset Button if active filters */}
-          {activeFiltersCount > 0 && (
+            {/* Mobile Filters Drawer Trigger Button */}
             <button
               type="button"
               suppressHydrationWarning
-              onClick={handleResetFilters}
-              className="inline-flex items-center gap-1 px-2.5 py-2 rounded-xl text-xs font-semibold text-rose-600 hover:text-rose-800 hover:bg-rose-50 border border-transparent transition-colors cursor-pointer shrink-0"
-              title="Reset all filters"
+              onClick={() => setIsMobileProjectFilterOpen(true)}
+              className={`md:hidden px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 shrink-0 border cursor-pointer ${
+                activeFiltersCount > 0
+                  ? "bg-blue-50 border-[#3562E8] text-[#3562E8] font-bold shadow-xs"
+                  : "bg-white border-[#E2E6F0] text-slate-700 hover:bg-[#F8F9FD]"
+              }`}
+              title="Open all filters"
             >
-              <RotateCcw className="w-3 h-3" />
-              <span>Reset</span>
+              <SlidersHorizontal className="w-3.5 h-3.5 text-[#3562E8]" />
+              <span>Filters</span>
+              {activeFiltersCount > 0 && (
+                <span className="w-5 h-5 rounded-full bg-[#3562E8] text-white text-[10px] font-mono font-bold flex items-center justify-center">
+                  {activeFiltersCount}
+                </span>
+              )}
             </button>
-          )}
+          </div>
+
+          {/* Desktop Filter Row (hidden on mobile, visible on md and up) */}
+          <div className="hidden md:flex items-center gap-3 w-full md:w-auto">
+            {/* Status Filter */}
+            <div className="min-w-[145px]">
+              <SearchableDropdown
+                size="sm"
+                optionType="status"
+                value={statusFilter}
+                onChange={setStatusFilter}
+                placeholder="All Statuses"
+                searchable={false}
+                clearable={false}
+                options={[
+                  { value: "ALL", label: `All Statuses (${initialProjects.length})` },
+                  { value: "ACTIVE", label: "Active" },
+                  { value: "DRAFT", label: "Draft Setup" },
+                  { value: "PLANNING", label: "Planning" },
+                  { value: "ON_HOLD", label: "On Hold" },
+                  { value: "COMPLETED", label: "Completed" },
+                  { value: "CANCELLED", label: "Cancelled" },
+                  { value: "ARCHIVED", label: "Archived" },
+                ]}
+              />
+            </div>
+
+            {/* Phase Filter */}
+            <div className="min-w-[155px]">
+              <SearchableDropdown
+                size="sm"
+                optionType="phase"
+                value={phaseFilter}
+                onChange={setPhaseFilter}
+                placeholder="All Phases"
+                searchPlaceholder="Search phases..."
+                clearable={false}
+                options={[
+                  { value: "ALL", label: "All Phases" },
+                  ...ARCHITECTURAL_PHASES.map((ph) => ({ value: ph, label: ph })),
+                ]}
+              />
+            </div>
+
+            {/* Sort By Filter */}
+            <div className="min-w-[200px]">
+              <SearchableDropdown
+                size="sm"
+                value={projectSortBy}
+                onChange={setProjectSortBy}
+                placeholder="Sort projects..."
+                searchable={false}
+                clearable={false}
+                options={[
+                  { value: "CREATED_DESC", label: "Sort: Date (Newest First)" },
+                  { value: "CREATED_ASC", label: "Sort: Date (Oldest First)" },
+                  { value: "TARGET_DATE_ASC", label: "Sort: Target Date (Earliest Day)" },
+                  { value: "TARGET_DATE_DESC", label: "Sort: Target Date (Latest Day)" },
+                  { value: "ALPHA_NAME_ASC", label: "Sort: Name (A → Z)" },
+                  { value: "ALPHA_NAME_DESC", label: "Sort: Name (Z → A)" },
+                  { value: "ALPHA_CODE_ASC", label: "Sort: Code (A → Z)" },
+                  { value: "ALPHA_CODE_DESC", label: "Sort: Code (Z → A)" },
+                ]}
+              />
+            </div>
+
+            {/* Advanced Filters Toggle Button */}
+            <button
+              type="button"
+              suppressHydrationWarning
+              onClick={() => setIsAdvancedFilterOpen(!isAdvancedFilterOpen)}
+              className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer shrink-0 ${
+                isAdvancedFilterOpen || activeFiltersCount > 0
+                  ? "bg-[#5A81FA] text-white border-[#5A81FA] shadow-2xs"
+                  : "bg-[#F8F9FD] text-[#1F1F1F] border-[#E2E6F0] hover:bg-white"
+              }`}
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5" />
+              <span>Filters</span>
+              {activeFiltersCount > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-[#CEDEFF] text-[#2C308D]">
+                  {activeFiltersCount}
+                </span>
+              )}
+              {isAdvancedFilterOpen ? (
+                <ChevronUp className="w-3.5 h-3.5" />
+              ) : (
+                <ChevronDown className="w-3.5 h-3.5" />
+              )}
+            </button>
+
+            {/* Quick Reset Button if active filters */}
+            {activeFiltersCount > 0 && (
+              <button
+                type="button"
+                suppressHydrationWarning
+                onClick={handleResetFilters}
+                className="inline-flex items-center gap-1 px-2.5 py-2 rounded-xl text-xs font-semibold text-rose-600 hover:text-rose-800 hover:bg-rose-50 border border-transparent transition-colors cursor-pointer shrink-0"
+                title="Reset all filters"
+              >
+                <RotateCcw className="w-3 h-3" />
+                <span>Reset</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Mobile View: 1-Tap Quick Filter Carousel */}
+        <div className="md:hidden flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none -mx-1 px-1 pt-1 border-t border-slate-100">
+          <button
+            type="button"
+            onClick={() => setStatusFilter("ALL")}
+            className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-colors shrink-0 ${
+              statusFilter === "ALL"
+                ? "bg-[#3562E8] text-white shadow-xs"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            All ({initialProjects.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setStatusFilter((prev) => (prev === "ACTIVE" ? "ALL" : "ACTIVE"))}
+            className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-colors shrink-0 flex items-center gap-1 ${
+              statusFilter === "ACTIVE"
+                ? "bg-emerald-600 text-white shadow-xs"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span>Active</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setStatusFilter((prev) => (prev === "DRAFT" ? "ALL" : "DRAFT"))}
+            className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-colors shrink-0 flex items-center gap-1 ${
+              statusFilter === "DRAFT"
+                ? "bg-[#3562E8] text-white shadow-xs"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            <span>Draft</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setStatusFilter((prev) => (prev === "PLANNING" ? "ALL" : "PLANNING"))}
+            className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-colors shrink-0 flex items-center gap-1 ${
+              statusFilter === "PLANNING"
+                ? "bg-purple-600 text-white shadow-xs"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            <Clock className="w-3 h-3" />
+            <span>Planning</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setStatusFilter((prev) => (prev === "COMPLETED" ? "ALL" : "COMPLETED"))}
+            className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-colors shrink-0 flex items-center gap-1 ${
+              statusFilter === "COMPLETED"
+                ? "bg-slate-800 text-white shadow-xs"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            <CheckCircle2 className="w-3 h-3" />
+            <span>Completed</span>
+          </button>
         </div>
 
         {/* Collapsible Advanced Filter Panel */}
@@ -1419,6 +1519,300 @@ export function ProjectsClientView({
           </div>
         )}
       </div>
+
+      {/* Mobile Filter Drawer for Projects */}
+      <MobileFilterDrawer
+        isOpen={isMobileProjectFilterOpen}
+        onClose={() => setIsMobileProjectFilterOpen(false)}
+        title="Filter Projects"
+        activeCount={activeFiltersCount}
+        onReset={handleResetFilters}
+        resultCount={filteredProjects.length}
+      >
+        <div className="space-y-4">
+          {/* Status */}
+          <div>
+            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">
+              Project Status
+            </label>
+            <SearchableDropdown
+              size="md"
+              optionType="status"
+              value={statusFilter}
+              onChange={setStatusFilter}
+              placeholder="All Statuses"
+              searchable={false}
+              clearable={false}
+              options={[
+                { value: "ALL", label: `All Statuses (${initialProjects.length})` },
+                { value: "ACTIVE", label: "Active" },
+                { value: "DRAFT", label: "Draft Setup" },
+                { value: "PLANNING", label: "Planning" },
+                { value: "ON_HOLD", label: "On Hold" },
+                { value: "COMPLETED", label: "Completed" },
+                { value: "CANCELLED", label: "Cancelled" },
+                { value: "ARCHIVED", label: "Archived" },
+              ]}
+              className="w-full"
+            />
+          </div>
+
+          {/* Phase */}
+          <div>
+            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">
+              Architectural Phase
+            </label>
+            <SearchableDropdown
+              size="md"
+              optionType="phase"
+              value={phaseFilter}
+              onChange={setPhaseFilter}
+              placeholder="All Phases"
+              searchPlaceholder="Search phases..."
+              clearable={false}
+              options={[
+                { value: "ALL", label: "All Phases" },
+                ...ARCHITECTURAL_PHASES.map((ph) => ({ value: ph, label: ph })),
+              ]}
+              className="w-full"
+            />
+          </div>
+
+          {/* Typology */}
+          <div>
+            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">
+              Typology
+            </label>
+            <SearchableDropdown
+              size="md"
+              value={typologyFilter}
+              onChange={setTypologyFilter}
+              placeholder="All Typologies"
+              searchPlaceholder="Search typology..."
+              clearable={false}
+              options={[
+                { value: "ALL", label: "All Typologies" },
+                ...dynamicTypologies.map((t) => ({
+                  value: t,
+                  label: t,
+                  icon: <TypologyDot typology={t} />,
+                })),
+              ]}
+              className="w-full"
+            />
+          </div>
+
+          {/* Sort By */}
+          <div>
+            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">
+              Sort Order
+            </label>
+            <SearchableDropdown
+              size="md"
+              value={projectSortBy}
+              onChange={setProjectSortBy}
+              placeholder="Sort projects..."
+              searchable={false}
+              clearable={false}
+              options={[
+                { value: "CREATED_DESC", label: "Sort: Date (Newest First)" },
+                { value: "CREATED_ASC", label: "Sort: Date (Oldest First)" },
+                { value: "TARGET_DATE_ASC", label: "Sort: Target Date (Earliest Day)" },
+                { value: "TARGET_DATE_DESC", label: "Sort: Target Date (Latest Day)" },
+                { value: "ALPHA_NAME_ASC", label: "Sort: Name (A → Z)" },
+                { value: "ALPHA_NAME_DESC", label: "Sort: Name (Z → A)" },
+                { value: "ALPHA_CODE_ASC", label: "Sort: Code (A → Z)" },
+                { value: "ALPHA_CODE_DESC", label: "Sort: Code (Z → A)" },
+              ]}
+              className="w-full"
+            />
+          </div>
+
+          {/* Lead Architect */}
+          <div>
+            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">
+              Lead Architect
+            </label>
+            <SearchableDropdown
+              size="md"
+              optionType="employee"
+              value={architectFilter}
+              onChange={setArchitectFilter}
+              placeholder="All Architects"
+              searchPlaceholder="Search architects..."
+              clearable={false}
+              options={[
+                { value: "ALL", label: "All Architects" },
+                ...members.map((m) => ({
+                  value: m.id,
+                  label: m.user.fullName,
+                  employeeId: m.employee?.employeeId || undefined,
+                  designation: m.employee?.designation || "Architect",
+                  type: "employee" as const,
+                })),
+              ]}
+              className="w-full"
+            />
+          </div>
+
+          {/* Project Manager */}
+          <div>
+            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">
+              Project Architecture 2
+            </label>
+            <SearchableDropdown
+              size="md"
+              optionType="employee"
+              value={managerFilter}
+              onChange={setManagerFilter}
+              placeholder="All Project Architecture 2"
+              searchPlaceholder="Search team..."
+              clearable={false}
+              options={[
+                { value: "ALL", label: "All Project Architecture 2" },
+                ...members.map((m) => ({
+                  value: m.id,
+                  label: m.user.fullName,
+                  employeeId: m.employee?.employeeId || undefined,
+                  designation: m.employee?.designation || "Project Architecture 2",
+                  type: "employee" as const,
+                })),
+              ]}
+              className="w-full"
+            />
+          </div>
+
+          {/* Project Coordinator */}
+          <div>
+            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">
+              Project Coordinator
+            </label>
+            <SearchableDropdown
+              size="md"
+              optionType="employee"
+              value={coordinatorFilter}
+              onChange={setCoordinatorFilter}
+              placeholder="All Coordinators"
+              searchPlaceholder="Search coordinators..."
+              clearable={false}
+              options={[
+                { value: "ALL", label: "All Coordinators" },
+                ...members.map((m) => ({
+                  value: m.id,
+                  label: m.user.fullName,
+                  employeeId: m.employee?.employeeId || undefined,
+                  designation: m.employee?.designation || "Coordinator",
+                  type: "employee" as const,
+                })),
+              ]}
+              className="w-full"
+            />
+          </div>
+
+          {/* City */}
+          <div>
+            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">
+              Site City
+            </label>
+            <SearchableDropdown
+              size="md"
+              optionType="location"
+              value={cityFilter}
+              onChange={setCityFilter}
+              placeholder="All Cities"
+              searchPlaceholder="Search cities..."
+              clearable={false}
+              options={[
+                { value: "ALL", label: "All Cities" },
+                ...availableCities.map((city) => ({
+                  value: city,
+                  label: city,
+                  type: "location" as const,
+                })),
+              ]}
+              className="w-full"
+            />
+          </div>
+
+          {/* Contractor */}
+          <div>
+            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">
+              Contractor
+            </label>
+            <SearchableDropdown
+              size="md"
+              optionType="contractor"
+              value={contractorFilter}
+              onChange={setContractorFilter}
+              placeholder="All Contractors"
+              searchPlaceholder="Search contractors..."
+              clearable={false}
+              options={[
+                { value: "ALL", label: "All Contractors" },
+                ...contractors.map((c) => ({
+                  value: c.id,
+                  label: c.firmName || c.name,
+                  badge: c.trade || undefined,
+                  type: "contractor" as const,
+                })),
+              ]}
+              className="w-full"
+            />
+          </div>
+
+          {/* Consultant */}
+          <div>
+            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">
+              Consultant
+            </label>
+            <SearchableDropdown
+              size="md"
+              optionType="consultant"
+              value={consultantFilter}
+              onChange={setConsultantFilter}
+              placeholder="All Consultants"
+              searchPlaceholder="Search consultants..."
+              clearable={false}
+              options={[
+                { value: "ALL", label: "All Consultants" },
+                ...consultants.map((c) => ({
+                  value: c.id,
+                  label: c.firmName || c.name,
+                  badge: c.discipline || undefined,
+                  type: "consultant" as const,
+                })),
+              ]}
+              className="w-full"
+            />
+          </div>
+
+          {/* Client */}
+          <div>
+            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">
+              Primary Client
+            </label>
+            <SearchableDropdown
+              size="md"
+              optionType="client"
+              value={clientFilter}
+              onChange={setClientFilter}
+              placeholder="All Clients"
+              searchPlaceholder="Search clients..."
+              clearable={false}
+              options={[
+                { value: "ALL", label: "All Clients" },
+                ...clients.map((cl) => ({
+                  value: cl.id,
+                  label: cl.name,
+                  badge: cl.company || undefined,
+                  type: "client" as const,
+                })),
+              ]}
+              className="w-full"
+            />
+          </div>
+        </div>
+      </MobileFilterDrawer>
 
       {/* Bulk Action & Selection Toolbar */}
       {filteredProjects.length > 0 && (

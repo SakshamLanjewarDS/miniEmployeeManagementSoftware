@@ -23,6 +23,7 @@ import {
   MapPin,
   RefreshCw,
 } from "lucide-react";
+import MobileFilterDrawer from "@/components/ui/MobileFilterDrawer";
 
 interface DecisionInboxItem {
   id: string;
@@ -76,6 +77,11 @@ export default function OwnerDecisionInboxPage() {
   const [selectedType, setSelectedType] = useState<string>("ALL");
   const [selectedUrgency, setSelectedUrgency] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
+
+  // Active filter count for mobile badge
+  const mobileActiveFilterCount = (selectedType !== "ALL" ? 1 : 0) + (selectedUrgency !== "ALL" ? 1 : 0);
+
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<DecisionInboxData | null>(null);
@@ -376,8 +382,8 @@ export default function OwnerDecisionInboxPage() {
           </button>
         </div>
 
-        {/* Filter Controls */}
-        <div className="flex flex-wrap items-center gap-2">
+        {/* Desktop Filter Controls */}
+        <div className="hidden sm:flex flex-wrap items-center gap-2">
           {/* Type Filter */}
           <select
             value={selectedType}
@@ -419,7 +425,113 @@ export default function OwnerDecisionInboxPage() {
             />
           </div>
         </div>
+
+        {/* Mobile Filter Row: Search + Filter Button */}
+        <div className="sm:hidden flex items-center gap-2 w-full pt-1">
+          <div className="relative flex-1">
+            <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search items, projects..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-8 pr-3 py-2 text-xs font-medium text-slate-900 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:bg-white"
+            />
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setIsMobileFilterOpen(true)}
+            className="relative flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-800 active:scale-95 transition-all shrink-0"
+            aria-label="Open filter sidebar"
+          >
+            <Filter className="w-3.5 h-3.5 text-blue-600" />
+            <span>Filters</span>
+            {mobileActiveFilterCount > 0 && (
+              <span className="w-4 h-4 rounded-full bg-blue-600 text-white text-[10px] font-bold flex items-center justify-center ml-0.5">
+                {mobileActiveFilterCount}
+              </span>
+            )}
+          </button>
+        </div>
+
+        {/* Mobile Horizontal Quick Category Carousel */}
+        <div className="sm:hidden flex items-center gap-1.5 overflow-x-auto touch-scroll-x scrollbar-none w-full pb-0.5">
+          {[
+            { id: "ALL", label: "All Types" },
+            { id: "DELIVERABLE_SUBMISSION", label: "Deliverables" },
+            { id: "DEADLINE_EXTENSION", label: "Extensions" },
+            { id: "SCOPE_CHANGE", label: "Scope" },
+            { id: "DRAWING_REVISION", label: "Drawings" },
+            { id: "SITE_VISIT", label: "Visits" },
+            { id: "LEAVE_APPLICATION", label: "Leave" },
+          ].map((pill) => {
+            const active = selectedType === pill.id;
+            return (
+              <button
+                key={pill.id}
+                type="button"
+                onClick={() => setSelectedType(pill.id)}
+                className={`px-3 py-1.5 rounded-full text-[11px] font-semibold whitespace-nowrap shrink-0 transition-colors ${
+                  active
+                    ? "bg-blue-600 text-white shadow-xs"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                }`}
+              >
+                {pill.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
+
+      {/* Mobile Filter Drawer / Bottom Sheet */}
+      <MobileFilterDrawer
+        isOpen={isMobileFilterOpen}
+        onClose={() => setIsMobileFilterOpen(false)}
+        title="Inbox Filters"
+        activeCount={mobileActiveFilterCount}
+        onReset={() => {
+          setSelectedType("ALL");
+          setSelectedUrgency("ALL");
+        }}
+        resultsCount={data?.items?.length ?? 0}
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-900 mb-1.5">Decision Category</label>
+            <select
+              value={selectedType}
+              onChange={(e) => setSelectedType(e.target.value)}
+              className="w-full px-3 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+            >
+              <option value="ALL">All Categories</option>
+              <option value="DELIVERABLE_SUBMISSION">Deliverables</option>
+              <option value="DEADLINE_EXTENSION">Extensions</option>
+              <option value="SCOPE_CHANGE">Scope Changes</option>
+              <option value="PROFILE_CHANGE">HR Profile</option>
+              <option value="DRAWING_REVISION">Drawings</option>
+              <option value="SITE_VISIT">Site Visits</option>
+              <option value="LEAVE_APPLICATION">Leave Applications</option>
+              <option value="LEAVE_CANCELLATION">Leave Cancellations</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-900 mb-1.5">Urgency Level</label>
+            <select
+              value={selectedUrgency}
+              onChange={(e) => setSelectedUrgency(e.target.value)}
+              className="w-full px-3 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+            >
+              <option value="ALL">All Urgencies</option>
+              <option value="CRITICAL">Critical (&gt;48h)</option>
+              <option value="URGENT">Urgent (&gt;24h)</option>
+              <option value="NORMAL">Standard</option>
+            </select>
+          </div>
+        </div>
+      </MobileFilterDrawer>
 
       {/* Main List Area */}
       {error ? (

@@ -60,6 +60,7 @@ import PhotoEvidenceGallery, { SitePhotoItem } from "./PhotoEvidenceGallery";
 import SnagsTracker, { SnagItem } from "./SnagsTracker";
 import PrintableInspectionReport from "./PrintableInspectionReport";
 import SiteIssuesView from "./SiteIssuesView";
+import { MobileFilterDrawer } from "@/components/ui/MobileFilterDrawer";
 
 export interface SiteVisitItem {
   id: string;
@@ -522,13 +523,20 @@ export default function VisitsClientView({
     visitSortBy,
   ]);
 
-  const isVisitFilterActive =
-    visitSearch.trim().length > 0 ||
-    visitStateFilter !== "ALL" ||
-    visitProjectFilter !== "ALL" ||
-    visitReviewFilter !== "ALL" ||
-    visitCategoryFilter !== "ALL" ||
-    visitSortBy !== "DATE_DESC";
+  const [isMobileVisitFilterOpen, setIsMobileVisitFilterOpen] = useState(false);
+
+  const activeVisitFilterCount = useMemo(() => {
+    let count = 0;
+    if (visitSearch.trim().length > 0) count++;
+    if (visitStateFilter !== "ALL") count++;
+    if (visitProjectFilter !== "ALL") count++;
+    if (visitReviewFilter !== "ALL") count++;
+    if (visitCategoryFilter !== "ALL") count++;
+    if (visitSortBy !== "DATE_DESC") count++;
+    return count;
+  }, [visitSearch, visitStateFilter, visitProjectFilter, visitReviewFilter, visitCategoryFilter, visitSortBy]);
+
+  const isVisitFilterActive = activeVisitFilterCount > 0;
 
   const handleClearVisitFilters = () => {
     setVisitSearch("");
@@ -1928,25 +1936,47 @@ export default function VisitsClientView({
         {/* Inspection Log Filter & Sort Bar */}
         <div className="bg-[#FAFBFD] p-3 rounded-xl border border-[#E2E6F0] space-y-2.5">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-2.5">
-            {/* Search */}
-            <div className="relative flex-1 min-w-[200px]">
-              <Search className="w-3.5 h-3.5 text-[#696E82] absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={visitSearch}
-                onChange={(e) => setVisitSearch(e.target.value)}
-                placeholder="Search visits by employee, project, site, locality, or purpose..."
-                className="w-full pl-8 pr-7 py-1.5 bg-white border border-[#E2E6F0] rounded-lg text-xs text-[#1F1F1F] placeholder-[#696E82] focus:outline-none focus:ring-1 focus:ring-[#5A81FA]"
-              />
-              {visitSearch && (
-                <button
-                  type="button"
-                  onClick={() => setVisitSearch("")}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#696E82] hover:text-[#1F1F1F]"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              )}
+            {/* Search & Mobile Filter Trigger */}
+            <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+              <div className="relative flex-1">
+                <Search className="w-3.5 h-3.5 text-[#696E82] absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={visitSearch}
+                  onChange={(e) => setVisitSearch(e.target.value)}
+                  placeholder="Search visits by employee, project, site, locality, or purpose..."
+                  className="w-full pl-8 pr-7 py-1.5 bg-white border border-[#E2E6F0] rounded-lg text-xs text-[#1F1F1F] placeholder-[#696E82] focus:outline-none focus:ring-1 focus:ring-[#5A81FA]"
+                />
+                {visitSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setVisitSearch("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#696E82] hover:text-[#1F1F1F]"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+
+              {/* Mobile Filter Button */}
+              <button
+                type="button"
+                onClick={() => setIsMobileVisitFilterOpen(true)}
+                className={`lg:hidden px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 shrink-0 border cursor-pointer ${
+                  activeVisitFilterCount > 0
+                    ? "bg-blue-50 border-[#3562E8] text-[#3562E8] font-bold shadow-xs"
+                    : "bg-white border-[#E2E6F0] text-slate-700 hover:bg-[#F8F9FD]"
+                }`}
+                title="Open all filters"
+              >
+                <SlidersHorizontal className="w-3.5 h-3.5 text-[#3562E8]" />
+                <span>Filters</span>
+                {activeVisitFilterCount > 0 && (
+                  <span className="w-5 h-5 rounded-full bg-[#3562E8] text-white text-[10px] font-mono font-bold flex items-center justify-center">
+                    {activeVisitFilterCount}
+                  </span>
+                )}
+              </button>
             </div>
 
             <div className="text-[11px] text-[#696E82] self-end md:self-auto font-medium">
@@ -1954,8 +1984,59 @@ export default function VisitsClientView({
             </div>
           </div>
 
-          {/* Filter selects row */}
-          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-[#E2E6F0]/60 text-xs">
+          {/* Mobile View: 1-Tap Quick Filter Carousel */}
+          <div className="lg:hidden flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none -mx-1 px-1 pt-1 border-t border-slate-200/60">
+            <button
+              type="button"
+              onClick={() => setVisitStateFilter("ALL")}
+              className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-colors shrink-0 ${
+                visitStateFilter === "ALL"
+                  ? "bg-[#3562E8] text-white shadow-xs"
+                  : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
+              }`}
+            >
+              All ({allVisits.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setVisitStateFilter((prev) => (prev === "ACTIVE" ? "ALL" : "ACTIVE"))}
+              className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-colors shrink-0 flex items-center gap-1 ${
+                visitStateFilter === "ACTIVE"
+                  ? "bg-emerald-600 text-white shadow-xs"
+                  : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
+              }`}
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span>Active</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setVisitStateFilter((prev) => (prev === "SCHEDULED" ? "ALL" : "SCHEDULED"))}
+              className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-colors shrink-0 flex items-center gap-1 ${
+                visitStateFilter === "SCHEDULED"
+                  ? "bg-[#3562E8] text-white shadow-xs"
+                  : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
+              }`}
+            >
+              <Clock className="w-3 h-3" />
+              <span>Scheduled</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setVisitStateFilter((prev) => (prev === "CHECKED_OUT" ? "ALL" : "CHECKED_OUT"))}
+              className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-colors shrink-0 flex items-center gap-1 ${
+                visitStateFilter === "CHECKED_OUT"
+                  ? "bg-slate-800 text-white shadow-xs"
+                  : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
+              }`}
+            >
+              <CheckCircle2 className="w-3 h-3" />
+              <span>Checked Out</span>
+            </button>
+          </div>
+
+          {/* Desktop Filter selects row (hidden on mobile, visible on lg and up) */}
+          <div className="hidden lg:flex flex-wrap items-center gap-2 pt-2 border-t border-[#E2E6F0]/60 text-xs">
             <div className="flex items-center gap-1 text-[#696E82] font-semibold text-xs">
               <Filter className="w-3.5 h-3.5 text-[#5878FF]" />
               <span>Filters:</span>
@@ -2075,6 +2156,139 @@ export default function VisitsClientView({
             )}
           </div>
         </div>
+
+        {/* Mobile Filter Drawer for Visits */}
+        <MobileFilterDrawer
+          isOpen={isMobileVisitFilterOpen}
+          onClose={() => setIsMobileVisitFilterOpen(false)}
+          title="Filter Site Inspections"
+          activeCount={activeVisitFilterCount}
+          onReset={handleClearVisitFilters}
+          resultCount={filteredAndSortedVisits.length}
+        >
+          <div className="space-y-4">
+            {/* Operational State */}
+            <div>
+              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">
+                Operational State
+              </label>
+              <SearchableDropdown
+                size="md"
+                optionType="status"
+                value={visitStateFilter}
+                onChange={setVisitStateFilter}
+                placeholder="All States"
+                searchable={false}
+                clearable={false}
+                options={[
+                  { value: "ALL", label: "All States" },
+                  { value: "ACTIVE", label: "Active On-Site" },
+                  { value: "CHECKED_OUT", label: "Checked Out" },
+                  { value: "SCHEDULED", label: "Scheduled" },
+                  { value: "CANCELLED", label: "Cancelled" },
+                ]}
+                className="w-full"
+              />
+            </div>
+
+            {/* Category */}
+            <div>
+              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">
+                Inspection Category
+              </label>
+              <SearchableDropdown
+                size="md"
+                value={visitCategoryFilter}
+                onChange={setVisitCategoryFilter}
+                placeholder="All Categories"
+                searchable={false}
+                clearable={false}
+                options={[
+                  { value: "ALL", label: "All Categories" },
+                  { value: "STRUCTURAL", label: "Structural Quality" },
+                  { value: "MEP", label: "MEP & Waterproofing" },
+                  { value: "FINISHES", label: "Finishes & Snagging" },
+                  { value: "ROUTINE", label: "Routine Progress" },
+                  { value: "CLIENT_WALKTHROUGH", label: "Client Walkthrough" },
+                  { value: "URGENT_DEFECT", label: "Urgent Defect" },
+                ]}
+                className="w-full"
+              />
+            </div>
+
+            {/* Project */}
+            <div>
+              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">
+                Project
+              </label>
+              <SearchableDropdown
+                size="md"
+                optionType="project"
+                value={visitProjectFilter}
+                onChange={setVisitProjectFilter}
+                placeholder="All Projects"
+                searchPlaceholder="Search projects..."
+                clearable={false}
+                options={[
+                  { value: "ALL", label: "All Projects" },
+                  ...availableProjects.map((p) => ({
+                    value: p.id,
+                    label: p.name,
+                    projectCode: p.code,
+                    subLabel: p.projectType || undefined,
+                    icon: <ProjectProfileCircle typology={p.projectType} name={p.name} size="xs" />,
+                  })),
+                ]}
+                className="w-full"
+              />
+            </div>
+
+            {/* Review Decision */}
+            <div>
+              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">
+                Architectural Review
+              </label>
+              <SearchableDropdown
+                size="md"
+                value={visitReviewFilter}
+                onChange={setVisitReviewFilter}
+                placeholder="All Reviews"
+                searchable={false}
+                clearable={false}
+                options={[
+                  { value: "ALL", label: "All Reviews" },
+                  { value: "PENDING", label: "Pending Review" },
+                  { value: "ACCEPTED", label: "Accepted" },
+                  { value: "NEEDS_CLARIFICATION", label: "Needs Clarification" },
+                  { value: "REJECTED", label: "Rejected" },
+                ]}
+                className="w-full"
+              />
+            </div>
+
+            {/* Sort Filter */}
+            <div>
+              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">
+                Sort Order
+              </label>
+              <SearchableDropdown
+                size="md"
+                value={visitSortBy}
+                onChange={setVisitSortBy}
+                placeholder="Sort By"
+                searchable={false}
+                clearable={false}
+                options={[
+                  { value: "DATE_DESC", label: "Date (Newest First)" },
+                  { value: "DATE_ASC", label: "Date (Oldest First)" },
+                  { value: "ALPHA_EMPLOYEE_ASC", label: "Employee (A → Z)" },
+                  { value: "ALPHA_PROJECT_ASC", label: "Project (A → Z)" },
+                ]}
+                className="w-full"
+              />
+            </div>
+          </div>
+        </MobileFilterDrawer>
 
         <div className="overflow-x-auto">
           {filteredAndSortedVisits.length === 0 ? (

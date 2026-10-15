@@ -43,6 +43,7 @@ import { CustomFieldsManagerModal } from "@/components/custom-fields/CustomField
 import { DynamicFormFields } from "@/components/custom-fields/DynamicFormFields";
 import { DynamicCardFields } from "@/components/custom-fields/DynamicCardFields";
 import { SearchableDropdown, SearchableSelect } from "@/components/ui/SearchableDropdown";
+import { MobileFilterDrawer } from "@/components/ui/MobileFilterDrawer";
 import { TaskGrid } from "@/components/tasks/TaskGrid";
 import { sanitizeTaskDescription } from "@/components/tasks/task-utils";
 import { CustomFieldDefinition } from "@/server/modules/custom-fields/repository";
@@ -336,6 +337,29 @@ export default function TasksClientView({
     ["IN_PROGRESS", "WAITING_REVIEW", "COMPLETED"].includes(activeFilter) ? activeFilter : "ALL"
   );
   const [taskSortBy, setTaskSortBy] = useState<string>("DUE_DATE_ASC");
+  const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
+
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (selectedDueDateCategory !== "ALL") count++;
+    if (selectedStatusCategory !== "ALL") count++;
+    if (selectedPriorityFilter !== "ALL") count++;
+    if (selectedTypologyFilter !== "ALL") count++;
+    if (selectedProjectFilter !== "ALL") count++;
+    if (selectedAssigneeFilter !== "ALL") count++;
+    if (searchQuery.trim().length > 0) count++;
+    if (taskSortBy !== "DUE_DATE_ASC") count++;
+    return count;
+  }, [
+    selectedDueDateCategory,
+    selectedStatusCategory,
+    selectedPriorityFilter,
+    selectedTypologyFilter,
+    selectedProjectFilter,
+    selectedAssigneeFilter,
+    searchQuery,
+    taskSortBy,
+  ]);
 
   // Detail Drawer state
   const [drawerTask, setDrawerTask] = useState<TaskItem | null>(null);
@@ -2428,50 +2452,77 @@ export default function TasksClientView({
 
       {/* 3. MULTI-DIMENSION FILTER BAR (SEARCH, DUE DATE, STATUS, PRIORITY, PROJECT) */}
       <div className="bg-white border border-[#E2E6F0] rounded-2xl p-3.5 sm:p-4 shadow-xs space-y-3">
+        {/* Desktop Top Row / Mobile Row 1 */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-          {/* Search Input */}
-          <div className="relative flex-1 min-w-0 sm:min-w-[240px]">
-            <Search className="w-4 h-4 text-[#696E82] absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              suppressHydrationWarning
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search deliverables by title, project code, or description..."
-              className="w-full pl-9 pr-4 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-xs text-[#1F1F1F] placeholder-[#696E82] focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
-            />
-            {searchQuery && (
-              <button
+          {/* Search Input & Mobile Filter Button */}
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <div className="relative flex-1 min-w-0">
+              <Search className="w-4 h-4 text-[#696E82] absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
                 suppressHydrationWarning
-                onClick={() => setSearchQuery("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#696E82] hover:text-[#1F1F1F]"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search deliverables by title, code, or description..."
+                className="w-full pl-9 pr-7 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-xs text-[#1F1F1F] placeholder-[#696E82] focus:outline-none focus:ring-2 focus:ring-[#3562E8]"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  suppressHydrationWarning
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#696E82] hover:text-[#1F1F1F] p-0.5"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Mobile Filters Drawer Trigger Button */}
+            <button
+              type="button"
+              suppressHydrationWarning
+              onClick={() => setIsMobileFilterOpen(true)}
+              className={`lg:hidden px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 shrink-0 border cursor-pointer ${
+                activeFilterCount > 0
+                  ? "bg-blue-50 border-[#3562E8] text-[#3562E8] font-bold shadow-xs"
+                  : "bg-white border-[#E2E6F0] text-slate-700 hover:bg-[#F8F9FD]"
+              }`}
+              title="Open all filters"
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5 text-[#3562E8]" />
+              <span>Filters</span>
+              {activeFilterCount > 0 && (
+                <span className="w-5 h-5 rounded-full bg-[#3562E8] text-white text-[10px] font-mono font-bold flex items-center justify-center">
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
           </div>
 
-          {/* Right Action buttons: Assign Task & View Switcher */}
-          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+          {/* Action buttons: Assign Task & View Switcher */}
+          <div className="flex flex-wrap items-center justify-between sm:justify-end gap-2 w-full lg:w-auto">
             {(userRole === "OWNER" || userRole === "ADMIN") && (
               <button
                 type="button"
                 suppressHydrationWarning
                 onClick={() => setCustomFieldsModalOpen(true)}
-                className="px-3.5 py-2 bg-white border border-[#E2E6F0] hover:bg-[#F8F9FD] text-slate-700 text-xs font-semibold rounded-xl shadow-2xs transition-colors flex items-center gap-1.5 cursor-pointer shrink-0"
+                className="hidden sm:flex px-3.5 py-2 bg-white border border-[#E2E6F0] hover:bg-[#F8F9FD] text-slate-700 text-xs font-semibold rounded-xl shadow-2xs transition-colors items-center gap-1.5 cursor-pointer shrink-0"
                 title="Configure dynamic task & deliverable fields without code"
               >
                 <SlidersHorizontal className="w-3.5 h-3.5 text-[#5A81FA]" />
                 <span>Form Fields</span>
               </button>
             )}
+
             <button
+              type="button"
               suppressHydrationWarning
               onClick={() => {
                 setCustomFieldValues({});
                 setIsCreateTaskModalOpen(true);
               }}
-              className="px-3.5 py-2 bg-[#5A81FA] hover:bg-[#426EE8] text-white text-xs font-semibold rounded-xl shadow-2xs transition-colors flex items-center gap-1.5 cursor-pointer shrink-0"
+              className="px-3.5 py-2 bg-[#3562E8] hover:bg-[#254fc7] text-white text-xs font-semibold rounded-xl shadow-2xs transition-colors flex items-center gap-1.5 cursor-pointer shrink-0"
             >
               <Plus className="w-4 h-4" />
               <span>Assign Deliverable</span>
@@ -2488,10 +2539,10 @@ export default function TasksClientView({
                     ? "bg-white text-[#111B35] font-semibold shadow-2xs border border-[#DFE5F2]/60"
                     : "text-[#52617C] hover:text-[#111B35]"
                 }`}
-                title="Grid view (3 cards per desktop row)"
+                title="Grid view"
               >
-                <LayoutGrid className="w-3.5 h-3.5 text-[#5878FF]" />
-                <span>Grid</span>
+                <LayoutGrid className="w-3.5 h-3.5 text-[#3562E8]" />
+                <span className="hidden sm:inline">Grid</span>
               </button>
               <button
                 type="button"
@@ -2505,7 +2556,7 @@ export default function TasksClientView({
                 title="List view"
               >
                 <LayoutList className="w-3.5 h-3.5" />
-                <span>List</span>
+                <span className="hidden sm:inline">List</span>
               </button>
               <button
                 type="button"
@@ -2519,16 +2570,102 @@ export default function TasksClientView({
                 title="Kanban view"
               >
                 <Columns3 className="w-3.5 h-3.5" />
-                <span>Kanban</span>
+                <span className="hidden sm:inline">Kanban</span>
               </button>
             </div>
           </div>
         </div>
 
-        {/* Second Row: Specific Category Selectors */}
-        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-[#E2E6F0] text-xs">
+        {/* Mobile View: 1-Tap Quick Filter Carousel (Linear / Apple style) */}
+        <div className="lg:hidden flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none -mx-1 px-1 pt-1 border-t border-slate-100">
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedStatusCategory("ALL");
+              setSelectedDueDateCategory("ALL");
+              setSelectedPriorityFilter("ALL");
+            }}
+            className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-colors shrink-0 ${
+              selectedStatusCategory === "ALL" && selectedDueDateCategory === "ALL" && selectedPriorityFilter === "ALL"
+                ? "bg-[#3562E8] text-white shadow-xs"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            All ({tasks.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedDueDateCategory((prev) => (prev === "TODAY" ? "ALL" : "TODAY"))}
+            className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-colors shrink-0 flex items-center gap-1 ${
+              selectedDueDateCategory === "TODAY"
+                ? "bg-[#3562E8] text-white shadow-xs"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            <Clock className="w-3 h-3" />
+            <span>Today</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedStatusCategory((prev) => (prev === "ONGOING" ? "ALL" : "ONGOING"))}
+            className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-colors shrink-0 flex items-center gap-1 ${
+              selectedStatusCategory === "ONGOING"
+                ? "bg-[#3562E8] text-white shadow-xs"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            <span>Ongoing</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedStatusCategory((prev) => (prev === "CHECKING" ? "ALL" : "CHECKING"))}
+            className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-colors shrink-0 flex items-center gap-1 ${
+              selectedStatusCategory === "CHECKING"
+                ? "bg-purple-600 text-white shadow-xs"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            <span>Review</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedPriorityFilter((prev) => (prev === "URGENT" ? "ALL" : "URGENT"))}
+            className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-colors shrink-0 flex items-center gap-1 ${
+              selectedPriorityFilter === "URGENT"
+                ? "bg-rose-600 text-white shadow-xs"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+            <span>Urgent</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedStatusCategory((prev) => (prev === "COMPLETED" ? "ALL" : "COMPLETED"))}
+            className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-colors shrink-0 flex items-center gap-1 ${
+              selectedStatusCategory === "COMPLETED"
+                ? "bg-emerald-600 text-white shadow-xs"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            <span>Done</span>
+          </button>
+          {isFilterActive && (
+            <button
+              type="button"
+              onClick={handleClearFilters}
+              className="px-2.5 py-1 rounded-full text-xs font-semibold text-rose-600 bg-rose-50 border border-rose-200 whitespace-nowrap transition-colors shrink-0 flex items-center gap-1"
+            >
+              <X className="w-3 h-3" />
+              <span>Clear</span>
+            </button>
+          )}
+        </div>
+
+        {/* Desktop View: Multi-Dimension Inline Filter Dropdowns */}
+        <div className="hidden lg:flex flex-wrap items-center gap-2 pt-2 border-t border-[#E2E6F0] text-xs">
           <div className="flex items-center gap-1 text-[#696E82] font-semibold">
-            <Filter className="w-3.5 h-3.5 text-[#5878FF]" />
+            <Filter className="w-3.5 h-3.5 text-[#3562E8]" />
             <span>Filters:</span>
           </div>
 
@@ -2543,7 +2680,7 @@ export default function TasksClientView({
               clearable={false}
               options={[
                 { value: "ALL", label: "All Due Dates" },
-                { value: "TODAY", label: "Due Today", icon: <Clock className="w-3.5 h-3.5 text-[#5878FF]" /> },
+                { value: "TODAY", label: "Due Today", icon: <Clock className="w-3.5 h-3.5 text-[#3562E8]" /> },
                 { value: "OVERDUE", label: "Overdue Only", icon: <AlertTriangle className="w-3.5 h-3.5 text-rose-500" /> },
                 { value: "UPCOMING", label: "Upcoming", icon: <Calendar className="w-3.5 h-3.5 text-indigo-500" /> },
               ]}
@@ -2647,7 +2784,7 @@ export default function TasksClientView({
               searchPlaceholder="Search employees..."
               clearable={false}
               options={[
-                { value: "ALL", label: "All Employees", icon: <Users className="w-3.5 h-3.5 text-[#5878FF]" /> },
+                { value: "ALL", label: "All Employees", icon: <Users className="w-3.5 h-3.5 text-[#3562E8]" /> },
                 { value: "UNASSIGNED", label: "Unassigned Tasks", subLabel: "No assignee attached" },
                 ...members.map((m) => ({
                   value: m.id,
@@ -2684,6 +2821,7 @@ export default function TasksClientView({
           {/* Clear Filters */}
           {isFilterActive && (
             <button
+              type="button"
               suppressHydrationWarning
               onClick={handleClearFilters}
               className="text-[#696E82] hover:text-red-700 font-semibold text-xs ml-auto flex items-center gap-1 cursor-pointer"
@@ -2698,6 +2836,195 @@ export default function TasksClientView({
           </div>
         </div>
       </div>
+
+      {/* Mobile Filter Drawer (Opens complete filter sidebar from bottom/sheet) */}
+      <MobileFilterDrawer
+        isOpen={isMobileFilterOpen}
+        onClose={() => setIsMobileFilterOpen(false)}
+        title="Filter Deliverables"
+        activeCount={activeFilterCount}
+        onReset={handleClearFilters}
+        resultCount={filteredTasks.length}
+      >
+        <div className="space-y-4">
+          {/* Due Date Category */}
+          <div>
+            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">
+              Due Date
+            </label>
+            <SearchableDropdown
+              size="md"
+              value={selectedDueDateCategory}
+              onChange={setSelectedDueDateCategory}
+              placeholder="All Due Dates"
+              searchable={false}
+              clearable={false}
+              options={[
+                { value: "ALL", label: "All Due Dates" },
+                { value: "TODAY", label: "Due Today", icon: <Clock className="w-3.5 h-3.5 text-[#3562E8]" /> },
+                { value: "OVERDUE", label: "Overdue Only", icon: <AlertTriangle className="w-3.5 h-3.5 text-rose-500" /> },
+                { value: "UPCOMING", label: "Upcoming", icon: <Calendar className="w-3.5 h-3.5 text-indigo-500" /> },
+              ]}
+              className="w-full"
+            />
+          </div>
+
+          {/* Status Category */}
+          <div>
+            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">
+              Workflow Status
+            </label>
+            <SearchableDropdown
+              size="md"
+              optionType="status"
+              value={selectedStatusCategory}
+              onChange={setSelectedStatusCategory}
+              placeholder="All Statuses"
+              searchable={false}
+              clearable={false}
+              options={[
+                { value: "ALL", label: "All Statuses" },
+                { value: "NOT_STARTED", label: "📋 Todo", subLabel: "Pending work" },
+                { value: "STARTED", label: "▶ Started", subLabel: "Commenced" },
+                { value: "ONGOING", label: "⚡ Ongoing", subLabel: "In progress" },
+                { value: "CHECKING", label: "🔍 Checking", subLabel: "Waiting review" },
+                { value: "COMPLETED", label: "✔ Completed", subLabel: "Done & approved" },
+              ]}
+              className="w-full"
+            />
+          </div>
+
+          {/* Priority */}
+          <div>
+            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">
+              Priority Level
+            </label>
+            <SearchableDropdown
+              size="md"
+              optionType="priority"
+              value={selectedPriorityFilter}
+              onChange={setSelectedPriorityFilter}
+              placeholder="All Priorities"
+              searchable={false}
+              clearable={false}
+              options={[
+                { value: "ALL", label: "All Priorities" },
+                { value: "URGENT", label: "Urgent", subLabel: "Critical path" },
+                { value: "HIGH", label: "High Priority", subLabel: "Strict deadline" },
+                { value: "MEDIUM", label: "Medium", subLabel: "Standard deliverable" },
+                { value: "LOW", label: "Low", subLabel: "Routine drafting" },
+              ]}
+              className="w-full"
+            />
+          </div>
+
+          {/* Project */}
+          <div>
+            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">
+              Project
+            </label>
+            <SearchableDropdown
+              size="md"
+              optionType="project"
+              value={selectedProjectFilter}
+              onChange={setSelectedProjectFilter}
+              placeholder="All Projects"
+              searchPlaceholder="Search projects..."
+              clearable={false}
+              options={[
+                { value: "ALL", label: "All Projects" },
+                ...projects
+                  .filter((p) => selectedTypologyFilter === "ALL" || isTypologyMatch(p.projectType, selectedTypologyFilter))
+                  .map((p) => ({
+                    value: p.id,
+                    label: p.name,
+                    projectCode: p.code,
+                    subLabel: p.projectType || undefined,
+                    icon: <ProjectProfileCircle typology={p.projectType} name={p.name} size="xs" />,
+                  })),
+              ]}
+              className="w-full"
+            />
+          </div>
+
+          {/* Typology Filter */}
+          <div>
+            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">
+              Typology
+            </label>
+            <SearchableDropdown
+              size="md"
+              value={selectedTypologyFilter}
+              onChange={setSelectedTypologyFilter}
+              placeholder="All Typologies"
+              searchPlaceholder="Search typology..."
+              clearable={false}
+              options={[
+                { value: "ALL", label: "All Typologies" },
+                ...dynamicTypologies.map((t) => ({
+                  value: t,
+                  label: t,
+                  icon: <TypologyDot typology={t} />,
+                })),
+              ]}
+              className="w-full"
+            />
+          </div>
+
+          {/* Employee Filter */}
+          <div>
+            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">
+              Assigned Employee
+            </label>
+            <SearchableDropdown
+              size="md"
+              optionType="employee"
+              value={selectedAssigneeFilter}
+              onChange={setSelectedAssigneeFilter}
+              placeholder="All Employees"
+              searchPlaceholder="Search employees..."
+              clearable={false}
+              options={[
+                { value: "ALL", label: "All Employees", icon: <Users className="w-3.5 h-3.5 text-[#3562E8]" /> },
+                { value: "UNASSIGNED", label: "Unassigned Tasks", subLabel: "No assignee attached" },
+                ...members.map((m) => ({
+                  value: m.id,
+                  label: m.user.fullName,
+                  employeeId: m.employee?.employeeId,
+                  subLabel: m.employee?.designation ? `${m.employee.designation} (${m.role})` : m.role,
+                  category: "employee" as const,
+                })),
+              ]}
+              className="w-full"
+            />
+          </div>
+
+          {/* Sort By Filter */}
+          <div>
+            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">
+              Sort Order
+            </label>
+            <SearchableDropdown
+              size="md"
+              value={taskSortBy}
+              onChange={setTaskSortBy}
+              placeholder="Sort By"
+              searchable={false}
+              clearable={false}
+              options={[
+                { value: "DUE_DATE_ASC", label: "Due Date (Closest First)" },
+                { value: "DUE_DATE_DESC", label: "Due Date (Furthest First)" },
+                { value: "CREATED_DESC", label: "Date Created (Newest First)" },
+                { value: "CREATED_ASC", label: "Date Created (Oldest First)" },
+                { value: "ALPHA_ASC", label: "Alphabetical (A → Z)" },
+                { value: "ALPHA_DESC", label: "Alphabetical (Z → A)" },
+                { value: "PROJ_ALPHA_ASC", label: "Project Code (A → Z)" },
+              ]}
+              className="w-full"
+            />
+          </div>
+        </div>
+      </MobileFilterDrawer>
 
       {/* 4. MAIN VIEW: GRID, LIST OR KANBAN */}
       {view === "grid" && (

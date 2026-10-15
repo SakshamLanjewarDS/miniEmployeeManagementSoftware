@@ -28,8 +28,10 @@ import {
   FolderGit2,
   ArrowUpDown,
   Filter,
+  SlidersHorizontal,
 } from "lucide-react";
 import { SearchableDropdown, SearchableSelect } from "@/components/ui/SearchableDropdown";
+import { MobileFilterDrawer } from "@/components/ui/MobileFilterDrawer";
 
 export interface ApprovalRequestItem {
   id: string;
@@ -104,6 +106,25 @@ export default function DrawingsClientView({
   const [selectedDisciplineFilter, setSelectedDisciplineFilter] = useState<string>("ALL");
   const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>("ALL");
   const [drawingSortBy, setDrawingSortBy] = useState<string>("DATE_DESC");
+  const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
+
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (selectedProjectFilter !== "ALL") count++;
+    if (selectedDisciplineFilter !== "ALL") count++;
+    if (selectedStatusFilter !== "ALL") count++;
+    if (searchQuery.trim().length > 0) count++;
+    if (drawingSortBy !== "DATE_DESC") count++;
+    return count;
+  }, [selectedProjectFilter, selectedDisciplineFilter, selectedStatusFilter, searchQuery, drawingSortBy]);
+
+  const handleClearFilters = () => {
+    setSelectedProjectFilter("ALL");
+    setSelectedDisciplineFilter("ALL");
+    setSelectedStatusFilter("ALL");
+    setSearchQuery("");
+    setDrawingSortBy("DATE_DESC");
+  };
 
   const [isMounted, setIsMounted] = useState(false);
   useEffect(() => {
@@ -536,24 +557,47 @@ export default function DrawingsClientView({
       {/* Top Filter and Search Bar */}
       <div className="bg-white border border-[#E2E6F0] rounded-2xl p-3.5 sm:p-4 shadow-xs space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          {/* Search Box */}
-          <div className="relative flex-1 min-w-0 sm:max-w-md">
-            <Search className="w-4 h-4 text-[#696E82] absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search drawings by sheet #, title, or project..."
-              className="w-full pl-9 pr-4 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-xs text-[#1F1F1F] placeholder-[#696E82] focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#696E82] hover:text-[#1F1F1F]"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
+          {/* Search Box & Mobile Filter Button */}
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <div className="relative flex-1 min-w-0 sm:max-w-md">
+              <Search className="w-4 h-4 text-[#696E82] absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search drawings by sheet #, title, or project..."
+                className="w-full pl-9 pr-7 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-xs text-[#1F1F1F] placeholder-[#696E82] focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#696E82] hover:text-[#1F1F1F] p-0.5"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Mobile Filters Drawer Trigger Button */}
+            <button
+              type="button"
+              onClick={() => setIsMobileFilterOpen(true)}
+              className={`sm:hidden px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 shrink-0 border cursor-pointer ${
+                activeFilterCount > 0
+                  ? "bg-blue-50 border-[#3562E8] text-[#3562E8] font-bold shadow-xs"
+                  : "bg-white border-[#E2E6F0] text-slate-700 hover:bg-[#F8F9FD]"
+              }`}
+              title="Open all filters"
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5 text-[#3562E8]" />
+              <span>Filters</span>
+              {activeFilterCount > 0 && (
+                <span className="w-5 h-5 rounded-full bg-[#3562E8] text-white text-[10px] font-mono font-bold flex items-center justify-center">
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
           </div>
 
           {/* Right Action: Register Drawing */}
@@ -568,8 +612,58 @@ export default function DrawingsClientView({
           </div>
         </div>
 
-        {/* Filter Dropdowns */}
-        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-[#E2E6F0] text-xs">
+        {/* Mobile View: 1-Tap Quick Filter Carousel */}
+        <div className="sm:hidden flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none -mx-1 px-1 pt-1 border-t border-slate-100">
+          <button
+            type="button"
+            onClick={() => setSelectedStatusFilter("ALL")}
+            className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-colors shrink-0 ${
+              selectedStatusFilter === "ALL"
+                ? "bg-[#3562E8] text-white shadow-xs"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            All ({drawings.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedStatusFilter((prev) => (prev === "DRAFT" ? "ALL" : "DRAFT"))}
+            className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-colors shrink-0 flex items-center gap-1 ${
+              selectedStatusFilter === "DRAFT"
+                ? "bg-[#3562E8] text-white shadow-xs"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            <span>Draft</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedStatusFilter((prev) => (prev === "IN_REVIEW" ? "ALL" : "IN_REVIEW"))}
+            className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-colors shrink-0 flex items-center gap-1 ${
+              selectedStatusFilter === "IN_REVIEW"
+                ? "bg-purple-600 text-white shadow-xs"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            <Clock className="w-3 h-3" />
+            <span>In Review</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedStatusFilter((prev) => (prev === "APPROVED" ? "ALL" : "APPROVED"))}
+            className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-colors shrink-0 flex items-center gap-1 ${
+              selectedStatusFilter === "APPROVED"
+                ? "bg-emerald-600 text-white shadow-xs"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            <CheckCircle2 className="w-3 h-3" />
+            <span>Approved</span>
+          </button>
+        </div>
+
+        {/* Desktop Filter Dropdowns (hidden on mobile, visible on sm and up) */}
+        <div className="hidden sm:flex flex-wrap items-center gap-2 pt-2 border-t border-[#E2E6F0] text-xs">
           <div className="flex items-center gap-1 text-[#696E82] font-semibold">
             <Filter className="w-3.5 h-3.5 text-[#5878FF]" />
             <span>Filters:</span>
@@ -654,20 +748,10 @@ export default function DrawingsClientView({
             />
           </div>
 
-          {(selectedProjectFilter !== "ALL" ||
-            selectedDisciplineFilter !== "ALL" ||
-            selectedStatusFilter !== "ALL" ||
-            searchQuery.trim().length > 0 ||
-            drawingSortBy !== "DATE_DESC") && (
+          {activeFilterCount > 0 && (
             <button
               type="button"
-              onClick={() => {
-                setSelectedProjectFilter("ALL");
-                setSelectedDisciplineFilter("ALL");
-                setSelectedStatusFilter("ALL");
-                setSearchQuery("");
-                setDrawingSortBy("DATE_DESC");
-              }}
+              onClick={handleClearFilters}
               className="text-[#696E82] hover:text-red-700 font-semibold text-xs flex items-center gap-1 cursor-pointer"
             >
               <X className="w-3.5 h-3.5" />
@@ -680,6 +764,113 @@ export default function DrawingsClientView({
           </div>
         </div>
       </div>
+
+      {/* Mobile Filter Drawer */}
+      <MobileFilterDrawer
+        isOpen={isMobileFilterOpen}
+        onClose={() => setIsMobileFilterOpen(false)}
+        title="Filter Drawings"
+        activeCount={activeFilterCount}
+        onReset={handleClearFilters}
+        resultCount={filteredDrawings.length}
+      >
+        <div className="space-y-4">
+          {/* Project */}
+          <div>
+            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">
+              Project
+            </label>
+            <SearchableDropdown
+              size="md"
+              optionType="project"
+              value={selectedProjectFilter}
+              onChange={setSelectedProjectFilter}
+              placeholder="All Projects"
+              searchPlaceholder="Search projects..."
+              clearable={false}
+              options={[
+                { value: "ALL", label: "All Projects" },
+                ...projects.map((p) => ({
+                  value: p.id,
+                  label: p.name,
+                  projectCode: p.code,
+                })),
+              ]}
+              className="w-full"
+            />
+          </div>
+
+          {/* Discipline */}
+          <div>
+            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">
+              Discipline
+            </label>
+            <SearchableDropdown
+              size="md"
+              value={selectedDisciplineFilter}
+              onChange={setSelectedDisciplineFilter}
+              placeholder="All Disciplines"
+              searchable={false}
+              clearable={false}
+              options={[
+                { value: "ALL", label: "All Disciplines" },
+                ...disciplines.map((d) => ({
+                  value: d,
+                  label: d,
+                })),
+              ]}
+              className="w-full"
+            />
+          </div>
+
+          {/* Workflow Status */}
+          <div>
+            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">
+              Workflow Status
+            </label>
+            <SearchableDropdown
+              size="md"
+              optionType="status"
+              value={selectedStatusFilter}
+              onChange={setSelectedStatusFilter}
+              placeholder="All Workflow States"
+              searchable={false}
+              clearable={false}
+              options={[
+                { value: "ALL", label: "All Workflow States" },
+                { value: "DRAFT", label: "Draft Revisions", subLabel: "In progress" },
+                { value: "IN_REVIEW", label: "In Review", subLabel: "Pending review" },
+                { value: "APPROVED", label: "Approved Deliverables", subLabel: "Formally accepted" },
+              ]}
+              className="w-full"
+            />
+          </div>
+
+          {/* Sort By */}
+          <div>
+            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">
+              Sort Order
+            </label>
+            <SearchableDropdown
+              size="md"
+              value={drawingSortBy}
+              onChange={setDrawingSortBy}
+              placeholder="Sort By"
+              searchable={false}
+              clearable={false}
+              options={[
+                { value: "DATE_DESC", label: "Date (Newest First)" },
+                { value: "DATE_ASC", label: "Date (Oldest First)" },
+                { value: "ALPHA_TITLE_ASC", label: "Title (A → Z)" },
+                { value: "ALPHA_TITLE_DESC", label: "Title (Z → A)" },
+                { value: "ALPHA_NUMBER_ASC", label: "Drawing No. (A → Z)" },
+                { value: "ALPHA_NUMBER_DESC", label: "Drawing No. (Z → A)" },
+              ]}
+              className="w-full"
+            />
+          </div>
+        </div>
+      </MobileFilterDrawer>
 
       {/* Drawings Cards List */}
       <div className="space-y-3">
