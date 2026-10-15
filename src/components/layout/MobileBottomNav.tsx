@@ -8,7 +8,7 @@ import {
   LayoutDashboard,
   CheckSquare,
   FolderKanban,
-  Inbox,
+  HardHat,
   Clock,
   Calendar,
   Menu,
@@ -30,7 +30,7 @@ export function MobileBottomNav({ context }: MobileBottomNavProps) {
   const navItems = isLeader
     ? [
         {
-          name: "Dashboard",
+          name: "Day",
           href: `/w/${slug}/dashboard/${context.role.toLowerCase()}`,
           icon: LayoutDashboard,
         },
@@ -45,14 +45,14 @@ export function MobileBottomNav({ context }: MobileBottomNavProps) {
           icon: CheckSquare,
         },
         {
-          name: "Inbox",
-          href: `/w/${slug}/inbox`,
-          icon: Inbox,
+          name: "Visits",
+          href: `/w/${slug}/visits`,
+          icon: HardHat,
         },
       ]
     : [
         {
-          name: "Today",
+          name: "Day",
           href: `/w/${slug}/dashboard/employee`,
           icon: LayoutDashboard,
         },
@@ -75,47 +75,43 @@ export function MobileBottomNav({ context }: MobileBottomNavProps) {
 
   return (
     <nav
-      aria-label="Mobile primary navigation"
-      className="fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200/90 shadow-[0_-4px_16px_rgba(0,0,0,0.04)] lg:hidden pb-safe"
+      aria-label="Mobile studio navigation"
+      className="fixed bottom-2.5 inset-x-3 sm:inset-x-6 z-40 max-w-md mx-auto bg-slate-950/90 backdrop-blur-xl border border-white/10 shadow-[0_12px_36px_rgba(0,0,0,0.36)] rounded-2xl p-1.5 lg:hidden pb-safe select-none"
     >
-      <div className="grid grid-cols-5 h-14 max-w-md mx-auto items-stretch">
+      <div className="grid grid-cols-5 items-center gap-1">
         {navItems.map((item) => {
-          const isActive = pathname === item.href || (item.href.includes("dashboard") && pathname?.includes("dashboard"));
+          const isActive =
+            pathname === item.href ||
+            (item.href.includes("dashboard") && pathname?.includes("dashboard"));
           const Icon = item.icon;
 
           return (
             <Link
               key={item.name}
               href={item.href}
-              className={`flex flex-col items-center justify-center py-1 px-1 touch-target transition-all ${
+              className={`flex flex-col items-center justify-center py-1.5 px-1 rounded-xl transition-all duration-150 active:scale-95 ${
                 isActive
-                  ? "text-[#3562E8] font-bold"
-                  : "text-slate-500 hover:text-slate-900 font-medium"
+                  ? "bg-[#3562E8] text-white shadow-md shadow-[#3562E8]/40 font-bold"
+                  : "text-slate-400 hover:text-white hover:bg-white/5 font-medium"
               }`}
             >
-              <div
-                className={`w-7 h-7 rounded-xl flex items-center justify-center transition-all ${
-                  isActive ? "bg-blue-50 text-[#3562E8]" : "text-slate-500"
-                }`}
-              >
-                <Icon className="w-4 h-4 shrink-0" />
-              </div>
-              <span className="text-[10px] leading-tight truncate mt-0.5">{item.name}</span>
+              <Icon className="w-4 h-4 shrink-0" />
+              <span className="text-[10px] font-mono tracking-tight truncate mt-0.5">
+                {item.name}
+              </span>
             </Link>
           );
         })}
 
-        {/* Menu button */}
+        {/* Studio Menu Button */}
         <button
           type="button"
           onClick={handleOpenMenu}
           aria-label="Open full studio menu"
-          className="flex flex-col items-center justify-center py-1 px-1 text-slate-500 hover:text-slate-900 font-medium touch-target cursor-pointer transition-colors"
+          className="flex flex-col items-center justify-center py-1.5 px-1 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 font-medium transition-all duration-150 active:scale-95 cursor-pointer"
         >
-          <div className="w-7 h-7 rounded-xl flex items-center justify-center text-slate-500 hover:bg-slate-100">
-            <Menu className="w-4 h-4 shrink-0" />
-          </div>
-          <span className="text-[10px] leading-tight truncate mt-0.5">Menu</span>
+          <Menu className="w-4 h-4 shrink-0" />
+          <span className="text-[10px] font-mono tracking-tight truncate mt-0.5">Menu</span>
         </button>
       </div>
     </nav>

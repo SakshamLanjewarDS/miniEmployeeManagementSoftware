@@ -3224,13 +3224,16 @@ export default function TasksClientView({
           role="dialog"
           aria-modal="true"
           aria-label="Task Details"
-          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-2.5 sm:p-6 overflow-y-auto animate-in fade-in duration-150"
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center sm:p-6 overflow-hidden animate-in fade-in duration-150"
           onClick={() => setDrawerTask(null)}
         >
           <div
-            className="bg-white rounded-2xl sm:rounded-[28px] border border-slate-100 w-full max-w-2xl max-h-[94vh] sm:max-h-[92vh] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 relative my-auto"
+            className="bg-white rounded-t-[28px] sm:rounded-[28px] border-t sm:border border-slate-100 w-full max-w-2xl max-h-[90vh] sm:max-h-[92vh] shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom sm:zoom-in-95 duration-200 relative"
             onClick={(e) => e.stopPropagation()}
           >
+            {/* iOS/Android Mobile Sheet Grabber Handle */}
+            <div className="w-10 h-1.5 rounded-full bg-slate-300 mx-auto mt-2.5 -mb-1 sm:hidden shrink-0" />
+
             {/* Header (Matching Image B) */}
             <div className="p-4 sm:p-7 pb-3 sm:pb-4 bg-white flex items-start justify-between gap-3 sm:gap-4 border-b border-slate-100/80">
               <div className="space-y-1.5 min-w-0 flex-1">
