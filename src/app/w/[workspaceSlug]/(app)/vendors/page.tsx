@@ -281,12 +281,6 @@ export default function VendorManagementPage() {
       setActionLoading(false);
     }
   };
-    } catch (err: any) {
-      alert(err.message);
-    } finally {
-      setActionLoading(false);
-    }
-  };
 
   return (
     <div className="space-y-6">
