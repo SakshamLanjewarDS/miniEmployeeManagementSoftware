@@ -115,3 +115,5 @@ export function MobileFilterDrawer({
     </div>
   );
 }
+
+export default MobileFilterDrawer;
