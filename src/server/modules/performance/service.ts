@@ -20,6 +20,60 @@ export interface OpenTaskSummary {
   status: string;
 }
 
+export interface EmployeeTaskDetail {
+  id: string;
+  title: string;
+  projectId: string;
+  projectCode: string;
+  projectName: string;
+  priority: string;
+  status: string;
+  dueDate: string | null;
+  startDate: string | null;
+  completionDate: string | null;
+  estimatedHours: number | null;
+  isCompleted: boolean;
+  isOnTime: boolean | null;
+  isOverdue: boolean;
+  overdueDays: number;
+  isBlocked: boolean;
+  blockerReason: string | null;
+  checklistTotal: number;
+  checklistCompleted: number;
+  submissionCount: number;
+  latestSubmissionStatus: string | null;
+  latestFeedback: string | null;
+  governancePolicy: string;
+}
+
+export interface EmployeeTaskAnalytics {
+  totalTasks: number;
+  completedTasks: number;
+  inProgressTasks: number;
+  pendingTasks: number;
+  overdueTasks: number;
+  blockedTasks: number;
+  onTimeCompletedCount: number;
+  lateCompletedCount: number;
+  completionRatePercent: number;
+  governedCompletedCount: number;
+  operationalCompletedCount: number;
+  projectBreakdown: Array<{
+    projectId: string;
+    projectName: string;
+    projectCode: string;
+    total: number;
+    completed: number;
+    overdue: number;
+  }>;
+  priorityBreakdown: {
+    urgent: number;
+    high: number;
+    medium: number;
+    low: number;
+  };
+}
+
 export interface EmployeePerformanceRow {
   employeeId: string; // Database ID
   membershipId: string;
@@ -87,6 +141,8 @@ export interface EmployeePerformanceRow {
 
   // Actionable Deliverable References
   openTasks: OpenTaskSummary[];
+  taskList: EmployeeTaskDetail[];
+  taskAnalytics: EmployeeTaskAnalytics;
 }
 
 export interface PerformanceDashboardData {
@@ -241,7 +297,20 @@ export async function getStudioPerformanceData(
             : {}),
         },
         include: {
+          project: {
+            select: {
+              id: true,
+              code: true,
+              name: true,
+            },
+          },
           assignments: true,
+          checklistItems: {
+            select: {
+              id: true,
+              isCompleted: true,
+            },
+          },
           submissions: {
             orderBy: { version: "asc" },
           },
@@ -568,16 +637,121 @@ export async function getStudioPerformanceData(
       burnout = "UNDERUTILIZED";
     }
 
+    // Build comprehensive task list (completed, in-progress, overdue, blocked)
+    const taskList: EmployeeTaskDetail[] = empTasks.map((t) => {
+      const isDone = t.status === TaskWorkflowStatus.COMPLETED;
+      const isBlocked = t.status === TaskWorkflowStatus.BLOCKED;
+      const isPastDue = t.dueDate ? t.dueDate < (endDate > now ? now : endDate) : false;
+      const isOverdue = !isDone && t.status !== TaskWorkflowStatus.CANCELLED && isPastDue;
+
+      let overdueDays = 0;
+      if (isOverdue && t.dueDate) {
+        overdueDays = Math.max(1, Math.floor((now.getTime() - t.dueDate.getTime()) / (1000 * 60 * 60 * 24)));
+      }
+
+      let isOnTime: boolean | null = null;
+      if (isDone && t.dueDate && t.completionDate) {
+        isOnTime = t.completionDate <= t.dueDate;
+      }
+
+      const checklistTotal = t.checklistItems?.length || 0;
+      const checklistCompleted = t.checklistItems?.filter((c) => c.isCompleted).length || 0;
+
+      const latestSub = t.submissions && t.submissions.length > 0
+        ? t.submissions[t.submissions.length - 1]
+        : null;
+
+      return {
+        id: t.id,
+        title: t.title,
+        projectId: t.projectId,
+        projectCode: (t as any).project?.code || "PRJ",
+        projectName: (t as any).project?.name || "Studio Project",
+        priority: t.priority,
+        status: t.status,
+        dueDate: t.dueDate ? t.dueDate.toISOString().split("T")[0] : null,
+        startDate: t.startDate ? t.startDate.toISOString().split("T")[0] : null,
+        completionDate: t.completionDate ? t.completionDate.toISOString().split("T")[0] : null,
+        estimatedHours: t.estimatedHours ? Number(t.estimatedHours) : null,
+        isCompleted: isDone,
+        isOnTime,
+        isOverdue,
+        overdueDays,
+        isBlocked,
+        blockerReason: t.blockerReason || null,
+        checklistTotal,
+        checklistCompleted,
+        submissionCount: t.submissions?.length || 0,
+        latestSubmissionStatus: latestSub?.status || null,
+        latestFeedback: latestSub?.reviewFeedback || null,
+        governancePolicy: (t as any).governancePolicy || "FOUR_EYES_GOVERNED",
+      };
+    });
+
+    const completedTasksCount = taskList.filter((t) => t.isCompleted).length;
+    const overdueTasksCount = taskList.filter((t) => t.isOverdue).length;
+    const blockedTasksCount = taskList.filter((t) => t.isBlocked).length;
+    const inProgressTasksCount = taskList.filter(
+      (t) => !t.isCompleted && t.status !== "CANCELLED" && (t.status === "IN_PROGRESS" || t.status === "ONGOING" || t.status === "STARTED" || t.status === "CHECKING" || t.status === "IN_REVIEW")
+    ).length;
+    const pendingTasksCount = taskList.filter(
+      (t) => !t.isCompleted && t.status !== "CANCELLED" && (t.status === "NOT_STARTED" || t.status === "TODO")
+    ).length;
+
+    const onTimeDoneCount = taskList.filter((t) => t.isCompleted && t.isOnTime === true).length;
+    const lateDoneCount = taskList.filter((t) => t.isCompleted && t.isOnTime === false).length;
+
+    // Project breakdown
+    const prjMap = new Map<string, { projectId: string; projectName: string; projectCode: string; total: number; completed: number; overdue: number }>();
+    for (const t of taskList) {
+      const existing = prjMap.get(t.projectId) || {
+        projectId: t.projectId,
+        projectName: t.projectName,
+        projectCode: t.projectCode,
+        total: 0,
+        completed: 0,
+        overdue: 0,
+      };
+      existing.total++;
+      if (t.isCompleted) existing.completed++;
+      if (t.isOverdue) existing.overdue++;
+      prjMap.set(t.projectId, existing);
+    }
+    const projectBreakdown = Array.from(prjMap.values()).sort((a, b) => b.total - a.total);
+
+    const priorityBreakdown = {
+      urgent: taskList.filter((t) => t.priority === "URGENT").length,
+      high: taskList.filter((t) => t.priority === "HIGH").length,
+      medium: taskList.filter((t) => t.priority === "MEDIUM").length,
+      low: taskList.filter((t) => t.priority === "LOW").length,
+    };
+
+    const taskAnalytics: EmployeeTaskAnalytics = {
+      totalTasks: taskList.length,
+      completedTasks: completedTasksCount,
+      inProgressTasks: inProgressTasksCount,
+      pendingTasks: pendingTasksCount,
+      overdueTasks: overdueTasksCount,
+      blockedTasks: blockedTasksCount,
+      onTimeCompletedCount: onTimeDoneCount,
+      lateCompletedCount: lateDoneCount,
+      completionRatePercent: taskList.length > 0 ? Number(((completedTasksCount / taskList.length) * 100).toFixed(1)) : 0,
+      governedCompletedCount: governedCompleted,
+      operationalCompletedCount: operationalCompleted,
+      projectBreakdown,
+      priorityBreakdown,
+    };
+
     // Open Tasks for quick inspection & rebalancing
-    const openTasksList: OpenTaskSummary[] = empTasks
-      .filter((t) => t.status !== TaskWorkflowStatus.COMPLETED && t.status !== TaskWorkflowStatus.CANCELLED)
-      .slice(0, 8)
+    const openTasksList: OpenTaskSummary[] = taskList
+      .filter((t) => !t.isCompleted && t.status !== "CANCELLED")
+      .slice(0, 12)
       .map((t) => ({
         id: t.id,
         title: t.title,
         priority: t.priority,
-        dueDate: t.dueDate ? t.dueDate.toISOString().split("T")[0] : null,
-        estimatedHours: t.estimatedHours ? Number(t.estimatedHours) : null,
+        dueDate: t.dueDate,
+        estimatedHours: t.estimatedHours,
         status: t.status,
       }));
 
@@ -628,6 +802,8 @@ export async function getStudioPerformanceData(
       talentQuadrant: talentQuad,
       burnoutRisk: burnout,
       openTasks: openTasksList,
+      taskList,
+      taskAnalytics,
     };
 
     rows.push(row);

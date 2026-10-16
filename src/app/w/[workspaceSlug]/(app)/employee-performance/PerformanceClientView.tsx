@@ -34,6 +34,15 @@ import {
   Briefcase,
   AlertCircle,
   Zap,
+  ListTodo,
+  CheckSquare,
+  PieChart,
+  ExternalLink,
+  ShieldCheck,
+  CircleDot,
+  SlidersHorizontal,
+  ArrowRight,
+  CornerDownRight,
 } from "lucide-react";
 
 interface PerformanceClientViewProps {
@@ -58,7 +67,59 @@ export function PerformanceClientView({ context }: PerformanceClientViewProps) {
 
   // Selected Employee Detail Drawer
   const [selectedEmployee, setSelectedEmployee] = useState<any | null>(null);
-  const [drawerTab, setDrawerTab] = useState<"overview" | "radar" | "delivery" | "quality" | "site" | "capacity" | "notes">("overview");
+  const [drawerTab, setDrawerTab] = useState<"overview" | "tasks" | "taskAnalytics" | "radar" | "delivery" | "quality" | "site" | "capacity" | "notes">("overview");
+
+  // Task Filter state in Slide-over Drawer
+  const [drawerTaskStatusFilter, setDrawerTaskStatusFilter] = useState<"ALL" | "COMPLETED" | "IN_PROGRESS" | "OVERDUE" | "BLOCKED">("ALL");
+  const [drawerTaskSearch, setDrawerTaskSearch] = useState<string>("");
+  const [drawerTaskProjectFilter, setDrawerTaskProjectFilter] = useState<string>("ALL");
+
+  const handleSelectEmployee = (emp: any) => {
+    setSelectedEmployee(emp);
+    setDrawerTaskStatusFilter("ALL");
+    setDrawerTaskSearch("");
+    setDrawerTaskProjectFilter("ALL");
+  };
+
+  // Task counts for drawer filter tabs
+  const drawerTaskCounts = useMemo(() => {
+    if (!selectedEmployee?.taskList) {
+      return { total: 0, completed: 0, inProgress: 0, overdue: 0, blocked: 0 };
+    }
+    const list = selectedEmployee.taskList as any[];
+    return {
+      total: list.length,
+      completed: list.filter((t) => t.isCompleted).length,
+      inProgress: list.filter((t) => !t.isCompleted && !t.isOverdue && !t.isBlocked && t.status !== "CANCELLED").length,
+      overdue: list.filter((t) => t.isOverdue).length,
+      blocked: list.filter((t) => t.isBlocked).length,
+    };
+  }, [selectedEmployee]);
+
+  // Filtered task list for drawer
+  const filteredEmployeeTasks = useMemo(() => {
+    if (!selectedEmployee?.taskList) return [];
+    return (selectedEmployee.taskList as any[]).filter((task) => {
+      // Status filter
+      if (drawerTaskStatusFilter === "COMPLETED" && !task.isCompleted) return false;
+      if (drawerTaskStatusFilter === "IN_PROGRESS" && (task.isCompleted || task.isOverdue || task.isBlocked || task.status === "CANCELLED")) return false;
+      if (drawerTaskStatusFilter === "OVERDUE" && !task.isOverdue) return false;
+      if (drawerTaskStatusFilter === "BLOCKED" && !task.isBlocked) return false;
+
+      // Project filter
+      if (drawerTaskProjectFilter !== "ALL" && task.projectId !== drawerTaskProjectFilter) return false;
+
+      // Search query
+      if (drawerTaskSearch.trim()) {
+        const q = drawerTaskSearch.toLowerCase().trim();
+        const matchesTitle = task.title?.toLowerCase().includes(q);
+        const matchesProject = task.projectName?.toLowerCase().includes(q) || task.projectCode?.toLowerCase().includes(q);
+        if (!matchesTitle && !matchesProject) return false;
+      }
+
+      return true;
+    });
+  }, [selectedEmployee, drawerTaskStatusFilter, drawerTaskProjectFilter, drawerTaskSearch]);
 
   // Action Modals State
   const [rebalanceModalOpen, setRebalanceModalOpen] = useState(false);
@@ -783,7 +844,7 @@ export function PerformanceClientView({ context }: PerformanceClientViewProps) {
                     <div
                       key={emp.employeeId}
                       onClick={() => {
-                        setSelectedEmployee(emp);
+                        handleSelectEmployee(emp);
                         setDrawerTab("overview");
                       }}
                       className="p-2.5 rounded-xl bg-white border border-emerald-200 shadow-2xs hover:border-emerald-400 cursor-pointer transition-all flex items-center justify-between"
@@ -827,7 +888,7 @@ export function PerformanceClientView({ context }: PerformanceClientViewProps) {
                     <div
                       key={emp.employeeId}
                       onClick={() => {
-                        setSelectedEmployee(emp);
+                        handleSelectEmployee(emp);
                         setDrawerTab("overview");
                       }}
                       className="p-2.5 rounded-xl bg-white border border-indigo-200 shadow-2xs hover:border-indigo-400 cursor-pointer transition-all flex items-center justify-between"
@@ -871,7 +932,7 @@ export function PerformanceClientView({ context }: PerformanceClientViewProps) {
                     <div
                       key={emp.employeeId}
                       onClick={() => {
-                        setSelectedEmployee(emp);
+                        handleSelectEmployee(emp);
                         setDrawerTab("overview");
                       }}
                       className="p-2.5 rounded-xl bg-white border border-amber-200 shadow-2xs hover:border-amber-400 cursor-pointer transition-all flex items-center justify-between"
@@ -915,7 +976,7 @@ export function PerformanceClientView({ context }: PerformanceClientViewProps) {
                     <div
                       key={emp.employeeId}
                       onClick={() => {
-                        setSelectedEmployee(emp);
+                        handleSelectEmployee(emp);
                         setDrawerTab("overview");
                       }}
                       className="p-2.5 rounded-xl bg-white border border-slate-200 shadow-2xs hover:border-slate-400 cursor-pointer transition-all flex items-center justify-between"
@@ -1159,7 +1220,7 @@ export function PerformanceClientView({ context }: PerformanceClientViewProps) {
                     <button
                       type="button"
                       onClick={() => {
-                        setSelectedEmployee(emp);
+                        handleSelectEmployee(emp);
                         setDrawerTab("radar");
                       }}
                       className="text-[11px] font-semibold text-[#3562E8] hover:underline"
@@ -1354,7 +1415,7 @@ export function PerformanceClientView({ context }: PerformanceClientViewProps) {
                       key={emp.employeeId}
                       className="hover:bg-slate-50/80 transition-colors group cursor-pointer"
                       onClick={() => {
-                        setSelectedEmployee(emp);
+                        handleSelectEmployee(emp);
                         setDrawerTab("overview");
                       }}
                     >
@@ -1446,7 +1507,19 @@ export function PerformanceClientView({ context }: PerformanceClientViewProps) {
                           <button
                             type="button"
                             onClick={() => {
-                              setSelectedEmployee(emp);
+                              handleSelectEmployee(emp);
+                              setDrawerTab("tasks");
+                            }}
+                            className="px-2 py-1 text-[11px] font-semibold text-slate-700 hover:text-[#3562E8] hover:bg-slate-100 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
+                            title="View employee's deliverables and task breakdown"
+                          >
+                            <ListTodo className="w-3 h-3 text-[#3562E8]" />
+                            <span>Tasks ({emp.taskList?.length ?? emp.assignedCount})</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              handleSelectEmployee(emp);
                               setDrawerTab("overview");
                             }}
                             className="px-2 py-1 text-[11px] font-semibold text-[#3562E8] hover:bg-[#3562E8]/10 rounded-lg transition-colors cursor-pointer"
@@ -1486,7 +1559,7 @@ export function PerformanceClientView({ context }: PerformanceClientViewProps) {
             role="dialog"
             aria-modal="true"
             aria-labelledby="perf-drawer-title"
-            className="relative w-full max-w-xl bg-white h-full shadow-2xl flex flex-col z-10 animate-in slide-in-from-right duration-200"
+            className="relative w-full max-w-2xl lg:max-w-3xl bg-white h-full shadow-2xl flex flex-col z-10 animate-in slide-in-from-right duration-200"
           >
             {/* Drawer Header */}
             <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/70">
@@ -1535,6 +1608,15 @@ export function PerformanceClientView({ context }: PerformanceClientViewProps) {
             <div className="flex border-b border-slate-200 bg-white px-3 sm:px-4 text-xs font-semibold overflow-x-auto touch-scroll-x">
               {[
                 { id: "overview", label: "Overview" },
+                {
+                  id: "tasks",
+                  label: `Deliverables & Tasks (${selectedEmployee.taskList?.length || selectedEmployee.assignedCount || 0})`,
+                  badge: (selectedEmployee.taskAnalytics?.overdueTasks || selectedEmployee.overdueCount) > 0
+                    ? `${selectedEmployee.taskAnalytics?.overdueTasks || selectedEmployee.overdueCount} late`
+                    : undefined,
+                  badgeColor: "bg-rose-100 text-rose-700",
+                },
+                { id: "taskAnalytics", label: "Task Analytics & Mix" },
                 { id: "radar", label: "Competency Radar" },
                 { id: "delivery", label: "Delivery & Latency" },
                 { id: "quality", label: "Quality & Rework" },
@@ -1545,13 +1627,18 @@ export function PerformanceClientView({ context }: PerformanceClientViewProps) {
                   key={t.id}
                   type="button"
                   onClick={() => setDrawerTab(t.id as any)}
-                  className={`py-3 px-3 border-b-2 font-medium transition-colors cursor-pointer shrink-0 whitespace-nowrap min-h-[40px] ${
+                  className={`py-3 px-3 border-b-2 font-medium transition-colors cursor-pointer shrink-0 whitespace-nowrap min-h-[40px] flex items-center gap-1.5 ${
                     drawerTab === t.id
                       ? "border-[#3562E8] text-[#3562E8] font-bold"
                       : "border-transparent text-slate-500 hover:text-slate-900"
                   }`}
                 >
-                  {t.label}
+                  <span>{t.label}</span>
+                  {t.badge && (
+                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${t.badgeColor}`}>
+                      {t.badge}
+                    </span>
+                  )}
                 </button>
               ))}
             </div>
@@ -1560,6 +1647,7 @@ export function PerformanceClientView({ context }: PerformanceClientViewProps) {
             <div className="flex-1 overflow-y-auto p-5 space-y-4 text-xs text-slate-700">
               {drawerTab === "overview" && (
                 <div className="space-y-4">
+                  {/* Top Key Performance Indicators */}
                   <div className="grid grid-cols-2 gap-3">
                     <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200">
                       <div className="text-[10px] text-slate-500 uppercase font-bold">On-Time Rate</div>
@@ -1578,6 +1666,131 @@ export function PerformanceClientView({ context }: PerformanceClientViewProps) {
                       <div className="text-[10px] text-slate-500 mt-1">
                         {selectedEmployee.firstPassApprovedCount} of {selectedEmployee.firstPassDecidedCount} decided
                       </div>
+                    </div>
+                  </div>
+
+                  {/* Deliverables Execution Health Card */}
+                  <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-2xs space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <ListTodo className="w-4 h-4 text-[#3562E8]" />
+                        <span className="text-xs font-bold text-slate-900">Deliverables Execution Health</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setDrawerTab("tasks")}
+                        className="text-[11px] font-semibold text-[#3562E8] hover:text-blue-700 hover:underline flex items-center gap-1 cursor-pointer"
+                      >
+                        <span>View All Deliverables ({selectedEmployee.taskAnalytics?.totalTasks || selectedEmployee.assignedCount || 0})</span>
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-4 gap-2 text-center">
+                      <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-100">
+                        <div className="text-[10px] uppercase font-bold text-slate-400">Total Tasks</div>
+                        <div className="text-lg font-bold font-mono text-slate-900 mt-0.5">
+                          {selectedEmployee.taskAnalytics?.totalTasks ?? selectedEmployee.assignedCount}
+                        </div>
+                      </div>
+                      <div className="p-2.5 bg-emerald-50/70 rounded-lg border border-emerald-100">
+                        <div className="text-[10px] uppercase font-bold text-emerald-700">Completed</div>
+                        <div className="text-lg font-bold font-mono text-emerald-800 mt-0.5">
+                          {selectedEmployee.taskAnalytics?.completedTasks ?? selectedEmployee.completedCount}
+                        </div>
+                      </div>
+                      <div className="p-2.5 bg-blue-50/70 rounded-lg border border-blue-100">
+                        <div className="text-[10px] uppercase font-bold text-blue-700">In Progress</div>
+                        <div className="text-lg font-bold font-mono text-blue-800 mt-0.5">
+                          {selectedEmployee.taskAnalytics?.inProgressTasks ?? 0}
+                        </div>
+                      </div>
+                      <div className={`p-2.5 rounded-lg border ${
+                        (selectedEmployee.taskAnalytics?.overdueTasks ?? selectedEmployee.overdueCount) > 0
+                          ? "bg-rose-50/80 border-rose-200"
+                          : "bg-slate-50 border-slate-100"
+                      }`}>
+                        <div className={`text-[10px] uppercase font-bold ${
+                          (selectedEmployee.taskAnalytics?.overdueTasks ?? selectedEmployee.overdueCount) > 0
+                            ? "text-rose-700"
+                            : "text-slate-400"
+                        }`}>Overdue</div>
+                        <div className={`text-lg font-bold font-mono mt-0.5 ${
+                          (selectedEmployee.taskAnalytics?.overdueTasks ?? selectedEmployee.overdueCount) > 0
+                            ? "text-rose-700"
+                            : "text-slate-900"
+                        }`}>
+                          {selectedEmployee.taskAnalytics?.overdueTasks ?? selectedEmployee.overdueCount}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Progress Bar */}
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-[11px] text-slate-500">
+                        <span>Completion Rate</span>
+                        <span className="font-mono font-bold text-slate-900">
+                          {selectedEmployee.taskAnalytics?.completionRatePercent ?? 0}%
+                        </span>
+                      </div>
+                      <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden flex">
+                        <div
+                          className="bg-emerald-500 h-full transition-all"
+                          style={{
+                            width: `${
+                              selectedEmployee.taskAnalytics?.totalTasks
+                                ? ((selectedEmployee.taskAnalytics.onTimeCompletedCount || 0) / selectedEmployee.taskAnalytics.totalTasks) * 100
+                                : 0
+                            }%`,
+                          }}
+                          title={`On-Time Completed: ${selectedEmployee.taskAnalytics?.onTimeCompletedCount || 0}`}
+                        />
+                        <div
+                          className="bg-amber-400 h-full transition-all"
+                          style={{
+                            width: `${
+                              selectedEmployee.taskAnalytics?.totalTasks
+                                ? ((selectedEmployee.taskAnalytics.lateCompletedCount || 0) / selectedEmployee.taskAnalytics.totalTasks) * 100
+                                : 0
+                            }%`,
+                          }}
+                          title={`Late Completed: ${selectedEmployee.taskAnalytics?.lateCompletedCount || 0}`}
+                        />
+                        <div
+                          className="bg-blue-400 h-full transition-all"
+                          style={{
+                            width: `${
+                              selectedEmployee.taskAnalytics?.totalTasks
+                                ? ((selectedEmployee.taskAnalytics.inProgressTasks || 0) / selectedEmployee.taskAnalytics.totalTasks) * 100
+                                : 0
+                            }%`,
+                          }}
+                          title={`In Progress: ${selectedEmployee.taskAnalytics?.inProgressTasks || 0}`}
+                        />
+                        <div
+                          className="bg-rose-500 h-full transition-all"
+                          style={{
+                            width: `${
+                              selectedEmployee.taskAnalytics?.totalTasks
+                                ? ((selectedEmployee.taskAnalytics.overdueTasks || 0) / selectedEmployee.taskAnalytics.totalTasks) * 100
+                                : 0
+                            }%`,
+                          }}
+                          title={`Overdue: ${selectedEmployee.taskAnalytics?.overdueTasks || 0}`}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="pt-2 flex items-center justify-between border-t border-slate-100 text-[11px]">
+                      <span className="text-slate-500">Need deep project & urgency breakdown?</span>
+                      <button
+                        type="button"
+                        onClick={() => setDrawerTab("taskAnalytics")}
+                        className="font-bold text-[#3562E8] hover:underline flex items-center gap-1 cursor-pointer"
+                      >
+                        <span>Open Task Analytics & Mix</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   </div>
 
@@ -1633,6 +1846,655 @@ export function PerformanceClientView({ context }: PerformanceClientViewProps) {
                         <MessageSquare className="w-3.5 h-3.5 text-indigo-600" />
                         <span>Add Coaching Note</span>
                       </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* DEDICATED TAB 1: DELIVERABLES & TASKS */}
+              {drawerTab === "tasks" && (
+                <div className="space-y-4">
+                  {/* 1. Filter Pills Row */}
+                  <div className="flex flex-wrap gap-1.5">
+                    {[
+                      { id: "ALL", label: "All Tasks", count: drawerTaskCounts.total, activeColor: "bg-slate-900 text-white" },
+                      { id: "COMPLETED", label: "Completed", count: drawerTaskCounts.completed, activeColor: "bg-emerald-600 text-white", badgeColor: "text-emerald-700 bg-emerald-100" },
+                      { id: "IN_PROGRESS", label: "In Progress", count: drawerTaskCounts.inProgress, activeColor: "bg-[#3562E8] text-white", badgeColor: "text-blue-700 bg-blue-100" },
+                      { id: "OVERDUE", label: "Overdue", count: drawerTaskCounts.overdue, activeColor: "bg-rose-600 text-white", badgeColor: "text-rose-700 bg-rose-100" },
+                      { id: "BLOCKED", label: "Blocked", count: drawerTaskCounts.blocked, activeColor: "bg-amber-600 text-white", badgeColor: "text-amber-700 bg-amber-100" },
+                    ].map((f) => (
+                      <button
+                        key={f.id}
+                        type="button"
+                        onClick={() => setDrawerTaskStatusFilter(f.id as any)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                          drawerTaskStatusFilter === f.id
+                            ? `${f.activeColor} shadow-2xs`
+                            : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                        }`}
+                      >
+                        <span>{f.label}</span>
+                        <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                          drawerTaskStatusFilter === f.id ? "bg-white/20 text-white" : (f.badgeColor || "bg-slate-200 text-slate-700")
+                        }`}>
+                          {f.count}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* 2. Search & Project Filter Controls */}
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <div className="relative flex-1">
+                      <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="text"
+                        value={drawerTaskSearch}
+                        onChange={(e) => setDrawerTaskSearch(e.target.value)}
+                        placeholder="Search deliverables or projects..."
+                        className="w-full pl-8 pr-7 py-2 text-xs rounded-xl border border-slate-200 bg-white focus:outline-hidden focus:ring-1 focus:ring-[#3562E8]"
+                      />
+                      {drawerTaskSearch && (
+                        <button
+                          type="button"
+                          onClick={() => setDrawerTaskSearch("")}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="sm:w-56 shrink-0">
+                      <select
+                        value={drawerTaskProjectFilter}
+                        onChange={(e) => setDrawerTaskProjectFilter(e.target.value)}
+                        aria-label="Filter tasks by project"
+                        className="w-full px-2.5 py-2 text-xs rounded-xl border border-slate-200 bg-white focus:outline-hidden focus:ring-1 focus:ring-[#3562E8]"
+                      >
+                        <option value="ALL">All Projects ({selectedEmployee.taskAnalytics?.projectBreakdown?.length || 0})</option>
+                        {selectedEmployee.taskAnalytics?.projectBreakdown?.map((p: any) => (
+                          <option key={p.projectId} value={p.projectId}>
+                            [{p.projectCode}] {p.projectName} ({p.total})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* 3. Status Summary Banner */}
+                  <div className="flex items-center justify-between text-xs text-slate-500 px-1">
+                    <span>
+                      Showing <strong>{filteredEmployeeTasks.length}</strong> of <strong>{drawerTaskCounts.total}</strong> deliverables
+                      {drawerTaskStatusFilter !== "ALL" && ` (Filter: ${drawerTaskStatusFilter})`}
+                    </span>
+                    {drawerTaskCounts.overdue > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRebalanceEmployee(selectedEmployee);
+                          const firstOverdue = selectedEmployee.taskList?.find((t: any) => t.isOverdue);
+                          if (firstOverdue) setRebalanceTaskId(firstOverdue.id);
+                          setRebalanceModalOpen(true);
+                        }}
+                        className="text-[11px] font-bold text-rose-600 hover:text-rose-700 flex items-center gap-1 cursor-pointer"
+                      >
+                        <Scale className="w-3 h-3" />
+                        <span>Rebalance Overdue Workload</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {/* 4. Task Cards List */}
+                  {filteredEmployeeTasks.length === 0 ? (
+                    <div className="p-8 text-center bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+                      <ListTodo className="w-8 h-8 text-slate-300 mx-auto" />
+                      <div className="text-sm font-bold text-slate-700">No deliverables match current filters</div>
+                      <p className="text-xs text-slate-400">
+                        Try changing the status filter or clearing your search query.
+                      </p>
+                      {(drawerTaskStatusFilter !== "ALL" || drawerTaskSearch || drawerTaskProjectFilter !== "ALL") && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDrawerTaskStatusFilter("ALL");
+                            setDrawerTaskSearch("");
+                            setDrawerTaskProjectFilter("ALL");
+                          }}
+                          className="mt-2 px-3 py-1.5 text-xs font-semibold rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 cursor-pointer"
+                        >
+                          Reset Filters
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {filteredEmployeeTasks.map((task: any) => {
+                        const isOverdue = task.isOverdue;
+                        const isCompleted = task.isCompleted;
+                        const isBlocked = task.isBlocked;
+
+                        return (
+                          <div
+                            key={task.id}
+                            className={`p-4 rounded-xl border transition-all ${
+                              isOverdue
+                                ? "bg-rose-50/30 border-rose-200 hover:border-rose-300"
+                                : isBlocked
+                                ? "bg-amber-50/30 border-amber-200 hover:border-amber-300"
+                                : isCompleted
+                                ? "bg-white border-slate-200/90 hover:border-slate-300"
+                                : "bg-white border-slate-200 hover:border-[#3562E8]/40 shadow-2xs"
+                            }`}
+                          >
+                            {/* Card Top: Badges */}
+                            <div className="flex items-center justify-between gap-2 flex-wrap">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                {/* Status Pill */}
+                                {isCompleted ? (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                                    <CheckCircle2 className="w-3 h-3" />
+                                    <span>COMPLETED</span>
+                                  </span>
+                                ) : isOverdue ? (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 animate-pulse">
+                                    <AlertCircle className="w-3 h-3" />
+                                    <span>OVERDUE (+{task.overdueDays}d)</span>
+                                  </span>
+                                ) : isBlocked ? (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
+                                    <AlertTriangle className="w-3 h-3" />
+                                    <span>BLOCKED</span>
+                                  </span>
+                                ) : task.status === "IN_PROGRESS" || task.status === "ONGOING" ? (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800">
+                                    <Clock className="w-3 h-3" />
+                                    <span>IN PROGRESS</span>
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">
+                                    <CircleDot className="w-3 h-3" />
+                                    <span>{task.status}</span>
+                                  </span>
+                                )}
+
+                                {/* Priority Pill */}
+                                <span
+                                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                                    task.priority === "URGENT"
+                                      ? "bg-rose-100 text-rose-700 border border-rose-200"
+                                      : task.priority === "HIGH"
+                                      ? "bg-orange-100 text-orange-700 border border-orange-200"
+                                      : task.priority === "MEDIUM"
+                                      ? "bg-blue-50 text-blue-700 border border-blue-200"
+                                      : "bg-slate-100 text-slate-600 border border-slate-200"
+                                  }`}
+                                >
+                                  {task.priority}
+                                </span>
+
+                                {/* Project Tag */}
+                                <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-[10px] font-mono font-semibold flex items-center gap-1">
+                                  <span>[{task.projectCode}]</span>
+                                  <span className="max-w-[140px] truncate">{task.projectName}</span>
+                                </span>
+                              </div>
+
+                              {/* Governance pill */}
+                              <div>
+                                {task.governancePolicy === "FOUR_EYES_GOVERNED" ? (
+                                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200 flex items-center gap-1">
+                                    <ShieldCheck className="w-3 h-3" />
+                                    <span>Four-Eyes Governed</span>
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] text-slate-400 font-mono">
+                                    Operational
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Task Title */}
+                            <div className="text-sm font-bold text-slate-900 mt-2 mb-1">
+                              {task.title}
+                            </div>
+
+                            {/* Checklist Progress if items exist */}
+                            {task.checklistTotal > 0 && (
+                              <div className="mt-2 p-2.5 bg-slate-50 rounded-lg border border-slate-100 space-y-1">
+                                <div className="flex justify-between text-[11px] text-slate-600 font-medium">
+                                  <span className="flex items-center gap-1">
+                                    <CheckSquare className="w-3 h-3 text-slate-400" />
+                                    <span>Checklist Milestones</span>
+                                  </span>
+                                  <span className="font-mono font-bold">
+                                    {task.checklistCompleted} / {task.checklistTotal} ({Math.round((task.checklistCompleted / task.checklistTotal) * 100)}%)
+                                  </span>
+                                </div>
+                                <div className="h-1.5 w-full bg-slate-200 rounded-full overflow-hidden">
+                                  <div
+                                    className={`h-full transition-all ${
+                                      task.checklistCompleted === task.checklistTotal ? "bg-emerald-500" : "bg-[#3562E8]"
+                                    }`}
+                                    style={{ width: `${(task.checklistCompleted / task.checklistTotal) * 100}%` }}
+                                  />
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Blocker reason if blocked */}
+                            {task.isBlocked && (
+                              <div className="mt-2 p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 flex items-start gap-2">
+                                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                                <div className="text-[11px]">
+                                  <span className="font-bold">Blocker Detail: </span>
+                                  {task.blockerReason || "Delivery blocked pending external resolution or team input."}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Submission status & review feedback if present */}
+                            {(task.latestSubmissionStatus || task.latestFeedback) && (
+                              <div className="mt-2 p-2 rounded-lg bg-indigo-50/60 border border-indigo-100 text-[11px] text-indigo-950 space-y-1">
+                                <div className="flex items-center justify-between">
+                                  <span className="font-bold text-[10px] uppercase text-indigo-700 flex items-center gap-1">
+                                    <FileCheck2 className="w-3 h-3" />
+                                    <span>Leadership Review: {task.latestSubmissionStatus || "Submitted"}</span>
+                                  </span>
+                                  <span className="text-[10px] text-indigo-500 font-mono">
+                                    {task.submissionCount} {task.submissionCount === 1 ? "submission" : "submissions"}
+                                  </span>
+                                </div>
+                                {task.latestFeedback && (
+                                  <p className="italic text-slate-700 pl-2 border-l-2 border-indigo-300">
+                                    "{task.latestFeedback}"
+                                  </p>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Footer: Timeline & Actions */}
+                            <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] flex-wrap gap-2">
+                              <div className="flex items-center gap-2 flex-wrap text-slate-500">
+                                <span className="flex items-center gap-1 font-mono">
+                                  <Calendar className="w-3 h-3 text-slate-400" />
+                                  <span>Due: {task.dueDate || "No deadline"}</span>
+                                </span>
+
+                                {isCompleted && (
+                                  <>
+                                    <span>•</span>
+                                    {task.isOnTime === true ? (
+                                      <span className="font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">
+                                        ✓ Delivered On-Time ({task.completionDate})
+                                      </span>
+                                    ) : task.isOnTime === false ? (
+                                      <span className="font-semibold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded">
+                                        ⚠️ Delivered Late ({task.completionDate})
+                                      </span>
+                                    ) : (
+                                      <span className="text-slate-600">
+                                        Finished: {task.completionDate}
+                                      </span>
+                                    )}
+                                  </>
+                                )}
+
+                                {isOverdue && (
+                                  <span className="font-bold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded">
+                                    🚨 {task.overdueDays} days past deadline
+                                  </span>
+                                )}
+
+                                {task.estimatedHours && (
+                                  <>
+                                    <span>•</span>
+                                    <span className="font-mono text-slate-600">
+                                      {task.estimatedHours}h est.
+                                    </span>
+                                  </>
+                                )}
+                              </div>
+
+                              {/* Action Buttons */}
+                              <div className="flex items-center gap-1.5">
+                                {!isCompleted && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setRebalanceEmployee(selectedEmployee);
+                                      setRebalanceTaskId(task.id);
+                                      setRebalanceModalOpen(true);
+                                    }}
+                                    className="px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-slate-100 text-slate-700 hover:bg-[#3562E8] hover:text-white transition-colors flex items-center gap-1 cursor-pointer"
+                                  >
+                                    <Scale className="w-3 h-3" />
+                                    <span>Reassign / Offload</span>
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* DEDICATED TAB 2: TASK ANALYTICS & MIX */}
+              {drawerTab === "taskAnalytics" && (
+                <div className="space-y-4">
+                  {/* Hero Metric Scorecards */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                      <div className="text-[10px] text-slate-500 uppercase font-bold">Completion Rate</div>
+                      <div className="text-2xl font-bold font-mono text-slate-900 mt-1">
+                        {selectedEmployee.taskAnalytics?.completionRatePercent ?? 0}%
+                      </div>
+                      <div className="text-[10px] text-slate-500 mt-0.5">
+                        {selectedEmployee.taskAnalytics?.completedTasks ?? 0} of {selectedEmployee.taskAnalytics?.totalTasks ?? 0} finished
+                      </div>
+                    </div>
+
+                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                      <div className="text-[10px] text-slate-500 uppercase font-bold">On-Time Execution</div>
+                      <div className="text-2xl font-bold font-mono text-emerald-700 mt-1">
+                        {selectedEmployee.onTimeRatePercent !== null ? `${selectedEmployee.onTimeRatePercent}%` : "—"}
+                      </div>
+                      <div className="text-[10px] text-slate-500 mt-0.5">
+                        {selectedEmployee.taskAnalytics?.onTimeCompletedCount ?? 0} on-time, {selectedEmployee.taskAnalytics?.lateCompletedCount ?? 0} late
+                      </div>
+                    </div>
+
+                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                      <div className="text-[10px] text-slate-500 uppercase font-bold">Active Pressure</div>
+                      <div className={`text-2xl font-bold font-mono mt-1 ${
+                        (selectedEmployee.taskAnalytics?.overdueTasks || 0) > 0 ? "text-rose-600" : "text-slate-900"
+                      }`}>
+                        {(selectedEmployee.taskAnalytics?.overdueTasks || 0) + (selectedEmployee.taskAnalytics?.blockedTasks || 0)}
+                      </div>
+                      <div className="text-[10px] text-slate-500 mt-0.5">
+                        {selectedEmployee.taskAnalytics?.overdueTasks || 0} overdue • {selectedEmployee.taskAnalytics?.blockedTasks || 0} blocked
+                      </div>
+                    </div>
+
+                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                      <div className="text-[10px] text-slate-500 uppercase font-bold">Capacity Load</div>
+                      <div className="text-2xl font-bold font-mono text-[#3562E8] mt-1">
+                        {selectedEmployee.utilizationPercent}%
+                      </div>
+                      <div className="text-[10px] text-slate-500 mt-0.5">
+                        {selectedEmployee.allocatedEstimatedHours}h of {selectedEmployee.availableCapacityHours}h net
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Deliverable Mix & Status Distribution Bar */}
+                  <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                        <PieChart className="w-4 h-4 text-[#3562E8]" />
+                        <span>Deliverables Status Distribution</span>
+                      </div>
+                      <span className="text-[10px] font-mono text-slate-500">
+                        {selectedEmployee.taskAnalytics?.totalTasks || 0} total deliverables
+                      </span>
+                    </div>
+
+                    {/* Stacked Distribution Bar */}
+                    <div className="h-3 w-full bg-slate-200 rounded-full overflow-hidden flex shadow-inner">
+                      {(selectedEmployee.taskAnalytics?.totalTasks || 0) > 0 ? (
+                        <>
+                          <div
+                            className="bg-emerald-500 h-full"
+                            style={{
+                              width: `${((selectedEmployee.taskAnalytics.onTimeCompletedCount || 0) / selectedEmployee.taskAnalytics.totalTasks) * 100}%`,
+                            }}
+                            title={`On-time completed: ${selectedEmployee.taskAnalytics.onTimeCompletedCount || 0}`}
+                          />
+                          <div
+                            className="bg-amber-400 h-full"
+                            style={{
+                              width: `${((selectedEmployee.taskAnalytics.lateCompletedCount || 0) / selectedEmployee.taskAnalytics.totalTasks) * 100}%`,
+                            }}
+                            title={`Late completed: ${selectedEmployee.taskAnalytics.lateCompletedCount || 0}`}
+                          />
+                          <div
+                            className="bg-[#3562E8] h-full"
+                            style={{
+                              width: `${((selectedEmployee.taskAnalytics.inProgressTasks || 0) / selectedEmployee.taskAnalytics.totalTasks) * 100}%`,
+                            }}
+                            title={`In progress: ${selectedEmployee.taskAnalytics.inProgressTasks || 0}`}
+                          />
+                          <div
+                            className="bg-rose-500 h-full"
+                            style={{
+                              width: `${((selectedEmployee.taskAnalytics.overdueTasks || 0) / selectedEmployee.taskAnalytics.totalTasks) * 100}%`,
+                            }}
+                            title={`Overdue: ${selectedEmployee.taskAnalytics.overdueTasks || 0}`}
+                          />
+                          <div
+                            className="bg-orange-500 h-full"
+                            style={{
+                              width: `${((selectedEmployee.taskAnalytics.blockedTasks || 0) / selectedEmployee.taskAnalytics.totalTasks) * 100}%`,
+                            }}
+                            title={`Blocked: ${selectedEmployee.taskAnalytics.blockedTasks || 0}`}
+                          />
+                          <div
+                            className="bg-slate-300 h-full"
+                            style={{
+                              width: `${((selectedEmployee.taskAnalytics.pendingTasks || 0) / selectedEmployee.taskAnalytics.totalTasks) * 100}%`,
+                            }}
+                            title={`Pending: ${selectedEmployee.taskAnalytics.pendingTasks || 0}`}
+                          />
+                        </>
+                      ) : (
+                        <div className="bg-slate-200 h-full w-full" />
+                      )}
+                    </div>
+
+                    {/* Legend */}
+                    <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 pt-1 text-[11px]">
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
+                        <span className="text-slate-600 truncate">On-Time: <strong>{selectedEmployee.taskAnalytics?.onTimeCompletedCount || 0}</strong></span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0" />
+                        <span className="text-slate-600 truncate">Late: <strong>{selectedEmployee.taskAnalytics?.lateCompletedCount || 0}</strong></span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded-full bg-[#3562E8] shrink-0" />
+                        <span className="text-slate-600 truncate">Active: <strong>{selectedEmployee.taskAnalytics?.inProgressTasks || 0}</strong></span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0" />
+                        <span className="text-slate-600 truncate">Overdue: <strong>{selectedEmployee.taskAnalytics?.overdueTasks || 0}</strong></span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded-full bg-orange-500 shrink-0" />
+                        <span className="text-slate-600 truncate">Blocked: <strong>{selectedEmployee.taskAnalytics?.blockedTasks || 0}</strong></span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded-full bg-slate-300 shrink-0" />
+                        <span className="text-slate-600 truncate">Pending: <strong>{selectedEmployee.taskAnalytics?.pendingTasks || 0}</strong></span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Project Breakdown & Context Switching */}
+                  <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                        <Briefcase className="w-4 h-4 text-indigo-600" />
+                        <span>Project Workload Distribution & Context Switching</span>
+                      </div>
+                      <span className="text-[10px] font-mono text-slate-500">
+                        {selectedEmployee.taskAnalytics?.projectBreakdown?.length || 0} active projects
+                      </span>
+                    </div>
+
+                    {selectedEmployee.taskAnalytics?.projectBreakdown && selectedEmployee.taskAnalytics.projectBreakdown.length > 0 ? (
+                      <div className="space-y-2">
+                        {selectedEmployee.taskAnalytics.projectBreakdown.map((prj: any, idx: number) => {
+                          const pct = prj.total > 0 ? Math.round((prj.completed / prj.total) * 100) : 0;
+                          return (
+                            <div key={prj.projectId} className="p-2.5 bg-white rounded-lg border border-slate-200/80 space-y-1.5">
+                              <div className="flex items-center justify-between text-xs">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-mono font-bold text-slate-800">[{prj.projectCode}]</span>
+                                  <span className="font-semibold text-slate-900">{prj.projectName}</span>
+                                  {idx === 0 && (
+                                    <span className="text-[10px] px-1.5 py-0.2 rounded bg-indigo-50 text-indigo-700 font-medium">
+                                      Primary Load
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="font-mono text-[11px] text-slate-500">
+                                  <strong>{prj.completed}</strong> / {prj.total} completed ({pct}%)
+                                  {prj.overdue > 0 && (
+                                    <span className="text-rose-600 font-bold ml-1.5">
+                                      • {prj.overdue} overdue
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                                <div
+                                  className={`h-full ${pct === 100 ? "bg-emerald-500" : "bg-[#3562E8]"}`}
+                                  style={{ width: `${pct}%` }}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="text-xs text-slate-400 italic">No project task mappings found.</div>
+                    )}
+
+                    {(selectedEmployee.taskAnalytics?.projectBreakdown?.length || 0) >= 4 && (
+                      <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-[11px] flex items-start gap-1.5">
+                        <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+                        <span>
+                          <strong>High Context Switching:</strong> Assigned across {selectedEmployee.taskAnalytics.projectBreakdown.length} concurrent projects. High task interleaving may reduce technical focus and elevate handoff latency.
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Priority Mix & Cognitive Pressure */}
+                  <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
+                    <div className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                      <Zap className="w-4 h-4 text-amber-500" />
+                      <span>Priority Pressure & Task Urgency Mix</span>
+                    </div>
+
+                    <div className="space-y-2">
+                      {[
+                        {
+                          label: "Urgent Priority",
+                          count: selectedEmployee.taskAnalytics?.priorityBreakdown?.urgent || 0,
+                          barColor: "bg-rose-500",
+                          textColor: "text-rose-700",
+                        },
+                        {
+                          label: "High Priority",
+                          count: selectedEmployee.taskAnalytics?.priorityBreakdown?.high || 0,
+                          barColor: "bg-orange-500",
+                          textColor: "text-orange-700",
+                        },
+                        {
+                          label: "Medium Priority",
+                          count: selectedEmployee.taskAnalytics?.priorityBreakdown?.medium || 0,
+                          barColor: "bg-[#3562E8]",
+                          textColor: "text-blue-700",
+                        },
+                        {
+                          label: "Low Priority",
+                          count: selectedEmployee.taskAnalytics?.priorityBreakdown?.low || 0,
+                          barColor: "bg-slate-400",
+                          textColor: "text-slate-600",
+                        },
+                      ].map((p) => {
+                        const total = selectedEmployee.taskAnalytics?.totalTasks || 1;
+                        const pct = Math.round((p.count / total) * 100);
+                        return (
+                          <div key={p.label} className="space-y-1">
+                            <div className="flex justify-between text-xs">
+                              <span className="text-slate-600 font-medium">{p.label}</span>
+                              <span className="font-mono font-bold text-slate-800">
+                                {p.count} <span className="text-slate-400 font-normal">({pct}%)</span>
+                              </span>
+                            </div>
+                            <div className="h-1.5 w-full bg-slate-200 rounded-full overflow-hidden">
+                              <div className={`h-full ${p.barColor}`} style={{ width: `${pct}%` }} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Stress Assessment */}
+                    {(() => {
+                      const urgent = selectedEmployee.taskAnalytics?.priorityBreakdown?.urgent || 0;
+                      const high = selectedEmployee.taskAnalytics?.priorityBreakdown?.high || 0;
+                      const total = selectedEmployee.taskAnalytics?.totalTasks || 1;
+                      const ratio = (urgent + high) / total;
+
+                      if (ratio >= 0.4 && total > 2) {
+                        return (
+                          <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-900 text-[11px] flex items-start gap-1.5">
+                            <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0 mt-0.5" />
+                            <span>
+                              <strong>High Urgency Load ({Math.round(ratio * 100)}%):</strong> Over 40% of deliverables are marked Urgent/High. Recommend offloading medium/low deliverables to protect core execution quality.
+                            </span>
+                          </div>
+                        );
+                      }
+                      return (
+                        <div className="p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 text-[11px] flex items-start gap-1.5">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                          <span>
+                            <strong>Balanced Priority Distribution:</strong> Healthy spread of urgent vs routine tasks without disproportionate firefighting pressure.
+                          </span>
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  {/* Governance & Four-Eyes Technical Quality Architecture */}
+                  <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2.5">
+                    <div className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                      <ShieldCheck className="w-4 h-4 text-purple-600" />
+                      <span>Four-Eyes Technical Governance vs Operational Deliverables</span>
+                    </div>
+
+                    <div className="flex justify-between py-1 border-b border-slate-200/60">
+                      <span className="text-slate-500">Governed Deliverables Passed (Four-Eyes):</span>
+                      <span className="font-mono font-bold text-purple-700">
+                        {selectedEmployee.governedCompletedCount}
+                      </span>
+                    </div>
+                    <div className="flex justify-between py-1 border-b border-slate-200/60">
+                      <span className="text-slate-500">Operational Deliverables Completed:</span>
+                      <span className="font-mono font-bold text-slate-800">
+                        {selectedEmployee.operationalCompletedCount}
+                      </span>
+                    </div>
+                    <div className="flex justify-between py-1 border-b border-slate-200/60">
+                      <span className="text-slate-500">First-Pass Technical Approval Rate:</span>
+                      <span className="font-mono font-bold text-emerald-700">
+                        {selectedEmployee.firstPassRatePercent !== null ? `${selectedEmployee.firstPassRatePercent}%` : "No decided reviews"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between py-1">
+                      <span className="text-slate-500">Technical Revisions / Rework Required:</span>
+                      <span className="font-mono font-bold text-amber-600">
+                        {selectedEmployee.reworkCount}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -1804,21 +2666,28 @@ export function PerformanceClientView({ context }: PerformanceClientViewProps) {
                 <label className="text-xs font-bold text-slate-700 block mb-1">
                   1. Select Deliverable to Offload:
                 </label>
-                {rebalanceEmployee.openTasks?.length > 0 ? (
-                  <select
-                    value={rebalanceTaskId}
-                    onChange={(e) => setRebalanceTaskId(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white"
-                  >
-                    {rebalanceEmployee.openTasks.map((t: any) => (
-                      <option key={t.id} value={t.id}>
-                        {t.title} ({t.priority} • Due: {t.dueDate || "No deadline"})
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <div className="text-xs text-slate-400 italic">No open deliverables available to reassign.</div>
-                )}
+                {(() => {
+                  const candidateTasks = (rebalanceEmployee.taskList?.filter((t: any) => !t.isCompleted && t.status !== "CANCELLED") || rebalanceEmployee.openTasks || []);
+                  if (candidateTasks.length > 0) {
+                    return (
+                      <select
+                        value={rebalanceTaskId}
+                        onChange={(e) => setRebalanceTaskId(e.target.value)}
+                        className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white"
+                      >
+                        <option value="">Select a deliverable to reassign...</option>
+                        {candidateTasks.map((t: any) => (
+                          <option key={t.id} value={t.id}>
+                            {t.title} ({t.priority} • Due: {t.dueDate || "No deadline"}{t.isOverdue ? ` • OVERDUE (+${t.overdueDays}d)` : ""})
+                          </option>
+                        ))}
+                      </select>
+                    );
+                  }
+                  return (
+                    <div className="text-xs text-slate-400 italic">No open deliverables available to reassign.</div>
+                  );
+                })()}
               </div>
 
               <div>
