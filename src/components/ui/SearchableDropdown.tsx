@@ -23,6 +23,8 @@ import {
   Minus,
   CheckSquare,
 } from "lucide-react";
+import { useFormFieldAdmin } from "./FormFieldAdminContext";
+import { AdminFieldActions } from "./AdminFieldActions";
 import {
   getAllTypologies,
   isTypologyMatch as robustIsTypologyMatch,
@@ -127,6 +129,8 @@ export interface SearchableDropdownProps {
   align?: "left" | "right";
   renderOption?: (option: DropdownOption, isSelected: boolean) => React.ReactNode;
   renderTriggerValue?: (selected: DropdownOption | DropdownOption[] | null) => React.ReactNode;
+  formId?: string;
+  fieldKey?: string;
 }
 
 // Backward-compatible props alias
@@ -235,7 +239,18 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
   align = "left",
   renderOption,
   renderTriggerValue,
+  formId,
+  fieldKey,
 }) => {
+  const { getFieldConfig, isFieldHidden } = useFormFieldAdmin();
+  const effectiveFormId = formId || "GLOBAL_FORM";
+  const effectiveFieldKey = fieldKey || id || (label ? label.toLowerCase().replace(/[^a-z0-9]/g, "") : "");
+
+  const customConfig = effectiveFieldKey ? getFieldConfig(effectiveFormId, effectiveFieldKey) : undefined;
+  const effectiveLabel = customConfig?.label ?? label;
+  const effectiveRequired = customConfig?.required !== undefined ? customConfig.required : required;
+  const effectivePlaceholder = customConfig?.placeholder ?? placeholder;
+
   const isMulti = Boolean(multiple ?? multiSelect);
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -245,6 +260,11 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+
+  // If this dropdown field has been hidden by an Admin, don't render it
+  if (effectiveFieldKey && isFieldHidden(effectiveFormId, effectiveFieldKey)) {
+    return null;
+  }
 
   // Determine whether "OTHER" is active
   const isKnownOption = options.some((opt) => opt.value === value);
@@ -652,11 +672,22 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
       onKeyDown={handleKeyDown}
     >
       {/* Optional Form Field Label */}
-      {label && (
+      {effectiveLabel && (
         <div className="flex items-center justify-between">
-          <label htmlFor={id} className="block font-semibold text-[#111B35] text-xs">
-            {label} {required && <span className="text-rose-600">*</span>}
-          </label>
+          <div className="flex items-center">
+            <label htmlFor={id} className="block font-semibold text-[#111B35] text-xs">
+              {effectiveLabel} {effectiveRequired && <span className="text-rose-600">*</span>}
+            </label>
+            {effectiveFieldKey && (
+              <AdminFieldActions
+                formId={effectiveFormId}
+                fieldKey={effectiveFieldKey}
+                label={effectiveLabel}
+                placeholder={effectivePlaceholder}
+                required={effectiveRequired}
+              />
+            )}
+          </div>
           {isOtherSelected && !isMulti && (
             <span className="text-[10px] font-semibold text-[#5878FF] bg-[#F1F4FF] px-2 py-0.5 rounded-md border border-[#CEDEFF]">
               Custom Value Active

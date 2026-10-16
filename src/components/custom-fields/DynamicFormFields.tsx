@@ -4,6 +4,8 @@ import React from "react";
 import { CustomFieldDefinition } from "@/server/modules/custom-fields/repository";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { Sparkles, Calendar, Hash, Type, ListFilter, ToggleLeft, FileText, Link as LinkIcon } from "lucide-react";
+import { useFormFieldAdmin } from "@/components/ui/FormFieldAdminContext";
+import { AdminFieldActions } from "@/components/ui/AdminFieldActions";
 
 interface DynamicFormFieldsProps {
   fields: CustomFieldDefinition[];
@@ -18,38 +20,65 @@ export function DynamicFormFields({
   onChange,
   disabled = false,
 }: DynamicFormFieldsProps) {
+  const { getFieldConfig, isFieldHidden } = useFormFieldAdmin();
+
   if (!fields || fields.length === 0) return null;
 
-  // Group fields by category if available
-  const categories = Array.from(new Set(fields.map((f) => f.category || "Additional Studio Attributes")));
+  // Filter out any fields hidden by Admin
+  const visibleFields = fields.filter((f) => !isFieldHidden(f.entity || "PROJECT", f.key));
+
+  if (visibleFields.length === 0) return null;
 
   return (
     <div className="space-y-4 pt-3 border-t border-[#E2E6F0]">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5 text-xs font-bold text-[#5A81FA] uppercase tracking-wider">
           <Sparkles className="w-3.5 h-3.5" />
-          <span>Configured Studio Attributes ({fields.length})</span>
+          <span>Configured Studio Attributes ({visibleFields.length})</span>
         </div>
         <span className="text-[10px] text-slate-400 font-medium">Dynamic Custom Fields</span>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs">
-        {fields.map((field) => {
+        {visibleFields.map((field) => {
+          const formId = field.entity || "PROJECT";
+          const customConfig = getFieldConfig(formId, field.key);
+          const effectiveLabel = customConfig?.label ?? field.label;
+          const effectivePlaceholder = customConfig?.placeholder ?? field.placeholder;
+          const effectiveRequired = customConfig?.required !== undefined ? customConfig.required : field.required;
           const val = values[field.key] !== undefined ? values[field.key] : "";
+
+          const adminActions = (
+            <AdminFieldActions
+              formId={formId}
+              fieldKey={field.key}
+              label={effectiveLabel}
+              placeholder={effectivePlaceholder}
+              required={effectiveRequired}
+              isCustomField={true}
+            />
+          );
 
           switch (field.type) {
             case "select":
               return (
-                <div key={field.id}>
+                <div key={field.id} className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <span className="font-bold text-slate-700">
+                        {effectiveLabel} {effectiveRequired && <span className="text-red-500">*</span>}
+                      </span>
+                      {adminActions}
+                    </div>
+                  </div>
                   <SearchableSelect
                     id={field.id}
-                    label={field.label}
-                    required={field.required}
+                    required={effectiveRequired}
                     disabled={disabled}
                     value={val}
                     onChange={(newVal) => onChange(field.key, newVal)}
-                    placeholder={field.placeholder || `Select ${field.label}...`}
-                    searchPlaceholder={`Search ${field.label}...`}
+                    placeholder={effectivePlaceholder || `Select ${effectiveLabel}...`}
+                    searchPlaceholder={`Search ${effectiveLabel}...`}
                     allowOther={true}
                     options={(field.options || []).map((opt) => ({
                       value: opt,
@@ -62,9 +91,12 @@ export function DynamicFormFields({
             case "boolean":
               return (
                 <div key={field.id} className="flex items-center justify-between p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl self-end">
-                  <span className="font-bold text-slate-700">
-                    {field.label} {field.required && <span className="text-red-500">*</span>}
-                  </span>
+                  <div className="flex items-center">
+                    <span className="font-bold text-slate-700">
+                      {effectiveLabel} {effectiveRequired && <span className="text-red-500">*</span>}
+                    </span>
+                    {adminActions}
+                  </div>
                   <label className="relative inline-flex items-center cursor-pointer">
                     <input
                       type="checkbox"
@@ -81,16 +113,21 @@ export function DynamicFormFields({
             case "textarea":
               return (
                 <div key={field.id} className="col-span-full space-y-1">
-                  <label className="block font-bold text-slate-700">
-                    {field.label} {field.required && <span className="text-red-500">*</span>}
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <label className="block font-bold text-slate-700">
+                        {effectiveLabel} {effectiveRequired && <span className="text-red-500">*</span>}
+                      </label>
+                      {adminActions}
+                    </div>
+                  </div>
                   <textarea
                     rows={2}
                     disabled={disabled}
-                    required={field.required}
+                    required={effectiveRequired}
                     value={val}
                     onChange={(e) => onChange(field.key, e.target.value)}
-                    placeholder={field.placeholder || `Enter ${field.label}...`}
+                    placeholder={effectivePlaceholder || `Enter ${effectiveLabel}...`}
                     className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#5A81FA] disabled:opacity-60"
                   />
                 </div>
@@ -99,13 +136,18 @@ export function DynamicFormFields({
             case "date":
               return (
                 <div key={field.id} className="space-y-1">
-                  <label className="block font-bold text-slate-700">
-                    {field.label} {field.required && <span className="text-red-500">*</span>}
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <label className="block font-bold text-slate-700">
+                        {effectiveLabel} {effectiveRequired && <span className="text-red-500">*</span>}
+                      </label>
+                      {adminActions}
+                    </div>
+                  </div>
                   <input
                     type="date"
                     disabled={disabled}
-                    required={field.required}
+                    required={effectiveRequired}
                     value={val ? String(val).split("T")[0] : ""}
                     onChange={(e) => onChange(field.key, e.target.value)}
                     className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#5A81FA] disabled:opacity-60"
@@ -116,16 +158,21 @@ export function DynamicFormFields({
             case "number":
               return (
                 <div key={field.id} className="space-y-1">
-                  <label className="block font-bold text-slate-700">
-                    {field.label} {field.required && <span className="text-red-500">*</span>}
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <label className="block font-bold text-slate-700">
+                        {effectiveLabel} {effectiveRequired && <span className="text-red-500">*</span>}
+                      </label>
+                      {adminActions}
+                    </div>
+                  </div>
                   <input
                     type="number"
                     step="any"
                     disabled={disabled}
-                    required={field.required}
+                    required={effectiveRequired}
                     value={val}
-                    placeholder={field.placeholder || "0"}
+                    placeholder={effectivePlaceholder || "0"}
                     onChange={(e) => onChange(field.key, e.target.value === "" ? "" : Number(e.target.value))}
                     className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#5A81FA] disabled:opacity-60"
                   />
@@ -135,15 +182,20 @@ export function DynamicFormFields({
             case "url":
               return (
                 <div key={field.id} className="space-y-1">
-                  <label className="block font-bold text-slate-700">
-                    {field.label} {field.required && <span className="text-red-500">*</span>}
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <label className="block font-bold text-slate-700">
+                        {effectiveLabel} {effectiveRequired && <span className="text-red-500">*</span>}
+                      </label>
+                      {adminActions}
+                    </div>
+                  </div>
                   <input
                     type="url"
                     disabled={disabled}
-                    required={field.required}
+                    required={effectiveRequired}
                     value={val}
-                    placeholder={field.placeholder || "https://..."}
+                    placeholder={effectivePlaceholder || "https://..."}
                     onChange={(e) => onChange(field.key, e.target.value)}
                     className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#5A81FA] disabled:opacity-60"
                   />
@@ -154,15 +206,20 @@ export function DynamicFormFields({
             default:
               return (
                 <div key={field.id} className="space-y-1">
-                  <label className="block font-bold text-slate-700">
-                    {field.label} {field.required && <span className="text-red-500">*</span>}
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <label className="block font-bold text-slate-700">
+                        {effectiveLabel} {effectiveRequired && <span className="text-red-500">*</span>}
+                      </label>
+                      {adminActions}
+                    </div>
+                  </div>
                   <input
                     type="text"
                     disabled={disabled}
-                    required={field.required}
+                    required={effectiveRequired}
                     value={val}
-                    placeholder={field.placeholder || `Enter ${field.label}...`}
+                    placeholder={effectivePlaceholder || `Enter ${effectiveLabel}...`}
                     onChange={(e) => onChange(field.key, e.target.value)}
                     className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#5A81FA] disabled:opacity-60"
                   />

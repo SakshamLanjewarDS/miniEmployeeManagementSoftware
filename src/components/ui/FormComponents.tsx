@@ -3,6 +3,9 @@
 import React from "react";
 import { X, AlertCircle } from "lucide-react";
 
+import { useFormFieldAdmin } from "./FormFieldAdminContext";
+import { AdminFieldActions, AdminFormHeaderToolbar } from "./AdminFieldActions";
+
 /* ==========================================================================
    1. FORM MODAL CONTAINER & HEADER
    ========================================================================== */
@@ -15,6 +18,7 @@ export interface FormModalProps {
   iconBgColor?: string;
   maxWidth?: "sm" | "md" | "lg" | "xl" | "2xl" | "3xl" | "4xl";
   children: React.ReactNode;
+  formId?: string;
 }
 
 export const FormModal: React.FC<FormModalProps> = ({
@@ -25,6 +29,7 @@ export const FormModal: React.FC<FormModalProps> = ({
   icon,
   maxWidth = "xl",
   children,
+  formId,
 }) => {
   if (!isOpen) return null;
 
@@ -37,6 +42,8 @@ export const FormModal: React.FC<FormModalProps> = ({
     "3xl": "max-w-3xl",
     "4xl": "max-w-4xl",
   }[maxWidth];
+
+  const effectiveFormId = formId || title.toLowerCase().replace(/[^a-z0-9]/g, "_");
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
@@ -63,6 +70,10 @@ export const FormModal: React.FC<FormModalProps> = ({
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        {/* Admin Form Controls Toolbar */}
+        <AdminFormHeaderToolbar formId={effectiveFormId} />
+
         {children}
       </div>
     </div>
@@ -81,6 +92,9 @@ export interface FormFieldProps {
   className?: string;
   action?: React.ReactNode;
   children: React.ReactNode;
+  formId?: string;
+  fieldKey?: string;
+  placeholder?: string;
 }
 
 export const FormField: React.FC<FormFieldProps> = ({
@@ -92,20 +106,51 @@ export const FormField: React.FC<FormFieldProps> = ({
   className = "",
   action,
   children,
+  formId,
+  fieldKey,
+  placeholder,
 }) => {
+  const { getFieldConfig, isFieldHidden } = useFormFieldAdmin();
+
+  const effectiveFormId = formId || "GLOBAL_FORM";
+  const effectiveFieldKey =
+    fieldKey || htmlFor || (label ? label.toLowerCase().replace(/[^a-z0-9]/g, "") : "");
+
+  // If this field has been hidden by an Admin, don't render it
+  if (effectiveFieldKey && isFieldHidden(effectiveFormId, effectiveFieldKey)) {
+    return null;
+  }
+
+  const customConfig = effectiveFieldKey ? getFieldConfig(effectiveFormId, effectiveFieldKey) : undefined;
+  const effectiveLabel = customConfig?.label ?? label;
+  const effectiveHelper = customConfig?.helperText ?? helperText;
+  const effectiveRequired = customConfig?.required !== undefined ? customConfig.required : required;
+
   return (
     <div className={`space-y-1 ${className}`}>
-      {label && (
+      {effectiveLabel && (
         <div className="flex items-center justify-between">
-          <label htmlFor={htmlFor} className="block font-semibold text-[#1F1F1F] text-xs">
-            {label} {required && <span className="text-red-600">*</span>}
-          </label>
+          <div className="flex items-center">
+            <label htmlFor={htmlFor} className="block font-semibold text-[#1F1F1F] text-xs">
+              {effectiveLabel} {effectiveRequired && <span className="text-red-600">*</span>}
+            </label>
+            {effectiveFieldKey && (
+              <AdminFieldActions
+                formId={effectiveFormId}
+                fieldKey={effectiveFieldKey}
+                label={effectiveLabel}
+                placeholder={customConfig?.placeholder ?? placeholder}
+                helperText={effectiveHelper}
+                required={effectiveRequired}
+              />
+            )}
+          </div>
           {action && <div className="text-[11px]">{action}</div>}
         </div>
       )}
       {children}
-      {helperText && !error && (
-        <p className="text-[10px] text-[#696E82] pl-0.5 leading-tight">{helperText}</p>
+      {effectiveHelper && !error && (
+        <p className="text-[10px] text-[#696E82] pl-0.5 leading-tight">{effectiveHelper}</p>
       )}
       {error && (
         <div className="flex items-center gap-1 text-[11px] text-red-600 pl-0.5">
