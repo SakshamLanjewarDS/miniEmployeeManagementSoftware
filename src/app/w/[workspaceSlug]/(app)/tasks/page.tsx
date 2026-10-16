@@ -125,6 +125,13 @@ export default async function TasksPage({ params, searchParams }: TasksPageProps
       isCompleted: a.isCompleted,
       completedAt: a.completedAt ? a.completedAt.toISOString() : null,
       memberName: a.membership?.user?.fullName || "Assigned Staff",
+      membership: a.membership
+        ? {
+            id: a.membership.id,
+            user: a.membership.user,
+            employee: a.membership.employee,
+          }
+        : null,
     })),
     submissions: ((t as any).submissions || []).map((s: any) => ({
       id: s.id,

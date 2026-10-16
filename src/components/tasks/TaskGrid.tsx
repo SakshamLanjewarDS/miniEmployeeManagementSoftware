@@ -20,7 +20,7 @@ export interface TaskGridProps {
   onOpenCreateTask?: () => void;
   onClearFilters?: () => void;
   onUpdateStatus: (taskId: string, newStatus: string) => void;
-  onOpenDetails: (task: any) => void;
+  onOpenDetails: (task: any, assignmentId?: string) => void;
   onEdit: (task: any) => void;
   onDelegate: (task: any) => void;
   onDelete: (task: any) => void;

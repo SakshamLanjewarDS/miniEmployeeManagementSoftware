@@ -562,7 +562,7 @@ export default function TasksClientView({
             {
               id: `chk-${id}-${Date.now()}`,
               title: "",
-              priority: (taskPriority as any) || "MEDIUM",
+              priority: "MEDIUM",
               dueDate: "",
             },
           ];
@@ -752,18 +752,41 @@ export default function TasksClientView({
         }
       }
 
+      // 4.5 Scope Filter (Assigned by Me)
+      if (currentScope === "assigned_by_me") {
+        const isCreator = task.creatorId === currentMembershipId || task.creator?.id === currentMembershipId;
+        if (!isCreator) return false;
+      }
+
       // 5. Status Category Filter
       if (selectedStatusCategory !== "ALL") {
-        if (selectedStatusCategory === "NOT_STARTED" || selectedStatusCategory === "TODO") {
+        if (selectedStatusCategory === "AWAITING_ACKNOWLEDGEMENT") {
+          const hasUnacked =
+            (Array.isArray((task as any).assignments) && (task as any).assignments.some((a: any) => !a.acknowledgedAt)) ||
+            task.status === "NOT_STARTED" ||
+            task.status === "TODO";
+          if (!hasUnacked) return false;
+        } else if (selectedStatusCategory === "NOT_STARTED" || selectedStatusCategory === "TODO") {
           if (task.status !== "NOT_STARTED" && task.status !== "TODO") return false;
         } else if (selectedStatusCategory === "STARTED") {
           if (task.status !== "STARTED") return false;
-        } else if (selectedStatusCategory === "ONGOING") {
-          if (task.status !== "ONGOING" && task.status !== "IN_PROGRESS") return false;
-        } else if (selectedStatusCategory === "IN_PROGRESS") {
-          if (task.status !== "IN_PROGRESS" && task.status !== "ONGOING" && task.status !== "STARTED") return false;
-        } else if (selectedStatusCategory === "CHECKING" || selectedStatusCategory === "WAITING_REVIEW") {
-          if (task.status !== "CHECKING" && task.status !== "IN_REVIEW") return false;
+        } else if (selectedStatusCategory === "ONGOING" || selectedStatusCategory === "IN_PROGRESS") {
+          const isOngoing =
+            task.status === "ONGOING" ||
+            task.status === "IN_PROGRESS" ||
+            task.status === "STARTED" ||
+            (Array.isArray((task as any).assignments) && (task as any).assignments.some((a: any) => a.acknowledgedAt && !a.isCompleted));
+          if (!isOngoing) return false;
+        } else if (selectedStatusCategory === "CHECKING" || selectedStatusCategory === "WAITING_REVIEW" || selectedStatusCategory === "AWAITING_REVIEW") {
+          const hasPendingSubmission = Array.isArray(task.submissions) && task.submissions.some((s: any) => s.status === "PENDING");
+          const hasItemInReview = Array.isArray(task.checklistItems) && task.checklistItems.some((ci: any) => ci.status === "IN_REVIEW" || ci.status === "CHECKING");
+          if (task.status !== "CHECKING" && task.status !== "IN_REVIEW" && !hasPendingSubmission && !hasItemInReview) return false;
+        } else if (selectedStatusCategory === "CHANGES_REQUESTED" || selectedStatusCategory === "REWORK_REQUESTED") {
+          const hasChanges =
+            task.status === "CHANGES_REQUESTED" ||
+            task.status === "REVISION" ||
+            (Array.isArray(task.submissions) && task.submissions.some((s: any) => s.status === "CHANGES_REQUESTED" || s.status === "REWORK_REQUESTED"));
+          if (!hasChanges) return false;
         } else if (selectedStatusCategory === "COMPLETED") {
           if (task.status !== "COMPLETED") return false;
         } else if (task.status !== selectedStatusCategory) {
@@ -907,7 +930,7 @@ export default function TasksClientView({
         {
           id: `chk-${memberId}-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
           title: "",
-          priority: (taskPriority as any) || "MEDIUM",
+          priority: "MEDIUM",
           dueDate: "",
         },
       ],
@@ -1024,7 +1047,7 @@ export default function TasksClientView({
         return {
           title: row.title.trim(),
           assignedMemberId: empId,
-          priority: row.priority || taskPriority || "MEDIUM",
+          priority: row.priority || "MEDIUM",
           dueDate: row.dueDate ? new Date(row.dueDate).toISOString() : null,
           sortOrder: idx + 1,
         };
@@ -1053,10 +1076,9 @@ export default function TasksClientView({
           projectId: selectedProjectId,
           phaseId: selectedPhaseId || undefined,
           description: taskDescription.trim(),
-          priority: taskPriority,
+          priority: "MEDIUM",
           assigneeIds: taskAssigneeIds,
           reviewerId: taskReviewerId || undefined,
-          acceptanceCriteria: taskAcceptanceCriteria.trim() || undefined,
           checklistItems: flatChecklistItems,
           estimatedHours: taskEstimatedHours ? Number(taskEstimatedHours) : undefined,
         }),
@@ -1084,10 +1106,34 @@ export default function TasksClientView({
           user: { fullName: contextUserFullName || "You" },
         },
         checklistItems: flatChecklistItems.map((item, idx) => ({
-          id: `chk-created-${idx}`,
+          id: (data.task.checklistItems && data.task.checklistItems[idx]?.id) || `chk-created-${idx}`,
           title: item.title,
+          assignedMemberId: item.assignedMemberId,
+          priority: (item.priority as any) || "MEDIUM",
+          dueDate: item.dueDate,
           isCompleted: false,
+          status: "NOT_STARTED",
         })),
+        assignments: taskAssigneeIds.map((id) => {
+          const m = members.find((mb) => mb.id === id);
+          return {
+            id: `assign-${id}`,
+            membershipId: id,
+            acknowledgedAt: null,
+            acknowledgedVersion: null,
+            isCompleted: false,
+            completedAt: null,
+            memberName: m?.user.fullName || "Staff",
+            membership: m
+              ? {
+                  id: m.id,
+                  user: m.user,
+                  employee: m.employee,
+                }
+              : null,
+          };
+        }),
+        submissions: [],
         comments: [],
         activityHistory: [],
       };
@@ -1097,10 +1143,10 @@ export default function TasksClientView({
       setIsCreateTaskModalOpen(false);
       broadcastRealtimeEvent("TASK_UPDATED");
       broadcastRealtimeEvent("NOTIFICATION_UPDATED");
+      router.refresh();
 
       // Reset form
       setTaskDescription("");
-      setTaskAcceptanceCriteria("");
       setTaskReviewerId("");
       setTaskEstimatedHours("");
       setTaskAssigneeIds(userRole === "OWNER" || userRole === "ADMIN" ? [] : [currentMembershipId]);
@@ -2271,10 +2317,16 @@ export default function TasksClientView({
       <div className="bg-white border border-[#E2E6F0] rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#1F1F1F]">
-            {currentScope === "all" ? "All Studio Deliverables" : "My Assigned Tasks"}
+            {currentScope === "assigned_by_me"
+              ? "Deliverables Assigned by Me"
+              : currentScope === "all"
+              ? "All Studio Deliverables"
+              : "My Assigned Tasks"}
           </h1>
           <p className="text-xs text-[#696E82] mt-0.5">
-            {currentScope === "all"
+            {currentScope === "assigned_by_me"
+              ? "Tracking architectural deliverables and employee checklists you assigned."
+              : currentScope === "all"
               ? "Overseeing studio deliverables, milestones, and project deadlines."
               : "Review your task assignments, update statuses, and submit deliverables."}
           </p>
@@ -2297,7 +2349,19 @@ export default function TasksClientView({
                   : "text-[#696E82] hover:text-[#1F1F1F]"
               }`}
             >
-              All Studio Tasks
+              All Deliverables
+            </button>
+            <button
+              type="button"
+              suppressHydrationWarning
+              onClick={() => handleScopeChange("assigned_by_me")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex-1 sm:flex-initial text-center ${
+                currentScope === "assigned_by_me"
+                  ? "bg-[#5A81FA] text-white shadow-2xs"
+                  : "text-[#696E82] hover:text-[#1F1F1F]"
+              }`}
+            >
+              Assigned by Me
             </button>
             <button
               type="button"
@@ -2607,6 +2671,17 @@ export default function TasksClientView({
           </button>
           <button
             type="button"
+            onClick={() => setSelectedStatusCategory((prev) => (prev === "AWAITING_ACKNOWLEDGEMENT" ? "ALL" : "AWAITING_ACKNOWLEDGEMENT"))}
+            className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-colors shrink-0 flex items-center gap-1 ${
+              selectedStatusCategory === "AWAITING_ACKNOWLEDGEMENT"
+                ? "bg-amber-600 text-white shadow-xs"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            <span>Awaiting Ack</span>
+          </button>
+          <button
+            type="button"
             onClick={() => setSelectedStatusCategory((prev) => (prev === "ONGOING" ? "ALL" : "ONGOING"))}
             className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-colors shrink-0 flex items-center gap-1 ${
               selectedStatusCategory === "ONGOING"
@@ -2626,6 +2701,17 @@ export default function TasksClientView({
             }`}
           >
             <span>Review</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedStatusCategory((prev) => (prev === "CHANGES_REQUESTED" ? "ALL" : "CHANGES_REQUESTED"))}
+            className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-colors shrink-0 flex items-center gap-1 ${
+              selectedStatusCategory === "CHANGES_REQUESTED"
+                ? "bg-rose-600 text-white shadow-xs"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            <span>Changes</span>
           </button>
           <button
             type="button"
@@ -2699,10 +2785,10 @@ export default function TasksClientView({
               clearable={false}
               options={[
                 { value: "ALL", label: "All Statuses" },
-                { value: "NOT_STARTED", label: "📋 Todo", subLabel: "Pending work" },
-                { value: "STARTED", label: "▶ Started", subLabel: "Commenced" },
-                { value: "ONGOING", label: "⚡ Ongoing", subLabel: "In progress" },
-                { value: "CHECKING", label: "🔍 Checking", subLabel: "Waiting review" },
+                { value: "AWAITING_ACKNOWLEDGEMENT", label: "⏳ Awaiting Ack", subLabel: "Pending acknowledgement" },
+                { value: "ONGOING", label: "⚡ In Progress", subLabel: "Active execution" },
+                { value: "CHECKING", label: "🔍 Awaiting Review", subLabel: "Submitted for review" },
+                { value: "CHANGES_REQUESTED", label: "🔄 Changes Requested", subLabel: "Corrections needed" },
                 { value: "COMPLETED", label: "✔ Completed", subLabel: "Done & approved" },
               ]}
             />
@@ -3044,7 +3130,7 @@ export default function TasksClientView({
           }}
           onClearFilters={handleClearFilters}
           onUpdateStatus={updateStatus}
-          onOpenDetails={(task) => setDrawerTask(task)}
+          onOpenDetails={(task, _assignmentId) => setDrawerTask(task)}
           onEdit={(task) => openEditModal(task)}
           onDelegate={(task) => openReassignModal(task)}
           onDelete={(task) => setTaskToDelete(task)}
@@ -5278,63 +5364,7 @@ export default function TasksClientView({
                 )}
               </div>
 
-              {/* 3.1 ACCEPTANCE CRITERIA (VOICE/GRAMMAR ASSISTANT OPTED-IN) */}
-              <div id="field-acceptance-criteria">
-                <div className="flex items-center justify-between mb-1">
-                  <label className="font-semibold text-[#1F1F1F]">
-                    Acceptance Criteria & Definition of Done
-                  </label>
-                  <span className="text-[10px] text-[#696E82]">
-                    Speech Assistant enabled
-                  </span>
-                </div>
-                <textarea
-                  id="task-acceptance-criteria-input"
-                  rows={2}
-                  data-enable-assistant="true"
-                  value={taskAcceptanceCriteria}
-                  onChange={(e) => setTaskAcceptanceCriteria(e.target.value)}
-                  placeholder="e.g. Dimensions verified with structural grid, AutoCAD layers comply with studio standards, PDF export stamped with GFC stamp..."
-                  className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] focus:outline-none focus:ring-2 focus:ring-[#5A81FA] transition-all"
-                />
-              </div>
-
-              {/* 4. OVERALL PRIORITY */}
-              <div>
-                <label className="block font-semibold text-[#1F1F1F] mb-1">
-                  Overall Deliverable Priority <span className="text-red-600">*</span>
-                </label>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  {[
-                    { val: "LOW", label: "Low", color: "bg-emerald-50 text-emerald-800 border-emerald-300", desc: "Calm / Routine" },
-                    { val: "MEDIUM", label: "Medium", color: "bg-amber-50 text-amber-800 border-amber-300", desc: "Standard gate" },
-                    { val: "HIGH", label: "High", color: "bg-orange-50 text-orange-800 border-orange-300", desc: "Milestone gate" },
-                    { val: "URGENT", label: "Urgent", color: "bg-rose-50 text-rose-800 border-rose-300", desc: "Critical path" },
-                  ].map((p) => {
-                    const isSelected = taskPriority === p.val;
-                    return (
-                      <button
-                        key={p.val}
-                        type="button"
-                        onClick={() => setTaskPriority(p.val)}
-                        className={`p-2 rounded-xl border text-left cursor-pointer transition-all ${
-                          isSelected
-                            ? `${p.color} ring-2 ring-offset-1 ring-[#5A81FA] font-bold shadow-xs`
-                            : "bg-[#F8F9FD] border-[#E2E6F0] text-[#696E82] hover:bg-white"
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs">{p.label}</span>
-                          {isSelected && <CheckCircle2 className="w-3.5 h-3.5" />}
-                        </div>
-                        <span className="text-[10px] block opacity-80 mt-0.5">{p.desc}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* 5. ELIGIBLE ASSIGNEES MULTISELECT */}
+              {/* 3. ELIGIBLE ASSIGNEES MULTISELECT */}
               <div id="field-assignees">
                 <SearchableSelect
                   id="task-assignee"

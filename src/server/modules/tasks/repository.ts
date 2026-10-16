@@ -198,18 +198,32 @@ export async function findTasks(ctx: TenantContext, params: TaskFilterParams = {
   }
 
   // 2. Status Category Filter (can overlap with due date filters)
-  const statusFilter = params.statusCategory || (
-    params.filter === "IN_PROGRESS"
-      ? TaskWorkflowStatus.IN_PROGRESS
-      : params.filter === "WAITING_REVIEW"
-      ? TaskWorkflowStatus.IN_REVIEW
-      : params.filter === "COMPLETED"
-      ? TaskWorkflowStatus.COMPLETED
-      : undefined
-  );
+  const isWaitingReview =
+    params.filter === "WAITING_REVIEW" ||
+    params.statusCategory === TaskWorkflowStatus.IN_REVIEW ||
+    params.statusCategory === TaskWorkflowStatus.CHECKING;
 
-  if (statusFilter && statusFilter !== "ALL") {
-    andConditions.push({ status: statusFilter });
+  if (isWaitingReview) {
+    andConditions.push({
+      OR: [
+        { status: TaskWorkflowStatus.IN_REVIEW },
+        { status: TaskWorkflowStatus.CHECKING },
+        { submissions: { some: { status: "PENDING" } } },
+        { checklistItems: { some: { status: TaskWorkflowStatus.IN_REVIEW } } },
+      ],
+    });
+  } else {
+    const statusFilter = params.statusCategory || (
+      params.filter === "IN_PROGRESS"
+        ? TaskWorkflowStatus.IN_PROGRESS
+        : params.filter === "COMPLETED"
+        ? TaskWorkflowStatus.COMPLETED
+        : undefined
+    );
+
+    if (statusFilter && statusFilter !== "ALL") {
+      andConditions.push({ status: statusFilter });
+    }
   }
 
   return await prisma.task.findMany({
@@ -271,6 +285,13 @@ export async function findTasks(ctx: TenantContext, params: TaskFilterParams = {
               user: {
                 select: {
                   fullName: true,
+                  email: true,
+                },
+              },
+              employee: {
+                select: {
+                  employeeId: true,
+                  designation: true,
                 },
               },
             },
@@ -572,7 +593,7 @@ export interface CreateTaskData {
   referenceFiles?: any;
   assigneeId?: string;
   assigneeIds?: string[];
-  priority: TaskPriority;
+  priority?: TaskPriority;
   startDate?: Date;
   dueDate?: Date;
   estimatedHours?: number;
@@ -747,7 +768,7 @@ export async function createTask(ctx: TenantContext, data: CreateTaskData) {
         assigneeId: primaryAssigneeId,
         assignedMemberIds: allAssigneeIds.length > 0 ? allAssigneeIds : undefined,
         creatorId: ctx.membershipId,
-        priority: data.priority,
+        priority: data.priority || TaskPriority.MEDIUM,
         status: TaskWorkflowStatus.NOT_STARTED,
         startDate: data.startDate,
         dueDate: derivedDueDate,
