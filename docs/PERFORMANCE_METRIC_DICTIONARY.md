@@ -111,6 +111,42 @@
 
 ---
 
+---
+
+### Metric 11: Site Inspections & Field Defect Execution
+- **Definition:** Physical site inspections conducted, verified snag reports logged, and site issues resolved.
+- **Source Records:** `SiteVisit` (where `operationalState = 'CHECKED_OUT'` or `reviewDecision = 'ACCEPTED'`) and `StudioSiteIssue` (where `status = 'CLOSED'` or `'READY_FOR_VERIFICATION'`).
+- **Purpose:** Connects studio drafting performance with field architectural supervision and quality governance.
+
+---
+
+### Metric 12: Attendance Punctuality & Overtime Balance
+- **Definition:** Regularity of studio check-ins, percentage of on-time arrivals, and excess overtime hours logged.
+- **Source Record:** `StudioAttendanceRecord` (where `punchIn <= 10:30 AM` is considered on-time arrival).
+- **Formula:**
+  $$\text{Punctuality Rate} = \frac{\text{Present Days} - \text{Late Arrival Days}}{\text{Present Days}} \times 100\%$$
+
+---
+
+### Metric 13: 9-Box Talent & Strategic Execution Profiling
+- **Definition:** Two-dimensional classification pairing First-Pass Technical Quality with Delivery Velocity / On-Time Rate.
+- **Quadrants:**
+  - *Lead / Star Architect:* Quality $\ge 75\%$ and On-Time $\ge 75\%$.
+  - *Precision Master:* Quality $\ge 75\%$ and On-Time $< 75\%$.
+  - *Velocity Deliverer:* Quality $< 75\%$ and On-Time $\ge 75\%$.
+  - *Developing / Guidance Required:* Emerging contributors, unrated cohorts, or those facing blockers.
+
+---
+
+### Metric 14: Workload Fragility & Burnout Early Warning
+- **Definition:** Predictive indicator identifying practitioners at risk of exhaustion or milestone failure.
+- **Heuristics:**
+  - *Critical Burnout:* Capacity utilization $> 115\%$ OR ($> 100\%$ with $\ge 2$ overdue deliverables).
+  - *Elevated Risk:* Capacity utilization $> 95\%$ OR $\ge 2$ overdue deliverables OR $\ge 2$ active blockers.
+  - *Optimal Flow:* Safe sustainable utilization between $60\%$ and $95\%$.
+
+---
+
 ## 3. Data Representation Standards
 
 | Condition | Display Rule | Prohibited Behavior |
@@ -119,3 +155,4 @@
 | Pending first review | Display `Pending Review` with count | Counting as failed first-pass review |
 | Approved leave during period | Explicitly deduct from scheduled capacity | Counting as low productivity or idle time |
 | Shared multi-assignee task | Display as `Shared Deliverable (N members)` | Awarding each assignee 100% standalone credit |
+
