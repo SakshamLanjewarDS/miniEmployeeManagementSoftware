@@ -22,6 +22,15 @@ import {
   X,
   CalendarDays,
   ShieldAlert,
+  BarChart3,
+  TrendingUp,
+  PieChart,
+  Activity,
+  Sparkles,
+  ShieldCheck,
+  Clock3,
+  Flame,
+  CalendarRange,
 } from "lucide-react";
 import { broadcastRealtimeEvent, useRealtimeSubscription } from "@/lib/realtime";
 
@@ -53,6 +62,9 @@ export default function EmployeeMyLeavePage() {
   const [data, setData] = useState<any | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Active view tab: "analytics" (Advance Leave Analytics) vs "calendar" (Calendar & Applications)
+  const [activeTab, setActiveTab] = useState<"analytics" | "calendar">("analytics");
 
   // Modals state
   const [isApplyModalOpen, setIsApplyModalOpen] = useState(false);
@@ -460,6 +472,173 @@ export default function EmployeeMyLeavePage() {
     return days;
   }, [currentYear, currentMonth, history]);
 
+  // Comprehensive Advance Analytics Engine
+  const analytics = useMemo(() => {
+    const currentYearLeaves = history.filter((h: any) => {
+      const s = new Date(h.startDate);
+      return s.getFullYear() === currentYear;
+    });
+
+    const approvedLeaves = currentYearLeaves.filter((h: any) => h.status === "APPROVED");
+    const allowance = summary?.monthlyPaidAllowance ? Number(summary.monthlyPaidAllowance) : 2.0;
+
+    // 1. Month-wise stats for currentYear (Jan - Dec)
+    const monthNamesShort = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const monthlyData = monthNamesShort.map((mName, idx) => {
+      const mNum = idx + 1;
+      const mLeaves = approvedLeaves.filter((h: any) => {
+        const d = new Date(h.startDate);
+        return d.getMonth() + 1 === mNum;
+      });
+
+      const totalDays = mLeaves.reduce((sum: number, h: any) => sum + (Number(h.days) || 0), 0);
+      const paidDays = Math.min(allowance, totalDays);
+      const unpaidLopDays = Math.max(0, totalDays - allowance);
+
+      return {
+        monthNumber: mNum,
+        monthName: mName,
+        totalDays: Number(totalDays.toFixed(2)),
+        paidDays: Number(paidDays.toFixed(2)),
+        unpaidLopDays: Number(unpaidLopDays.toFixed(2)),
+        requestCount: mLeaves.length,
+        isCurrent: mNum === currentMonth,
+      };
+    });
+
+    const maxMonthDays = Math.max(3, ...monthlyData.map((m) => m.totalDays));
+
+    // 2. YTD Totals for active year
+    const ytdTotalDays = monthlyData.reduce((sum, m) => sum + m.totalDays, 0);
+    const ytdPaidDays = monthlyData.reduce((sum, m) => sum + m.paidDays, 0);
+    const ytdUnpaidLopDays = monthlyData.reduce((sum, m) => sum + m.unpaidLopDays, 0);
+
+    // 3. Typology breakdown for currentYear approved
+    let casualDays = 0;
+    let sickDays = 0;
+    let emergencyDays = 0;
+    let annualDays = 0;
+    let hourlyDays = 0;
+    let halfDays = 0;
+    let totalHourlyMinutes = 0;
+    let hourlyRequestsCount = 0;
+    let emergencyRequestsCount = 0;
+    let sickRequestsCount = 0;
+    let casualRequestsCount = 0;
+
+    approvedLeaves.forEach((h: any) => {
+      const d = Number(h.days) || 0;
+      const type = (h.leaveType || "").toUpperCase();
+
+      if (h.isHourly) {
+        hourlyDays += d;
+        totalHourlyMinutes += h.totalMinutes || (d * 480);
+        hourlyRequestsCount++;
+      } else if (h.isHalfDay) {
+        halfDays += d;
+      }
+
+      if (type.includes("SICK") || type.includes("MEDICAL")) {
+        sickDays += d;
+        sickRequestsCount++;
+      } else if (type.includes("EMERGENCY")) {
+        emergencyDays += d;
+        emergencyRequestsCount++;
+      } else if (type.includes("ANNUAL") || type.includes("PRIVILEGE")) {
+        annualDays += d;
+      } else {
+        casualDays += d;
+        casualRequestsCount++;
+      }
+    });
+
+    // 4. Day of Week Breakdown
+    const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const dayOfWeekCounts = [0, 0, 0, 0, 0, 0, 0];
+    let mondayFridayCount = 0;
+    let totalDayHits = 0;
+
+    approvedLeaves.forEach((h: any) => {
+      const s = new Date(h.startDate);
+      const day = s.getDay();
+      dayOfWeekCounts[day] += (Number(h.days) || 1);
+      totalDayHits += (Number(h.days) || 1);
+      if (day === 1 || day === 5) {
+        mondayFridayCount += (Number(h.days) || 1);
+      }
+    });
+
+    const maxDayHit = Math.max(1, ...dayOfWeekCounts);
+    const weekendAdjacentPercent = totalDayHits > 0 ? Math.round((mondayFridayCount / totalDayHits) * 100) : 0;
+
+    // 5. 24-Hour Notice Policy Compliance
+    let compliantCount = 0;
+    let shortNoticeCount = 0;
+    currentYearLeaves.forEach((h: any) => {
+      if (h.submittedAt && h.startDate) {
+        const subTime = new Date(h.submittedAt).getTime();
+        const startTime = new Date(h.startDate).getTime();
+        const diffHours = (startTime - subTime) / (1000 * 60 * 60);
+        if (diffHours >= 24) {
+          compliantCount++;
+        } else {
+          shortNoticeCount++;
+        }
+      }
+    });
+    const totalSubmissions = compliantCount + shortNoticeCount;
+    const complianceRate = totalSubmissions > 0 ? Math.round((compliantCount / totalSubmissions) * 100) : 100;
+
+    // 6. Approval Rates
+    const totalDecided = currentYearLeaves.filter((h: any) => h.status === "APPROVED" || h.status === "REJECTED").length;
+    const totalApprovedCount = approvedLeaves.length;
+    const approvalRate = totalDecided > 0 ? Math.round((totalApprovedCount / totalDecided) * 100) : 100;
+
+    // 7. Upcoming Approved Absences
+    const todayStr = new Date().toISOString().split("T")[0];
+    const upcomingLeaves = history.filter((h: any) => {
+      if (h.status !== "APPROVED") return false;
+      const endStr = new Date(h.endDate).toISOString().split("T")[0];
+      return endStr >= todayStr;
+    });
+
+    const totalCategorizedDays = casualDays + sickDays + emergencyDays + annualDays || 1;
+
+    return {
+      monthlyData,
+      maxMonthDays,
+      ytdTotalDays: Number(ytdTotalDays.toFixed(2)),
+      ytdPaidDays: Number(ytdPaidDays.toFixed(2)),
+      ytdUnpaidLopDays: Number(ytdUnpaidLopDays.toFixed(2)),
+      totalApprovedInYear: approvedLeaves.length,
+      annualQuotaAccrued: currentMonth * allowance,
+      annualQuotaTotal: 12 * allowance,
+      casualDays: Number(casualDays.toFixed(2)),
+      casualPercent: Math.round((casualDays / totalCategorizedDays) * 100),
+      casualRequestsCount,
+      sickDays: Number(sickDays.toFixed(2)),
+      sickPercent: Math.round((sickDays / totalCategorizedDays) * 100),
+      sickRequestsCount,
+      emergencyDays: Number(emergencyDays.toFixed(2)),
+      emergencyPercent: Math.round((emergencyDays / totalCategorizedDays) * 100),
+      emergencyRequestsCount,
+      annualDays: Number(annualDays.toFixed(2)),
+      hourlyDays: Number(hourlyDays.toFixed(2)),
+      hourlyDaysEquivalent: (totalHourlyMinutes / 480).toFixed(2),
+      halfDays: Number(halfDays.toFixed(2)),
+      totalHourlyHours: (totalHourlyMinutes / 60).toFixed(1),
+      hourlyRequestsCount,
+      dayOfWeekCounts,
+      daysOfWeek,
+      maxDayHit,
+      weekendAdjacentPercent,
+      complianceRate,
+      approvalRate,
+      upcomingLeaves,
+      totalApplications: currentYearLeaves.length,
+    };
+  }, [history, currentYear, currentMonth, summary]);
+
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
       {/* Toast Alert Message */}
@@ -558,7 +737,497 @@ export default function EmployeeMyLeavePage() {
         </div>
       )}
 
-      {/* 4 Policy KPI Cards */}
+      {/* View Switcher: Advance Analytics vs Calendar & Requests */}
+      <div className="flex items-center gap-2 p-1.5 bg-[#F8F9FE] border border-[#E2E6F0] rounded-2xl w-fit">
+        <button
+          onClick={() => setActiveTab("analytics")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            activeTab === "analytics"
+              ? "bg-[#5A81FA] text-white shadow-xs"
+              : "text-[#696E82] hover:text-[#1F1F1F] hover:bg-white/60"
+          }`}
+        >
+          <BarChart3 className="w-4 h-4" />
+          <span>Advance Leave Analytics</span>
+        </button>
+        <button
+          onClick={() => setActiveTab("calendar")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            activeTab === "calendar"
+              ? "bg-[#5A81FA] text-white shadow-xs"
+              : "text-[#696E82] hover:text-[#1F1F1F] hover:bg-white/60"
+          }`}
+        >
+          <CalendarDays className="w-4 h-4" />
+          <span>Monthly Calendar & Requests</span>
+        </button>
+      </div>
+
+      {/* ADVANCE ANALYTICS TAB CONTENT */}
+      {activeTab === "analytics" && (
+        <div className="space-y-6">
+          {/* 4 Annual KPI Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="p-4 bg-white rounded-2xl border border-[#E2E6F0] shadow-2xs">
+              <div className="flex items-center justify-between">
+                <div className="text-[11px] text-[#696E82] font-semibold uppercase tracking-wider">
+                  Total Absences (YTD)
+                </div>
+                <Activity className="w-4 h-4 text-[#5A81FA]" />
+              </div>
+              <div className="text-2xl font-extrabold text-[#1F1F1F] mt-2 font-mono">
+                {analytics.ytdTotalDays} <span className="text-sm font-normal text-[#696E82]">Days</span>
+              </div>
+              <div className="text-[11px] text-[#696E82] mt-1 flex items-center justify-between">
+                <span>{analytics.totalApprovedInYear} approved in {currentYear}</span>
+                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-[#F2F4FF] text-[#2C308D]">
+                  {analytics.totalApplications} applied
+                </span>
+              </div>
+            </div>
+
+            <div className="p-4 bg-white rounded-2xl border border-[#E2E6F0] shadow-2xs">
+              <div className="flex items-center justify-between">
+                <div className="text-[11px] text-[#696E82] font-semibold uppercase tracking-wider">
+                  Paid vs Unpaid (LOP)
+                </div>
+                <ShieldCheck className="w-4 h-4 text-emerald-600" />
+              </div>
+              <div className="text-2xl font-extrabold text-[#1F1F1F] mt-2 font-mono flex items-baseline gap-1.5">
+                <span className="text-[#5A81FA]">{analytics.ytdPaidDays}d</span>
+                <span className="text-xs text-[#696E82]">paid /</span>
+                <span className="text-rose-600">{analytics.ytdUnpaidLopDays}d</span>
+                <span className="text-xs text-[#696E82]">LOP</span>
+              </div>
+              {/* Mini visual bar */}
+              <div className="w-full bg-[#E2E6F0] h-1.5 rounded-full overflow-hidden mt-2 flex">
+                <div
+                  className="bg-[#5A81FA] h-full"
+                  style={{
+                    width: `${analytics.ytdTotalDays > 0 ? (analytics.ytdPaidDays / analytics.ytdTotalDays) * 100 : 100}%`,
+                  }}
+                />
+                <div
+                  className="bg-rose-500 h-full"
+                  style={{
+                    width: `${analytics.ytdTotalDays > 0 ? (analytics.ytdUnpaidLopDays / analytics.ytdTotalDays) * 100 : 0}%`,
+                  }}
+                />
+              </div>
+              <div className="text-[10px] text-[#696E82] mt-1">
+                LOP results in monthly salary deduction
+              </div>
+            </div>
+
+            <div className="p-4 bg-white rounded-2xl border border-[#E2E6F0] shadow-2xs">
+              <div className="flex items-center justify-between">
+                <div className="text-[11px] text-[#696E82] font-semibold uppercase tracking-wider">
+                  Emergency & Sick
+                </div>
+                <AlertTriangle className="w-4 h-4 text-amber-500" />
+              </div>
+              <div className="text-2xl font-extrabold text-[#1F1F1F] mt-2 font-mono">
+                {analytics.emergencyDays + analytics.sickDays} <span className="text-sm font-normal text-[#696E82]">Days</span>
+              </div>
+              <div className="text-[11px] text-[#696E82] mt-1 flex items-center justify-between">
+                <span>{analytics.emergencyRequestsCount} Emergency · {analytics.sickRequestsCount} Medical</span>
+                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200">
+                  Exempt
+                </span>
+              </div>
+            </div>
+
+            <div className="p-4 bg-white rounded-2xl border border-[#E2E6F0] shadow-2xs">
+              <div className="flex items-center justify-between">
+                <div className="text-[11px] text-[#696E82] font-semibold uppercase tracking-wider">
+                  Hourly & Half-Days
+                </div>
+                <Clock3 className="w-4 h-4 text-purple-600" />
+              </div>
+              <div className="text-2xl font-extrabold text-[#1F1F1F] mt-2 font-mono">
+                {analytics.totalHourlyHours} <span className="text-sm font-normal text-[#696E82]">Hrs</span>
+              </div>
+              <div className="text-[11px] text-[#696E82] mt-1 flex items-center justify-between">
+                <span>{analytics.hourlyRequestsCount} permissions ({analytics.hourlyDaysEquivalent}d eq)</span>
+                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-purple-50 text-purple-800 border border-purple-200">
+                  {analytics.halfDays} Half-Days
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* 12-Month Interactive Stacked Bar Chart & Trajectory */}
+          <div className="bg-white rounded-3xl border border-[#E2E6F0] p-6 shadow-2xs space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#E2E6F0] pb-4">
+              <div>
+                <h3 className="text-sm font-bold text-[#1F1F1F] flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4 text-[#5A81FA]" />
+                  <span>Month-Wise Leave Trajectory ({currentYear})</span>
+                </h3>
+                <p className="text-xs text-[#696E82] mt-0.5">
+                  Click any month bar to inspect or change the active calendar month. Stacked comparison of Paid Quota vs Loss of Pay (LOP).
+                </p>
+              </div>
+
+              {/* Chart Legend */}
+              <div className="flex items-center gap-4 text-xs">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-3 h-3 rounded bg-[#5A81FA]" />
+                  <span className="text-[#696E82] font-medium">Paid Quota</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-3 h-3 rounded bg-rose-500" />
+                  <span className="text-[#696E82] font-medium">Unpaid LOP</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full ring-2 ring-[#5A81FA] bg-white" />
+                  <span className="text-[#696E82] font-medium">Current Month</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Interactive 12-Month Bar Grid */}
+            <div className="pt-4">
+              <div className="grid grid-cols-12 gap-1.5 sm:gap-3 items-end h-56 pb-2 border-b border-[#E2E6F0]">
+                {analytics.monthlyData.map((m) => {
+                  const maxVal = Math.max(analytics.maxMonthDays, 3);
+                  const paidHeightPct = (m.paidDays / maxVal) * 100;
+                  const lopHeightPct = (m.unpaidLopDays / maxVal) * 100;
+
+                  return (
+                    <div
+                      key={`month-bar-${m.monthNumber}`}
+                      onClick={() => setCurrentMonth(m.monthNumber)}
+                      className={`group flex flex-col items-center justify-end h-full cursor-pointer relative transition-all rounded-xl p-1 ${
+                        m.isCurrent
+                          ? "bg-[#F2F4FF] ring-2 ring-[#5A81FA]"
+                          : "hover:bg-[#F8F9FE]"
+                      }`}
+                    >
+                      {/* Floating tooltip on hover */}
+                      <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-16 z-20 pointer-events-none bg-[#1F1F1F] text-white text-[10px] p-2 rounded-xl shadow-lg whitespace-nowrap text-center">
+                        <div className="font-bold">{m.monthName} {currentYear}</div>
+                        <div className="text-emerald-300">Paid: {m.paidDays}d</div>
+                        <div className="text-rose-300">LOP: {m.unpaidLopDays}d</div>
+                        <div className="text-gray-300 text-[9px] border-t border-gray-700 mt-0.5 pt-0.5">
+                          Total: {m.totalDays}d ({m.requestCount} leaves)
+                        </div>
+                      </div>
+
+                      {/* Bar Value at top */}
+                      <span className="text-[10px] font-mono font-bold text-[#1F1F1F] mb-1">
+                        {m.totalDays > 0 ? m.totalDays : "-"}
+                      </span>
+
+                      {/* Stacked Vertical Bar */}
+                      <div className="w-full max-w-[32px] bg-[#E2E6F0]/40 rounded-t-lg flex flex-col justify-end overflow-hidden h-40">
+                        {/* LOP portion on top (Rose) */}
+                        {m.unpaidLopDays > 0 && (
+                          <div
+                            className="w-full bg-rose-500 transition-all group-hover:opacity-90"
+                            style={{ height: `${lopHeightPct}%` }}
+                            title={`LOP: ${m.unpaidLopDays} days`}
+                          />
+                        )}
+                        {/* Paid portion at bottom (Blue) */}
+                        {m.paidDays > 0 && (
+                          <div
+                            className="w-full bg-[#5A81FA] transition-all group-hover:opacity-90"
+                            style={{ height: `${paidHeightPct}%` }}
+                            title={`Paid: ${m.paidDays} days`}
+                          />
+                        )}
+                      </div>
+
+                      {/* Month Label */}
+                      <span
+                        className={`text-[11px] font-semibold mt-2 ${
+                          m.isCurrent ? "text-[#5A81FA] font-bold" : "text-[#696E82]"
+                        }`}
+                      >
+                        {m.monthName}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Annual Summary Metrics Footer */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 text-xs">
+                <div className="p-3 rounded-2xl bg-[#F8F9FE] border border-[#E2E6F0]">
+                  <div className="text-[11px] text-[#696E82] font-medium">Annual Quota Progress</div>
+                  <div className="text-base font-bold text-[#1F1F1F] mt-1 font-mono">
+                    {analytics.ytdPaidDays} / {analytics.annualQuotaTotal} Paid Days ({Math.round((analytics.ytdPaidDays / (analytics.annualQuotaTotal || 1)) * 100)}%)
+                  </div>
+                  <div className="text-[10px] text-[#696E82] mt-0.5">
+                    Accrued to date: {analytics.annualQuotaAccrued} eligible days
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-2xl bg-[#F8F9FE] border border-[#E2E6F0]">
+                  <div className="text-[11px] text-[#696E82] font-medium">Average Monthly Leaves</div>
+                  <div className="text-base font-bold text-[#1F1F1F] mt-1 font-mono">
+                    {(analytics.ytdTotalDays / Math.max(1, currentMonth)).toFixed(2)} Days / Month
+                  </div>
+                  <div className="text-[10px] text-[#696E82] mt-0.5">
+                    Standard studio target &le; 2.0 days / month
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-2xl bg-[#F8F9FE] border border-[#E2E6F0]">
+                  <div className="text-[11px] text-[#696E82] font-medium">Approval Consistency</div>
+                  <div className="text-base font-bold text-emerald-600 mt-1 font-mono">
+                    {analytics.approvalRate}% Approval Rate
+                  </div>
+                  <div className="text-[10px] text-[#696E82] mt-0.5">
+                    {analytics.totalApprovedInYear} approved out of {analytics.totalApplications} applied
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Deep-Dive 2-Column Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Category / Typology Breakdown Card */}
+            <div className="bg-white rounded-3xl border border-[#E2E6F0] p-6 shadow-2xs space-y-4">
+              <div className="flex items-center justify-between border-b border-[#E2E6F0] pb-3">
+                <h3 className="text-sm font-bold text-[#1F1F1F] flex items-center gap-2">
+                  <PieChart className="w-4 h-4 text-[#5A81FA]" />
+                  <span>Leave Typology & Category Share ({currentYear})</span>
+                </h3>
+                <span className="text-[11px] text-[#696E82] font-mono">
+                  {analytics.ytdTotalDays} Days Total
+                </span>
+              </div>
+
+              <div className="space-y-4 pt-1">
+                {/* Casual Leaves */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-semibold text-[#1F1F1F] flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
+                      Casual Leave (CL)
+                    </span>
+                    <span className="font-mono text-[#696E82]">
+                      {analytics.casualDays}d ({analytics.casualPercent}%) · {analytics.casualRequestsCount} req
+                    </span>
+                  </div>
+                  <div className="w-full bg-[#E2E6F0] h-2 rounded-full overflow-hidden">
+                    <div
+                      className="bg-blue-500 h-full rounded-full transition-all"
+                      style={{ width: `${analytics.casualPercent}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Sick / Medical Leaves */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-semibold text-[#1F1F1F] flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                      Sick / Medical Leave (SL)
+                    </span>
+                    <span className="font-mono text-[#696E82]">
+                      {analytics.sickDays}d ({analytics.sickPercent}%) · {analytics.sickRequestsCount} req
+                    </span>
+                  </div>
+                  <div className="w-full bg-[#E2E6F0] h-2 rounded-full overflow-hidden">
+                    <div
+                      className="bg-emerald-500 h-full rounded-full transition-all"
+                      style={{ width: `${analytics.sickPercent}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Emergency Leaves */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-semibold text-[#1F1F1F] flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+                      Emergency Leave (EL)
+                    </span>
+                    <span className="font-mono text-[#696E82]">
+                      {analytics.emergencyDays}d ({analytics.emergencyPercent}%) · {analytics.emergencyRequestsCount} req
+                    </span>
+                  </div>
+                  <div className="w-full bg-[#E2E6F0] h-2 rounded-full overflow-hidden">
+                    <div
+                      className="bg-amber-500 h-full rounded-full transition-all"
+                      style={{ width: `${analytics.emergencyPercent}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Hourly Permissions */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-semibold text-[#1F1F1F] flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-purple-500" />
+                      Hourly Permissions
+                    </span>
+                    <span className="font-mono text-[#696E82]">
+                      {analytics.totalHourlyHours} hrs ({analytics.hourlyDaysEquivalent}d eq) · {analytics.hourlyRequestsCount} req
+                    </span>
+                  </div>
+                  <div className="w-full bg-[#E2E6F0] h-2 rounded-full overflow-hidden">
+                    <div
+                      className="bg-purple-500 h-full rounded-full transition-all"
+                      style={{
+                        width: `${Math.min(100, (Number(analytics.hourlyDaysEquivalent) / (analytics.ytdTotalDays || 1)) * 100)}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Half-Day Leaves */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-semibold text-[#1F1F1F] flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-indigo-400" />
+                      Half-Day Sessions
+                    </span>
+                    <span className="font-mono text-[#696E82]">
+                      {analytics.halfDays} Days (0.5 day/session)
+                    </span>
+                  </div>
+                  <div className="w-full bg-[#E2E6F0] h-2 rounded-full overflow-hidden">
+                    <div
+                      className="bg-indigo-400 h-full rounded-full transition-all"
+                      style={{
+                        width: `${Math.min(100, (analytics.halfDays / (analytics.ytdTotalDays || 1)) * 100)}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-[11px] flex items-start gap-2 mt-2">
+                <Info className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <span>
+                  <strong>Studio Rule:</strong> Emergency and Sick leaves automatically bypass the 24-hour advance notice requirement.
+                </span>
+              </div>
+            </div>
+
+            {/* Pattern & Compliance Insights Card */}
+            <div className="bg-white rounded-3xl border border-[#E2E6F0] p-6 shadow-2xs space-y-4">
+              <div className="flex items-center justify-between border-b border-[#E2E6F0] pb-3">
+                <h3 className="text-sm font-bold text-[#1F1F1F] flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-purple-600" />
+                  <span>Work Habits & Pattern Analysis</span>
+                </h3>
+                <span className="text-[11px] text-[#696E82]">
+                  Day-of-Week Distribution
+                </span>
+              </div>
+
+              {/* Day of week distribution */}
+              <div className="space-y-2">
+                <div className="text-xs font-semibold text-[#1F1F1F]">Day-of-Week Leave Hits:</div>
+                <div className="grid grid-cols-7 gap-1.5 text-center">
+                  {analytics.daysOfWeek.map((dayName, idx) => {
+                    const count = analytics.dayOfWeekCounts[idx];
+                    const heightPct = Math.max(12, (count / analytics.maxDayHit) * 100);
+                    const isMonOrFri = idx === 1 || idx === 5;
+                    return (
+                      <div key={dayName} className="flex flex-col items-center">
+                        <div className="h-20 w-full flex items-end justify-center">
+                          <div
+                            className={`w-full max-w-[24px] rounded-t-md transition-all ${
+                              isMonOrFri ? "bg-[#5A81FA]" : "bg-[#CEDEFF]"
+                            }`}
+                            style={{ height: `${count > 0 ? heightPct : 10}%` }}
+                            title={`${dayName}: ${count} leave days`}
+                          />
+                        </div>
+                        <span className={`text-[10px] mt-1 font-semibold ${isMonOrFri ? "text-[#5A81FA]" : "text-[#696E82]"}`}>
+                          {dayName}
+                        </span>
+                        <span className="text-[10px] font-mono text-[#1F1F1F] font-bold">
+                          {count}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 2 Pattern Metrics */}
+              <div className="grid grid-cols-2 gap-3 pt-2">
+                <div className="p-3 rounded-2xl bg-[#F8F9FE] border border-[#E2E6F0]">
+                  <div className="text-[10px] text-[#696E82] font-semibold uppercase tracking-wider">
+                    Weekend Adjacency
+                  </div>
+                  <div className="text-lg font-extrabold text-[#1F1F1F] mt-1 font-mono">
+                    {analytics.weekendAdjacentPercent}%
+                  </div>
+                  <div className="text-[10px] text-[#696E82] mt-0.5">
+                    Leaves taken on Mon / Fri
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-2xl bg-[#F8F9FE] border border-[#E2E6F0]">
+                  <div className="text-[10px] text-[#696E82] font-semibold uppercase tracking-wider">
+                    24h Notice Compliance
+                  </div>
+                  <div className="text-lg font-extrabold text-emerald-600 mt-1 font-mono">
+                    {analytics.complianceRate}%
+                  </div>
+                  <div className="text-[10px] text-[#696E82] mt-0.5">
+                    Applied &ge; 24h in advance
+                  </div>
+                </div>
+              </div>
+
+              {/* Upcoming Absences Section */}
+              <div className="pt-2 border-t border-[#E2E6F0]">
+                <div className="text-xs font-bold text-[#1F1F1F] mb-2 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <CalendarRange className="w-3.5 h-3.5 text-[#5A81FA]" />
+                    Upcoming Scheduled Absences
+                  </span>
+                  <span className="text-[11px] text-[#696E82]">
+                    {analytics.upcomingLeaves.length} scheduled
+                  </span>
+                </div>
+
+                {analytics.upcomingLeaves.length === 0 ? (
+                  <div className="p-3 rounded-2xl bg-[#F8F9FE] text-center text-xs text-[#696E82]">
+                    No future absences scheduled. You are all set!
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                    {analytics.upcomingLeaves.map((up: any) => (
+                      <div
+                        key={up.id}
+                        className="p-2.5 rounded-xl border border-[#CEDEFF] bg-[#F2F4FF] flex items-center justify-between text-xs"
+                      >
+                        <div>
+                          <div className="font-bold text-[#2C308D]">
+                            {up.leaveType} ({up.days} {Number(up.days) === 1 ? "Day" : "Days"})
+                          </div>
+                          <div className="text-[11px] text-[#4870EB] mt-0.5">
+                            {formatLocalDate(up.startDate)} – {formatLocalDate(up.endDate)}
+                          </div>
+                        </div>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                          Approved
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MONTHLY CALENDAR & REQUESTS TAB CONTENT */}
+      {activeTab === "calendar" && (
+        <div className="space-y-6">
+          {/* 4 Policy KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="p-4 bg-white rounded-2xl border border-[#E2E6F0] shadow-2xs">
           <div className="text-[11px] text-[#696E82] font-semibold uppercase tracking-wider">
@@ -867,6 +1536,8 @@ export default function EmployeeMyLeavePage() {
           </div>
         </div>
       </div>
+        </div>
+      )}
 
       {/* Historical Records Archive (Searchable, Filterable, Paginated) */}
       <div className="bg-white rounded-3xl border border-[#E2E6F0] p-5 shadow-2xs space-y-4">
