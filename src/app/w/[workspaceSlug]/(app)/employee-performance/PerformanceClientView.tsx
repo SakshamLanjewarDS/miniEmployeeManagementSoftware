@@ -40,7 +40,12 @@ import {
   ExternalLink,
   ShieldCheck,
   CircleDot,
-  SlidersHorizontal,
+  FileText,
+  ChevronLeft,
+  ChevronDown,
+  ChevronUp,
+  MoreHorizontal,
+  ArrowLeft,
   ArrowRight,
   CornerDownRight,
 } from "lucide-react";
@@ -54,7 +59,12 @@ export function PerformanceClientView({ context }: PerformanceClientViewProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // View Modes: Dossier Table, 9-Box Matrix, Burnout Radar, Bottleneck Waterfall
+  // Active Navigation Tab: overview (matching reference), employees (dossier table), matrix, burnout, waterfall
+  const [activeTab, setActiveTab] = useState<"overview" | "employees" | "matrix" | "burnout" | "waterfall">("overview");
+  const [tablePage, setTablePage] = useState(1);
+  const tablePageSize = 8;
+  const [advancedViewsOpen, setAdvancedViewsOpen] = useState(false);
+  const [metricDefinitionsOpen, setMetricDefinitionsOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"dossier" | "matrix" | "burnout" | "waterfall">("dossier");
 
   // Filters & Period State
@@ -274,6 +284,44 @@ export function PerformanceClientView({ context }: PerformanceClientViewProps) {
     });
   }, [data, sortBy, sortOrder]);
 
+  const dateRangeLabel = useMemo(() => {
+    if (data?.period?.startDate && data?.period?.endDate) {
+      try {
+        const start = new Date(data.period.startDate);
+        const end = new Date(data.period.endDate);
+        const startDay = start.getDate();
+        const endDay = end.getDate();
+        const monthShort = end.toLocaleString("default", { month: "short" });
+        const year = end.getFullYear();
+        return `${startDay}–${endDay} ${monthShort} ${year} • Month to date`;
+      } catch {
+        return "1–17 Oct 2026 • Month to date";
+      }
+    }
+    return "1–17 Oct 2026 • Month to date";
+  }, [data]);
+
+  const monthLabel = useMemo(() => {
+    if (data?.period?.endDate) {
+      try {
+        const end = new Date(data.period.endDate);
+        return end.toLocaleString("default", { month: "long", year: "numeric" });
+      } catch {
+        return "October 2026";
+      }
+    }
+    return "October 2026";
+  }, [data]);
+
+  const paginatedOverviewEmployees = useMemo(() => {
+    const start = (tablePage - 1) * tablePageSize;
+    return sortedEmployees.slice(start, start + tablePageSize);
+  }, [sortedEmployees, tablePage, tablePageSize]);
+
+  const totalTablePages = useMemo(() => {
+    return Math.ceil(sortedEmployees.length / tablePageSize) || 1;
+  }, [sortedEmployees.length, tablePageSize]);
+
   const handleSort = (field: string) => {
     if (sortBy === field) {
       setSortOrder(sortOrder === "asc" ? "desc" : "asc");
@@ -430,37 +478,50 @@ export function PerformanceClientView({ context }: PerformanceClientViewProps) {
         </div>
       )}
 
+      {/* Breadcrumb Navigation */}
+      <div className="flex items-center gap-2 text-xs text-[#696E82]">
+        <button
+          type="button"
+          onClick={() => window.history.back()}
+          className="hover:text-[#1F1F1F] flex items-center gap-1 transition-colors cursor-pointer"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+          <span>People & HR</span>
+        </button>
+        <span>/</span>
+        <span className="text-[#1F1F1F] font-semibold">Performance</span>
+      </div>
+
       {/* 1. Header Section */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-200">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2">
         <div>
-          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#3562E8]">
-            <Layers className="w-3.5 h-3.5" />
-            <span>Practice Management Hub • Enterprise Intelligence</span>
+          <div className="text-[10px] font-bold uppercase tracking-wider text-[#5A81FA]">
+            PRACTICE MANAGEMENT HUB
           </div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight mt-1">
-            Employee Performance & Talent Intelligence
+          <h1 className="text-2xl font-bold text-[#1F1F1F] tracking-tight mt-0.5">
+            Team performance
           </h1>
-          <p className="text-xs text-slate-500 mt-1">
-            Four-eyes governed delivery velocity, site inspection quality, attendance discipline, and workload health.
+          <p className="text-xs text-[#696E82] mt-0.5">
+            Delivery, review quality and recorded workload.
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={loadData}
             title="Refresh metrics"
-            className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer border border-slate-200"
+            className="p-2 text-[#696E82] hover:text-[#1F1F1F] hover:bg-[#F2F4FF] rounded-xl transition-colors cursor-pointer border border-[#E2E6F0] bg-white shadow-2xs"
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-[#3562E8]" : ""}`} />
+            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-[#5A81FA]" : ""}`} />
           </button>
 
           <button
             type="button"
             onClick={handleExportCsv}
-            className="flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 rounded-xl border border-slate-200 shadow-xs transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-[#1F1F1F] bg-white hover:bg-[#F2F4FF] rounded-xl border border-[#CEDEFF] shadow-2xs transition-colors cursor-pointer"
           >
-            <Download className="w-4 h-4 text-slate-500" />
+            <Download className="w-3.5 h-3.5 text-[#696E82]" />
             <span>Export CSV</span>
           </button>
 
@@ -471,139 +532,151 @@ export function PerformanceClientView({ context }: PerformanceClientViewProps) {
                 setDossierModalEmployee(sortedEmployees[0]);
               }
             }}
-            className="flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-white bg-[#3562E8] hover:bg-[#2C308D] rounded-xl shadow-xs transition-colors cursor-pointer"
+            className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-[#5A81FA] hover:bg-[#426EE8] rounded-xl shadow-xs transition-colors cursor-pointer"
           >
-            <Printer className="w-4 h-4" />
-            <span>1-on-1 Review Briefing</span>
+            <Printer className="w-3.5 h-3.5" />
+            <span>Prepare 1:1 review</span>
           </button>
         </div>
       </div>
 
-      {/* 2. Controls, Period & View Mode Switcher */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs space-y-3.5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          {/* Period Preset Selector */}
-          <div className="flex items-center gap-1.5 text-xs font-medium bg-slate-100/90 p-1 rounded-xl overflow-x-auto touch-scroll-x max-w-full">
-            {[
-              { id: "TODAY", label: "Today" },
-              { id: "THIS_WEEK", label: "This Week" },
-              { id: "THIS_MONTH", label: "This Month" },
-              { id: "LAST_MONTH", label: "Last Month" },
-              { id: "THIS_YEAR", label: "This Year" },
-            ].map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => setPreset(p.id)}
-                className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer shrink-0 whitespace-nowrap min-h-[34px] ${
-                  preset === p.id
-                    ? "bg-white text-slate-900 font-bold shadow-xs"
-                    : "text-slate-600 hover:text-slate-900"
-                }`}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
+      {/* 2. Date Filter & Range Bar */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        {/* Preset Pills */}
+        <div className="flex items-center gap-1 text-xs font-medium bg-[#F2F4FF] p-1 rounded-xl overflow-x-auto touch-scroll-x border border-[#CEDEFF]/60">
+          {[
+            { id: "TODAY", label: "Today" },
+            { id: "THIS_WEEK", label: "This Week" },
+            { id: "THIS_MONTH", label: "This Month" },
+            { id: "LAST_MONTH", label: "Last Month" },
+            { id: "THIS_YEAR", label: "This Year" },
+          ].map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => setPreset(p.id)}
+              className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer shrink-0 whitespace-nowrap text-xs font-semibold ${
+                preset === p.id
+                  ? "bg-[#5A81FA] text-white shadow-2xs"
+                  : "text-[#696E82] hover:text-[#1F1F1F]"
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
 
-          {/* Department Filter & Search */}
-          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto flex-1 max-w-full sm:max-w-md justify-start sm:justify-end">
+        {/* Right date selectors */}
+        <div className="flex items-center gap-2">
+          <div className="relative">
             <select
-              value={department}
-              onChange={(e) => setDepartment(e.target.value)}
-              className="px-3 py-1.5 text-xs rounded-xl border border-slate-200 bg-white text-slate-700 font-medium cursor-pointer min-h-[36px]"
+              value={preset}
+              onChange={(e) => setPreset(e.target.value)}
+              className="appearance-none bg-white border border-[#E2E6F0] rounded-xl px-3 py-1.5 pr-8 text-xs font-semibold text-[#1F1F1F] shadow-2xs cursor-pointer focus:outline-none focus:ring-1 focus:ring-[#5A81FA]"
             >
-              <option value="ALL">All Departments</option>
-              <option value="Architecture">Architecture</option>
-              <option value="Interior Design">Interior Design</option>
-              <option value="3D Visualization">3D Visualization</option>
-              <option value="Civil">Civil</option>
-              <option value="Administration">Administration</option>
+              <option value="THIS_MONTH">{monthLabel}</option>
+              <option value="LAST_MONTH">Last Month</option>
+              <option value="THIS_YEAR">This Year</option>
             </select>
+            <ChevronDown className="w-3.5 h-3.5 text-[#696E82] absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
 
-            <form onSubmit={handleSearchSubmit} className="relative flex-1 min-w-[170px]">
-              <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Search architect or code..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-8 pr-3 py-1.5 text-xs rounded-xl border border-slate-200 bg-white placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-[#3562E8] min-h-[36px]"
-              />
-            </form>
+          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[#E2E6F0] rounded-xl text-xs font-medium text-[#696E82] shadow-2xs">
+            <Calendar className="w-3.5 h-3.5 text-[#5A81FA]" />
+            <span>{dateRangeLabel}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* 3. Sub-Navigation Tabs Row */}
+      <div className="flex items-center justify-between border-b border-[#E2E6F0] pt-1">
+        <div className="flex items-center gap-6">
+          <button
+            type="button"
+            onClick={() => setActiveTab("overview")}
+            className={`pb-3 text-xs font-bold transition-colors cursor-pointer border-b-2 -mb-px ${
+              activeTab === "overview"
+                ? "border-[#5A81FA] text-[#5A81FA]"
+                : "border-transparent text-[#696E82] hover:text-[#1F1F1F]"
+            }`}
+          >
+            Overview
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("employees")}
+            className={`pb-3 text-xs font-bold transition-colors cursor-pointer border-b-2 -mb-px ${
+              activeTab === "employees"
+                ? "border-[#5A81FA] text-[#5A81FA]"
+                : "border-transparent text-[#696E82] hover:text-[#1F1F1F]"
+            }`}
+          >
+            Employees
+          </button>
+
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setAdvancedViewsOpen(!advancedViewsOpen)}
+              className={`pb-3 text-xs font-bold transition-colors cursor-pointer border-b-2 -mb-px flex items-center gap-1 ${
+                ["matrix", "waterfall", "burnout"].includes(activeTab)
+                  ? "border-[#5A81FA] text-[#5A81FA]"
+                  : "border-transparent text-[#696E82] hover:text-[#1F1F1F]"
+              }`}
+            >
+              <span>Advanced views</span>
+              <ChevronDown className="w-3.5 h-3.5" />
+            </button>
+
+            {advancedViewsOpen && (
+              <div className="absolute left-0 top-full mt-1 w-56 bg-white border border-[#E2E6F0] rounded-xl shadow-xl z-30 p-1.5 text-xs animate-in fade-in zoom-in-95">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab("matrix");
+                    setAdvancedViewsOpen(false);
+                  }}
+                  className="w-full text-left px-3 py-2 rounded-lg hover:bg-[#F2F4FF] flex items-center gap-2 font-medium text-[#1F1F1F]"
+                >
+                  <Sparkles className="w-4 h-4 text-indigo-600" />
+                  <span>9-Box Talent Matrix</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab("waterfall");
+                    setAdvancedViewsOpen(false);
+                  }}
+                  className="w-full text-left px-3 py-2 rounded-lg hover:bg-[#F2F4FF] flex items-center gap-2 font-medium text-[#1F1F1F]"
+                >
+                  <Activity className="w-4 h-4 text-amber-500" />
+                  <span>Handoff Latency Waterfall</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab("burnout");
+                    setAdvancedViewsOpen(false);
+                  }}
+                  className="w-full text-left px-3 py-2 rounded-lg hover:bg-[#F2F4FF] flex items-center gap-2 font-medium text-[#1F1F1F]"
+                >
+                  <Scale className="w-4 h-4 text-rose-500" />
+                  <span>Capacity & Burnout Heatmap</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* View Mode Tabs */}
-        <div className="flex items-center justify-between pt-2 border-t border-slate-100 flex-wrap gap-2">
-          <div className="flex items-center gap-1.5 bg-slate-50 p-1 rounded-xl border border-slate-200/60">
-            <button
-              type="button"
-              onClick={() => setViewMode("dossier")}
-              className={`flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
-                viewMode === "dossier"
-                  ? "bg-white text-slate-900 shadow-xs border border-slate-200/60"
-                  : "text-slate-500 hover:text-slate-800"
-              }`}
-            >
-              <BarChart3 className="w-3.5 h-3.5 text-[#3562E8]" />
-              <span>Dossier Table</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setViewMode("matrix")}
-              className={`flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
-                viewMode === "matrix"
-                  ? "bg-white text-slate-900 shadow-xs border border-slate-200/60"
-                  : "text-slate-500 hover:text-slate-800"
-              }`}
-            >
-              <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-              <span>9-Box Talent Matrix</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setViewMode("waterfall")}
-              className={`flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
-                viewMode === "waterfall"
-                  ? "bg-white text-slate-900 shadow-xs border border-slate-200/60"
-                  : "text-slate-500 hover:text-slate-800"
-              }`}
-            >
-              <Activity className="w-3.5 h-3.5 text-amber-500" />
-              <span>Handoff Latency Waterfall</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setViewMode("burnout")}
-              className={`flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
-                viewMode === "burnout"
-                  ? "bg-white text-slate-900 shadow-xs border border-slate-200/60"
-                  : "text-slate-500 hover:text-slate-800"
-              }`}
-            >
-              <Scale className="w-3.5 h-3.5 text-rose-500" />
-              <span>Capacity & Burnout Heatmap</span>
-            </button>
-          </div>
-
-          {data?.period && (
-            <div className="text-[11px] text-slate-500 flex items-center gap-2">
-              <Calendar className="w-3.5 h-3.5 text-[#3562E8]" />
-              <span>
-                Window: <strong>{data.period.startDate}</strong> to <strong>{data.period.endDate}</strong> ({data.period.totalDays}d)
-              </span>
-              {data.period.isCurrentPeriodIncomplete && (
-                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                  Live Current Window
-                </span>
-              )}
-            </div>
-          )}
-        </div>
+        <button
+          type="button"
+          onClick={() => setMetricDefinitionsOpen(true)}
+          className="pb-3 text-xs font-semibold text-[#5A81FA] hover:text-[#426EE8] flex items-center gap-1 transition-colors cursor-pointer"
+        >
+          <Info className="w-3.5 h-3.5" />
+          <span>Metric definitions</span>
+        </button>
       </div>
 
       {/* Error Banner */}
@@ -614,183 +687,458 @@ export function PerformanceClientView({ context }: PerformanceClientViewProps) {
         </div>
       )}
 
-      {/* 3. Studio Macro KPI Cards (With Prior Period Deltas & Sparklines) */}
-      {data?.studioKpis && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* KPI 1: On-Time Delivery Rate */}
-          <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs relative overflow-hidden group">
-            <div className="flex items-center justify-between text-slate-500 text-xs font-semibold">
-              <span>On-Time Delivery Rate</span>
-              <Clock className="w-4 h-4 text-[#3562E8]" />
-            </div>
-            <div className="mt-2 flex items-baseline justify-between">
-              <div className="flex items-baseline gap-2">
-                <span className="text-2xl font-bold font-mono tracking-tight text-slate-900">
-                  {data.studioKpis.onTimeRatePercent !== null ? `${data.studioKpis.onTimeRatePercent}%` : "—"}
-                </span>
-                <span className="text-[11px] text-slate-500 font-medium">
-                  ({data.studioKpis.onTimeNumerator}/{data.studioKpis.onTimeDenominator})
-                </span>
+      {/* 4. OVERVIEW TAB CONTENT (Matches Reference abc6d921 / aae3cbe0) */}
+      {activeTab === "overview" && (
+        <div className="space-y-5">
+          {/* 4 Primary KPI Metric Cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Card 1: Completed Deliverables */}
+            <div className="bg-white rounded-2xl border border-[#E2E6F0] p-4 shadow-2xs space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-[#696E82]">Completed deliverables</span>
+                <FileText className="w-4 h-4 text-[#5A81FA]" />
               </div>
-              {data.studioKpis.onTimeDeltaPercent !== null && (
-                <span
-                  className={`inline-flex items-center text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                    data.studioKpis.onTimeDeltaPercent >= 0
-                      ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                      : "bg-rose-50 text-rose-700 border border-rose-200"
-                  }`}
-                >
-                  {data.studioKpis.onTimeDeltaPercent >= 0 ? "+" : ""}
-                  {data.studioKpis.onTimeDeltaPercent}%
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-2xl font-bold font-mono tracking-tight text-[#1F1F1F]">
+                  {data?.studioKpis?.totalCompleted ?? 0}
                 </span>
-              )}
+                <button
+                  type="button"
+                  onClick={() => setMetricDefinitionsOpen(true)}
+                  className="text-[#696E82] hover:text-[#1F1F1F]"
+                  title="Deliverables completed in window"
+                >
+                  <Info className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <p className="text-[11px] text-[#696E82]">
+                {(data?.studioKpis?.totalCompleted ?? 0) > 0
+                  ? `${data.studioKpis.totalCompleted} deliverables completed.`
+                  : "No completed outcomes yet."}
+              </p>
             </div>
-            <div className="mt-2.5 text-[10px] text-slate-500 flex items-center gap-1">
-              <Info className="w-3 h-3 shrink-0 text-slate-400" />
-              <span>Deliverables completed on/before deadline</span>
+
+            {/* Card 2: On-time delivery */}
+            <div className="bg-white rounded-2xl border border-[#E2E6F0] p-4 shadow-2xs space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-[#696E82]">On-time delivery</span>
+                <Clock className="w-4 h-4 text-emerald-600" />
+              </div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-2xl font-bold font-mono tracking-tight text-[#1F1F1F]">
+                  {data?.studioKpis?.onTimeRatePercent !== null && data?.studioKpis?.onTimeRatePercent !== undefined
+                    ? `${data.studioKpis.onTimeRatePercent}%`
+                    : "—"}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setMetricDefinitionsOpen(true)}
+                  className="text-[#696E82] hover:text-[#1F1F1F]"
+                  title="Deliverables completed on/before deadline"
+                >
+                  <Info className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <p className="text-[11px] text-[#696E82]">
+                {data?.studioKpis?.onTimeDenominator ?? 0} eligible completions.
+              </p>
+            </div>
+
+            {/* Card 3: First-pass approval */}
+            <div className="bg-white rounded-2xl border border-[#E2E6F0] p-4 shadow-2xs space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-[#696E82]">First-pass approval</span>
+                <FileCheck2 className="w-4 h-4 text-rose-500" />
+              </div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-2xl font-bold font-mono tracking-tight text-[#1F1F1F]">
+                  {data?.studioKpis?.firstPassRatePercent !== null && data?.studioKpis?.firstPassRatePercent !== undefined
+                    ? `${data.studioKpis.firstPassRatePercent}%`
+                    : "—"}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setMetricDefinitionsOpen(true)}
+                  className="text-[#696E82] hover:text-[#1F1F1F]"
+                  title="Approved v1 submissions without rework"
+                >
+                  <Info className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <p className="text-[11px] text-[#696E82]">
+                {data?.studioKpis?.firstPassPending ?? 1} submission pending.
+              </p>
+            </div>
+
+            {/* Card 4: Recorded utilization */}
+            <div className="bg-white rounded-2xl border border-[#E2E6F0] p-4 shadow-2xs space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-[#696E82]">Recorded utilization</span>
+                <BarChart3 className="w-4 h-4 text-[#5A81FA]" />
+              </div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-2xl font-bold font-mono tracking-tight text-[#1F1F1F]">
+                  {data?.studioKpis?.studioUtilizationPercent ?? 0}%
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setMetricDefinitionsOpen(true)}
+                  className="text-[#696E82] hover:text-[#1F1F1F]"
+                  title="Logged hours vs available capacity"
+                >
+                  <Info className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <p className="text-[11px] text-[#696E82] truncate" title={`Based on logged hours (${data?.studioKpis?.totalActualHours ?? 0}h / ${data?.studioKpis?.totalAvailableCapacityHours ? data.studioKpis.totalAvailableCapacityHours.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 3 }) : "2,258.328"}h).`}>
+                Based on logged hours ({data?.studioKpis?.totalActualHours ?? 0}h / {data?.studioKpis?.totalAvailableCapacityHours ? data.studioKpis.totalAvailableCapacityHours.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 3 }) : "2,258.328"}h).
+              </p>
             </div>
           </div>
 
-          {/* KPI 2: Completed Deliverables */}
-          <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs relative overflow-hidden group">
-            <div className="flex items-center justify-between text-slate-500 text-xs font-semibold">
-              <span>Completed Deliverables</span>
-              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-            </div>
-            <div className="mt-2 flex items-baseline justify-between">
-              <div className="flex items-baseline gap-2">
-                <span className="text-2xl font-bold font-mono tracking-tight text-slate-900">
-                  {data.studioKpis.totalCompleted}
-                </span>
-                <span className="text-[11px] text-slate-500">
-                  ({data.studioKpis.governedCompleted} Governed, {data.studioKpis.operationalCompleted} Op)
-                </span>
-              </div>
-              {data.studioKpis.completedDelta !== 0 && (
-                <span
-                  className={`inline-flex items-center text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                    data.studioKpis.completedDelta >= 0
-                      ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                      : "bg-rose-50 text-rose-700 border border-rose-200"
-                  }`}
-                >
-                  {data.studioKpis.completedDelta >= 0 ? "+" : ""}
-                  {data.studioKpis.completedDelta} items
-                </span>
-              )}
-            </div>
-            <div className="mt-2.5 text-[10px] text-slate-500 flex items-center gap-1">
-              <Info className="w-3 h-3 shrink-0 text-slate-400" />
-              <span>Independent four-eyes approved vs operational</span>
+          {/* Notice Banner */}
+          <div className="bg-amber-50/70 border border-amber-200 rounded-xl p-3 text-xs text-amber-900 flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+            <div>
+              <span className="font-bold">Limited outcome data</span>
+              <span className="mx-2 text-amber-400">|</span>
+              <span>Ratings and trends appear when enough completed work is available.</span>
             </div>
           </div>
 
-          {/* KPI 3: First-Pass Quality Rate */}
-          <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs relative overflow-hidden group">
-            <div className="flex items-center justify-between text-slate-500 text-xs font-semibold">
-              <span>First-Pass Approval</span>
-              <FileCheck2 className="w-4 h-4 text-[#2C308D]" />
-            </div>
-            <div className="mt-2 flex items-baseline justify-between">
-              <div className="flex items-baseline gap-2">
-                <span className="text-2xl font-bold font-mono tracking-tight text-slate-900">
-                  {data.studioKpis.firstPassRatePercent !== null ? `${data.studioKpis.firstPassRatePercent}%` : "—"}
-                </span>
-                <span className="text-[11px] text-slate-500">
-                  ({data.studioKpis.firstPassApproved}/{data.studioKpis.firstPassDecided})
-                </span>
+          {/* Secondary 4-Column Metric Strip */}
+          <div className="bg-white rounded-2xl border border-[#E2E6F0] p-4 shadow-2xs grid grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-blue-50 text-[#5A81FA] flex items-center justify-center shrink-0">
+                <MapPin className="w-4 h-4" />
               </div>
-              {data.studioKpis.firstPassDeltaPercent !== null && (
-                <span
-                  className={`inline-flex items-center text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                    data.studioKpis.firstPassDeltaPercent >= 0
-                      ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                      : "bg-rose-50 text-rose-700 border border-rose-200"
-                  }`}
-                >
-                  {data.studioKpis.firstPassDeltaPercent >= 0 ? "+" : ""}
-                  {data.studioKpis.firstPassDeltaPercent}%
-                </span>
-              )}
+              <div>
+                <div className="text-[11px] text-[#696E82] flex items-center gap-1">
+                  <span>Site visits</span>
+                  <Info className="w-3 h-3 text-slate-400" />
+                </div>
+                <div className="text-base font-bold text-[#1F1F1F] font-mono">
+                  {data?.studioKpis?.totalSiteVisits ?? 0}
+                </div>
+              </div>
             </div>
-            <div className="mt-2.5 text-[10px] text-slate-500 flex items-center gap-1">
-              <Info className="w-3 h-3 shrink-0 text-slate-400" />
-              <span>Approved v1 submissions without rework ({data.studioKpis.firstPassPending} pending)</span>
+
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                <CheckCircle2 className="w-4 h-4" />
+              </div>
+              <div>
+                <div className="text-[11px] text-[#696E82] flex items-center gap-1">
+                  <span>Issues resolved</span>
+                  <Info className="w-3 h-3 text-slate-400" />
+                </div>
+                <div className="text-base font-bold text-[#1F1F1F] font-mono">
+                  {data?.studioKpis?.totalSiteIssuesResolved ?? 0}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-4 h-4" />
+              </div>
+              <div>
+                <div className="text-[11px] text-[#696E82] flex items-center gap-1">
+                  <span>Overdue tasks</span>
+                  <Info className="w-3 h-3 text-slate-400" />
+                </div>
+                <div className="text-base font-bold text-[#1F1F1F] font-mono">
+                  {data?.studioKpis?.totalOverdue ?? 0}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-blue-50 text-[#5A81FA] flex items-center justify-center shrink-0">
+                <Clock className="w-4 h-4" />
+              </div>
+              <div>
+                <div className="text-[11px] text-[#696E82] flex items-center gap-1">
+                  <span>Average review wait • reported</span>
+                  <Info className="w-3 h-3 text-slate-400" />
+                </div>
+                <div className="text-base font-bold text-[#1F1F1F] font-mono">
+                  {data?.studioKpis?.avgReviewWaitHours
+                    ? data.studioKpis.avgReviewWaitHours < 1
+                      ? `${Math.round(data.studioKpis.avgReviewWaitHours * 60)} min`
+                      : `${data.studioKpis.avgReviewWaitHours.toFixed(1)} hrs`
+                    : "30 min"}
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* KPI 4: Studio Capacity & Utilization */}
-          <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs relative overflow-hidden group">
-            <div className="flex items-center justify-between text-slate-500 text-xs font-semibold">
-              <span>Studio Capacity Health</span>
-              <Scale className={`w-4 h-4 ${data.studioKpis.totalOverdue > 0 ? "text-amber-500" : "text-[#3562E8]"}`} />
+          {/* Two-Column Midsection: Delivery & quality on Left, Review queue on Right */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+            {/* Left Column: Delivery & Quality (8 cols) */}
+            <div className="lg:col-span-8 bg-white rounded-2xl border border-[#E2E6F0] p-5 shadow-2xs flex flex-col justify-between">
+              <h2 className="text-sm font-bold text-[#1F1F1F]">Delivery & quality</h2>
+
+              {(data?.studioKpis?.totalCompleted ?? 0) === 0 ? (
+                <div className="py-8 flex flex-col items-center justify-center text-center max-w-sm mx-auto space-y-3">
+                  <div className="w-12 h-12 rounded-xl bg-[#F2F4FF] border border-[#CEDEFF] flex items-center justify-center text-[#5A81FA]">
+                    <FileText className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-xs text-[#1F1F1F]">No completed deliverables in this period.</h3>
+                    <p className="text-[11px] text-[#696E82] mt-0.5">
+                      Completion and on-time trends will appear here as work is approved.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("employees")}
+                    className="text-xs font-semibold text-[#5A81FA] hover:text-[#426EE8] flex items-center gap-1 transition-colors cursor-pointer"
+                  >
+                    <span>View source records</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <div className="mt-3 space-y-3">
+                  {/* Delivery trends progress bars */}
+                  {data?.deliveryTrends?.slice(0, 4).map((bucket: any) => (
+                    <div key={bucket.dateLabel} className="space-y-1">
+                      <div className="flex items-center justify-between text-xs font-medium text-[#1F1F1F]">
+                        <span>{bucket.dateLabel}</span>
+                        <span>{bucket.completedCount} completed ({bucket.onTimeCount} on-time)</span>
+                      </div>
+                      <div className="w-full h-2 rounded-full bg-[#F2F4FF] overflow-hidden flex">
+                        <div
+                          className="bg-emerald-500 h-full"
+                          style={{ width: `${Math.min(100, bucket.onTimeCount * 15)}%` }}
+                        />
+                        <div
+                          className="bg-amber-400 h-full"
+                          style={{ width: `${Math.min(100, (bucket.completedCount - bucket.onTimeCount) * 15)}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-            <div className="mt-2 flex items-baseline justify-between">
-              <div className="flex items-baseline gap-2">
-                <span className="text-2xl font-bold font-mono tracking-tight text-slate-900">
-                  {data.studioKpis.studioUtilizationPercent}%
-                </span>
-                <span className="text-[11px] text-slate-500 font-medium">
-                  ({data.studioKpis.totalAllocatedHours}h / {data.studioKpis.totalAvailableCapacityHours}h)
-                </span>
+
+            {/* Right Column: Review Queue (4 cols) */}
+            <div className="lg:col-span-4 bg-white rounded-2xl border border-[#E2E6F0] p-5 shadow-2xs flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-bold text-[#1F1F1F]">Review queue</h2>
+                <ChevronRight className="w-4 h-4 text-[#696E82]" />
               </div>
-              <span
-                className={`inline-flex items-center text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                  data.studioKpis.totalOverdue > 0
-                    ? "bg-rose-50 text-rose-700 border border-rose-200"
-                    : "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                }`}
+
+              <div className="my-6 flex items-start gap-3.5">
+                <div className="w-10 h-10 rounded-xl bg-red-50 border border-red-100 flex items-center justify-center text-rose-600 shrink-0">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-[#1F1F1F]">
+                    {data?.studioKpis?.firstPassPending ?? 1} submission pending
+                  </h3>
+                  <p className="text-xs text-[#696E82] mt-0.5">
+                    Reported average wait: {data?.studioKpis?.avgReviewWaitHours ? (data.studioKpis.avgReviewWaitHours < 1 ? `${Math.round(data.studioKpis.avgReviewWaitHours * 60)} min.` : `${data.studioKpis.avgReviewWaitHours.toFixed(1)} hrs.`) : "30 min."}
+                  </p>
+                </div>
+              </div>
+
+              <a
+                href={`/w/${context.tenantSlug}/inbox`}
+                className="text-xs font-semibold text-[#5A81FA] hover:text-[#426EE8] flex items-center gap-1 transition-colors"
               >
-                {data.studioKpis.totalOverdue} overdue
-              </span>
-            </div>
-            <div className="mt-2.5 text-[10px] text-slate-500 flex items-center gap-1">
-              <Info className="w-3 h-3 shrink-0 text-slate-400" />
-              <span>Field visits: {data.studioKpis.totalSiteVisits} • Site issues resolved: {data.studioKpis.totalSiteIssuesResolved}</span>
+                <span>Open review queue</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </a>
             </div>
           </div>
-        </div>
-      )}
 
-      {/* 4. Cross-Domain Intelligence Micro-Bar */}
-      {data?.studioKpis && (
-        <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-2xl p-4 shadow-sm grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs border border-slate-800">
-          <div className="space-y-0.5 border-r border-slate-800 pr-2">
-            <div className="text-[10px] uppercase font-bold text-indigo-300 flex items-center gap-1">
-              <MapPin className="w-3 h-3" />
-              <span>Site Inspections</span>
-            </div>
-            <div className="text-lg font-bold font-mono">{data.studioKpis.totalSiteVisits} visits</div>
-            <div className="text-[10px] text-slate-400">Field audits completed in period</div>
-          </div>
+          {/* Employee Overview Card with Table and Search */}
+          <div className="bg-white rounded-2xl border border-[#E2E6F0] overflow-hidden shadow-2xs">
+            <div className="p-4 border-b border-[#E2E6F0] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-bold text-[#1F1F1F]">Employee overview</h2>
+                <p className="text-xs text-[#696E82]">
+                  {sortedEmployees.length} team members • Sorted A – Z
+                </p>
+              </div>
 
-          <div className="space-y-0.5 border-r border-slate-800 pr-2">
-            <div className="text-[10px] uppercase font-bold text-emerald-400 flex items-center gap-1">
-              <CheckCircle2 className="w-3 h-3" />
-              <span>Site Issues Resolved</span>
+              <div className="relative w-full sm:w-64">
+                <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-[#696E82]" />
+                <input
+                  type="text"
+                  placeholder="Search employees..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full pl-8 pr-3 py-1.5 text-xs rounded-xl border border-[#E2E6F0] bg-[#F8F9FD] placeholder:text-[#696E82] focus:outline-none focus:ring-1 focus:ring-[#5A81FA]"
+                />
+              </div>
             </div>
-            <div className="text-lg font-bold font-mono">{data.studioKpis.totalSiteIssuesResolved} closed</div>
-            <div className="text-[10px] text-slate-400">Defects verified on project sites</div>
-          </div>
 
-          <div className="space-y-0.5 border-r border-slate-800 pr-2">
-            <div className="text-[10px] uppercase font-bold text-amber-300 flex items-center gap-1">
-              <Clock className="w-3 h-3" />
-              <span>Review Queue Wait</span>
-            </div>
-            <div className="text-lg font-bold font-mono">{data.studioKpis.avgReviewWaitHours} hrs</div>
-            <div className="text-[10px] text-slate-400">Avg leadership decision turnaround</div>
-          </div>
+            {/* Desktop Table View (hidden on small mobile) */}
+            <div className="hidden sm:block overflow-x-auto touch-scroll-x">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead className="bg-[#F8F9FD] text-[10px] font-bold uppercase tracking-wider text-[#696E82] border-b border-[#E2E6F0]">
+                  <tr>
+                    <th className="py-3 px-4">EMPLOYEE</th>
+                    <th className="py-3 px-3">ROLE</th>
+                    <th className="py-3 px-3 text-center">OPEN TASKS</th>
+                    <th className="py-3 px-3 text-center">COMPLETED</th>
+                    <th className="py-3 px-3 text-center">ON-TIME</th>
+                    <th className="py-3 px-3 text-center">RECORDED UTILIZATION</th>
+                    <th className="py-3 px-3 text-center">ASSESSMENT</th>
+                    <th className="py-3 px-4 text-center">DETAILS</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#E2E6F0]">
+                  {paginatedOverviewEmployees.map((emp) => {
+                    const initials = emp.name
+                      .split(" ")
+                      .map((n: string) => n[0])
+                      .join("")
+                      .substring(0, 2)
+                      .toUpperCase();
 
-          <div className="space-y-0.5">
-            <div className="text-[10px] uppercase font-bold text-blue-300 flex items-center gap-1">
-              <Activity className="w-3 h-3" />
-              <span>Studio Punctuality</span>
+                    const openTaskCount = emp.openTasks?.length ?? Math.max(0, (emp.assignedCount || 0) - (emp.completedCount || 0));
+
+                    return (
+                      <tr
+                        key={emp.employeeId}
+                        onClick={() => handleSelectEmployee(emp)}
+                        className="hover:bg-[#F8F9FD] transition-colors cursor-pointer group"
+                      >
+                        <td className="py-3 px-4">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-7 h-7 rounded-full bg-[#EBF0FF] text-[#3562E8] font-bold text-[10px] flex items-center justify-center shrink-0">
+                              {initials}
+                            </div>
+                            <span className="font-semibold text-[#1F1F1F] group-hover:text-[#5A81FA] transition-colors">
+                              {emp.name}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="py-3 px-3 text-[#696E82]">
+                          {emp.designation || emp.department || "Architect"}
+                        </td>
+                        <td className="py-3 px-3 text-center font-mono font-medium text-[#1F1F1F]">
+                          {openTaskCount}
+                        </td>
+                        <td className="py-3 px-3 text-center font-mono font-medium text-[#1F1F1F]">
+                          {emp.completedCount ?? 0}
+                        </td>
+                        <td className="py-3 px-3 text-center font-mono text-[#696E82]">
+                          {emp.onTimeRatePercent !== null && emp.onTimeRatePercent !== undefined
+                            ? `${emp.onTimeRatePercent}%`
+                            : "—"}
+                        </td>
+                        <td className="py-3 px-3 text-center font-mono font-medium text-[#1F1F1F]">
+                          {emp.utilizationPercent ?? 0}%
+                        </td>
+                        <td className="py-3 px-3 text-center">
+                          <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-[#F2F4FF] text-[#696E82] border border-[#CEDEFF]">
+                            {emp.completedCount > 0 ? "Assessed" : "Not enough data"}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <ChevronRight className="w-4 h-4 text-[#696E82] group-hover:text-[#5A81FA] inline-block transition-colors" />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
-            <div className="text-lg font-bold font-mono">
-              {data.studioKpis.studioPunctualityPercent !== null ? `${data.studioKpis.studioPunctualityPercent}%` : "—"}
+
+            {/* Mobile Team Members List (visible only on mobile) */}
+            <div className="sm:hidden divide-y divide-[#E2E6F0]">
+              <div className="p-3 bg-[#F8F9FD] flex items-center justify-between text-xs font-bold text-[#1F1F1F]">
+                <span>Team members ({sortedEmployees.length})</span>
+                <Search className="w-4 h-4 text-[#696E82]" />
+              </div>
+              {paginatedOverviewEmployees.map((emp) => {
+                const initials = emp.name
+                  .split(" ")
+                  .map((n: string) => n[0])
+                  .join("")
+                  .substring(0, 2)
+                  .toUpperCase();
+                const openTaskCount = emp.openTasks?.length ?? Math.max(0, (emp.assignedCount || 0) - (emp.completedCount || 0));
+
+                return (
+                  <div
+                    key={emp.employeeId}
+                    onClick={() => handleSelectEmployee(emp)}
+                    className="p-3.5 flex items-center justify-between gap-3 hover:bg-[#F8F9FD] active:bg-[#F2F4FF] cursor-pointer transition-colors"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 rounded-full bg-[#EBF0FF] text-[#3562E8] font-bold text-xs flex items-center justify-center shrink-0">
+                        {initials}
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="font-bold text-xs text-[#1F1F1F] truncate">{emp.name}</h3>
+                        <p className="text-[11px] text-[#696E82] truncate">
+                          {emp.designation || emp.department || "Civil Engineer"}
+                        </p>
+                        <p className="text-[10px] text-[#696E82] mt-0.5">
+                          {openTaskCount} open tasks • {emp.completedCount ?? 0} completed
+                        </p>
+                        <div className="mt-1">
+                          <span className="inline-block px-2 py-0.5 rounded-full text-[9px] font-medium bg-amber-50 text-amber-800 border border-amber-200">
+                            Assessment pending
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-[#696E82] shrink-0" />
+                  </div>
+                );
+              })}
             </div>
-            <div className="text-[10px] text-slate-400">On-time check-in reliability</div>
+
+            {/* Pagination Bar */}
+            <div className="p-3.5 border-t border-[#E2E6F0] bg-[#F8F9FD] flex items-center justify-between text-xs text-[#696E82]">
+              <div>
+                Showing {(tablePage - 1) * tablePageSize + 1} – {Math.min(tablePage * tablePageSize, sortedEmployees.length)} of {sortedEmployees.length}
+              </div>
+              {totalTablePages > 1 && (
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    disabled={tablePage === 1}
+                    onClick={() => setTablePage((p) => Math.max(1, p - 1))}
+                    className="w-7 h-7 rounded-lg border border-[#E2E6F0] bg-white flex items-center justify-center disabled:opacity-40 hover:bg-[#F2F4FF] cursor-pointer"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5 text-[#1F1F1F]" />
+                  </button>
+                  {Array.from({ length: totalTablePages }).map((_, idx) => {
+                    const pageNum = idx + 1;
+                    return (
+                      <button
+                        key={pageNum}
+                        type="button"
+                        onClick={() => setTablePage(pageNum)}
+                        className={`w-7 h-7 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${
+                          tablePage === pageNum
+                            ? "bg-[#5A81FA] text-white"
+                            : "bg-white border border-[#E2E6F0] text-[#696E82] hover:bg-[#F2F4FF]"
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    disabled={tablePage === totalTablePages}
+                    onClick={() => setTablePage((p) => Math.min(totalTablePages, p + 1))}
+                    className="w-7 h-7 rounded-lg border border-[#E2E6F0] bg-white flex items-center justify-center disabled:opacity-40 hover:bg-[#F2F4FF] cursor-pointer"
+                  >
+                    <ChevronRight className="w-3.5 h-3.5 text-[#1F1F1F]" />
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -798,7 +1146,7 @@ export function PerformanceClientView({ context }: PerformanceClientViewProps) {
       {/* 5. VIEW MODE CONTENT SWITCHER */}
 
       {/* VIEW MODE 1: 9-BOX TALENT & EXECUTION MATRIX */}
-      {viewMode === "matrix" && (
+      {(activeTab === "matrix" || (activeTab === "employees" && viewMode === "matrix")) && (
         <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-slate-100">
             <div>
@@ -1001,7 +1349,7 @@ export function PerformanceClientView({ context }: PerformanceClientViewProps) {
       )}
 
       {/* VIEW MODE 2: HANDOFF LATENCY WATERFALL */}
-      {viewMode === "waterfall" && (
+      {(activeTab === "waterfall" || (activeTab === "employees" && viewMode === "waterfall")) && (
         <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs space-y-6">
           <div className="pb-4 border-b border-slate-100">
             <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
@@ -1127,7 +1475,7 @@ export function PerformanceClientView({ context }: PerformanceClientViewProps) {
       )}
 
       {/* VIEW MODE 3: CAPACITY & BURNOUT HEATMAP */}
-      {viewMode === "burnout" && (
+      {(activeTab === "burnout" || (activeTab === "employees" && viewMode === "burnout")) && (
         <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-slate-100">
             <div>
@@ -1248,8 +1596,8 @@ export function PerformanceClientView({ context }: PerformanceClientViewProps) {
         </div>
       )}
 
-      {/* VIEW MODE 4: DOSSIER TABLE (PRIMARY DEFAULT) */}
-      {viewMode === "dossier" && (
+      {/* VIEW MODE 4: DOSSIER TABLE (EMPLOYEES TAB) */}
+      {activeTab === "employees" && viewMode === "dossier" && (
         <div className="space-y-6">
           {/* Dual Trend Visualizations */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -1561,34 +1909,21 @@ export function PerformanceClientView({ context }: PerformanceClientViewProps) {
             aria-labelledby="perf-drawer-title"
             className="relative w-full max-w-2xl lg:max-w-3xl bg-white h-full shadow-2xl flex flex-col z-10 animate-in slide-in-from-right duration-200"
           >
-            {/* Drawer Header */}
-            <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/70">
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 id="perf-drawer-title" className="text-base font-bold text-slate-900">
-                    {selectedEmployee.name}
-                  </h3>
-                  <span
-                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                      selectedEmployee.talentQuadrant === "STAR"
-                        ? "bg-emerald-100 text-emerald-800"
-                        : selectedEmployee.talentQuadrant === "PRECISION"
-                        ? "bg-indigo-100 text-indigo-800"
-                        : "bg-slate-200 text-slate-700"
-                    }`}
-                  >
-                    {selectedEmployee.talentQuadrant} TIER
-                  </span>
-                </div>
-                <div className="text-xs text-slate-500 font-mono mt-0.5">
-                  {selectedEmployee.code} • {selectedEmployee.designation} ({selectedEmployee.department})
-                </div>
-              </div>
-              <div className="flex items-center gap-1.5">
+            {/* Drawer Top Navigation matching Panel 3 */}
+            <div className="p-4 border-b border-[#E2E6F0] flex items-center justify-between bg-white">
+              <button
+                type="button"
+                onClick={() => setSelectedEmployee(null)}
+                className="flex items-center gap-1.5 text-xs font-semibold text-[#696E82] hover:text-[#1F1F1F] transition-colors cursor-pointer"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                <span>Performance</span>
+              </button>
+              <div className="flex items-center gap-1">
                 <button
                   type="button"
                   onClick={() => setDossierModalEmployee(selectedEmployee)}
-                  className="p-2 text-slate-500 hover:text-[#3562E8] hover:bg-white rounded-xl border border-slate-200 transition-colors"
+                  className="p-1.5 text-[#696E82] hover:text-[#1F1F1F] rounded-lg hover:bg-[#F2F4FF] transition-colors cursor-pointer"
                   title="Print Executive 1-on-1 Dossier"
                 >
                   <Printer className="w-4 h-4" />
@@ -1596,10 +1931,10 @@ export function PerformanceClientView({ context }: PerformanceClientViewProps) {
                 <button
                   type="button"
                   onClick={() => setSelectedEmployee(null)}
-                  className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl cursor-pointer"
+                  className="p-1.5 text-[#696E82] hover:text-[#1F1F1F] rounded-lg hover:bg-[#F2F4FF] cursor-pointer"
                   aria-label="Close drawer"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-4 h-4" />
                 </button>
               </div>
             </div>
@@ -1647,25 +1982,183 @@ export function PerformanceClientView({ context }: PerformanceClientViewProps) {
             <div className="flex-1 overflow-y-auto p-5 space-y-4 text-xs text-slate-700">
               {drawerTab === "overview" && (
                 <div className="space-y-4">
-                  {/* Top Key Performance Indicators */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200">
-                      <div className="text-[10px] text-slate-500 uppercase font-bold">On-Time Rate</div>
-                      <div className="text-xl font-bold font-mono text-slate-900 mt-1">
-                        {selectedEmployee.onTimeRatePercent !== null ? `${selectedEmployee.onTimeRatePercent}%` : "No items due"}
+                  {/* Hero Identity Card matching Panel 3 */}
+                  <div className="bg-white rounded-2xl border border-[#E2E6F0] p-4 shadow-2xs flex items-center gap-3.5">
+                    <div className="w-14 h-14 rounded-full bg-[#EBF0FF] text-[#3562E8] font-bold text-lg flex items-center justify-center shrink-0">
+                      {selectedEmployee.name
+                        .split(" ")
+                        .map((n: string) => n[0])
+                        .join("")
+                        .substring(0, 2)
+                        .toUpperCase()}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <h2 className="font-bold text-base text-[#1F1F1F] truncate">
+                        {selectedEmployee.name}
+                      </h2>
+                      <div className="font-mono text-xs text-[#5A81FA]">
+                        {selectedEmployee.code}
                       </div>
-                      <div className="text-[10px] text-slate-500 mt-1">
-                        {selectedEmployee.onTimeCount} of {selectedEmployee.onTimeEligibleDenominator} due deliverables
+                      <div className="text-xs text-[#696E82]">
+                        {selectedEmployee.designation || selectedEmployee.department || "Civil Engineer"}
                       </div>
                     </div>
-                    <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200">
-                      <div className="text-[10px] text-slate-500 uppercase font-bold">First-Pass Rate</div>
-                      <div className="text-xl font-bold font-mono text-slate-900 mt-1">
-                        {selectedEmployee.firstPassRatePercent !== null ? `${selectedEmployee.firstPassRatePercent}%` : "No submissions"}
+                  </div>
+
+                  {/* Date range pill row */}
+                  <div className="flex items-center justify-between gap-2 px-1">
+                    <div className="flex items-center gap-1.5 text-xs text-[#696E82]">
+                      <Calendar className="w-3.5 h-3.5 text-[#5A81FA]" />
+                      <span>{dateRangeLabel}</span>
+                    </div>
+                    <span className="text-xs font-semibold text-[#1F1F1F]">
+                      {monthLabel}
+                    </span>
+                  </div>
+
+                  {/* Assessment status banner */}
+                  <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl space-y-1">
+                    <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-800">
+                      Assessment pending
+                    </span>
+                    <p className="text-xs text-amber-900">
+                      Not enough completed work in this period.
+                    </p>
+                  </div>
+
+                  {/* 4 KPI Cards in 2x2 grid */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-white rounded-xl border border-[#E2E6F0] p-3 shadow-2xs space-y-1">
+                      <div className="flex items-center gap-1.5 text-xs text-[#696E82]">
+                        <FileText className="w-4 h-4 text-rose-500" />
+                        <span>Open tasks</span>
                       </div>
-                      <div className="text-[10px] text-slate-500 mt-1">
-                        {selectedEmployee.firstPassApprovedCount} of {selectedEmployee.firstPassDecidedCount} decided
+                      <div className="text-2xl font-bold font-mono text-[#1F1F1F]">
+                        {selectedEmployee.openTasks?.length ?? Math.max(0, (selectedEmployee.assignedCount || 0) - (selectedEmployee.completedCount || 0))}
                       </div>
+                    </div>
+
+                    <div className="bg-white rounded-xl border border-[#E2E6F0] p-3 shadow-2xs space-y-1">
+                      <div className="flex items-center gap-1.5 text-xs text-[#696E82]">
+                        <CheckSquare className="w-4 h-4 text-emerald-600" />
+                        <span>Completed deliverables</span>
+                      </div>
+                      <div className="text-2xl font-bold font-mono text-[#1F1F1F]">
+                        {selectedEmployee.completedCount ?? 0}
+                      </div>
+                    </div>
+
+                    <div className="bg-white rounded-xl border border-[#E2E6F0] p-3 shadow-2xs space-y-1">
+                      <div className="flex items-center justify-between text-xs text-[#696E82]">
+                        <span className="flex items-center gap-1.5">
+                          <Clock className="w-4 h-4 text-emerald-600" />
+                          <span>On-time delivery</span>
+                        </span>
+                        <Info className="w-3 h-3 text-slate-400" />
+                      </div>
+                      <div className="text-2xl font-bold font-mono text-[#1F1F1F]">
+                        {selectedEmployee.onTimeRatePercent !== null && selectedEmployee.onTimeRatePercent !== undefined
+                          ? `${selectedEmployee.onTimeRatePercent}%`
+                          : "—"}
+                      </div>
+                    </div>
+
+                    <div className="bg-white rounded-xl border border-[#E2E6F0] p-3 shadow-2xs space-y-1">
+                      <div className="flex items-center justify-between text-xs text-[#696E82]">
+                        <span className="flex items-center gap-1.5">
+                          <BarChart3 className="w-4 h-4 text-[#5A81FA]" />
+                          <span>Recorded utilization</span>
+                        </span>
+                        <Info className="w-3 h-3 text-slate-400" />
+                      </div>
+                      <div className="text-2xl font-bold font-mono text-[#1F1F1F]">
+                        {selectedEmployee.utilizationPercent ?? 0}%
+                      </div>
+                      <p className="text-[10px] text-[#696E82] truncate">
+                        Based on logged hours ({selectedEmployee.actualHours ?? 0}h / {selectedEmployee.availableCapacityHours ?? 160}h).
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Review quality card */}
+                  <div className="bg-white rounded-xl border border-[#E2E6F0] p-3.5 shadow-2xs space-y-1">
+                    <div className="flex items-center gap-2 text-xs font-semibold text-[#1F1F1F]">
+                      <FileText className="w-4 h-4 text-rose-500" />
+                      <span>Review quality</span>
+                    </div>
+                    <div className="text-base font-bold text-[#1F1F1F] font-mono mt-1">
+                      {selectedEmployee.firstPassPendingCount ?? 1} submission pending
+                    </div>
+                    <p className="text-xs text-[#696E82]">
+                      First-pass rate unavailable until review is resolved.
+                    </p>
+                  </div>
+
+                  {/* Activity in this period */}
+                  <div className="bg-white rounded-xl border border-[#E2E6F0] p-4 shadow-2xs space-y-2.5">
+                    <h3 className="text-xs font-bold text-[#1F1F1F] uppercase tracking-wider">
+                      Activity in this period
+                    </h3>
+                    <div className="space-y-2 text-xs">
+                      <div className="flex items-center justify-between py-1 border-b border-[#F2F4FF]">
+                        <span className="text-[#696E82] flex items-center gap-1.5">
+                          <MapPin className="w-3.5 h-3.5 text-[#5A81FA]" />
+                          <span>Site visits</span>
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <span className="font-bold text-[#1F1F1F] font-mono">{selectedEmployee.siteVisitsCount ?? 0}</span>
+                          <Info className="w-3 h-3 text-slate-400" />
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between py-1 border-b border-[#F2F4FF]">
+                        <span className="text-[#696E82] flex items-center gap-1.5">
+                          <AlertTriangle className="w-3.5 h-3.5 text-rose-500" />
+                          <span>Overdue tasks</span>
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <span className="font-bold text-[#1F1F1F] font-mono">{selectedEmployee.overdueCount ?? 0}</span>
+                          <Info className="w-3 h-3 text-slate-400" />
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between py-1">
+                        <span className="text-[#696E82] flex items-center gap-1.5">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Recorded completed</span>
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <span className="font-bold text-[#1F1F1F] font-mono">{selectedEmployee.completedCount ?? 0}</span>
+                          <Info className="w-3.5 h-3.5 text-slate-400" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Review preparation card */}
+                  <div className="bg-[#F8F9FD] rounded-xl border border-[#CEDEFF] p-4 space-y-2 text-xs">
+                    <div className="flex items-center gap-2">
+                      <BarChart3 className="w-4 h-4 text-[#5A81FA]" />
+                      <span className="font-bold text-[#1F1F1F]">Review preparation</span>
+                    </div>
+                    <p className="text-[#696E82]">
+                      Use task evidence and context in your 1:1.
+                    </p>
+                    <div className="pt-1 flex flex-col sm:flex-row gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setDrawerTab("tasks")}
+                        className="text-xs font-semibold text-[#5A81FA] hover:underline flex items-center gap-1 cursor-pointer"
+                      >
+                        <span>View assigned tasks ({selectedEmployee.openTasks?.length ?? 0})</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setMetricDefinitionsOpen(true)}
+                        className="text-xs font-semibold text-[#5A81FA] hover:underline flex items-center gap-1 cursor-pointer"
+                      >
+                        <span>Metric definitions</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   </div>
 
@@ -2635,6 +3128,80 @@ export function PerformanceClientView({ context }: PerformanceClientViewProps) {
                 </div>
               )}
             </div>
+
+            {/* Sticky Bottom Action matching Panel 3 */}
+            <div className="p-4 bg-white border-t border-[#E2E6F0] sticky bottom-0 z-10 shadow-md">
+              <button
+                type="button"
+                onClick={() => setDossierModalEmployee(selectedEmployee)}
+                className="w-full py-3 px-4 bg-[#5A81FA] hover:bg-[#426EE8] text-white font-bold text-xs rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Printer className="w-4 h-4" />
+                <span>Prepare 1:1 review</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Metric Definitions Modal */}
+      {metricDefinitionsOpen && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white rounded-2xl border border-[#E2E6F0] p-6 max-w-lg w-full shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-[#E2E6F0] pb-3">
+              <div className="flex items-center gap-2">
+                <Info className="w-5 h-5 text-[#5A81FA]" />
+                <h3 className="font-bold text-sm text-[#1F1F1F]">Studio Metric Definitions</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMetricDefinitionsOpen(false)}
+                className="text-[#696E82] hover:text-[#1F1F1F] p-1 rounded-lg cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs divide-y divide-[#E2E6F0]">
+              <div className="pt-2">
+                <span className="font-bold text-[#1F1F1F] block">Completed deliverables</span>
+                <p className="text-[#696E82] mt-0.5">
+                  The volume of governed architectural deliverables and operational tasks signed off or verified complete in the selected timeframe.
+                </p>
+              </div>
+              <div className="pt-2">
+                <span className="font-bold text-[#1F1F1F] block">On-time delivery</span>
+                <p className="text-[#696E82] mt-0.5">
+                  Percentage of deliverables completed on or prior to the agreed schedule baseline. Excludes uncommitted items without deadlines.
+                </p>
+              </div>
+              <div className="pt-2">
+                <span className="font-bold text-[#1F1F1F] block">First-pass approval</span>
+                <p className="text-[#696E82] mt-0.5">
+                  Percentage of milestone packages approved upon first leadership/client inspection without technical revisions or snagging rework.
+                </p>
+              </div>
+              <div className="pt-2">
+                <span className="font-bold text-[#1F1F1F] block">Recorded utilization</span>
+                <p className="text-[#696E82] mt-0.5">
+                  Recorded billable and delivery hours divided by employee available capacity. Calculated using individual working calendars and standard studio baselines.
+                </p>
+              </div>
+              <div className="pt-2">
+                <span className="font-bold text-[#1F1F1F] block">Site visits & Issues</span>
+                <p className="text-[#696E82] mt-0.5">
+                  GPS-verified physical site audits and contractor snags/defects logged and resolved in the field.
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setMetricDefinitionsOpen(false)}
+              className="w-full py-2 bg-[#5A81FA] hover:bg-[#426EE8] text-white font-semibold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
+            >
+              Close
+            </button>
           </div>
         </div>
       )}

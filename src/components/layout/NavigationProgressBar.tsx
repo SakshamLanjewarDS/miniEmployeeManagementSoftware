@@ -103,6 +103,10 @@ export function NavigationProgressBar() {
     let prefetchTimeout: NodeJS.Timeout | null = null;
 
     const handlePrefetch = (e: Event) => {
+      // In development mode, programmatic hover prefetch triggers full server compiles on the fly,
+      // creating an enormous compiler queue that slows down the entire application.
+      if (process.env.NODE_ENV === "development") return;
+
       const target = e.target as HTMLElement | null;
       const anchor = target?.closest("a");
       if (!anchor) return;
@@ -123,7 +127,7 @@ export function NavigationProgressBar() {
           } catch {
             // Ignore prefetch errors
           }
-        }, 80);
+        }, 150);
       }
     };
 

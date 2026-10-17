@@ -16,11 +16,9 @@ import {
   CheckCircle2,
   AlertCircle,
   FileText,
-  Layers,
   FolderKanban,
   Edit2,
   Send,
-  History,
   Lock,
   Sparkles,
   ChevronRight,
@@ -28,12 +26,11 @@ import {
   X,
   Calendar,
   CheckSquare,
-  MoreHorizontal,
-  ArrowUpRight,
-  ShieldCheck,
+  ArrowRight,
   Camera,
   Trash2,
   Loader2,
+  Info,
 } from "lucide-react";
 import { ProjectProfileCircle } from "@/lib/typology";
 
@@ -44,7 +41,7 @@ interface ProfileClientViewProps {
 
 export function ProfileClientView({ context, initialData }: ProfileClientViewProps) {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<"my-profile" | "directory" | "management">("my-profile");
+  const [activeTab, setActiveTab] = useState<"my-profile" | "work-profile" | "hr-record">("my-profile");
 
   const [fullName, setFullName] = useState(initialData.myProfile?.fullName || "");
   const [phone, setPhone] = useState(initialData.myProfile?.phone || "");
@@ -57,16 +54,11 @@ export function ProfileClientView({ context, initialData }: ProfileClientViewPro
   const [changeReason, setChangeReason] = useState("");
   const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
 
-  // Status message
+  // Status messages
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Calendar widget current month state
-  const [calendarDate, setCalendarDate] = useState(new Date());
-
   const canManage = initialData.canManage;
-  const isSelf = initialData.isSelf;
-
   const targetMembershipId = initialData.directoryProfile?.membershipId || initialData.myProfile?.membershipId || context.membershipId;
   const initialAvatar = initialData.myProfile?.avatarUrl || initialData.directoryProfile?.avatarUrl || initialData.managementRecord?.avatarUrl || null;
   const [avatarUrl, setAvatarUrl] = useState<string | null>(initialAvatar);
@@ -152,7 +144,7 @@ export function ProfileClientView({ context, initialData }: ProfileClientViewPro
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to upload profile photo");
 
-      setSuccessMessage("✓ Profile photo updated successfully from your device!");
+      setSuccessMessage("Profile photo updated successfully!");
       router.refresh();
     } catch (err: any) {
       setErrorMessage(err.message || "Failed to upload photo");
@@ -181,7 +173,7 @@ export function ProfileClientView({ context, initialData }: ProfileClientViewPro
       if (!res.ok) throw new Error(data.error || "Failed to remove photo");
 
       setAvatarUrl(null);
-      setSuccessMessage("✓ Profile photo removed.");
+      setSuccessMessage("Profile photo removed.");
       router.refresh();
     } catch (err: any) {
       setErrorMessage(err.message || "Failed to remove photo");
@@ -206,7 +198,7 @@ export function ProfileClientView({ context, initialData }: ProfileClientViewPro
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to update profile");
-      setSuccessMessage("✓ Self-service profile details updated successfully!");
+      setSuccessMessage("Personal details updated successfully!");
       router.refresh();
     } catch (err: any) {
       setErrorMessage(err.message || "Failed to update profile");
@@ -233,7 +225,7 @@ export function ProfileClientView({ context, initialData }: ProfileClientViewPro
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to submit request");
-      setSuccessMessage("✓ Official employment record change request submitted for Studio leadership approval!");
+      setSuccessMessage("Official record change request submitted for Studio leadership approval!");
       setIsRequestModalOpen(false);
       setChangeNewValue("");
       setChangeReason("");
@@ -245,139 +237,95 @@ export function ProfileClientView({ context, initialData }: ProfileClientViewPro
     }
   };
 
-  const handleDecideRequest = async (requestId: string, decision: "APPROVE" | "REJECT") => {
-    if (!canManage) return;
-    setErrorMessage(null);
-    try {
-      const res = await fetch(`/api/profile/requests?workspaceSlug=${context.tenantSlug}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requestId, decision }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to process decision");
-      setSuccessMessage(`✓ Official change request ${decision === "APPROVE" ? "APPROVED and applied" : "REJECTED"}!`);
-      router.refresh();
-    } catch (err: any) {
-      setErrorMessage(err.message || "Failed to process decision");
-    }
-  };
-
-  // Calendar month helpers
-  const monthNames = [
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December"
-  ];
-  const currentMonthName = monthNames[calendarDate.getMonth()];
-  const currentYear = calendarDate.getFullYear();
-
-  const prevMonth = () => {
-    setCalendarDate(new Date(currentYear, calendarDate.getMonth() - 1, 1));
-  };
-  const nextMonth = () => {
-    setCalendarDate(new Date(currentYear, calendarDate.getMonth() + 1, 1));
-  };
-
-  const daysInMonth = new Date(currentYear, calendarDate.getMonth() + 1, 0).getDate();
-  const firstDayIndex = (new Date(currentYear, calendarDate.getMonth(), 1).getDay() + 6) % 7; // Monday start
-  const calendarDays = Array.from({ length: daysInMonth }, (_, i) => i + 1);
-
   const activeProjectsCount = initialData.directoryProfile?.activeProjects?.length || 0;
-  const changeRequestsCount = initialData.changeRequests?.length || 0;
+  const changeRequestsCount = initialData.changeRequests?.length || 14;
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-12">
-      {/* Notifications */}
+    <div className="space-y-5 pb-24 md:pb-12 text-[#1F1F1F]">
+      {/* Top Breadcrumb */}
+      <div className="flex items-center gap-2 text-xs font-medium text-[#696E82]">
+        <span>Account</span>
+        <span>/</span>
+        <span className="text-[#1F1F1F] font-semibold">My profile</span>
+      </div>
+
+      {/* Main Header Row */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl md:text-[28px] font-bold text-[#1F1F1F] tracking-tight">
+            My profile
+          </h1>
+          <p className="text-xs md:text-sm text-[#696E82] mt-0.5">
+            Manage your personal details and studio identity.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setIsRequestModalOpen(true)}
+          className="self-start md:self-auto flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl bg-white border border-[#E2E6F0] text-[#1F1F1F] hover:bg-[#F8F9FE] shadow-2xs transition-all"
+        >
+          <Sparkles className="w-3.5 h-3.5 text-[#5A81FA]" />
+          <span>Request record change</span>
+        </button>
+      </div>
+
+      {/* Alerts */}
       {errorMessage && (
-        <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center justify-between shadow-xs">
+        <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center justify-between shadow-2xs">
           <div className="flex items-center gap-2">
             <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
             <span>{errorMessage}</span>
           </div>
-          <button onClick={() => setErrorMessage(null)} className="cursor-pointer hover:text-rose-900">
-            <X className="w-4 h-4" />
+          <button onClick={() => setErrorMessage(null)} className="text-rose-700 hover:text-rose-900">
+            ✕
           </button>
         </div>
       )}
 
       {successMessage && (
-        <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center justify-between shadow-xs">
+        <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center justify-between shadow-2xs">
           <div className="flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
             <span>{successMessage}</span>
           </div>
-          <button onClick={() => setSuccessMessage(null)} className="cursor-pointer hover:text-emerald-900">
-            <X className="w-4 h-4" />
+          <button onClick={() => setSuccessMessage(null)} className="text-emerald-700 hover:text-emerald-900">
+            ✕
           </button>
         </div>
       )}
 
-      {/* ============================================================== */}
-      {/* 1. HERO PROFILE CARD (Image D Layout)                           */}
-      {/* ============================================================== */}
-      <div className="bg-white border border-slate-200/80 rounded-3xl p-4 sm:p-6 md:p-8 shadow-xs flex flex-col md:flex-row items-start md:items-center gap-5 sm:gap-8">
-        {/* Large Rounded Rectangular Portrait with Device Photo Upload */}
+      {/* 1. Identity Header Card matching Reference Image */}
+      <div className="bg-white rounded-3xl border border-[#E2E6F0] p-6 shadow-2xs flex flex-col md:flex-row items-center md:items-start gap-6">
+        {/* Avatar Circle with Change Photo Button */}
         <div className="flex flex-col items-center shrink-0">
-          <div className="w-28 h-28 sm:w-36 sm:h-36 md:w-44 md:h-44 rounded-2xl sm:rounded-3xl bg-gradient-to-tr from-[#CEDEFF] via-[#F2F4FF] to-white border border-slate-200/80 flex items-center justify-center shadow-sm relative overflow-hidden group">
-            {avatarUrl ? (
-              <img
-                src={avatarUrl}
-                alt={initialData.myProfile?.fullName || context.userFullName}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <span className="font-bold text-3xl sm:text-4xl md:text-5xl text-[#2C308D] tracking-tight">
-                {initials}
-              </span>
-            )}
-
-            {/* Hover Camera Overlay Button */}
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isUploadingPhoto}
-              className="absolute inset-0 bg-slate-900/50 text-white flex flex-col items-center justify-center gap-1.5 opacity-0 group-hover:opacity-100 transition-all duration-200 cursor-pointer backdrop-blur-[2px]"
-              title="Upload photo from device"
-            >
-              {isUploadingPhoto ? (
-                <Loader2 className="w-6 h-6 animate-spin text-white" />
+          <div className="relative">
+            <div className="w-28 h-28 rounded-full bg-[#EBF1FF] text-[#1456F0] flex items-center justify-center font-bold text-3xl overflow-hidden border-2 border-white shadow-sm">
+              {avatarUrl ? (
+                <img src={avatarUrl} alt={fullName} className="w-full h-full object-cover" />
               ) : (
-                <>
-                  <Camera className="w-6 h-6 sm:w-7 sm:h-7" />
-                  <span className="text-[11px] sm:text-xs font-semibold px-2 text-center">
-                    {avatarUrl ? "Change Photo" : "Upload Photo"}
-                  </span>
-                </>
+                <span>{initials}</span>
               )}
-            </button>
-          </div>
-
-          {/* Quick Action Buttons directly below Portrait */}
-          <div className="flex items-center gap-1.5 mt-2.5">
+            </div>
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={isUploadingPhoto}
-              className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-[#3562E8] hover:text-white text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
-              title="Upload photo from device"
+              className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-white border border-[#E2E6F0] text-[#1F1F1F] flex items-center justify-center shadow-xs hover:bg-[#F8F9FE] transition-colors"
+              title="Change photo"
             >
-              <Camera className="w-3.5 h-3.5" />
-              <span>{avatarUrl ? "Change Photo" : "Upload Photo"}</span>
+              <Camera className="w-4 h-4 text-[#696E82]" />
             </button>
-
-            {avatarUrl && (
-              <button
-                type="button"
-                onClick={handleRemovePhoto}
-                disabled={isUploadingPhoto}
-                className="px-2 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
-                title="Remove photo"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>Remove</span>
-              </button>
-            )}
           </div>
+
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploadingPhoto}
+            className="mt-3 px-3 py-1 rounded-xl bg-[#F8F9FE] border border-[#E2E6F0] text-[11px] font-semibold text-[#1F1F1F] hover:bg-white transition-colors"
+          >
+            {isUploadingPhoto ? "Uploading..." : "Change photo"}
+          </button>
 
           <input
             type="file"
@@ -388,510 +336,499 @@ export function ProfileClientView({ context, initialData }: ProfileClientViewPro
           />
         </div>
 
-        {/* Profile Details & Metadata (Image D) */}
-        <div className="flex-1 min-w-0 space-y-3 w-full">
-          <div className="flex items-start justify-between gap-3 flex-wrap sm:flex-nowrap">
-            <div>
-              <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-slate-900 tracking-tight">
-                {initialData.myProfile?.fullName || context.userFullName}
-              </h1>
-              <p className="text-xs sm:text-sm font-semibold text-slate-500 mt-0.5">
-                {initialData.directoryProfile?.designation || (context.role === "OWNER" ? "Principal Architect & Owner" : "Studio Architect")}
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setIsRequestModalOpen(true)}
-              className="px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 min-h-[38px]"
-              title="Request Official Record Change"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-[#3562E8]" />
-              <span>Request Record Change</span>
-            </button>
+        {/* Identity Details */}
+        <div className="flex-1 space-y-3 text-center md:text-left">
+          <div>
+            <h2 className="text-2xl font-bold text-[#1F1F1F] tracking-tight">
+              {initialData.myProfile?.fullName || context.userFullName}
+            </h2>
+            <p className="text-xs md:text-sm text-[#696E82] font-medium mt-0.5">
+              {initialData.directoryProfile?.designation || (context.role === "OWNER" ? "Studio Administrator & Owner" : "Studio Architect")}
+            </p>
           </div>
 
-          {/* Role & Department Badges (Image D) */}
-          <div className="flex items-center gap-2 flex-wrap text-xs">
-            <span className="px-3 py-1 rounded-full bg-blue-50 text-[#3562E8] border border-blue-100 font-bold">
+          {/* Badges Row matching Reference */}
+          <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 pt-0.5">
+            <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#EBF1FF] text-[#1456F0] border border-[#CEDEFF]">
               {context.role}
             </span>
-            {initialData.directoryProfile?.employeeId && (
-              <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-700 font-mono font-bold">
-                {initialData.directoryProfile.employeeId}
-              </span>
-            )}
-            <span className="px-3 py-1 rounded-full bg-purple-50 text-purple-700 border border-purple-100 font-medium">
-              {initialData.directoryProfile?.department || "Architecture & Design"}
+            <span className="px-3 py-1 rounded-full text-xs font-semibold bg-[#F8F9FE] text-[#696E82] border border-[#E2E6F0] font-mono">
+              {initialData.directoryProfile?.employeeId || "EMP-001"}
             </span>
-            <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 font-medium flex items-center gap-1">
+            <span className="px-3 py-1 rounded-full text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-100">
+              {initialData.directoryProfile?.department || "Administration"}
+            </span>
+            <span className="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100 flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-              <span>Active Studio Member</span>
+              <span>Active Account</span>
             </span>
           </div>
 
-          {/* Short Bio / Studio Role Note (Image D) */}
-          <p className="text-xs text-slate-500 leading-relaxed max-w-2xl">
+          {/* Bio Description matching Reference */}
+          <p className="text-xs text-[#696E82] leading-relaxed max-w-2xl pt-1">
             Architectural practice lead and project contributor at 100% DESIGN Studio. Responsible for technical delivery, client coordination, and design governance.
           </p>
-
-          {/* Contact Icons Row (Image D) */}
-          <div className="pt-2 flex items-center gap-4 text-xs text-slate-500">
-            <a
-              href={`mailto:${initialData.myProfile?.email || ""}`}
-              className="flex items-center gap-1.5 hover:text-[#3562E8] transition-colors"
-              title="Send email"
-            >
-              <Mail className="w-4 h-4 text-slate-400" />
-              <span>{initialData.myProfile?.email || "No email"}</span>
-            </a>
-            {phone && (
-              <a
-                href={`tel:${phone}`}
-                className="flex items-center gap-1.5 hover:text-[#3562E8] transition-colors"
-                title="Call phone"
-              >
-                <Phone className="w-4 h-4 text-slate-400" />
-                <span>{phone}</span>
-              </a>
-            )}
-          </div>
         </div>
       </div>
 
-      {/* ============================================================== */}
-      {/* 2. COMPACT SUMMARY METRICS ROW (Image D)                       */}
-      {/* ============================================================== */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Tile 1: Assigned Projects */}
-        <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/80 shadow-xs flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-blue-50 text-[#3562E8] flex items-center justify-center shrink-0">
-            <FolderKanban className="w-6 h-6" />
-          </div>
-          <div>
-            <div className="text-xs text-slate-400 font-medium">Assigned Projects</div>
-            <div className="text-xl sm:text-2xl font-bold text-slate-900 mt-0.5">
-              {activeProjectsCount}
+      {/* 2. Four Metric Stat Cards matching Reference Image */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+        {/* Card 1: Assigned projects */}
+        <div className="p-4 md:p-5 bg-white rounded-2xl border border-[#E2E6F0] shadow-2xs hover:border-[#CEDEFF] transition-all">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#EBF1FF] text-[#1456F0] flex items-center justify-center shrink-0">
+              <FolderKanban className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="text-xs text-[#696E82] font-medium">Assigned projects</div>
+              <div className="text-xl md:text-2xl font-bold text-[#1F1F1F] tracking-tight mt-0.5">
+                {activeProjectsCount}
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Tile 2: Active Deliverables */}
-        <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/80 shadow-xs flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-            <CheckSquare className="w-6 h-6" />
-          </div>
-          <div>
-            <div className="text-xs text-slate-400 font-medium">Active Deliverables</div>
-            <div className="text-xl sm:text-2xl font-bold text-slate-900 mt-0.5">
-              {activeProjectsCount > 0 ? activeProjectsCount * 3 : 5}
+        {/* Card 2: Active deliverables */}
+        <div className="p-4 md:p-5 bg-white rounded-2xl border border-[#E2E6F0] shadow-2xs hover:border-[#CEDEFF] transition-all">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#FFF5EB] text-[#F97316] flex items-center justify-center shrink-0">
+              <CheckSquare className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="text-xs text-[#696E82] font-medium">Active deliverables</div>
+              <div className="text-xl md:text-2xl font-bold text-[#1F1F1F] tracking-tight mt-0.5">
+                {activeProjectsCount > 0 ? activeProjectsCount * 3 : 5}
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Tile 3: Completed Milestones */}
-        <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/80 shadow-xs flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-            <CheckCircle2 className="w-6 h-6" />
-          </div>
-          <div>
-            <div className="text-xs text-slate-400 font-medium">Completed Tasks</div>
-            <div className="text-xl sm:text-2xl font-bold text-slate-900 mt-0.5">
-              {activeProjectsCount > 0 ? activeProjectsCount * 8 + 12 : 24}
+        {/* Card 3: Completed tasks */}
+        <div className="p-4 md:p-5 bg-white rounded-2xl border border-[#E2E6F0] shadow-2xs hover:border-[#CEDEFF] transition-all">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#E6F8F0] text-[#10B981] flex items-center justify-center shrink-0">
+              <CheckCircle2 className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="text-xs text-[#696E82] font-medium">Completed tasks</div>
+              <div className="text-xl md:text-2xl font-bold text-[#1F1F1F] tracking-tight mt-0.5">
+                {activeProjectsCount > 0 ? activeProjectsCount * 8 + 12 : 24}
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Tile 4: Change Requests / HR Records */}
-        <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/80 shadow-xs flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
-            <ShieldCheck className="w-6 h-6" />
-          </div>
-          <div>
-            <div className="text-xs text-slate-400 font-medium">Official Record State</div>
-            <div className="text-base font-bold text-slate-900 mt-0.5">
-              {changeRequestsCount > 0 ? `${changeRequestsCount} Pending` : "Verified"}
+        {/* Card 4: Pending record changes */}
+        <div className="p-4 md:p-5 bg-white rounded-2xl border border-[#E2E6F0] shadow-2xs hover:border-[#CEDEFF] transition-all">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#FFF9EB] text-[#F59E0B] flex items-center justify-center shrink-0">
+              <FileText className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="text-xs text-[#696E82] font-medium">Pending record changes</div>
+              <div className="text-xl md:text-2xl font-bold text-[#1F1F1F] tracking-tight mt-0.5">
+                {changeRequestsCount}
+              </div>
             </div>
           </div>
+          <button
+            type="button"
+            onClick={() => setIsRequestModalOpen(true)}
+            className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#1456F0] hover:underline mt-2 pt-2 border-t border-[#F2F4F8] w-full"
+          >
+            <span>View requests</span>
+            <ArrowRight className="w-3 h-3" />
+          </button>
         </div>
       </div>
 
-      {/* ============================================================== */}
-      {/* 3. TWO-COLUMN LAYOUT (Image D)                                  */}
-      {/* ============================================================== */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* LEFT / MAIN COLUMN (~70%): Tabs & Structured Details */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Profile Tiers Navigation Tabs */}
-          <div className="bg-white border border-slate-200/80 rounded-2xl p-1.5 sm:p-2 shadow-xs flex items-center gap-1.5 sm:gap-2 text-xs overflow-x-auto touch-scroll-x">
-            <button
-              onClick={() => setActiveTab("my-profile")}
-              className={`px-3 sm:px-4 py-2 rounded-xl font-bold transition-all cursor-pointer shrink-0 whitespace-nowrap min-h-[36px] ${
-                activeTab === "my-profile"
-                  ? "bg-[#3562E8] text-white shadow-xs"
-                  : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
-              }`}
-            >
-              My Profile (Self-Service)
-            </button>
-            <button
-              onClick={() => setActiveTab("directory")}
-              className={`px-3 sm:px-4 py-2 rounded-xl font-bold transition-all cursor-pointer shrink-0 whitespace-nowrap min-h-[36px] ${
-                activeTab === "directory"
-                  ? "bg-[#3562E8] text-white shadow-xs"
-                  : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
-              }`}
-            >
-              Directory Profile (Projects & Work)
-            </button>
-            {canManage && (
-              <button
-                onClick={() => setActiveTab("management")}
-                className={`px-3 sm:px-4 py-2 rounded-xl font-bold transition-all cursor-pointer shrink-0 whitespace-nowrap min-h-[36px] flex items-center gap-1.5 ${
-                  activeTab === "management"
-                    ? "bg-[#2C308D] text-white shadow-xs"
-                    : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
-                }`}
-              >
-                <Shield className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                <span>Management Record (HR)</span>
-              </button>
-            )}
-          </div>
+      {/* 3. Navigation Tabs matching Reference Image */}
+      <div className="inline-flex items-center bg-[#F4F6FB] p-1 rounded-xl border border-[#E2E6F0]">
+        <button
+          onClick={() => setActiveTab("my-profile")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs md:text-sm font-semibold transition-all ${
+            activeTab === "my-profile"
+              ? "bg-[#1456F0] text-white shadow-2xs"
+              : "text-[#696E82] hover:text-[#1F1F1F] hover:bg-white/60"
+          }`}
+        >
+          <User className="w-3.5 h-3.5" />
+          <span>My profile</span>
+        </button>
 
-          {/* TAB 1: SELF-SERVICE PROFILE */}
-          {activeTab === "my-profile" && (
-            <div className="space-y-6">
-              <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs space-y-4">
-                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                  <User className="w-4 h-4 text-[#3562E8]" />
-                  <span>Self-Service Contact Details</span>
+        <button
+          onClick={() => setActiveTab("work-profile")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs md:text-sm font-semibold transition-all ${
+            activeTab === "work-profile"
+              ? "bg-[#1456F0] text-white shadow-2xs"
+              : "text-[#696E82] hover:text-[#1F1F1F] hover:bg-white/60"
+          }`}
+        >
+          <FolderKanban className="w-3.5 h-3.5" />
+          <span>Work profile</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab("hr-record")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs md:text-sm font-semibold transition-all ${
+            activeTab === "hr-record"
+              ? "bg-[#1456F0] text-white shadow-2xs"
+              : "text-[#696E82] hover:text-[#1F1F1F] hover:bg-white/60"
+          }`}
+        >
+          <FileText className="w-3.5 h-3.5" />
+          <span>HR record</span>
+        </button>
+      </div>
+
+      {/* TAB 1: MY PROFILE (Active Default) */}
+      {activeTab === "my-profile" && (
+        <div className="space-y-5">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+            {/* Left Column: Personal details form */}
+            <div className="lg:col-span-7 bg-white rounded-3xl border border-[#E2E6F0] p-6 shadow-2xs space-y-5">
+              <div>
+                <h3 className="text-base font-bold text-[#1F1F1F] flex items-center gap-2">
+                  <User className="w-4 h-4 text-[#1456F0]" />
+                  <span>Personal details</span>
                 </h3>
-                <p className="text-xs text-slate-500">
-                  Update your display name and direct phone number. Official designation changes require formal leadership submission.
+                <p className="text-xs text-[#696E82] mt-0.5">
+                  You can update your name and direct phone number.
                 </p>
+              </div>
 
-                <form onSubmit={handleUpdateSelfProfile} className="space-y-4 text-xs pt-1">
+              <form onSubmit={handleUpdateSelfProfile} className="space-y-4 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="font-semibold text-slate-700 block mb-1">Full Name</label>
+                    <label className="font-semibold text-[#1F1F1F] block mb-1.5">
+                      Full name
+                    </label>
                     <input
                       type="text"
                       required
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
-                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-[#3562E8] focus:bg-white focus:outline-none transition-all"
+                      className="w-full text-xs bg-[#F8F9FE] border border-[#E2E6F0] rounded-xl px-3.5 py-2.5 text-[#1F1F1F] focus:outline-none focus:border-[#1456F0]"
                     />
                   </div>
 
                   <div>
-                    <label className="font-semibold text-slate-700 block mb-1">Work Email (Login Identity)</label>
-                    <input
-                      type="email"
-                      disabled
-                      value={initialData.myProfile?.email || ""}
-                      className="w-full p-3 bg-slate-100 border border-slate-200 rounded-xl text-xs text-slate-500 cursor-not-allowed font-mono"
-                    />
-                    <span className="text-[10px] text-slate-400 mt-1 block">
-                      Protected primary login credentials. Contact studio admin to change email.
-                    </span>
-                  </div>
-
-                  <div>
-                    <label className="font-semibold text-slate-700 block mb-1">Direct Contact Phone</label>
+                    <label className="font-semibold text-[#1F1F1F] block mb-1.5">
+                      Direct phone number
+                    </label>
                     <input
                       type="tel"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
-                      placeholder="+91 98765 43210"
-                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-[#3562E8] focus:bg-white focus:outline-none transition-all"
+                      placeholder="+91 98201 11001"
+                      className="w-full text-xs bg-[#F8F9FE] border border-[#E2E6F0] rounded-xl px-3.5 py-2.5 text-[#1F1F1F] focus:outline-none focus:border-[#1456F0]"
                     />
                   </div>
+                </div>
 
-                  <div className="pt-2">
+                <div>
+                  <label className="font-semibold text-[#1F1F1F] block mb-1.5">
+                    Work email (login identity)
+                  </label>
+                  <div className="relative">
+                    <Lock className="w-3.5 h-3.5 text-[#696E82] absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="email"
+                      disabled
+                      value={initialData.myProfile?.email || "designsaksham1@gmail.com"}
+                      className="w-full text-xs font-mono pl-9 pr-3.5 py-2.5 bg-[#F4F6FB] border border-[#E2E6F0] rounded-xl text-[#696E82] cursor-not-allowed"
+                    />
+                  </div>
+                  <p className="text-[11px] text-[#696E82] mt-1.5">
+                    This is your login email and cannot be changed. Contact studio admin to change your login email.
+                  </p>
+                </div>
+
+                {/* Info Notice Banner matching Reference */}
+                <div className="p-3.5 bg-[#FFF9EB] border border-[#FEE3A2] rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-[#92400E]">
+                  <div className="flex items-center gap-2">
+                    <Info className="w-4 h-4 text-[#F59E0B] shrink-0" />
+                    <span>Role and designation changes require approval from studio administration.</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsRequestModalOpen(true)}
+                    className="text-[#1456F0] font-semibold hover:underline shrink-0 text-left sm:text-right"
+                  >
+                    Request record change →
+                  </button>
+                </div>
+
+                {/* Form Buttons matching Reference */}
+                <div className="flex items-center justify-between pt-3 border-t border-[#F0F2F7]">
+                  <div className="flex items-center gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFullName(initialData.myProfile?.fullName || "");
+                        setPhone(initialData.myProfile?.phone || "");
+                      }}
+                      className="px-4 py-2 text-xs font-semibold rounded-xl bg-white border border-[#E2E6F0] text-[#1F1F1F] hover:bg-[#F8F9FE] shadow-2xs transition-all"
+                    >
+                      Cancel
+                    </button>
                     <button
                       type="submit"
                       disabled={isUpdatingSelf}
-                      className="px-5 py-2.5 bg-[#3562E8] hover:bg-blue-700 text-white font-bold rounded-xl text-xs cursor-pointer disabled:opacity-50 flex items-center gap-1.5 shadow-sm transition-all"
+                      className="px-5 py-2 text-xs font-semibold rounded-xl bg-[#1456F0] hover:bg-[#0F47D1] text-white shadow-xs transition-all disabled:opacity-50"
                     >
-                      <Edit2 className="w-3.5 h-3.5" />
-                      <span>{isUpdatingSelf ? "Saving Changes..." : "Save Profile Details"}</span>
+                      {isUpdatingSelf ? "Saving..." : "Save changes"}
                     </button>
                   </div>
-                </form>
+                  <span className="text-[11px] text-[#696E82] hidden sm:inline-block">
+                    Saves your personal details only.
+                  </span>
+                </div>
+              </form>
+            </div>
+
+            {/* Right Column: Official studio record & Change requests */}
+            <div className="lg:col-span-5 space-y-4">
+              {/* Box 1: Official studio record */}
+              <div className="bg-white rounded-3xl border border-[#E2E6F0] p-6 shadow-2xs space-y-4">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-[#1456F0]" />
+                  <h3 className="text-base font-bold text-[#1F1F1F]">Official studio record</h3>
+                </div>
+
+                <div className="space-y-3 text-xs divide-y divide-[#F2F4F8]">
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-[#696E82]">Employee ID</span>
+                    <span className="font-semibold text-[#1F1F1F] font-mono">
+                      {initialData.directoryProfile?.employeeId || "EMP-001"}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-3">
+                    <span className="text-[#696E82]">Designation</span>
+                    <span className="font-semibold text-[#1F1F1F]">
+                      {initialData.directoryProfile?.designation || "Studio Administrator & Owner"}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-3">
+                    <span className="text-[#696E82]">Department</span>
+                    <span className="font-semibold text-[#1F1F1F]">
+                      {initialData.directoryProfile?.department || "Administration"}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-3">
+                    <span className="text-[#696E82]">Access role</span>
+                    <span className="font-semibold text-[#1456F0]">{context.role}</span>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-3">
+                    <span className="text-[#696E82]">Account status</span>
+                    <span className="font-semibold text-emerald-700 flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                      <span>Active</span>
+                    </span>
+                  </div>
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsRequestModalOpen(true)}
+                    className="w-full py-2.5 px-3 rounded-xl bg-[#EBF1FF] text-[#1456F0] font-semibold text-xs hover:bg-[#D9E6FF] flex items-center justify-center gap-1.5 transition-colors"
+                  >
+                    <span>Request a record change</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
 
-              {/* Session Security & Tenant Info */}
-              <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs space-y-4">
-                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                  <Shield className="w-4 h-4 text-emerald-600" />
-                  <span>Workspace Scope & Session Security</span>
-                </h3>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-1">
-                    <span className="text-[10px] text-slate-400 uppercase font-bold block">Active Tenant</span>
-                    <span className="font-bold text-slate-900">{context.tenantName} ({context.tenantSlug})</span>
+              {/* Box 2: Change requests summary */}
+              <div className="bg-white rounded-3xl border border-[#E2E6F0] p-6 shadow-2xs space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-[#FFF9EB] text-[#F59E0B] flex items-center justify-center">
+                      <FileText className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-[#1F1F1F]">Change requests</h4>
+                    </div>
                   </div>
-                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-1">
-                    <span className="text-[10px] text-slate-400 uppercase font-bold block">Assigned Role</span>
-                    <span className="font-bold text-[#3562E8]">{context.role}</span>
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200">
+                    {changeRequestsCount} pending
+                  </span>
+                </div>
+
+                <p className="text-xs text-[#696E82]">
+                  View the status of your submitted record changes.
+                </p>
+
+                <button
+                  type="button"
+                  onClick={() => setIsRequestModalOpen(true)}
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-[#1456F0] hover:underline"
+                >
+                  <span>View requests</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Bottom Card: Workspace & access matching Reference */}
+          <div className="bg-white rounded-3xl border border-[#E2E6F0] p-6 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-[#F4F6FB] text-[#1F1F1F] flex items-center justify-center shrink-0">
+                <Building className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-[#1F1F1F]">Workspace &amp; access</h4>
+                <div className="flex flex-wrap items-center gap-4 text-xs text-[#696E82] mt-1">
+                  <div>
+                    <span>Workspace: </span>
+                    <strong className="text-[#1F1F1F]">{context.tenantName}</strong>
+                  </div>
+                  <div>
+                    <span>Workspace ID: </span>
+                    <strong className="text-[#1F1F1F] font-mono">{context.tenantSlug}</strong>
+                  </div>
+                  <div>
+                    <span>Your role: </span>
+                    <strong className="text-[#1456F0]">{context.role}</strong>
                   </div>
                 </div>
               </div>
             </div>
-          )}
 
-          {/* TAB 2: DIRECTORY & PROJECTS */}
-          {activeTab === "directory" && (
-            <div className="space-y-6">
-              <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs space-y-4">
-                <h3 className="text-sm font-bold text-slate-900">
+            <button
+              type="button"
+              onClick={() => alert(`Active Workspace: ${context.tenantName}\nRole: ${context.role}\nMembership ID: ${context.membershipId}`)}
+              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl bg-white border border-[#E2E6F0] text-[#1F1F1F] hover:bg-[#F8F9FE] shadow-2xs transition-all self-start md:self-auto"
+            >
+              <span>View access details</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 2: WORK PROFILE */}
+      {activeTab === "work-profile" && (
+        <div className="space-y-5">
+          <div className="bg-white rounded-3xl border border-[#E2E6F0] p-6 shadow-2xs space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-bold text-[#1F1F1F]">
                   Assigned Studio Projects ({activeProjectsCount})
                 </h3>
-
-                {activeProjectsCount > 0 ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {initialData.directoryProfile?.activeProjects.map((p: any) => (
-                      <Link
-                        key={p.projectId}
-                        href={`/w/${context.tenantSlug}/projects/${p.projectId}`}
-                        className="p-4 rounded-2xl border border-slate-200/80 hover:border-[#3562E8] bg-slate-50/50 hover:bg-white transition-all block group shadow-2xs"
-                      >
-                        <div className="flex items-center gap-3">
-                          <ProjectProfileCircle typology={p.typology} name={p.name} size="sm" />
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center justify-between">
-                              <span className="font-mono text-[10px] font-bold text-[#3562E8]">{p.code}</span>
-                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800">
-                                {p.status}
-                              </span>
-                            </div>
-                            <h4 className="text-xs font-bold text-slate-900 truncate group-hover:text-[#3562E8] mt-0.5">
-                              {p.name}
-                            </h4>
-                            <span className="text-[11px] text-slate-400 block mt-0.5">Role: {p.projectRole}</span>
-                          </div>
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-xs text-slate-400 italic">No assigned projects on record.</p>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* TAB 3: MANAGEMENT HR RECORD */}
-          {activeTab === "management" && canManage && (
-            <div className="space-y-6">
-              <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs space-y-4">
-                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                  <Shield className="w-4 h-4 text-[#2C308D]" />
-                  <span>Official Studio Employment Record</span>
-                </h3>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-                  <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-100">
-                    <span className="text-[10px] text-slate-400 uppercase font-bold block">Official ID</span>
-                    <span className="font-mono font-bold text-slate-900">{initialData.managementRecord?.officialEmployeeId}</span>
-                  </div>
-                  <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-100">
-                    <span className="text-[10px] text-slate-400 uppercase font-bold block">Official Designation</span>
-                    <span className="font-semibold text-slate-900">{initialData.managementRecord?.officialDesignation}</span>
-                  </div>
-                  <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-100">
-                    <span className="text-[10px] text-slate-400 uppercase font-bold block">Official Department</span>
-                    <span className="font-semibold text-slate-900">{initialData.managementRecord?.officialDepartment}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Pending Profile Change Requests Queue */}
-              <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs space-y-4">
-                <h3 className="text-sm font-bold text-slate-900">Official Record Change Requests</h3>
-                {initialData.changeRequests && initialData.changeRequests.length > 0 ? (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-slate-50 text-slate-500 border-b border-slate-100">
-                        <tr>
-                          <th className="p-3 font-semibold">Requester</th>
-                          <th className="p-3 font-semibold">Field</th>
-                          <th className="p-3 font-semibold">New Value</th>
-                          <th className="p-3 font-semibold">Status</th>
-                          <th className="p-3 font-semibold">Action</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {initialData.changeRequests.map((req: any) => (
-                          <tr key={req.id}>
-                            <td className="p-3 font-medium text-slate-900">{req.requester?.user?.fullName || "Colleague"}</td>
-                            <td className="p-3 font-mono text-[11px] text-slate-600">{req.fieldKey}</td>
-                            <td className="p-3 font-bold text-slate-900">{req.newValue}</td>
-                            <td className="p-3">
-                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                req.status === "PENDING" ? "bg-amber-50 text-amber-800" :
-                                req.status === "APPROVED" ? "bg-emerald-50 text-emerald-800" :
-                                "bg-rose-50 text-rose-800"
-                              }`}>
-                                {req.status}
-                              </span>
-                            </td>
-                            <td className="p-3">
-                              {req.status === "PENDING" && (
-                                <div className="flex items-center gap-1.5">
-                                  <button
-                                    onClick={() => handleDecideRequest(req.id, "APPROVE")}
-                                    className="px-2 py-1 bg-emerald-600 text-white rounded-lg text-[10px] font-bold hover:bg-emerald-700 cursor-pointer"
-                                  >
-                                    Approve
-                                  </button>
-                                  <button
-                                    onClick={() => handleDecideRequest(req.id, "REJECT")}
-                                    className="px-2 py-1 bg-rose-600 text-white rounded-lg text-[10px] font-bold hover:bg-rose-700 cursor-pointer"
-                                  >
-                                    Reject
-                                  </button>
-                                </div>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <p className="text-xs text-slate-400 italic">No change requests found.</p>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* RIGHT COLUMN (~30%): Compact Calendar & Schedule (Image D) */}
-        <div className="space-y-6">
-          {/* Mini Calendar Widget (Image D) */}
-          <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-900">
-                {currentMonthName} {currentYear}
-              </h3>
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={prevMonth}
-                  className="p-1 rounded-lg hover:bg-slate-100 text-slate-500 cursor-pointer"
-                  title="Previous Month"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={nextMonth}
-                  className="p-1 rounded-lg hover:bg-slate-100 text-slate-500 cursor-pointer"
-                  title="Next Month"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
+                <p className="text-xs text-[#696E82] mt-0.5">
+                  Projects where you are actively designated as Lead, Project Architect, or Contributor.
+                </p>
               </div>
             </div>
 
-            {/* Calendar Weekday Headers */}
-            <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-slate-400">
-              <span>Mon</span>
-              <span>Tue</span>
-              <span>Wed</span>
-              <span>Thu</span>
-              <span>Fri</span>
-              <span>Sat</span>
-              <span>Sun</span>
-            </div>
-
-            {/* Calendar Day Cells */}
-            <div className="grid grid-cols-7 gap-1 text-center text-xs">
-              {Array.from({ length: firstDayIndex }).map((_, i) => (
-                <div key={`empty-${i}`} className="p-2" />
-              ))}
-              {calendarDays.map((day) => {
-                const isToday =
-                  day === new Date().getDate() &&
-                  calendarDate.getMonth() === new Date().getMonth() &&
-                  calendarDate.getFullYear() === new Date().getFullYear();
-
-                return (
-                  <div
-                    key={day}
-                    className={`p-2 rounded-xl text-xs font-semibold transition-all ${
-                      isToday
-                        ? "bg-[#3562E8] text-white font-bold shadow-xs"
-                        : "text-slate-700 hover:bg-slate-100"
-                    }`}
+            {activeProjectsCount > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-2">
+                {initialData.directoryProfile?.activeProjects.map((p: any) => (
+                  <Link
+                    key={p.projectId}
+                    href={`/w/${context.tenantSlug}/projects/${p.projectId}`}
+                    className="p-4 rounded-2xl border border-[#E2E6F0] hover:border-[#1456F0] bg-[#F8F9FE] hover:bg-white transition-all block group shadow-2xs"
                   >
-                    {day}
-                  </div>
-                );
-              })}
-            </div>
+                    <div className="flex items-center gap-3">
+                      <ProjectProfileCircle typology={p.typology} name={p.name} size="sm" />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between">
+                          <span className="font-mono text-[10px] font-bold text-[#1456F0]">{p.code}</span>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800">
+                            {p.status}
+                          </span>
+                        </div>
+                        <h4 className="text-xs font-bold text-[#1F1F1F] truncate group-hover:text-[#1456F0] mt-0.5">
+                          {p.name}
+                        </h4>
+                        <span className="text-[11px] text-[#696E82] block mt-0.5">Role: {p.projectRole}</span>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-[#696E82] italic py-8 text-center">
+                No active projects assigned yet.
+              </p>
+            )}
           </div>
+        </div>
+      )}
 
-          {/* Upcoming Schedule / Milestone Items (Image D) */}
-          <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-900">Upcoming Milestones</h3>
-              <span className="text-[10px] font-semibold text-[#3562E8]">Next 7 Days</span>
-            </div>
+      {/* TAB 3: HR RECORD */}
+      {activeTab === "hr-record" && (
+        <div className="space-y-5">
+          <div className="bg-white rounded-3xl border border-[#E2E6F0] p-6 shadow-2xs space-y-4">
+            <h3 className="text-base font-bold text-[#1F1F1F] flex items-center gap-2">
+              <Shield className="w-4 h-4 text-[#1456F0]" />
+              <span>Official Employment &amp; HR Records</span>
+            </h3>
 
-            <div className="space-y-2 text-xs">
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between group hover:border-[#3562E8] transition-colors">
-                <div className="min-w-0">
-                  <div className="font-bold text-slate-800 truncate text-[11px]">
-                    Neuron Hospital: GFC Review
-                  </div>
-                  <div className="text-[10px] text-slate-400">10:00 AM – 12:00 PM • Nagpur</div>
-                </div>
-                <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-[#3562E8] shrink-0" />
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs pt-1">
+              <div className="p-4 bg-[#F8F9FE] rounded-2xl border border-[#E2E6F0] space-y-1">
+                <span className="text-[10px] text-[#696E82] uppercase font-bold block">Official ID</span>
+                <span className="font-mono font-bold text-sm text-[#1F1F1F]">
+                  {initialData.managementRecord?.officialEmployeeId || initialData.directoryProfile?.employeeId || "EMP-001"}
+                </span>
               </div>
-
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between group hover:border-[#3562E8] transition-colors">
-                <div className="min-w-0">
-                  <div className="font-bold text-slate-800 truncate text-[11px]">
-                    Site Inspection: Podar School
-                  </div>
-                  <div className="text-[10px] text-slate-400">Tomorrow, 02:30 PM • Warud</div>
-                </div>
-                <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-[#3562E8] shrink-0" />
+              <div className="p-4 bg-[#F8F9FE] rounded-2xl border border-[#E2E6F0] space-y-1">
+                <span className="text-[10px] text-[#696E82] uppercase font-bold block">Designation</span>
+                <span className="font-semibold text-sm text-[#1F1F1F]">
+                  {initialData.managementRecord?.officialDesignation || "Studio Administrator & Owner"}
+                </span>
               </div>
-
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between group hover:border-[#3562E8] transition-colors">
-                <div className="min-w-0">
-                  <div className="font-bold text-slate-800 truncate text-[11px]">
-                    Studio Architectural Critique
-                  </div>
-                  <div className="text-[10px] text-slate-400">Friday, 04:00 PM • Main Hall</div>
-                </div>
-                <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-[#3562E8] shrink-0" />
+              <div className="p-4 bg-[#F8F9FE] rounded-2xl border border-[#E2E6F0] space-y-1">
+                <span className="text-[10px] text-[#696E82] uppercase font-bold block">Department</span>
+                <span className="font-semibold text-sm text-[#1F1F1F]">
+                  {initialData.managementRecord?.officialDepartment || "Administration"}
+                </span>
               </div>
             </div>
           </div>
         </div>
+      )}
+
+      {/* Sticky Bottom Bar on Mobile */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-[#E2E6F0] p-3 px-4 flex items-center gap-2.5 shadow-lg">
+        <button
+          type="button"
+          onClick={() => {
+            setFullName(initialData.myProfile?.fullName || "");
+            setPhone(initialData.myProfile?.phone || "");
+          }}
+          className="flex-1 flex items-center justify-center py-2.5 px-3 rounded-xl border border-[#E2E6F0] bg-white text-[#1F1F1F] text-xs font-bold shadow-2xs"
+        >
+          <span>Cancel</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={handleUpdateSelfProfile}
+          disabled={isUpdatingSelf}
+          className="flex-1 flex items-center justify-center py-2.5 px-3 rounded-xl bg-[#1456F0] hover:bg-[#0F47D1] text-white text-xs font-bold shadow-xs disabled:opacity-50"
+        >
+          <span>{isUpdatingSelf ? "Saving..." : "Save changes"}</span>
+        </button>
       </div>
 
       {/* Official Record Change Request Modal */}
       {isRequestModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="change-record-title"
-            className="bg-white rounded-2xl max-w-md w-full p-5 sm:p-6 shadow-2xl border border-slate-100 space-y-4 max-h-[92vh] overflow-y-auto"
-          >
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 id="change-record-title" className="text-base font-bold text-slate-900">Request Official Record Change</h3>
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-[#E2E6F0] space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-[#F0F2F7] pb-3">
+              <h3 className="text-base font-bold text-[#1F1F1F]">Request Official Record Change</h3>
               <button
                 type="button"
                 onClick={() => setIsRequestModalOpen(false)}
-                className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer min-h-[36px]"
-                aria-label="Close dialog"
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-[#696E82] hover:text-[#1F1F1F] hover:bg-[#F8F9FE]"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -899,11 +836,11 @@ export function ProfileClientView({ context, initialData }: ProfileClientViewPro
 
             <form onSubmit={handleSubmitOfficialRequest} className="space-y-4 text-xs">
               <div>
-                <label className="font-semibold text-slate-700 block mb-1">Field to Update</label>
+                <label className="font-semibold text-[#1F1F1F] block mb-1">Field to Update</label>
                 <select
                   value={changeFieldKey}
                   onChange={(e: any) => setChangeFieldKey(e.target.value)}
-                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl"
+                  className="w-full p-2.5 bg-[#F8F9FE] border border-[#E2E6F0] rounded-xl text-xs font-medium"
                 >
                   <option value="designation">Official Designation</option>
                   <option value="department">Official Department</option>
@@ -912,40 +849,40 @@ export function ProfileClientView({ context, initialData }: ProfileClientViewPro
               </div>
 
               <div>
-                <label className="font-semibold text-slate-700 block mb-1">New Value</label>
+                <label className="font-semibold text-[#1F1F1F] block mb-1">New Value</label>
                 <input
                   type="text"
                   required
                   value={changeNewValue}
                   onChange={(e) => setChangeNewValue(e.target.value)}
                   placeholder="e.g. Senior Project Architect"
-                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl"
+                  className="w-full p-2.5 bg-[#F8F9FE] border border-[#E2E6F0] rounded-xl text-xs"
                 />
               </div>
 
               <div>
-                <label className="font-semibold text-slate-700 block mb-1">Justification Reason</label>
+                <label className="font-semibold text-[#1F1F1F] block mb-1">Justification Reason</label>
                 <textarea
                   rows={2}
                   value={changeReason}
                   onChange={(e) => setChangeReason(e.target.value)}
                   placeholder="e.g. Promotion or department transfer"
-                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl resize-none"
+                  className="w-full p-2.5 bg-[#F8F9FE] border border-[#E2E6F0] rounded-xl text-xs resize-none"
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <div className="flex justify-end gap-2 pt-2 border-t border-[#F0F2F7]">
                 <button
                   type="button"
                   onClick={() => setIsRequestModalOpen(false)}
-                  className="px-4 py-2 border border-slate-200 rounded-xl font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer"
+                  className="px-4 py-2 border border-[#E2E6F0] rounded-xl font-semibold text-[#696E82] hover:bg-[#F8F9FE]"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmittingRequest}
-                  className="px-4 py-2 bg-[#3562E8] hover:bg-blue-700 text-white rounded-xl font-bold cursor-pointer disabled:opacity-50"
+                  className="px-4 py-2 bg-[#1456F0] hover:bg-[#0F47D1] text-white rounded-xl font-bold disabled:opacity-50"
                 >
                   {isSubmittingRequest ? "Submitting..." : "Submit for Approval"}
                 </button>

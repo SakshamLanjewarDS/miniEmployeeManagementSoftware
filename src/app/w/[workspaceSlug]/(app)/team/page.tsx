@@ -36,25 +36,14 @@ export default async function TeamPage({ params }: TeamPageProps) {
   }));
 
   return (
-    <div className="space-y-6">
-      <div className="border-b border-[#E2E6F0] pb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-[#1F1F1F]">Studio Team Members</h1>
-          <p className="text-xs text-[#696E82] mt-0.5">
-            Architecture partners, project architects, and studio team directory
-          </p>
-        </div>
-      </div>
-
-      <TeamClientView
-        workspaceSlug={ctx.tenantSlug}
-        currentUserId={ctx.userId}
-        userRole={ctx.role}
-        initialEmployees={serializeForClient(serializedEmployees) as any}
-        availableProjects={serializeForClient(projects)}
-        initialCustomFields={serializeForClient(customFieldDefinitions) as any}
-        initialCustomValues={serializeForClient(customFieldValues) as any}
-      />
-    </div>
+    <TeamClientView
+      workspaceSlug={ctx.tenantSlug}
+      currentUserId={ctx.userId}
+      userRole={ctx.role}
+      initialEmployees={serializeForClient(serializedEmployees) as any}
+      availableProjects={serializeForClient(projects)}
+      initialCustomFields={serializeForClient(customFieldDefinitions) as any}
+      initialCustomValues={serializeForClient(customFieldValues) as any}
+    />
   );
 }

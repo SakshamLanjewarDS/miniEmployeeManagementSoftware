@@ -36,6 +36,14 @@ import {
   ExternalLink,
   X,
   Compass,
+  ChevronDown,
+  Edit3,
+  HardHat,
+  Phone,
+  Mail,
+  Briefcase,
+  Wrench,
+  Search,
 } from "lucide-react";
 import { ProjectProfileCircle, TypologyBadge } from "@/lib/typology";
 
@@ -65,6 +73,10 @@ export function ProjectDetailClientView({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Dropdown states
+  const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
+  const [isMoreTabsOpen, setIsMoreTabsOpen] = useState(false);
 
   // Modal states
   const [isHoldModalOpen, setIsHoldModalOpen] = useState(false);
@@ -131,6 +143,21 @@ export function ProjectDetailClientView({
     pendingReviews?: any[];
   } | null>(null);
 
+  // Contractor management modal states
+  const [isLinkContractorModalOpen, setIsLinkContractorModalOpen] = useState(false);
+  const [availableContractors, setAvailableContractors] = useState<any[]>([]);
+  const [isLoadingAvailableContractors, setIsLoadingAvailableContractors] = useState(false);
+  const [selectedContractorId, setSelectedContractorId] = useState("");
+  const [contractorScope, setContractorScope] = useState("");
+  const [contractorSearchQuery, setContractorSearchQuery] = useState("");
+
+  // Edit contractor scope modal
+  const [editingContractorLink, setEditingContractorLink] = useState<any | null>(null);
+  const [editScopeValue, setEditScopeValue] = useState("");
+
+  // Unlink contractor modal
+  const [unlinkingContractor, setUnlinkingContractor] = useState<any | null>(null);
+
   // Tabs definition
   const tabs = [
     { key: "overview", label: "Overview" },
@@ -138,6 +165,7 @@ export function ProjectDetailClientView({
     { key: "phases", label: `Phases & Milestones (${project.phases.length})` },
     { key: "tasks", label: `Tasks (${project.tasks.length})` },
     { key: "drawings", label: `Drawings & Files (${project.documents.length})` },
+    { key: "contractors", label: `Contractors (${project.contractors?.length || 0})` },
     { key: "handover", label: "Handover Package" },
     { key: "team", label: `Team & Contacts (${project.members.length})` },
     { key: "visits", label: `Site Visits (${project.sites?.reduce((acc: number, s: any) => acc + (s.visits?.length || 0), 0) || 0})` },
@@ -682,6 +710,110 @@ export function ProjectDetailClientView({
     }
   };
 
+  // ============================================================================
+  // CONTRACTOR MANAGEMENT HANDLERS
+  // ============================================================================
+
+  const loadAvailableContractors = async () => {
+    setIsLoadingAvailableContractors(true);
+    try {
+      const res = await fetch(`/api/contractors?workspaceSlug=${context.tenantSlug}`);
+      const data = await res.json();
+      if (res.ok && data.contractors) {
+        setAvailableContractors(data.contractors);
+      }
+    } catch (err) {
+      console.error("Failed to load contractors:", err);
+    } finally {
+      setIsLoadingAvailableContractors(false);
+    }
+  };
+
+  const handleLinkContractor = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!canManage || !selectedContractorId) return;
+    setIsSubmitting(true);
+    setErrorMessage(null);
+    try {
+      const res = await fetch(`/api/contractors/project-link?workspaceSlug=${context.tenantSlug}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "add",
+          contractorId: selectedContractorId,
+          projectId: project.id,
+          scope: contractorScope.trim() || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to link contractor to project");
+      setSuccessMessage("✓ Contractor successfully linked to project!");
+      setIsLinkContractorModalOpen(false);
+      setSelectedContractorId("");
+      setContractorScope("");
+      router.refresh();
+    } catch (err: any) {
+      setErrorMessage(err.message || "Failed to link contractor");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleUpdateContractorScope = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!canManage || !editingContractorLink) return;
+    setIsSubmitting(true);
+    setErrorMessage(null);
+    try {
+      const res = await fetch(`/api/contractors/project-link?workspaceSlug=${context.tenantSlug}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "add",
+          contractorId: editingContractorLink.contractorId,
+          projectId: project.id,
+          scope: editScopeValue.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to update contractor scope");
+      setSuccessMessage("✓ Contractor scope updated successfully!");
+      setEditingContractorLink(null);
+      setEditScopeValue("");
+      router.refresh();
+    } catch (err: any) {
+      setErrorMessage(err.message || "Failed to update contractor scope");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleUnlinkContractor = async () => {
+    if (!canManage || !unlinkingContractor) return;
+    setIsSubmitting(true);
+    setErrorMessage(null);
+    try {
+      const res = await fetch(`/api/contractors/project-link?workspaceSlug=${context.tenantSlug}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "remove",
+          contractorId: unlinkingContractor.contractorId,
+          projectId: project.id,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to unlink contractor from project");
+      setSuccessMessage("✓ Contractor disassociated from project.");
+      setUnlinkingContractor(null);
+      router.refresh();
+    } catch (err: any) {
+      setErrorMessage(err.message || "Failed to unlink contractor");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Top Breadcrumb */}
@@ -808,7 +940,7 @@ export function ProjectDetailClientView({
       {/* ============================================================== */}
       <div className="bg-white border border-[#E2E6F0] rounded-2xl p-4 sm:p-6 shadow-2xs space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="space-y-1">
+          <div className="space-y-2">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="font-mono text-xs font-bold text-[#5A81FA] bg-[#F2F4FF] px-2.5 py-1 rounded border border-[#CEDEFF]">
                 {project.code}
@@ -834,145 +966,365 @@ export function ProjectDetailClientView({
               </span>
             </div>
 
-            <div className="flex items-center gap-3 mt-1.5">
+            <div className="flex items-center gap-3">
               <ProjectProfileCircle typology={project.projectType} name={project.name} size="lg" />
               <div>
                 <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#1F1F1F]">{project.name}</h1>
-                <p className="text-xs text-[#696E82] line-clamp-1">{project.brief || project.description || "Architectural project commission."}</p>
+                <p className="text-xs text-[#696E82] line-clamp-1">
+                  {project.brief || project.description || "Architectural project commission."}
+                </p>
               </div>
             </div>
           </div>
 
-          {/* Quick Metrics & Lifecycle Actions */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-            <div className="flex items-center gap-3 sm:gap-4 bg-[#F8F9FD] p-2.5 sm:p-3 rounded-xl border border-[#E2E6F0] shrink-0 text-xs justify-around sm:justify-start">
-              <div>
-                <span className="text-[10px] text-[#696E82] uppercase font-bold block">Deliverables</span>
-                <span className="text-sm font-bold text-[#1F1F1F]">{project.taskProgress?.percentage || 0}%</span>
-              </div>
-              <div className="border-l border-[#E2E6F0] pl-3">
-                <span className="text-[10px] text-[#696E82] uppercase font-bold block">Phases</span>
-                <span className="text-sm font-bold text-[#5A81FA]">{project.phaseProgress?.completedCount || 0}/{project.phases?.length || 11}</span>
-              </div>
-              {hasFinance && project.budget && (
-                <div className="border-l border-[#E2E6F0] pl-3">
-                  <span className="text-[10px] text-[#696E82] uppercase font-bold block">Budget</span>
-                  <span className="text-sm font-bold text-[#1F1F1F]">
-                    {project.currency} {Number(project.budget).toLocaleString("en-IN")}
-                  </span>
-                </div>
-              )}
-            </div>
+          {/* Header Action Buttons */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <Link
+              href={`/w/${context.tenantSlug}/tasks?projectId=${project.id}`}
+              className="px-3.5 py-2 bg-[#5A81FA] hover:bg-[#426EE8] text-white text-xs font-bold rounded-xl shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>+ Add deliverable</span>
+            </Link>
 
-            {/* Management Lifecycle Actions Toolbar */}
             {canManage && (
-              <div className="flex items-center gap-1.5 flex-wrap">
-                {project.status === "ACTIVE" && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => setIsHoldModalOpen(true)}
-                      className="px-2.5 py-1.5 rounded-lg border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors"
-                      title="Place project on temporary hold"
-                    >
-                      <PauseCircle className="w-3.5 h-3.5 text-amber-600" />
-                      <span>Hold</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleOpenCompletionModal}
-                      className="px-2.5 py-1.5 rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors"
-                      title="Evaluate handover checklist and close project"
-                    >
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>Close</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setIsCancelModalOpen(true)}
-                      className="px-2.5 py-1.5 rounded-lg border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-900 text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors"
-                      title="Cancel project with open work disposition"
-                    >
-                      <X className="w-3.5 h-3.5 text-rose-600" />
-                      <span>Cancel</span>
-                    </button>
-                  </>
-                )}
-                {project.status === "ON_HOLD" && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => setIsResumeModalOpen(true)}
-                      className="px-2.5 py-1.5 rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors"
-                      title="Resume project operations"
-                    >
-                      <PlayCircle className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>Resume</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setIsCancelModalOpen(true)}
-                      className="px-2.5 py-1.5 rounded-lg border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-900 text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors"
-                      title="Cancel project with open work disposition"
-                    >
-                      <X className="w-3.5 h-3.5 text-rose-600" />
-                      <span>Cancel</span>
-                    </button>
-                  </>
-                )}
-                {(project.status === "COMPLETED" || project.status === "CANCELLED") && !project.isArchived && (
-                  <button
-                    type="button"
-                    onClick={handleArchiveProject}
-                    className="px-2.5 py-1.5 rounded-lg border border-gray-300 bg-gray-50 hover:bg-gray-100 text-gray-700 text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors"
-                    title="Archive project from active views"
-                  >
-                    <Lock className="w-3.5 h-3.5 text-gray-600" />
-                    <span>Archive</span>
-                  </button>
-                )}
-                {project.isArchived && (
-                  <button
-                    type="button"
-                    onClick={handleUnarchiveProject}
-                    className="px-2.5 py-1.5 rounded-lg border border-blue-300 bg-blue-50 hover:bg-blue-100 text-blue-900 text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors"
-                    title="Restore project visibility"
-                  >
-                    <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-                    <span>Unarchive</span>
-                  </button>
-                )}
+              <div className="relative">
                 <button
                   type="button"
-                  onClick={() => setIsChangeRequestModalOpen(true)}
-                  className="px-2.5 py-1.5 rounded-lg border border-[#CEDEFF] bg-[#F2F4FF] hover:bg-[#E5EAFF] text-[#2C308D] text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors"
-                  title="Request formal scope or schedule change"
+                  onClick={() => setIsActionsMenuOpen(!isActionsMenuOpen)}
+                  className="px-3 py-2 bg-white border border-[#E2E6F0] hover:bg-[#F8F9FD] text-[#1F1F1F] text-xs font-semibold rounded-xl flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
                 >
-                  <Sparkles className="w-3.5 h-3.5 text-[#5A81FA]" />
-                  <span>Scope Change</span>
+                  <span>Project actions</span>
+                  <ChevronDown className="w-3.5 h-3.5 text-[#696E82]" />
                 </button>
+
+                {isActionsMenuOpen && (
+                  <div
+                    className="absolute right-0 mt-2 w-56 bg-white border border-[#E2E6F0] rounded-xl shadow-lg py-1.5 z-30 divide-y divide-[#E2E6F0]/60 animate-in fade-in zoom-in-95 duration-150"
+                    onMouseLeave={() => setIsActionsMenuOpen(false)}
+                  >
+                    <div className="py-1">
+                      {project.status === "ACTIVE" && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsActionsMenuOpen(false);
+                              setIsHoldModalOpen(true);
+                            }}
+                            className="w-full text-left px-3.5 py-2 text-xs text-amber-800 hover:bg-amber-50 flex items-center gap-2 cursor-pointer font-medium"
+                          >
+                            <PauseCircle className="w-3.5 h-3.5 text-amber-600" />
+                            <span>Hold Project</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsActionsMenuOpen(false);
+                              handleOpenCompletionModal();
+                            }}
+                            className="w-full text-left px-3.5 py-2 text-xs text-emerald-800 hover:bg-emerald-50 flex items-center gap-2 cursor-pointer font-medium"
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>Close Project</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsActionsMenuOpen(false);
+                              setIsCancelModalOpen(true);
+                            }}
+                            className="w-full text-left px-3.5 py-2 text-xs text-rose-800 hover:bg-rose-50 flex items-center gap-2 cursor-pointer font-medium"
+                          >
+                            <X className="w-3.5 h-3.5 text-rose-600" />
+                            <span>Cancel Project</span>
+                          </button>
+                        </>
+                      )}
+
+                      {project.status === "ON_HOLD" && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsActionsMenuOpen(false);
+                              setIsResumeModalOpen(true);
+                            }}
+                            className="w-full text-left px-3.5 py-2 text-xs text-emerald-800 hover:bg-emerald-50 flex items-center gap-2 cursor-pointer font-medium"
+                          >
+                            <PlayCircle className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>Resume Project</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsActionsMenuOpen(false);
+                              setIsCancelModalOpen(true);
+                            }}
+                            className="w-full text-left px-3.5 py-2 text-xs text-rose-800 hover:bg-rose-50 flex items-center gap-2 cursor-pointer font-medium"
+                          >
+                            <X className="w-3.5 h-3.5 text-rose-600" />
+                            <span>Cancel Project</span>
+                          </button>
+                        </>
+                      )}
+                    </div>
+
+                    <div className="py-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsActionsMenuOpen(false);
+                          setIsChangeRequestModalOpen(true);
+                        }}
+                        className="w-full text-left px-3.5 py-2 text-xs text-[#2C308D] hover:bg-[#F2F4FF] flex items-center gap-2 cursor-pointer font-medium"
+                      >
+                        <Sparkles className="w-3.5 h-3.5 text-[#5A81FA]" />
+                        <span>Request Scope Change</span>
+                      </button>
+
+                      {(project.status === "COMPLETED" || project.status === "CANCELLED") && !project.isArchived && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsActionsMenuOpen(false);
+                            handleArchiveProject();
+                          }}
+                          className="w-full text-left px-3.5 py-2 text-xs text-gray-700 hover:bg-gray-100 flex items-center gap-2 cursor-pointer font-medium"
+                        >
+                          <Lock className="w-3.5 h-3.5 text-gray-500" />
+                          <span>Archive Project</span>
+                        </button>
+                      )}
+
+                      {project.isArchived && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsActionsMenuOpen(false);
+                            handleUnarchiveProject();
+                          }}
+                          className="w-full text-left px-3.5 py-2 text-xs text-blue-800 hover:bg-blue-50 flex items-center gap-2 cursor-pointer font-medium"
+                        >
+                          <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                          <span>Unarchive Project</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
+            )}
+
+            <Link
+              href={`/w/${context.tenantSlug}/projects/${project.id}?tab=scope`}
+              className="p-2 bg-white border border-[#E2E6F0] hover:bg-[#F8F9FD] text-[#696E82] hover:text-[#1F1F1F] rounded-xl shadow-2xs transition-colors cursor-pointer"
+              title="Edit project brief & scope"
+            >
+              <Edit3 className="w-4 h-4" />
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      {/* ============================================================== */}
+      {/* 4 KPI METRIC CARDS                                             */}
+      {/* ============================================================== */}
+      {(() => {
+        const totalPhases = project.phases?.length || 11;
+        const completedPhasesCount = project.phases?.filter((p: any) => p.status === "COMPLETED").length || 0;
+        const currentPhaseIndex = project.phases?.findIndex((p: any) => p.status === "IN_PROGRESS" || p.status === "ACTIVE");
+        const phaseStageNumber = currentPhaseIndex >= 0 ? currentPhaseIndex + 1 : (completedPhasesCount > 0 ? completedPhasesCount : 1);
+        const totalTasksCount = project.tasks?.length || 0;
+        const completedTasksCount = project.tasks?.filter((t: any) => t.status === "APPROVED" || t.status === "COMPLETED").length || 0;
+        const taskProgressPercent = totalTasksCount > 0 ? Math.round((completedTasksCount / totalTasksCount) * 100) : (project.taskProgress?.percentage || 0);
+
+        return (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            <div className="bg-white border border-[#E2E6F0] rounded-xl p-4 shadow-2xs">
+              <span className="text-[11px] font-bold text-[#696E82] uppercase tracking-wider block">Current phase</span>
+              <div className="text-xl sm:text-2xl font-bold text-[#1F1F1F] mt-1">
+                Stage {phaseStageNumber} of {totalPhases}
+              </div>
+              <p className="text-xs text-[#696E82] mt-0.5 truncate">
+                {project.currentPhase || "Brief"} (In progress)
+              </p>
+            </div>
+
+            <div className="bg-white border border-[#E2E6F0] rounded-xl p-4 shadow-2xs">
+              <span className="text-[11px] font-bold text-[#696E82] uppercase tracking-wider block">Completed phases</span>
+              <div className="text-xl sm:text-2xl font-bold text-[#5A81FA] mt-1">
+                {completedPhasesCount} / {totalPhases}
+              </div>
+              <p className="text-xs text-[#696E82] mt-0.5">
+                {Math.round((completedPhasesCount / (totalPhases || 1)) * 100)}% completed
+              </p>
+            </div>
+
+            <div className="bg-white border border-[#E2E6F0] rounded-xl p-4 shadow-2xs">
+              <span className="text-[11px] font-bold text-[#696E82] uppercase tracking-wider block">Deliverables complete</span>
+              <div className="text-xl sm:text-2xl font-bold text-[#1F1F1F] mt-1">
+                {completedTasksCount} / {totalTasksCount}
+              </div>
+              <p className="text-xs text-[#696E82] mt-0.5">
+                {taskProgressPercent}% progress
+              </p>
+            </div>
+
+            <div className="bg-white border border-[#E2E6F0] rounded-xl p-4 shadow-2xs">
+              <span className="text-[11px] font-bold text-[#696E82] uppercase tracking-wider block">Project budget</span>
+              <div className="text-xl sm:text-2xl font-bold text-[#1F1F1F] mt-1">
+                {hasFinance && project.budget ? `${project.currency || "₹"} ${Number(project.budget).toLocaleString("en-IN")}` : "₹ --"}
+              </div>
+              <p className="text-xs text-[#696E82] mt-0.5">
+                Currency: {project.currency || "INR"}
+              </p>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ============================================================== */}
+      {/* TABS NAVIGATION                                                */}
+      {/* ============================================================== */}
+      {(() => {
+        const totalPhases = project.phases?.length || 11;
+        const totalTasksCount = project.tasks?.length || 0;
+        const totalDocsCount = project.documents?.length || 0;
+        const totalContractorsCount = project.contractors?.length || 0;
+        const visitsCount = project.sites?.reduce((acc: number, s: any) => acc + (s.visits?.length || 0), 0) || 0;
+        const teamCount = project.members?.length || 0;
+
+        const primaryTabList = [
+          { key: "overview", label: "Overview" },
+          { key: "scope", label: "Brief" },
+          { key: "phases", label: `Phases (${totalPhases})` },
+          { key: "tasks", label: `Tasks (${totalTasksCount})` },
+          { key: "drawings", label: `Files (${totalDocsCount})` },
+          { key: "contractors", label: `Contractors (${totalContractorsCount})` },
+          { key: "team", label: `Team (${teamCount})` },
+          { key: "visits", label: `Site Visits (${visitsCount})` },
+        ];
+
+        const secondaryTabList = [
+          { key: "handover", label: "Handover Package" },
+          ...(hasFinance ? [{ key: "finance", label: "Finance & Fees" }] : []),
+          { key: "activity", label: `Activity (${project.auditEvents?.length || 0})` },
+        ];
+
+        const activeSecondaryTab = secondaryTabList.find((t) => t.key === currentTab);
+
+        return (
+          <div className="relative border-b border-[#E2E6F0] pb-2 flex items-center justify-between gap-2">
+            {/* Scrollable primary tabs */}
+            <div className="flex items-center gap-1.5 overflow-x-auto touch-scroll-x scrollbar-none py-0.5 min-w-0 flex-1">
+              {primaryTabList.map((t) => (
+                <Link
+                  key={t.key}
+                  href={`/w/${context.tenantSlug}/projects/${project.id}?tab=${t.key}`}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors shrink-0 ${
+                    currentTab === t.key
+                      ? "bg-[#5A81FA] text-white shadow-2xs"
+                      : "text-[#696E82] hover:bg-[#F2F4FF] hover:text-[#1F1F1F]"
+                  }`}
+                >
+                  {t.label}
+                </Link>
+              ))}
+            </div>
+
+            {/* Non-clipped More dropdown positioned outside overflow-x-auto */}
+            <div className="relative shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsMoreTabsOpen(!isMoreTabsOpen)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap flex items-center gap-1.5 transition-colors cursor-pointer border ${
+                  activeSecondaryTab
+                    ? "bg-[#5A81FA] text-white border-[#5A81FA] shadow-2xs"
+                    : isMoreTabsOpen
+                    ? "bg-[#F2F4FF] text-[#1F1F1F] border-[#CEDEFF]"
+                    : "bg-white text-[#696E82] border-[#E2E6F0] hover:bg-[#F8F9FD] hover:text-[#1F1F1F]"
+                }`}
+                title="More project views"
+              >
+                <span>{activeSecondaryTab ? activeSecondaryTab.label : "More"}</span>
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isMoreTabsOpen ? "rotate-180" : ""}`} />
+              </button>
+
+              {isMoreTabsOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setIsMoreTabsOpen(false)}
+                  />
+                  <div
+                    className="absolute right-0 top-full mt-2 w-56 bg-white border border-[#E2E6F0] rounded-xl shadow-xl py-1.5 z-50 animate-in fade-in zoom-in-95 duration-150"
+                  >
+                    <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-[#94A3B8] border-b border-[#E2E6F0] mb-1">
+                      More Project Views
+                    </div>
+                    {secondaryTabList.map((st) => (
+                      <Link
+                        key={st.key}
+                        href={`/w/${context.tenantSlug}/projects/${project.id}?tab=${st.key}`}
+                        onClick={() => setIsMoreTabsOpen(false)}
+                        className={`block px-3.5 py-2 text-xs transition-colors ${
+                          currentTab === st.key
+                            ? "bg-[#F2F4FF] text-[#2C308D] font-bold"
+                            : "text-[#1F1F1F] hover:bg-[#F8F9FD]"
+                        }`}
+                      >
+                        {st.label}
+                      </Link>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ============================================================== */}
+      {/* CONDITIONAL PROJECT SETUP PROMPT                               */}
+      {/* ============================================================== */}
+      {(!project.projectArchitect || !project.siteAddress || (!project.milestones || project.milestones.length === 0)) && (
+        <div className="bg-[#FFF8E6] border border-[#FFE082] rounded-xl p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in">
+          <div className="flex items-start gap-2.5">
+            <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+            <div>
+              <h4 className="text-xs font-bold text-amber-900">Complete project setup</h4>
+              <p className="text-xs text-amber-800 mt-0.5">
+                {!project.projectArchitect
+                  ? "Assign a Project Architect lead to establish accountability and enable signoffs."
+                  : !project.siteAddress
+                  ? "Specify site location to enable coordinate tracking for site visits."
+                  : "Register at least one milestone to track delivery deadlines."}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {!project.projectArchitect && canManage && (
+              <button
+                type="button"
+                onClick={() => setIsAddMemberModalOpen(true)}
+                className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-lg transition-colors cursor-pointer"
+              >
+                Assign Lead →
+              </button>
+            )}
+            {(!project.milestones || project.milestones.length === 0) && canManage && (
+              <button
+                type="button"
+                onClick={() => setIsMilestoneModalOpen(true)}
+                className="px-3 py-1.5 bg-white border border-amber-300 text-amber-900 hover:bg-amber-100 text-xs font-bold rounded-lg transition-colors cursor-pointer"
+              >
+                + Milestone
+              </button>
             )}
           </div>
         </div>
-
-        {/* Tab Navigation */}
-        <div className="flex items-center gap-1 overflow-x-auto touch-scroll-x border-t border-[#E2E6F0] pt-3 scrollbar-none pb-0.5">
-          {tabs.map((t) => (
-            <Link
-              key={t.key}
-              href={`/w/${context.tenantSlug}/projects/${project.id}?tab=${t.key}`}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
-                currentTab === t.key
-                  ? "bg-[#5A81FA] text-white font-semibold shadow-2xs"
-                  : "text-[#696E82] hover:bg-[#F2F4FF] hover:text-[#1F1F1F]"
-              }`}
-            >
-              {t.label}
-            </Link>
-          ))}
-        </div>
-      </div>
+      )}
 
       {/* ============================================================== */}
       {/* TAB CONTENT SECTIONS                                           */}
@@ -980,35 +1332,180 @@ export function ProjectDetailClientView({
 
       {/* 1. OVERVIEW TAB */}
       {currentTab === "overview" && (
-        <div className="space-y-6">
-          {/* Top Info Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Leadership Card */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          {/* Left Column: 11-Phase Sequence */}
+          <div className="lg:col-span-7 bg-white border border-[#E2E6F0] rounded-2xl p-5 sm:p-6 shadow-2xs space-y-4">
+            <div className="flex items-center justify-between border-b border-[#E2E6F0] pb-3">
+              <div>
+                <h3 className="text-sm font-bold text-[#1F1F1F]">11-Phase Architectural Sequence</h3>
+                <p className="text-xs text-[#696E82]">
+                  {project.phaseProgress?.label || "11 standard architectural milestones"}
+                </p>
+              </div>
+              <Link
+                href={`/w/${context.tenantSlug}/projects/${project.id}?tab=phases`}
+                className="text-xs text-[#5A81FA] hover:underline font-bold"
+              >
+                View Detailed Phases →
+              </Link>
+            </div>
+
+            <div className="divide-y divide-[#E2E6F0]/60">
+              {project.phases?.map((ph: any, idx: number) => {
+                const isDone = ph.status === "COMPLETED";
+                const isCurrent = ph.status === "IN_PROGRESS" || ph.status === "ACTIVE";
+                return (
+                  <div key={ph.id} className="py-2.5 sm:py-3 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div
+                        className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                          isDone
+                            ? "bg-emerald-100 text-emerald-800"
+                            : isCurrent
+                            ? "bg-[#5A81FA] text-white"
+                            : "bg-[#F2F4FF] text-[#696E82]"
+                        }`}
+                      >
+                        {String(ph.sortOrder || idx + 1).padStart(2, "0")}
+                      </div>
+                      <div className="min-w-0">
+                        <p className={`text-xs font-bold truncate ${isCurrent ? "text-[#5A81FA]" : "text-[#1F1F1F]"}`}>
+                          {ph.phaseName}
+                        </p>
+                        <p className="text-[10px] text-[#696E82]">
+                          {isDone ? "Milestone achieved" : isCurrent ? "Active operational phase" : "Upcoming milestone"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="shrink-0 flex items-center gap-2">
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          isDone
+                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                            : isCurrent
+                            ? "bg-[#F2F4FF] text-[#2C308D] border border-[#CEDEFF]"
+                            : "bg-gray-100 text-gray-500 border border-gray-200"
+                        }`}
+                      >
+                        {isDone ? "Completed ✓" : isCurrent ? "⚡ Active" : "Pending"}
+                      </span>
+                      {canManage && isCurrent && (
+                        <button
+                          type="button"
+                          onClick={() => setCompletingPhase(ph)}
+                          className="text-[10px] text-[#5A81FA] hover:underline font-bold cursor-pointer"
+                        >
+                          Complete
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Right Column: Milestone, Team, and Client & Site */}
+          <div className="lg:col-span-5 space-y-4">
+            {/* Next Milestone */}
             <div className="bg-white border border-[#E2E6F0] rounded-2xl p-5 shadow-2xs space-y-3">
-              <h3 className="text-xs font-bold text-[#1F1F1F] uppercase tracking-wider flex items-center gap-1.5">
-                <Users className="w-4 h-4 text-[#5A81FA]" />
-                <span>Accountable Leadership</span>
-              </h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-bold text-[#1F1F1F] uppercase tracking-wider flex items-center gap-1.5">
+                  <Compass className="w-4 h-4 text-[#5A81FA]" />
+                  <span>Next Delivery Milestone</span>
+                </h3>
+                {canManage && (
+                  <button
+                    type="button"
+                    onClick={() => setIsMilestoneModalOpen(true)}
+                    className="text-[11px] text-[#5A81FA] hover:underline font-bold cursor-pointer"
+                  >
+                    + Add
+                  </button>
+                )}
+              </div>
+              {project.milestones && project.milestones.length > 0 ? (
+                <div className="space-y-2 text-xs">
+                  {project.milestones.find((m: any) => m.status === "PENDING") ? (
+                    (() => {
+                      const nextM = project.milestones.find((m: any) => m.status === "PENDING");
+                      return (
+                        <div className="p-3 bg-[#F8F9FD] rounded-xl border border-[#E2E6F0] space-y-1">
+                          <span className="text-[10px] text-[#5A81FA] font-bold block uppercase">
+                            Due: {new Date(nextM.targetDate).toLocaleDateString()}
+                          </span>
+                          <span className="font-bold text-[#1F1F1F] block">{nextM.title}</span>
+                          {nextM.isClientSignoffRequired && (
+                            <span className="inline-block text-[10px] px-2 py-0.5 rounded bg-blue-50 text-blue-800 border border-blue-200">
+                              Client Signoff Mandatory
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })()
+                  ) : (
+                    <p className="text-xs text-emerald-700 italic">All delivery milestones achieved!</p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-xs text-[#696E82] italic">No delivery milestones configured yet.</p>
+              )}
+            </div>
+
+            {/* Project Team */}
+            <div className="bg-white border border-[#E2E6F0] rounded-2xl p-5 shadow-2xs space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-bold text-[#1F1F1F] uppercase tracking-wider flex items-center gap-1.5">
+                  <Users className="w-4 h-4 text-[#5A81FA]" />
+                  <span>Project Team</span>
+                </h3>
+                <Link
+                  href={`/w/${context.tenantSlug}/projects/${project.id}?tab=team`}
+                  className="text-[11px] text-[#5A81FA] hover:underline font-bold"
+                >
+                  Manage →
+                </Link>
+              </div>
               <div className="space-y-2.5 text-xs">
-                <div>
-                  <span className="text-[10px] text-[#696E82] block">Project Architect</span>
-                  <span className="font-semibold text-[#1F1F1F]">
-                    {project.projectArchitect?.user.fullName || "Unassigned"}
-                  </span>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] text-[#696E82] block">Project Architect (Lead)</span>
+                    <span className="font-semibold text-[#1F1F1F]">
+                      {project.projectArchitect?.user.fullName || "Unassigned"}
+                    </span>
+                  </div>
+                  {project.projectArchitect?.user?.email && (
+                    <span className="text-[10px] text-[#696E82] font-mono">{project.projectArchitect.user.email}</span>
+                  )}
                 </div>
-                <div>
-                  <span className="text-[10px] text-[#696E82] block">Project Architecture 2</span>
-                  <span className="font-semibold text-[#1F1F1F]">
-                    {project.projectManager?.user.fullName || "Unassigned"}
-                  </span>
+                <div className="border-t border-[#E2E6F0]/60 pt-2 flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] text-[#696E82] block">Secondary Architect</span>
+                    <span className="font-semibold text-[#1F1F1F]">
+                      {project.projectManager?.user.fullName || "Unassigned"}
+                    </span>
+                  </div>
                 </div>
-                <div>
-                  <span className="text-[10px] text-[#696E82] block">Project Coordinator</span>
-                  <span className="font-semibold text-[#1F1F1F]">
-                    {project.projectCoordinator?.user.fullName || "Unassigned"}
-                  </span>
+                <div className="border-t border-[#E2E6F0]/60 pt-2 flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] text-[#696E82] block">Project Coordinator</span>
+                    <span className="font-semibold text-[#1F1F1F]">
+                      {project.projectCoordinator?.user.fullName || "Unassigned"}
+                    </span>
+                  </div>
                 </div>
               </div>
+              {canManage && (
+                <button
+                  type="button"
+                  onClick={() => setIsAddMemberModalOpen(true)}
+                  className="w-full mt-2 py-1.5 bg-[#F8F9FD] hover:bg-[#F2F4FF] border border-[#E2E6F0] text-xs font-bold text-[#5A81FA] rounded-xl flex items-center justify-center gap-1 transition-colors cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Assign Team Member</span>
+                </button>
+              )}
             </div>
 
             {/* Client & Site */}
@@ -1042,82 +1539,65 @@ export function ProjectDetailClientView({
               </div>
             </div>
 
-            {/* Next Milestone & Issues */}
+            {/* Commissioned Contractors */}
             <div className="bg-white border border-[#E2E6F0] rounded-2xl p-5 shadow-2xs space-y-3">
-              <h3 className="text-xs font-bold text-[#1F1F1F] uppercase tracking-wider flex items-center gap-1.5">
-                <Compass className="w-4 h-4 text-[#5A81FA]" />
-                <span>Next Delivery Milestone</span>
-              </h3>
-              {project.milestones && project.milestones.length > 0 ? (
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-bold text-[#1F1F1F] uppercase tracking-wider flex items-center gap-1.5">
+                  <HardHat className="w-4 h-4 text-[#5A81FA]" />
+                  <span>Linked Contractors ({project.contractors?.length || 0})</span>
+                </h3>
+                <Link
+                  href={`/w/${context.tenantSlug}/projects/${project.id}?tab=contractors`}
+                  className="text-[11px] text-[#5A81FA] hover:underline font-bold"
+                >
+                  View All →
+                </Link>
+              </div>
+
+              {project.contractors && project.contractors.length > 0 ? (
                 <div className="space-y-2 text-xs">
-                  {project.milestones.find((m: any) => m.status === "PENDING") ? (
-                    (() => {
-                      const nextM = project.milestones.find((m: any) => m.status === "PENDING");
-                      return (
-                        <div className="p-3 bg-[#F8F9FD] rounded-xl border border-[#E2E6F0] space-y-1">
-                          <span className="text-[10px] text-[#5A81FA] font-bold block uppercase">
-                            Due: {new Date(nextM.targetDate).toLocaleDateString()}
-                          </span>
-                          <span className="font-bold text-[#1F1F1F] block">{nextM.title}</span>
-                          {nextM.isClientSignoffRequired && (
-                            <span className="inline-block text-[10px] px-2 py-0.5 rounded bg-blue-50 text-blue-800 border border-blue-200">
-                              Client Signoff Mandatory
-                            </span>
-                          )}
-                        </div>
-                      );
-                    })()
-                  ) : (
-                    <p className="text-xs text-emerald-700 italic">All delivery milestones achieved!</p>
+                  {project.contractors.slice(0, 3).map((c: any) => (
+                    <div key={c.id} className="p-2.5 bg-[#F8F9FD] rounded-xl border border-[#E2E6F0] flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <span className="font-semibold text-[#1F1F1F] block truncate">
+                          {c.contractor?.firmName || c.contractor?.name}
+                        </span>
+                        <span className="text-[10px] text-[#696E82] block truncate">
+                          {c.scope || c.contractor?.trade || "Contractor"}
+                        </span>
+                      </div>
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#F2F4FF] text-[#5A81FA] shrink-0 border border-[#CEDEFF]">
+                        {c.contractor?.trade || "Trade"}
+                      </span>
+                    </div>
+                  ))}
+                  {project.contractors.length > 3 && (
+                    <Link
+                      href={`/w/${context.tenantSlug}/projects/${project.id}?tab=contractors`}
+                      className="block text-center text-[11px] text-[#5A81FA] hover:underline font-semibold pt-1"
+                    >
+                      + {project.contractors.length - 3} more contractors
+                    </Link>
                   )}
                 </div>
               ) : (
-                <p className="text-xs text-[#696E82] italic">No delivery milestones configured yet.</p>
+                <div className="text-center py-3 bg-[#F8F9FD] rounded-xl border border-dashed border-[#E2E6F0] space-y-1.5">
+                  <p className="text-xs text-[#696E82]">No contractors linked to this project yet.</p>
+                  {canManage && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsLinkContractorModalOpen(true);
+                        loadAvailableContractors();
+                      }}
+                      className="text-xs font-bold text-[#5A81FA] hover:underline cursor-pointer inline-flex items-center gap-1"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Link Contractor</span>
+                    </button>
+                  )}
+                </div>
               )}
-            </div>
-          </div>
-
-          {/* Phases Progress Sequence */}
-          <div className="bg-white border border-[#E2E6F0] rounded-2xl p-6 shadow-2xs space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-bold text-[#1F1F1F]">11-Phase Architectural Sequence</h3>
-                <p className="text-xs text-[#696E82]">
-                  {project.phaseProgress?.label || "11 standard architectural milestones"}
-                </p>
-              </div>
-              <Link
-                href={`/w/${context.tenantSlug}/projects/${project.id}?tab=phases`}
-                className="text-xs text-[#5A81FA] hover:underline font-bold"
-              >
-                View Detailed Phases →
-              </Link>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2">
-              {project.phases?.map((ph: any) => {
-                const isDone = ph.status === "COMPLETED";
-                const isCurrent = ph.status === "IN_PROGRESS";
-                return (
-                  <div
-                    key={ph.id}
-                    className={`p-3 rounded-xl border text-center space-y-1 ${
-                      isDone
-                        ? "bg-emerald-50 border-emerald-200 text-emerald-900"
-                        : isCurrent
-                        ? "bg-[#F2F4FF] border-[#5A81FA] ring-1 ring-[#5A81FA] text-[#1F1F1F] font-bold"
-                        : "bg-[#F8F9FD] border-[#E2E6F0] text-[#696E82]"
-                    }`}
-                  >
-                    <div className="text-[10px] font-mono text-[#696E82]">{ph.sortOrder}.</div>
-                    <div className="text-xs font-semibold truncate" title={ph.phaseName}>
-                      {ph.phaseName}
-                    </div>
-                    <div className="text-[9px] font-bold uppercase tracking-wider">
-                      {isDone ? "✓ Completed" : isCurrent ? "⚡ Active" : ph.status}
-                    </div>
-                  </div>
-                );
-              })}
             </div>
           </div>
         </div>
@@ -1506,6 +1986,310 @@ export function ProjectDetailClientView({
         </div>
       )}
 
+      {/* ============================================================== */}
+      {/* 5.1 COMMISSIONED CONTRACTORS & SPECIALISTS TAB                 */}
+      {/* ============================================================== */}
+      {currentTab === "contractors" && (
+        <div className="space-y-6 animate-in fade-in">
+          {/* Header Banner */}
+          <div className="bg-white border border-[#E2E6F0] rounded-2xl p-5 sm:p-6 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-blue-50 text-[#5A81FA] flex items-center justify-center shrink-0 border border-blue-100">
+                <HardHat className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-[#1F1F1F]">Commissioned Contractors & Specialists</h2>
+                <p className="text-xs text-[#696E82] mt-0.5">
+                  Civil contractors, specialized trade partners, and site teams commissioned for execution of {project.name}.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Link
+                href={`/w/${context.tenantSlug}/contractors`}
+                className="px-3.5 py-2 bg-[#F8F9FD] hover:bg-[#F2F4FF] border border-[#E2E6F0] text-xs font-semibold text-[#1F1F1F] rounded-xl flex items-center gap-1.5 transition-colors"
+              >
+                <Users className="w-3.5 h-3.5 text-[#696E82]" />
+                <span>Contractor Directory</span>
+              </Link>
+              {canManage && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsLinkContractorModalOpen(true);
+                    loadAvailableContractors();
+                  }}
+                  className="px-4 py-2 bg-[#5A81FA] hover:bg-[#426EE8] text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Link Contractor</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* KPI Summary Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div className="bg-white border border-[#E2E6F0] rounded-2xl p-4 shadow-2xs">
+              <span className="text-[11px] font-semibold text-[#696E82] block">Linked Contractors</span>
+              <div className="text-2xl font-bold text-[#1F1F1F] mt-1">
+                {project.contractors?.length || 0}
+              </div>
+              <p className="text-[11px] text-emerald-600 font-medium mt-0.5 flex items-center gap-1">
+                <CheckCircle2 className="w-3 h-3" />
+                <span>Active on project</span>
+              </p>
+            </div>
+
+            <div className="bg-white border border-[#E2E6F0] rounded-2xl p-4 shadow-2xs">
+              <span className="text-[11px] font-semibold text-[#696E82] block">Trade Disciplines</span>
+              <div className="text-2xl font-bold text-[#1F1F1F] mt-1">
+                {new Set(project.contractors?.map((c: any) => c.contractor?.trade).filter(Boolean)).size || 0}
+              </div>
+              <p className="text-[11px] text-[#696E82] mt-0.5">Specialized scopes</p>
+            </div>
+
+            <div className="bg-white border border-[#E2E6F0] rounded-2xl p-4 shadow-2xs">
+              <span className="text-[11px] font-semibold text-[#696E82] block">Consulting Partners</span>
+              <div className="text-2xl font-bold text-[#1F1F1F] mt-1">
+                {project.consultants?.length || 0}
+              </div>
+              <p className="text-[11px] text-[#696E82] mt-0.5">MEP & Structural</p>
+            </div>
+
+            <div className="bg-white border border-[#E2E6F0] rounded-2xl p-4 shadow-2xs">
+              <span className="text-[11px] font-semibold text-[#696E82] block">Execution Status</span>
+              <div className="text-2xl font-bold text-[#1F1F1F] mt-1">
+                {project.contractors?.length > 0 ? "Commissioned" : "Unassigned"}
+              </div>
+              <p className="text-[11px] text-[#5A81FA] font-medium mt-0.5">
+                {project.contractors?.length > 0 ? "Contracts active" : "Pending appointment"}
+              </p>
+            </div>
+          </div>
+
+          {/* Contractors List */}
+          {project.contractors && project.contractors.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {project.contractors.map((pc: any) => {
+                const contractor = pc.contractor || {};
+                const quotations = pc.quotations || [];
+                const latestQuote = quotations.length > 0 ? quotations[0] : null;
+
+                return (
+                  <div
+                    key={pc.id}
+                    className="bg-white border border-[#E2E6F0] rounded-2xl p-5 shadow-2xs hover:shadow-md transition-shadow flex flex-col justify-between space-y-4"
+                  >
+                    <div>
+                      {/* Top Bar: Name, Trade Badge, Status */}
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <h3 className="text-sm font-bold text-[#1F1F1F] truncate">
+                            {contractor.firmName || contractor.name}
+                          </h3>
+                          {contractor.firmName && contractor.name && contractor.firmName !== contractor.name && (
+                            <p className="text-xs text-[#696E82] flex items-center gap-1 mt-0.5">
+                              <Users className="w-3 h-3 text-[#94A3B8]" />
+                              <span>Contact: {contractor.name}</span>
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-[#F2F4FF] text-[#5A81FA] border border-[#CEDEFF]">
+                            {contractor.trade || "Contractor"}
+                          </span>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            {pc.engagementStatus || "Active"}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Scope of Work Box */}
+                      <div className="mt-3.5 p-3 rounded-xl bg-[#F8F9FD] border border-[#E2E6F0] space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-[#696E82] flex items-center gap-1">
+                            <FileText className="w-3 h-3 text-[#5A81FA]" />
+                            <span>Commissioned Scope of Work</span>
+                          </span>
+                          {canManage && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingContractorLink(pc);
+                                setEditScopeValue(pc.scope || "");
+                              }}
+                              className="text-[10px] font-bold text-[#5A81FA] hover:underline flex items-center gap-0.5 cursor-pointer"
+                            >
+                              <Edit3 className="w-2.5 h-2.5" />
+                              <span>Edit Scope</span>
+                            </button>
+                          )}
+                        </div>
+                        <p className="text-xs text-[#1F1F1F] leading-relaxed">
+                          {pc.scope || "Full trade scope execution in accordance with approved architectural drawings and specifications."}
+                        </p>
+                        {pc.createdAt && (
+                          <p className="text-[10px] text-[#94A3B8] pt-1 border-t border-[#E2E6F0]/60">
+                            Linked on: {new Date(pc.createdAt).toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" })}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Contact Details */}
+                      <div className="mt-3.5 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                        {contractor.contact ? (
+                          <a
+                            href={`tel:${contractor.contact}`}
+                            className="p-2 rounded-lg bg-gray-50 hover:bg-blue-50 border border-gray-100 flex items-center gap-2 text-[#1F1F1F] transition-colors"
+                          >
+                            <Phone className="w-3.5 h-3.5 text-[#5A81FA] shrink-0" />
+                            <span className="truncate">{contractor.contact}</span>
+                          </a>
+                        ) : (
+                          <div className="p-2 rounded-lg bg-gray-50 border border-gray-100 flex items-center gap-2 text-[#94A3B8]">
+                            <Phone className="w-3.5 h-3.5 shrink-0" />
+                            <span className="text-[11px]">No phone listed</span>
+                          </div>
+                        )}
+
+                        {contractor.email ? (
+                          <a
+                            href={`mailto:${contractor.email}`}
+                            className="p-2 rounded-lg bg-gray-50 hover:bg-blue-50 border border-gray-100 flex items-center gap-2 text-[#1F1F1F] transition-colors"
+                          >
+                            <Mail className="w-3.5 h-3.5 text-[#5A81FA] shrink-0" />
+                            <span className="truncate">{contractor.email}</span>
+                          </a>
+                        ) : (
+                          <div className="p-2 rounded-lg bg-gray-50 border border-gray-100 flex items-center gap-2 text-[#94A3B8]">
+                            <Mail className="w-3.5 h-3.5 shrink-0" />
+                            <span className="text-[11px]">No email listed</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {contractor.address && (
+                        <p className="text-[11px] text-[#696E82] mt-2 flex items-center gap-1 truncate">
+                          <MapPin className="w-3 h-3 text-[#94A3B8] shrink-0" />
+                          <span>{contractor.address}</span>
+                        </p>
+                      )}
+
+                      {/* Commercials / Quotations if available */}
+                      {hasFinance && latestQuote && (
+                        <div className="mt-3 p-2.5 rounded-xl bg-amber-50/60 border border-amber-200/60 flex items-center justify-between text-xs">
+                          <div>
+                            <span className="text-[10px] font-bold text-amber-900 block">
+                              Quotation #{latestQuote.quotationNumber || `REV-${latestQuote.revision || 1}`}
+                            </span>
+                            <span className="text-xs font-bold text-[#1F1F1F]">
+                              {latestQuote.currency || "₹"} {Number(latestQuote.amount || 0).toLocaleString("en-IN")}
+                            </span>
+                          </div>
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">
+                            {latestQuote.status || "Submitted"}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Bottom Actions */}
+                    {canManage && (
+                      <div className="pt-3 border-t border-[#E2E6F0] flex items-center justify-between">
+                        <span className="text-[10px] text-[#94A3B8]">
+                          Contractor Ref: {contractor.id?.slice(0, 8)}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setUnlinkingContractor(pc)}
+                          className="px-2.5 py-1 text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Unlink Contractor</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="bg-white border border-[#E2E6F0] rounded-2xl p-10 text-center space-y-4 shadow-2xs">
+              <div className="w-14 h-14 rounded-2xl bg-[#F2F4FF] text-[#5A81FA] flex items-center justify-center mx-auto">
+                <HardHat className="w-7 h-7" />
+              </div>
+              <div className="max-w-md mx-auto space-y-1">
+                <h3 className="text-base font-bold text-[#1F1F1F]">No Contractors Linked to This Project</h3>
+                <p className="text-xs text-[#696E82]">
+                  Link specialized trade contractors (Civil, MEP, Structural, Carpentry, Finishing) to coordinate on-site execution, issue drawings, and manage handover.
+                </p>
+              </div>
+              {canManage && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsLinkContractorModalOpen(true);
+                    loadAvailableContractors();
+                  }}
+                  className="px-5 py-2.5 bg-[#5A81FA] hover:bg-[#426EE8] text-white text-xs font-bold rounded-xl inline-flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Link Contractor to Project</span>
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Associated Consultants Section */}
+          <div className="bg-white border border-[#E2E6F0] rounded-2xl p-5 sm:p-6 shadow-2xs space-y-4">
+            <div className="flex items-center justify-between border-b border-[#E2E6F0] pb-3">
+              <div>
+                <h3 className="text-sm font-bold text-[#1F1F1F]">
+                  Associated Project Consultants ({project.consultants?.length || 0})
+                </h3>
+                <p className="text-xs text-[#696E82]">
+                  External technical specialists (Structural Engineers, MEP Consultants, Landscape Designers).
+                </p>
+              </div>
+              <Link
+                href={`/w/${context.tenantSlug}/consultants`}
+                className="text-xs text-[#5A81FA] hover:underline font-bold"
+              >
+                View Consultant Directory →
+              </Link>
+            </div>
+
+            {project.consultants && project.consultants.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                {project.consultants.map((con: any) => (
+                  <div key={con.id} className="p-3.5 bg-[#F8F9FD] rounded-xl border border-[#E2E6F0] space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-xs text-[#1F1F1F] truncate">
+                        {con.consultant?.firmName || con.consultant?.name}
+                      </span>
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                        {con.consultant?.discipline || con.discipline || "Consultant"}
+                      </span>
+                    </div>
+                    {con.consultant?.name && con.consultant?.firmName && (
+                      <p className="text-[11px] text-[#696E82]">Lead: {con.consultant.name}</p>
+                    )}
+                    {con.consultant?.email && (
+                      <p className="text-[10px] text-[#94A3B8] font-mono truncate">{con.consultant.email}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-[#696E82] italic">
+                No external consultants currently associated with this project.
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* 5.5 HANDOVER PACKAGE TAB */}
       {currentTab === "handover" && (
         <div className="space-y-6">
@@ -1763,7 +2547,15 @@ export function ProjectDetailClientView({
           {/* Contractors & Consultants */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="bg-white border border-[#E2E6F0] rounded-2xl p-6 shadow-2xs space-y-3">
-              <h3 className="text-sm font-bold text-[#1F1F1F]">Commissioned Contractors ({project.contractors.length})</h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold text-[#1F1F1F]">Commissioned Contractors ({project.contractors.length})</h3>
+                <Link
+                  href={`/w/${context.tenantSlug}/projects/${project.id}?tab=contractors`}
+                  className="text-xs text-[#5A81FA] hover:underline font-bold"
+                >
+                  Manage Contractors →
+                </Link>
+              </div>
               {project.contractors.map((c: any) => (
                 <div key={c.id} className="p-3 bg-[#F8F9FD] rounded-xl border border-[#E2E6F0] text-xs">
                   <span className="font-bold text-[#1F1F1F] block">{c.contractor?.name}</span>
@@ -2707,6 +3499,346 @@ export function ProjectDetailClientView({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* MODAL: LINK CONTRACTOR TO PROJECT                              */}
+      {/* ============================================================== */}
+      {isLinkContractorModalOpen && canManage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white rounded-2xl border border-[#E2E6F0] shadow-2xl max-w-lg w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center border-b border-[#E2E6F0] pb-3">
+              <h3 className="text-base font-bold text-[#1F1F1F] flex items-center gap-2">
+                <HardHat className="w-5 h-5 text-[#5A81FA]" />
+                <span>Link Contractor to Project</span>
+              </h3>
+              <button
+                onClick={() => {
+                  setIsLinkContractorModalOpen(false);
+                  setSelectedContractorId("");
+                  setContractorScope("");
+                  setContractorSearchQuery("");
+                }}
+                className="text-[#696E82] hover:text-[#1F1F1F] cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleLinkContractor} className="space-y-4 text-xs">
+              <p className="text-[#696E82]">
+                Commission a specialized contractor or trade partner for execution and drawing coordination on <span className="font-semibold text-[#1F1F1F]">{project.name}</span>.
+              </p>
+
+              {/* Contractor Selection */}
+              <div>
+                <label className="font-semibold text-[#1F1F1F] block mb-1">
+                  Select Contractor <span className="text-red-600">*</span>
+                </label>
+
+                {isLoadingAvailableContractors ? (
+                  <div className="p-4 text-center text-xs text-[#696E82] bg-[#F8F9FD] rounded-xl border border-[#E2E6F0]">
+                    Loading directory contractors...
+                  </div>
+                ) : availableContractors.length === 0 ? (
+                  <div className="p-4 text-center space-y-2 bg-[#F8F9FD] rounded-xl border border-[#E2E6F0]">
+                    <p className="text-xs text-[#696E82]">No contractors registered in your studio directory yet.</p>
+                    <Link
+                      href={`/w/${context.tenantSlug}/contractors`}
+                      target="_blank"
+                      className="text-xs text-[#5A81FA] hover:underline font-bold inline-flex items-center gap-1"
+                    >
+                      <span>Open Contractors Directory to Add</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {/* Search filter for contractors */}
+                    <div className="relative">
+                      <Search className="w-3.5 h-3.5 text-[#94A3B8] absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        value={contractorSearchQuery}
+                        onChange={(e) => setContractorSearchQuery(e.target.value)}
+                        placeholder="Filter by contractor name, firm, or trade..."
+                        className="w-full pl-8 pr-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-xs focus:ring-2 focus:ring-[#5A81FA] focus:outline-none"
+                      />
+                    </div>
+
+                    {/* Contractor selectable radio list */}
+                    <div className="max-h-48 overflow-y-auto space-y-1.5 border border-[#E2E6F0] rounded-xl p-2 bg-[#F8F9FD]/50">
+                      {availableContractors
+                        .filter((c: any) => {
+                          if (!contractorSearchQuery.trim()) return true;
+                          const q = contractorSearchQuery.toLowerCase();
+                          return (
+                            (c.firmName || "").toLowerCase().includes(q) ||
+                            (c.name || "").toLowerCase().includes(q) ||
+                            (c.trade || "").toLowerCase().includes(q)
+                          );
+                        })
+                        .map((c: any) => {
+                          const isAlreadyLinked = project.contractors?.some(
+                            (pc: any) => pc.contractorId === c.id || pc.contractor?.id === c.id
+                          );
+                          const isSelected = selectedContractorId === c.id;
+
+                          return (
+                            <div
+                              key={c.id}
+                              onClick={() => {
+                                if (!isAlreadyLinked) {
+                                  setSelectedContractorId(c.id);
+                                }
+                              }}
+                              className={`p-2.5 rounded-lg border transition-all text-xs flex items-center justify-between gap-2 ${
+                                isAlreadyLinked
+                                  ? "opacity-50 bg-gray-50 border-gray-200 cursor-not-allowed"
+                                  : isSelected
+                                  ? "bg-blue-50/80 border-[#5A81FA] shadow-2xs cursor-pointer"
+                                  : "bg-white border-[#E2E6F0] hover:bg-[#F2F4FF] cursor-pointer"
+                              }`}
+                            >
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-bold text-[#1F1F1F] truncate">
+                                    {c.firmName || c.name}
+                                  </span>
+                                  {c.firmName && c.name && c.firmName !== c.name && (
+                                    <span className="text-[11px] text-[#696E82] truncate">({c.name})</span>
+                                  )}
+                                </div>
+                                <div className="text-[11px] text-[#696E82] flex items-center gap-2 mt-0.5">
+                                  <span>{c.trade || "General Trade"}</span>
+                                  {c.contact && <span>• {c.contact}</span>}
+                                </div>
+                              </div>
+                              <div className="shrink-0 flex items-center gap-1.5">
+                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#F2F4FF] text-[#5A81FA]">
+                                  {c.trade || "Trade"}
+                                </span>
+                                {isAlreadyLinked ? (
+                                  <span className="text-[10px] text-amber-700 font-bold bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                                    Linked
+                                  </span>
+                                ) : isSelected ? (
+                                  <div className="w-5 h-5 rounded-full bg-[#5A81FA] text-white flex items-center justify-center">
+                                    <CheckCircle2 className="w-3.5 h-3.5" />
+                                  </div>
+                                ) : (
+                                  <div className="w-5 h-5 rounded-full border border-gray-300" />
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Commissioned Scope of Work */}
+              <div>
+                <label className="font-semibold text-[#1F1F1F] block mb-1">
+                  Commissioned Scope of Work
+                </label>
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {[
+                    "Civil & Structural Execution",
+                    "Interior Fitout & Millwork",
+                    "Electrical & Low Voltage MEP",
+                    "HVAC & Ducting Installation",
+                    "Plumbing & Public Health Engineering",
+                    "Façade & Exterior Glazing",
+                    "Painting & Specialized Wall Finishes",
+                  ].map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setContractorScope(preset)}
+                      className="px-2.5 py-1 rounded-lg text-[10px] font-semibold bg-[#F2F4FF] hover:bg-[#5A81FA] hover:text-white text-[#5A81FA] border border-[#CEDEFF] transition-colors cursor-pointer"
+                    >
+                      + {preset}
+                    </button>
+                  ))}
+                </div>
+                <textarea
+                  rows={3}
+                  value={contractorScope}
+                  onChange={(e) => setContractorScope(e.target.value)}
+                  placeholder="Describe specific trade scope, milestone boundaries, and drawing packages under this contractor's purview..."
+                  className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-xs focus:ring-2 focus:ring-[#5A81FA] focus:outline-none"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-[#E2E6F0]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsLinkContractorModalOpen(false);
+                    setSelectedContractorId("");
+                    setContractorScope("");
+                    setContractorSearchQuery("");
+                  }}
+                  className="px-4 py-2 bg-[#F2F4FF] text-[#696E82] font-semibold rounded-xl text-xs cursor-pointer hover:bg-gray-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting || !selectedContractorId}
+                  className="px-4 py-2 bg-[#5A81FA] hover:bg-[#426EE8] text-white font-bold rounded-xl text-xs cursor-pointer disabled:opacity-50 flex items-center gap-1.5 shadow-2xs"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>{isSubmitting ? "Linking..." : "Link Contractor to Project"}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* MODAL: EDIT CONTRACTOR PROJECT SCOPE                           */}
+      {/* ============================================================== */}
+      {editingContractorLink && canManage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white rounded-2xl border border-[#E2E6F0] shadow-2xl max-w-md w-full p-6 space-y-4">
+            <div className="flex justify-between items-center border-b border-[#E2E6F0] pb-3">
+              <h3 className="text-base font-bold text-[#1F1F1F] flex items-center gap-2">
+                <Edit3 className="w-5 h-5 text-[#5A81FA]" />
+                <span>Update Contractor Project Scope</span>
+              </h3>
+              <button
+                onClick={() => {
+                  setEditingContractorLink(null);
+                  setEditScopeValue("");
+                }}
+                className="text-[#696E82] hover:text-[#1F1F1F] cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateContractorScope} className="space-y-4 text-xs">
+              <div className="p-3 bg-[#F8F9FD] rounded-xl border border-[#E2E6F0] space-y-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[#696E82]">Contractor</span>
+                <p className="font-bold text-sm text-[#1F1F1F]">
+                  {editingContractorLink.contractor?.firmName || editingContractorLink.contractor?.name}
+                </p>
+                <p className="text-xs text-[#5A81FA] font-medium">
+                  Trade: {editingContractorLink.contractor?.trade || "General Trade"}
+                </p>
+              </div>
+
+              <div>
+                <label className="font-semibold text-[#1F1F1F] block mb-1">
+                  Commissioned Scope of Work
+                </label>
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {[
+                    "Civil & Structural Execution",
+                    "Interior Fitout & Millwork",
+                    "Electrical & Low Voltage MEP",
+                    "HVAC & Ducting Installation",
+                    "Plumbing & Sanitary",
+                    "Façade & Glazing",
+                  ].map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setEditScopeValue(preset)}
+                      className="px-2.5 py-1 rounded-lg text-[10px] font-semibold bg-[#F2F4FF] hover:bg-[#5A81FA] hover:text-white text-[#5A81FA] border border-[#CEDEFF] transition-colors cursor-pointer"
+                    >
+                      {preset}
+                    </button>
+                  ))}
+                </div>
+                <textarea
+                  rows={4}
+                  value={editScopeValue}
+                  onChange={(e) => setEditScopeValue(e.target.value)}
+                  placeholder="Describe specific trade scope and deliverable boundaries..."
+                  className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-xs focus:ring-2 focus:ring-[#5A81FA] focus:outline-none"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-[#E2E6F0]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingContractorLink(null);
+                    setEditScopeValue("");
+                  }}
+                  className="px-4 py-2 bg-[#F2F4FF] text-[#696E82] font-semibold rounded-xl text-xs cursor-pointer hover:bg-gray-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="px-4 py-2 bg-[#5A81FA] hover:bg-[#426EE8] text-white font-bold rounded-xl text-xs cursor-pointer disabled:opacity-50 flex items-center gap-1.5 shadow-2xs"
+                >
+                  <span>{isSubmitting ? "Saving..." : "Save Scope Changes"}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* MODAL: UNLINK CONTRACTOR SAFEGUARD CONFIRMATION                */}
+      {/* ============================================================== */}
+      {unlinkingContractor && canManage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white rounded-2xl border border-[#E2E6F0] shadow-2xl max-w-md w-full p-6 space-y-4">
+            <div className="flex justify-between items-center border-b border-[#E2E6F0] pb-3">
+              <h3 className="text-base font-bold text-rose-600 flex items-center gap-2">
+                <Trash2 className="w-5 h-5 text-rose-600" />
+                <span>Unlink Contractor from Project</span>
+              </h3>
+              <button
+                onClick={() => setUnlinkingContractor(null)}
+                className="text-[#696E82] hover:text-[#1F1F1F] cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <p className="text-[#1F1F1F]">
+                Are you sure you want to unlink <span className="font-bold text-[#1F1F1F]">{unlinkingContractor.contractor?.firmName || unlinkingContractor.contractor?.name}</span> from <span className="font-bold text-[#1F1F1F]">{project.name}</span>?
+              </p>
+              <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-amber-900 text-xs">
+                <p className="font-semibold">Safe Retention Note:</p>
+                <p className="mt-0.5 text-[11px] text-amber-800">
+                  This only disassociates the contractor from this specific project. The contractor record and their history will remain safe and intact in your studio's Contractors Directory.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-[#E2E6F0]">
+              <button
+                type="button"
+                onClick={() => setUnlinkingContractor(null)}
+                className="px-4 py-2 bg-[#F2F4FF] text-[#696E82] font-semibold rounded-xl text-xs cursor-pointer hover:bg-gray-200"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleUnlinkContractor}
+                disabled={isSubmitting}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs cursor-pointer disabled:opacity-50 flex items-center gap-1.5 shadow-2xs"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>{isSubmitting ? "Unlinking..." : "Confirm Unlink"}</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -29,6 +29,11 @@ import {
   ArrowUpDown,
   Filter,
   SlidersHorizontal,
+  ChevronLeft,
+  ChevronRight,
+  MoreVertical,
+  ArrowLeft,
+  AlertTriangle,
 } from "lucide-react";
 import { SearchableDropdown, SearchableSelect } from "@/components/ui/SearchableDropdown";
 import { MobileFilterDrawer } from "@/components/ui/MobileFilterDrawer";
@@ -134,6 +139,13 @@ export default function DrawingsClientView({
   // Notifications
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Register selection & Detail states
+  const [selectedDrawingId, setSelectedDrawingId] = useState<string>(initialDrawings[0]?.id || "");
+  const [mobileDetailDoc, setMobileDetailDoc] = useState<DrawingItem | null>(null);
+  const [detailSubTab, setDetailSubTab] = useState<"history" | "evidence">("history");
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [isDetailMoreOpen, setIsDetailMoreOpen] = useState<boolean>(false);
 
   // Modals & Drawers
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -513,6 +525,15 @@ export default function DrawingsClientView({
     }
   };
 
+  const inReviewCount = drawings.filter((d) => d.latestVersion?.approvalState === "IN_REVIEW").length;
+  const draftsCount = drawings.filter((d) => d.latestVersion?.approvalState === "DRAFT").length;
+  const approvedCount = drawings.filter((d) => d.latestVersion?.approvalState === "APPROVED").length;
+
+  const pageSize = 8;
+  const totalPages = Math.max(1, Math.ceil(filteredDrawings.length / pageSize));
+  const paginatedDrawings = filteredDrawings.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const selectedDrawing = drawings.find((d) => d.id === selectedDrawingId) || filteredDrawings[0] || drawings[0] || null;
+
   if (!isMounted) {
     return (
       <div className="space-y-6 animate-pulse" suppressHydrationWarning>
@@ -554,541 +575,833 @@ export default function DrawingsClientView({
         </div>
       )}
 
-      {/* Top Filter and Search Bar */}
-      <div className="bg-white border border-[#E2E6F0] rounded-2xl p-3.5 sm:p-4 shadow-xs space-y-3">
+      {/* Top Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-1.5 text-xs text-[#696E82] mb-1">
+            <span>Projects & Delivery</span>
+            <span>/</span>
+            <span className="text-[#1F1F1F] font-semibold">Drawings</span>
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#1F1F1F]">
+            Drawings & approvals
+          </h1>
+          <p className="text-xs text-[#696E82] mt-0.5">
+            Find the right revision. Keep every approval traceable.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setIsCreateModalOpen(true)}
+          className="px-4 py-2.5 bg-[#5A81FA] hover:bg-[#426EE8] text-white text-xs font-bold rounded-xl shadow-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
+        >
+          <Plus className="w-4 h-4" />
+          <span>+ Register drawing</span>
+        </button>
+      </div>
+
+      <div className="flex items-center gap-2 text-xs text-[#696E82]">
+        <span className="font-bold text-[#1F1F1F]">{drawings.length} drawings</span>
+        <span>|</span>
+        <span>Revision-controlled library</span>
+      </div>
+
+      {/* Workflow Tabs */}
+      <div className="flex items-center gap-2 border-b border-[#E2E6F0] pb-2 overflow-x-auto touch-scroll-x scrollbar-none">
+        <button
+          type="button"
+          onClick={() => {
+            setSelectedStatusFilter("ALL");
+            setCurrentPage(1);
+          }}
+          className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
+            selectedStatusFilter === "ALL"
+              ? "bg-[#5A81FA] text-white shadow-2xs"
+              : "text-[#696E82] hover:bg-[#F2F4FF] hover:text-[#1F1F1F]"
+          }`}
+        >
+          All drawings
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setSelectedStatusFilter("IN_REVIEW");
+            setCurrentPage(1);
+          }}
+          className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
+            selectedStatusFilter === "IN_REVIEW"
+              ? "bg-[#5A81FA] text-white shadow-2xs"
+              : "text-[#696E82] hover:bg-[#F2F4FF] hover:text-[#1F1F1F]"
+          }`}
+        >
+          In review ({inReviewCount})
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setSelectedStatusFilter("DRAFT");
+            setCurrentPage(1);
+          }}
+          className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
+            selectedStatusFilter === "DRAFT"
+              ? "bg-[#5A81FA] text-white shadow-2xs"
+              : "text-[#696E82] hover:bg-[#F2F4FF] hover:text-[#1F1F1F]"
+          }`}
+        >
+          Drafts ({draftsCount})
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setSelectedStatusFilter("APPROVED");
+            setCurrentPage(1);
+          }}
+          className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
+            selectedStatusFilter === "APPROVED"
+              ? "bg-[#5A81FA] text-white shadow-2xs"
+              : "text-[#696E82] hover:bg-[#F2F4FF] hover:text-[#1F1F1F]"
+          }`}
+        >
+          Approved ({approvedCount})
+        </button>
+      </div>
+
+      {/* Filter and Search Bar */}
+      <div className="bg-white border border-[#E2E6F0] rounded-2xl p-3.5 shadow-xs space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          {/* Search Box & Mobile Filter Button */}
-          <div className="flex items-center gap-2 flex-1 min-w-0">
-            <div className="relative flex-1 min-w-0 sm:max-w-md">
-              <Search className="w-4 h-4 text-[#696E82] absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search drawings by sheet #, title, or project..."
-                className="w-full pl-9 pr-7 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-xs text-[#1F1F1F] placeholder-[#696E82] focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
+          <div className="relative flex-1 min-w-0 sm:max-w-md">
+            <Search className="w-4 h-4 text-[#696E82] absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
+              placeholder="Search title, sheet code or project..."
+              className="w-full pl-9 pr-7 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-xs text-[#1F1F1F] placeholder-[#696E82] focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#696E82] hover:text-[#1F1F1F] p-0.5 cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Project dropdown */}
+            <div className="min-w-[150px]">
+              <SearchableDropdown
+                size="sm"
+                optionType="project"
+                value={selectedProjectFilter}
+                onChange={(v) => {
+                  setSelectedProjectFilter(v);
+                  setCurrentPage(1);
+                }}
+                placeholder="All projects"
+                searchPlaceholder="Search projects..."
+                clearable={false}
+                options={[
+                  { value: "ALL", label: "All projects" },
+                  ...projects.map((p) => ({
+                    value: p.id,
+                    label: p.name,
+                    projectCode: p.code,
+                  })),
+                ]}
               />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery("")}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#696E82] hover:text-[#1F1F1F] p-0.5"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              )}
             </div>
 
-            {/* Mobile Filters Drawer Trigger Button */}
+            {/* Discipline dropdown */}
+            <div className="min-w-[140px]">
+              <SearchableDropdown
+                size="sm"
+                value={selectedDisciplineFilter}
+                onChange={(v) => {
+                  setSelectedDisciplineFilter(v);
+                  setCurrentPage(1);
+                }}
+                placeholder="All disciplines"
+                searchable={false}
+                clearable={false}
+                options={[
+                  { value: "ALL", label: "All disciplines" },
+                  ...disciplines.map((d) => ({
+                    value: d,
+                    label: d,
+                  })),
+                ]}
+              />
+            </div>
+
+            {/* Mobile Filter Button */}
             <button
               type="button"
               onClick={() => setIsMobileFilterOpen(true)}
-              className={`sm:hidden px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 shrink-0 border cursor-pointer ${
-                activeFilterCount > 0
-                  ? "bg-blue-50 border-[#3562E8] text-[#3562E8] font-bold shadow-xs"
-                  : "bg-white border-[#E2E6F0] text-slate-700 hover:bg-[#F8F9FD]"
-              }`}
-              title="Open all filters"
+              className="px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 border border-[#E2E6F0] bg-white text-[#1F1F1F] hover:bg-[#F8F9FD] cursor-pointer"
             >
-              <SlidersHorizontal className="w-3.5 h-3.5 text-[#3562E8]" />
+              <Filter className="w-3.5 h-3.5 text-[#5A81FA]" />
               <span>Filters</span>
               {activeFilterCount > 0 && (
-                <span className="w-5 h-5 rounded-full bg-[#3562E8] text-white text-[10px] font-mono font-bold flex items-center justify-center">
+                <span className="w-4 h-4 rounded-full bg-[#5A81FA] text-white text-[9px] font-bold flex items-center justify-center">
                   {activeFilterCount}
                 </span>
               )}
             </button>
-          </div>
 
-          {/* Right Action: Register Drawing */}
-          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-            <button
-              onClick={() => setIsCreateModalOpen(true)}
-              className="px-3.5 py-2 bg-[#5A81FA] hover:bg-[#426EE8] text-white text-xs font-semibold rounded-xl shadow-2xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer w-full sm:w-auto shrink-0"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Register Drawing (R0)</span>
-            </button>
+            {/* Sort */}
+            <div className="min-w-[150px]">
+              <SearchableDropdown
+                size="sm"
+                value={drawingSortBy}
+                onChange={setDrawingSortBy}
+                placeholder="Sort: Newest first"
+                searchable={false}
+                clearable={false}
+                options={[
+                  { value: "DATE_DESC", label: "Sort: Newest first" },
+                  { value: "DATE_ASC", label: "Sort: Oldest first" },
+                  { value: "ALPHA_TITLE_ASC", label: "Sort: Title (A → Z)" },
+                  { value: "ALPHA_TITLE_DESC", label: "Sort: Title (Z → A)" },
+                  { value: "ALPHA_NUMBER_ASC", label: "Sort: Sheet # (A → Z)" },
+                  { value: "ALPHA_NUMBER_DESC", label: "Sort: Sheet # (Z → A)" },
+                ]}
+              />
+            </div>
           </div>
         </div>
+      </div>
 
-        {/* Mobile View: 1-Tap Quick Filter Carousel */}
-        <div className="sm:hidden flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none -mx-1 px-1 pt-1 border-t border-slate-100">
-          <button
-            type="button"
-            onClick={() => setSelectedStatusFilter("ALL")}
-            className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-colors shrink-0 ${
-              selectedStatusFilter === "ALL"
-                ? "bg-[#3562E8] text-white shadow-xs"
-                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-            }`}
-          >
-            All ({drawings.length})
-          </button>
-          <button
-            type="button"
-            onClick={() => setSelectedStatusFilter((prev) => (prev === "DRAFT" ? "ALL" : "DRAFT"))}
-            className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-colors shrink-0 flex items-center gap-1 ${
-              selectedStatusFilter === "DRAFT"
-                ? "bg-[#3562E8] text-white shadow-xs"
-                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-            }`}
-          >
-            <span>Draft</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setSelectedStatusFilter((prev) => (prev === "IN_REVIEW" ? "ALL" : "IN_REVIEW"))}
-            className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-colors shrink-0 flex items-center gap-1 ${
-              selectedStatusFilter === "IN_REVIEW"
-                ? "bg-purple-600 text-white shadow-xs"
-                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-            }`}
-          >
-            <Clock className="w-3 h-3" />
-            <span>In Review</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setSelectedStatusFilter((prev) => (prev === "APPROVED" ? "ALL" : "APPROVED"))}
-            className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-colors shrink-0 flex items-center gap-1 ${
-              selectedStatusFilter === "APPROVED"
-                ? "bg-emerald-600 text-white shadow-xs"
-                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-            }`}
-          >
-            <CheckCircle2 className="w-3 h-3" />
-            <span>Approved</span>
-          </button>
-        </div>
-
-        {/* Desktop Filter Dropdowns (hidden on mobile, visible on sm and up) */}
-        <div className="hidden sm:flex flex-wrap items-center gap-2 pt-2 border-t border-[#E2E6F0] text-xs">
-          <div className="flex items-center gap-1 text-[#696E82] font-semibold">
-            <Filter className="w-3.5 h-3.5 text-[#5878FF]" />
-            <span>Filters:</span>
-          </div>
-
-          {/* Project */}
-          <div className="min-w-[180px]">
-            <SearchableDropdown
-              size="sm"
-              optionType="project"
-              value={selectedProjectFilter}
-              onChange={setSelectedProjectFilter}
-              placeholder="All Projects"
-              searchPlaceholder="Search projects..."
-              clearable={false}
-              options={[
-                { value: "ALL", label: "All Projects" },
-                ...projects.map((p) => ({
-                  value: p.id,
-                  label: p.name,
-                  projectCode: p.code,
-                })),
-              ]}
-            />
-          </div>
-
-          {/* Discipline */}
-          <div className="min-w-[150px]">
-            <SearchableDropdown
-              size="sm"
-              value={selectedDisciplineFilter}
-              onChange={setSelectedDisciplineFilter}
-              placeholder="All Disciplines"
-              searchable={false}
-              clearable={false}
-              options={[
-                { value: "ALL", label: "All Disciplines" },
-                ...disciplines.map((d) => ({
-                  value: d,
-                  label: d,
-                })),
-              ]}
-            />
-          </div>
-
-          {/* Status */}
-          <div className="min-w-[160px]">
-            <SearchableDropdown
-              size="sm"
-              optionType="status"
-              value={selectedStatusFilter}
-              onChange={setSelectedStatusFilter}
-              placeholder="All Workflow States"
-              searchable={false}
-              clearable={false}
-              options={[
-                { value: "ALL", label: "All Workflow States" },
-                { value: "DRAFT", label: "Draft Revisions", subLabel: "In progress" },
-                { value: "IN_REVIEW", label: "In Review", subLabel: "Pending review" },
-                { value: "APPROVED", label: "Approved Deliverables", subLabel: "Formally accepted" },
-              ]}
-            />
-          </div>
-
-          {/* Sort By Filter (Date, Day & Alphabetical Order) */}
-          <div className="min-w-[180px]">
-            <SearchableDropdown
-              size="sm"
-              value={drawingSortBy}
-              onChange={setDrawingSortBy}
-              placeholder="Sort By"
-              searchable={false}
-              clearable={false}
-              options={[
-                { value: "DATE_DESC", label: "Sort: Date (Newest First)" },
-                { value: "DATE_ASC", label: "Sort: Date (Oldest First)" },
-                { value: "ALPHA_TITLE_ASC", label: "Sort: Title (A → Z)" },
-                { value: "ALPHA_TITLE_DESC", label: "Sort: Title (Z → A)" },
-                { value: "ALPHA_NUMBER_ASC", label: "Sort: Drawing No. (A → Z)" },
-                { value: "ALPHA_NUMBER_DESC", label: "Sort: Drawing No. (Z → A)" },
-              ]}
-            />
-          </div>
-
-          {activeFilterCount > 0 && (
+      {/* If Mobile Detail is active on mobile screens: show focused detail view */}
+      {mobileDetailDoc ? (
+        <div className="lg:hidden space-y-4">
+          <div className="flex items-center justify-between">
             <button
               type="button"
-              onClick={handleClearFilters}
-              className="text-[#696E82] hover:text-red-700 font-semibold text-xs flex items-center gap-1 cursor-pointer"
+              onClick={() => setMobileDetailDoc(null)}
+              className="text-xs font-bold text-[#5A81FA] hover:underline flex items-center gap-1.5 cursor-pointer py-1"
             >
-              <X className="w-3.5 h-3.5" />
-              <span>Clear filters</span>
+              <ArrowLeft className="w-4 h-4" />
+              <span>Drawings</span>
             </button>
-          )}
-
-          <div className="text-[11px] text-[#696E82] ml-auto">
-            Showing {filteredDrawings.length} of {drawings.length} drawings
-          </div>
-        </div>
-      </div>
-
-      {/* Mobile Filter Drawer */}
-      <MobileFilterDrawer
-        isOpen={isMobileFilterOpen}
-        onClose={() => setIsMobileFilterOpen(false)}
-        title="Filter Drawings"
-        activeCount={activeFilterCount}
-        onReset={handleClearFilters}
-        resultCount={filteredDrawings.length}
-      >
-        <div className="space-y-4">
-          {/* Project */}
-          <div>
-            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">
-              Project
-            </label>
-            <SearchableDropdown
-              size="md"
-              optionType="project"
-              value={selectedProjectFilter}
-              onChange={setSelectedProjectFilter}
-              placeholder="All Projects"
-              searchPlaceholder="Search projects..."
-              clearable={false}
-              options={[
-                { value: "ALL", label: "All Projects" },
-                ...projects.map((p) => ({
-                  value: p.id,
-                  label: p.name,
-                  projectCode: p.code,
-                })),
-              ]}
-              className="w-full"
-            />
-          </div>
-
-          {/* Discipline */}
-          <div>
-            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">
-              Discipline
-            </label>
-            <SearchableDropdown
-              size="md"
-              value={selectedDisciplineFilter}
-              onChange={setSelectedDisciplineFilter}
-              placeholder="All Disciplines"
-              searchable={false}
-              clearable={false}
-              options={[
-                { value: "ALL", label: "All Disciplines" },
-                ...disciplines.map((d) => ({
-                  value: d,
-                  label: d,
-                })),
-              ]}
-              className="w-full"
-            />
-          </div>
-
-          {/* Workflow Status */}
-          <div>
-            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">
-              Workflow Status
-            </label>
-            <SearchableDropdown
-              size="md"
-              optionType="status"
-              value={selectedStatusFilter}
-              onChange={setSelectedStatusFilter}
-              placeholder="All Workflow States"
-              searchable={false}
-              clearable={false}
-              options={[
-                { value: "ALL", label: "All Workflow States" },
-                { value: "DRAFT", label: "Draft Revisions", subLabel: "In progress" },
-                { value: "IN_REVIEW", label: "In Review", subLabel: "Pending review" },
-                { value: "APPROVED", label: "Approved Deliverables", subLabel: "Formally accepted" },
-              ]}
-              className="w-full"
-            />
-          </div>
-
-          {/* Sort By */}
-          <div>
-            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">
-              Sort Order
-            </label>
-            <SearchableDropdown
-              size="md"
-              value={drawingSortBy}
-              onChange={setDrawingSortBy}
-              placeholder="Sort By"
-              searchable={false}
-              clearable={false}
-              options={[
-                { value: "DATE_DESC", label: "Date (Newest First)" },
-                { value: "DATE_ASC", label: "Date (Oldest First)" },
-                { value: "ALPHA_TITLE_ASC", label: "Title (A → Z)" },
-                { value: "ALPHA_TITLE_DESC", label: "Title (Z → A)" },
-                { value: "ALPHA_NUMBER_ASC", label: "Drawing No. (A → Z)" },
-                { value: "ALPHA_NUMBER_DESC", label: "Drawing No. (Z → A)" },
-              ]}
-              className="w-full"
-            />
-          </div>
-        </div>
-      </MobileFilterDrawer>
-
-      {/* Drawings Cards List */}
-      <div className="space-y-3">
-        {filteredDrawings.length === 0 ? (
-          <div className="bg-white border border-[#E2E6F0] rounded-2xl p-12 text-center text-[#696E82]">
-            <FileText className="w-10 h-10 mx-auto text-[#A8B1CE] mb-3" />
-            <h3 className="text-sm font-semibold text-[#1F1F1F]">No architectural drawings found</h3>
-            <p className="text-xs text-[#696E82] mt-1">
-              Upload initial CAD sheets (R0) or change your project/discipline filter.
-            </p>
-          </div>
-        ) : (
-          filteredDrawings.map((doc) => {
-            const latest = doc.latestVersion;
-            const latestApproved = doc.latestApprovedVersion;
-            const isUploader = latest?.uploaderId === currentMembershipId;
-            const canReview = isPrivileged && !isUploader; // Strictly prevent self-approval!
-
-            return (
-              <div
-                key={doc.id}
-                className="bg-white border border-[#E2E6F0] rounded-2xl p-4 sm:p-5 shadow-xs hover:border-[#5A81FA]/40 transition-all space-y-4"
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setIsDetailMoreOpen(!isDetailMoreOpen)}
+                className="p-1.5 text-[#696E82] hover:text-[#1F1F1F] rounded-lg cursor-pointer"
               >
-                {/* Top Row: Meta & Project */}
-                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-                  <div className="space-y-1 min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-mono text-xs font-bold text-[#5A81FA] bg-[#F2F4FF] px-2 py-0.5 rounded border border-[#CEDEFF]">
-                        {doc.project.code}
-                      </span>
-                      {doc.drawingNumber && (
-                        <span className="font-mono text-xs font-bold text-[#1F1F1F] bg-[#F2F4FF] px-2 py-0.5 rounded">
-                          {doc.drawingNumber}
-                        </span>
-                      )}
-                      <span className="text-xs font-medium text-[#696E82] bg-[#F2F4FF] px-2 py-0.5 rounded">
-                        {doc.discipline}
-                      </span>
-                      <span className="text-[11px] text-[#696E82]">
-                        {doc.documentType}
-                      </span>
-                    </div>
-
-                    <h3 className="text-base font-bold text-[#1F1F1F] tracking-tight">{doc.title}</h3>
-                    <p className="text-xs text-[#696E82]">Project: <strong>{doc.project.name}</strong></p>
-                  </div>
-
-                  {/* Dual Revision Badges (Crucial distinction between Latest Revision and Latest Approved Revision) */}
-                  <div className="flex flex-wrap sm:flex-col items-end gap-1.5 shrink-0 text-xs">
-                    {/* Latest Revision Badge */}
-                    <div className="flex items-center gap-1.5 bg-[#F8F9FD] px-2.5 py-1 rounded-lg border border-[#E2E6F0]">
-                      <span className="text-[11px] text-[#696E82]">Latest Revision:</span>
-                      <span className="font-mono font-bold text-[#1F1F1F]">
-                        {latest ? latest.revision : "None"}
-                      </span>
-                      {latest && getStatusBadge(latest.approvalState)}
-                    </div>
-
-                    {/* Latest Approved Revision Badge */}
-                    <div className="flex items-center gap-1.5 bg-emerald-50/60 px-2.5 py-1 rounded-lg border border-emerald-200">
-                      <span className="text-[11px] text-emerald-800">Latest Approved:</span>
-                      {latestApproved ? (
-                        <span className="font-mono font-bold text-emerald-900">
-                          {latestApproved.revision} ✔
-                        </span>
-                      ) : (
-                        <span className="text-[11px] text-[#696E82] italic">No approved revision yet</span>
-                      )}
-                    </div>
-                  </div>
+                <MoreVertical className="w-4 h-4" />
+              </button>
+              {isDetailMoreOpen && (
+                <div
+                  className="absolute right-0 mt-1 w-44 bg-white border border-[#E2E6F0] rounded-xl shadow-lg py-1 z-30 animate-in fade-in zoom-in-95"
+                  onMouseLeave={() => setIsDetailMoreOpen(false)}
+                >
+                  {mobileDetailDoc.latestVersion && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsDetailMoreOpen(false);
+                        openPreview(mobileDetailDoc.latestVersion!.fileId, `${mobileDetailDoc.title}_${mobileDetailDoc.latestVersion!.revision}.pdf`);
+                      }}
+                      className="w-full text-left px-3.5 py-2 text-xs hover:bg-[#F8F9FD] flex items-center gap-2 cursor-pointer font-medium"
+                    >
+                      <Eye className="w-3.5 h-3.5 text-[#696E82]" />
+                      <span>Preview sheet</span>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsDetailMoreOpen(false);
+                      setDetailDrawerDoc(mobileDetailDoc);
+                    }}
+                    className="w-full text-left px-3.5 py-2 text-xs hover:bg-[#F8F9FD] flex items-center gap-2 cursor-pointer font-medium"
+                  >
+                    <History className="w-3.5 h-3.5 text-[#696E82]" />
+                    <span>View audit history</span>
+                  </button>
                 </div>
+              )}
+            </div>
+          </div>
 
-                {/* Latest Revision Context & Action Controls */}
-                {latest && (
-                  <div className="bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl p-3.5 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
-                    <div className="space-y-1">
+          <div className="bg-white border border-[#E2E6F0] rounded-2xl p-5 shadow-2xs space-y-4">
+            <div>
+              <h2 className="text-xl font-bold text-[#1F1F1F] tracking-tight">{mobileDetailDoc.title}</h2>
+              <p className="text-xs text-[#696E82] mt-0.5">
+                Project: {mobileDetailDoc.project.name} • {mobileDetailDoc.discipline} • {mobileDetailDoc.documentType}
+              </p>
+            </div>
+
+            {/* Comparison boxes */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="p-3 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl space-y-1">
+                <span className="text-[10px] font-bold text-[#696E82] uppercase block">Latest revision</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-lg font-bold font-mono text-[#1F1F1F]">{mobileDetailDoc.latestVersion?.revision || "—"}</span>
+                  {mobileDetailDoc.latestVersion && getStatusBadge(mobileDetailDoc.latestVersion.approvalState)}
+                </div>
+                <span className="text-[10px] text-[#696E82] block truncate">
+                  {mobileDetailDoc.latestVersion ? `Updated ${new Date(mobileDetailDoc.latestVersion.updatedAt || mobileDetailDoc.latestVersion.createdAt).toLocaleDateString()}` : "No revisions"}
+                </span>
+              </div>
+
+              <div className="p-3 bg-emerald-50/50 border border-emerald-200 rounded-xl space-y-1">
+                <span className="text-[10px] font-bold text-emerald-800 uppercase block">Approved revision</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-lg font-bold font-mono text-emerald-900">{mobileDetailDoc.latestApprovedVersion?.revision || "—"}</span>
+                  {mobileDetailDoc.latestApprovedVersion ? getStatusBadge("APPROVED") : <span className="text-[10px] text-gray-500 italic">None</span>}
+                </div>
+                <span className="text-[10px] text-emerald-700 block truncate">
+                  {mobileDetailDoc.latestApprovedVersion ? `Approved ${new Date(mobileDetailDoc.latestApprovedVersion.updatedAt || mobileDetailDoc.latestApprovedVersion.createdAt).toLocaleDateString()}` : "No approved revision"}
+                </span>
+              </div>
+            </div>
+
+            {/* Alert banner if unapproved */}
+            {mobileDetailDoc.latestVersion?.approvalState !== "APPROVED" && (
+              <div className="bg-[#FFF8E6] border border-[#FFE082] rounded-xl p-3 flex items-start gap-2 text-xs text-amber-900">
+                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <span>
+                  {mobileDetailDoc.latestApprovedVersion
+                    ? `${mobileDetailDoc.latestVersion?.revision || "Latest"} is not approved. Use ${mobileDetailDoc.latestApprovedVersion.revision} as the approved revision.`
+                    : `${mobileDetailDoc.latestVersion?.revision || "Latest"} is not approved. Construction holds apply.`}
+                </span>
+              </div>
+            )}
+
+            {/* Preview Box Placeholder */}
+            <div className="p-6 bg-[#F8F9FD] border border-dashed border-[#E2E6F0] rounded-xl text-center space-y-2">
+              <FileText className="w-10 h-10 mx-auto text-[#A8B1CE]" />
+              <p className="text-xs text-[#696E82]">No preview available. Open the file to view the drawing.</p>
+              {mobileDetailDoc.latestVersion && (
+                <button
+                  type="button"
+                  onClick={() => openPreview(mobileDetailDoc.latestVersion!.fileId, `${mobileDetailDoc.title}_${mobileDetailDoc.latestVersion!.revision}.pdf`)}
+                  className="px-3.5 py-1.5 bg-white border border-[#E2E6F0] hover:bg-[#F2F4FF] text-[#1F1F1F] text-xs font-semibold rounded-lg shadow-2xs inline-flex items-center gap-1.5 cursor-pointer"
+                >
+                  <span>Open preview</span>
+                  <ExternalLink className="w-3.5 h-3.5 text-[#5A81FA]" />
+                </button>
+              )}
+            </div>
+
+            {/* Sub-tabs */}
+            <div className="flex items-center gap-4 border-b border-[#E2E6F0] pb-2 text-xs">
+              <button
+                type="button"
+                onClick={() => setDetailSubTab("history")}
+                className={`font-semibold pb-1 cursor-pointer transition-colors ${
+                  detailSubTab === "history" ? "text-[#5A81FA] border-b-2 border-[#5A81FA]" : "text-[#696E82]"
+                }`}
+              >
+                Revision history
+              </button>
+              <button
+                type="button"
+                onClick={() => setDetailSubTab("evidence")}
+                className={`font-semibold pb-1 cursor-pointer transition-colors ${
+                  detailSubTab === "evidence" ? "text-[#5A81FA] border-b-2 border-[#5A81FA]" : "text-[#696E82]"
+                }`}
+              >
+                Evidence
+              </button>
+            </div>
+
+            {/* Tab content */}
+            {detailSubTab === "history" ? (
+              <div className="space-y-4">
+                {mobileDetailDoc.versions.map((ver, idx) => (
+                  <div key={ver.id} className="relative pl-6 pb-2 text-xs space-y-1">
+                    {idx < mobileDetailDoc.versions.length - 1 && (
+                      <div className="absolute left-2.5 top-3 bottom-0 w-0.5 bg-[#E2E6F0]" />
+                    )}
+                    <div className={`absolute left-1 top-1.5 w-3.5 h-3.5 rounded-full ring-2 ring-white ${
+                      ver.approvalState === "APPROVED" ? "bg-emerald-500" : ver.approvalState === "IN_REVIEW" ? "bg-purple-600" : "bg-slate-400"
+                    }`} />
+                    <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <span className="font-mono font-bold text-[#5A81FA]">
-                          {latest.revision}
-                        </span>
-                        <span className="text-[#696E82] font-medium">— {latest.issuePurpose}</span>
-                        <span className="text-[#696E82] text-[11px]">
-                          (Uploaded {new Date(latest.createdAt).toLocaleDateString()})
-                        </span>
+                        <span className="font-mono font-bold text-[#1F1F1F]">{ver.revision}</span>
+                        {getStatusBadge(ver.approvalState)}
                       </div>
-
-                      {/* Client Approval Status for Latest Approved */}
-                      {latestApproved?.approvalRequests.some((ar) => ar.isClientApproval && ar.status === "APPROVED") && (
-                        <div className="flex items-center gap-1 text-[11px] text-emerald-700 font-semibold">
-                          <Award className="w-3.5 h-3.5" />
-                          <span>Client Approved (Evidence Recorded)</span>
-                        </div>
-                      )}
+                      <span className="text-[11px] text-[#696E82]">{new Date(ver.createdAt).toLocaleDateString()}</span>
                     </div>
-
-                    {/* Action Buttons for this Drawing */}
-                    <div className="flex flex-wrap items-center gap-2">
-                      {/* Preview Button */}
+                    <p className="text-[#696E82] text-xs">{ver.issuePurpose}</p>
+                    {ver.approvalRequests?.some((ar) => ar.isClientApproval && ar.status === "APPROVED") && (
                       <button
-                        onClick={() => openPreview(latest.fileId, `${doc.title}_${latest.revision}.pdf`)}
-                        className="px-2.5 py-1.5 bg-white border border-[#E2E6F0] text-[#1F1F1F] font-semibold rounded-lg hover:bg-[#F2F4FF] cursor-pointer flex items-center gap-1"
-                        title="Preview sheet"
+                        type="button"
+                        onClick={() => setDetailSubTab("evidence")}
+                        className="text-[11px] text-[#5A81FA] hover:underline font-semibold block"
                       >
-                        <Eye className="w-3.5 h-3.5 text-[#696E82]" />
-                        <span>Preview</span>
+                        Client approval evidence recorded. View evidence →
                       </button>
-
-                      {/* Download Button */}
-                      <a
-                        href={`/api/storage/files/${latest.fileId}?download=true&workspaceSlug=${workspaceSlug}`}
-                        className="px-2.5 py-1.5 bg-white border border-[#E2E6F0] text-[#1F1F1F] font-semibold rounded-lg hover:bg-[#F2F4FF] cursor-pointer flex items-center gap-1"
-                        title="Download private file safely"
-                      >
-                        <Download className="w-3.5 h-3.5 text-[#696E82]" />
-                        <span>Download</span>
-                      </a>
-
-                      {/* Workflow Step 1: Submit Draft for Review */}
-                      {latest.approvalState === "DRAFT" && (isUploader || isPrivileged) && (
-                        <>
-                          <button
-                            onClick={() => handleSubmitForReview(latest.id)}
-                            className="px-3 py-1.5 bg-[#5A81FA] hover:bg-[#426EE8] text-white font-semibold rounded-lg shadow-2xs cursor-pointer flex items-center gap-1"
-                          >
-                            <Clock className="w-3.5 h-3.5" />
-                            <span>Submit Review</span>
-                          </button>
-
-                          {doc.versions.length === 1 && (
-                            <button
-                              onClick={() => handleDeleteDraft(latest.id)}
-                              className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg cursor-pointer"
-                              title="Delete unsubmitted draft"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                        </>
-                      )}
-
-                      {/* Workflow Step 2: Withdraw Draft if in review and unreviewed */}
-                      {latest.approvalState === "IN_REVIEW" && (isUploader || isPrivileged) && (
-                        <button
-                          onClick={() => handleWithdrawSubmission(latest.id)}
-                          className="px-2.5 py-1.5 bg-[#F2F4FF] hover:bg-[#F2F4FF] text-[#696E82] font-semibold rounded-lg border border-[#E2E6F0] cursor-pointer flex items-center gap-1"
-                          title="Withdraw submission back to draft"
-                        >
-                          <RotateCcw className="w-3.5 h-3.5" />
-                          <span>Withdraw</span>
-                        </button>
-                      )}
-
-                      {/* Workflow Step 3: Approve / Request Changes (Privileged Only & NO SELF-APPROVAL!) */}
-                      {latest.approvalState === "IN_REVIEW" && isPrivileged && (
-                        <>
-                          {canReview ? (
-                            <div className="flex items-center gap-1">
-                              <button
-                                onClick={() => handleApproveRevision(latest.id)}
-                                className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-semibold rounded-lg shadow-2xs cursor-pointer flex items-center gap-1"
-                              >
-                                <CheckCheck className="w-3.5 h-3.5" />
-                                <span>Approve</span>
-                              </button>
-
-                              <button
-                                onClick={() => setChangeRequestVersion(latest)}
-                                className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-semibold rounded-lg cursor-pointer flex items-center gap-1"
-                              >
-                                <RotateCcw className="w-3.5 h-3.5 text-amber-700" />
-                                <span>Changes</span>
-                              </button>
-                            </div>
-                          ) : (
-                            <div className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-lg">
-                              Awaiting another partner approval (Self-approval blocked)
-                            </div>
-                          )}
-                        </>
-                      )}
-
-                      {/* Record Client Approval (Owner / Admin only) */}
-                      {isPrivileged && latest.approvalState === "APPROVED" && (
-                        <button
-                          onClick={() => setClientApprovalVersion(latest)}
-                          className="px-2.5 py-1.5 bg-[#F2F4FF] hover:bg-[#E7EBD5] text-[#5A81FA] border border-[#CEDEFF] font-semibold rounded-lg cursor-pointer flex items-center gap-1"
-                        >
-                          <Award className="w-3.5 h-3.5" />
-                          <span>Record Client Evidence</span>
-                        </button>
-                      )}
-
-                      {/* Upload Next Revision (R1, R2...) */}
-                      <button
-                        onClick={() => setUploadRevisionDoc(doc)}
-                        className="px-2.5 py-1.5 bg-[#F2F4FF] hover:bg-[#F2F4FF] text-[#1F1F1F] font-semibold rounded-lg border border-[#E2E6F0] cursor-pointer flex items-center gap-1"
-                        title="Upload revised CAD/PDF sheet"
-                      >
-                        <Upload className="w-3.5 h-3.5 text-[#696E82]" />
-                        <span>Upload Revision</span>
-                      </button>
-
-                      {/* View Full Revision History Drawer */}
-                      <button
-                        onClick={() => setDetailDrawerDoc(doc)}
-                        className="p-1.5 hover:bg-[#F2F4FF] text-[#696E82] hover:text-[#1F1F1F] rounded-lg transition-colors cursor-pointer"
-                        title="View revision history & approval log"
-                      >
-                        <History className="w-4 h-4" />
-                      </button>
-                    </div>
+                    )}
                   </div>
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-2 text-xs">
+                {mobileDetailDoc.versions.flatMap(v => v.approvalRequests).length > 0 ? (
+                  mobileDetailDoc.versions.flatMap(v => v.approvalRequests).map(req => (
+                    <div key={req.id} className="p-3 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl space-y-1">
+                      <div className="flex items-center justify-between font-semibold">
+                        <span>{req.isClientApproval ? "Client Approval Evidence" : "Review Approval"}</span>
+                        <span className="font-mono text-[10px]">{req.status}</span>
+                      </div>
+                      {req.comment && <p className="text-[#696E82]">{req.comment}</p>}
+                      {req.clientApprovalEvidence && <p className="text-[#1F1F1F] font-medium">Evidence: {req.clientApprovalEvidence}</p>}
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-xs text-[#696E82] italic">No evidence recorded yet.</p>
                 )}
               </div>
-            );
-          })
-        )}
-      </div>
+            )}
+
+            {/* Mobile Actions Footer */}
+            <div className="pt-3 border-t border-[#E2E6F0] space-y-2">
+              {mobileDetailDoc.latestVersion?.approvalState === "IN_REVIEW" && (
+                (isPrivileged && mobileDetailDoc.latestVersion.uploaderId !== currentMembershipId) ? (
+                  <button
+                    type="button"
+                    onClick={() => handleApproveRevision(mobileDetailDoc.latestVersion!.id)}
+                    className="w-full py-2.5 bg-[#5A81FA] hover:bg-[#426EE8] text-white text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer"
+                  >
+                    Review {mobileDetailDoc.latestVersion.revision}
+                  </button>
+                ) : (
+                  <div className="w-full py-2 bg-amber-50 border border-amber-200 text-amber-800 text-center text-xs rounded-xl font-semibold">
+                    Awaiting Partner Approval (Self-approval blocked)
+                  </div>
+                )
+              )}
+              {mobileDetailDoc.latestVersion?.approvalState === "DRAFT" && (
+                <button
+                  type="button"
+                  onClick={() => handleSubmitForReview(mobileDetailDoc.latestVersion!.id)}
+                  className="w-full py-2.5 bg-[#5A81FA] hover:bg-[#426EE8] text-white text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer"
+                >
+                  Submit {mobileDetailDoc.latestVersion.revision} for Review
+                </button>
+              )}
+              {mobileDetailDoc.latestVersion?.approvalState === "APPROVED" && isPrivileged && (
+                <button
+                  type="button"
+                  onClick={() => setClientApprovalVersion(mobileDetailDoc.latestVersion!)}
+                  className="w-full py-2.5 bg-[#5A81FA] hover:bg-[#426EE8] text-white text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer"
+                >
+                  Record Client Approval Evidence
+                </button>
+              )}
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setUploadRevisionDoc(mobileDetailDoc)}
+                  className="flex-1 py-2 bg-[#F8F9FD] border border-[#E2E6F0] hover:bg-[#F2F4FF] text-[#1F1F1F] text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Upload className="w-3.5 h-3.5 text-[#696E82]" />
+                  <span>Upload revision</span>
+                </button>
+                {mobileDetailDoc.latestVersion && (
+                  <a
+                    href={`/api/storage/files/${mobileDetailDoc.latestVersion.fileId}?download=true&workspaceSlug=${workspaceSlug}`}
+                    className="flex-1 py-2 bg-[#F8F9FD] border border-[#E2E6F0] hover:bg-[#F2F4FF] text-[#1F1F1F] text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <Download className="w-3.5 h-3.5 text-[#696E82]" />
+                    <span>Download</span>
+                  </a>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* Regular desktop split layout + mobile card list */
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          {/* Left Side: Register Table on desktop / Cards on mobile */}
+          <div className="lg:col-span-7 space-y-4">
+            {/* Desktop Table View */}
+            <div className="hidden lg:block bg-white border border-[#E2E6F0] rounded-2xl shadow-2xs overflow-hidden">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-[#F8F9FD] text-[#696E82] border-b border-[#E2E6F0]">
+                  <tr>
+                    <th className="p-3.5 font-bold uppercase tracking-wider text-[11px]">Drawing</th>
+                    <th className="p-3.5 font-bold uppercase tracking-wider text-[11px]">Latest</th>
+                    <th className="p-3.5 font-bold uppercase tracking-wider text-[11px]">Approved</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#E2E6F0]/60">
+                  {paginatedDrawings.length === 0 ? (
+                    <tr>
+                      <td colSpan={3} className="p-8 text-center text-[#696E82]">
+                        No drawings match current filters.
+                      </td>
+                    </tr>
+                  ) : (
+                    paginatedDrawings.map((doc) => {
+                      const isSelected = selectedDrawing?.id === doc.id;
+                      const latest = doc.latestVersion;
+                      const latestApproved = doc.latestApprovedVersion;
+
+                      return (
+                        <tr
+                          key={doc.id}
+                          onClick={() => setSelectedDrawingId(doc.id)}
+                          className={`cursor-pointer transition-colors ${
+                            isSelected
+                              ? "bg-[#F2F4FF]/70 font-semibold"
+                              : "hover:bg-[#F8F9FD]"
+                          }`}
+                        >
+                          <td className="p-3.5">
+                            <div className="font-bold text-[#1F1F1F] text-xs">{doc.title}</div>
+                            <div className="text-[11px] text-[#696E82] mt-0.5">
+                              Project: {doc.project.name} | {doc.discipline}
+                            </div>
+                          </td>
+                          <td className="p-3.5 whitespace-nowrap">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-mono font-bold text-[#1F1F1F]">
+                                {latest ? latest.revision : "—"}
+                              </span>
+                              {latest && getStatusBadge(latest.approvalState)}
+                            </div>
+                          </td>
+                          <td className="p-3.5 whitespace-nowrap">
+                            {latestApproved ? (
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-mono font-bold text-emerald-900">
+                                  {latestApproved.revision}
+                                </span>
+                                {getStatusBadge("APPROVED")}
+                              </div>
+                            ) : (
+                              <span className="text-[11px] text-[#696E82] italic">
+                                — No approved revision
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+
+              {/* Desktop Pagination */}
+              <div className="p-3.5 border-t border-[#E2E6F0] bg-[#F8F9FD] flex items-center justify-between text-xs text-[#696E82]">
+                <span>
+                  Showing {Math.min((currentPage - 1) * pageSize + 1, filteredDrawings.length)} –{" "}
+                  {Math.min(currentPage * pageSize, filteredDrawings.length)} of {filteredDrawings.length}
+                </span>
+
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    disabled={currentPage <= 1}
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    className="px-2.5 py-1 rounded-lg border border-[#E2E6F0] bg-white text-[#1F1F1F] hover:bg-[#F2F4FF] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                  >
+                    &lt; Previous
+                  </button>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
+                    <button
+                      key={pageNum}
+                      type="button"
+                      onClick={() => setCurrentPage(pageNum)}
+                      className={`w-7 h-7 rounded-lg text-xs font-semibold cursor-pointer ${
+                        currentPage === pageNum
+                          ? "bg-[#5A81FA] text-white"
+                          : "bg-white border border-[#E2E6F0] text-[#1F1F1F] hover:bg-[#F2F4FF]"
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    disabled={currentPage >= totalPages}
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    className="px-2.5 py-1 rounded-lg border border-[#E2E6F0] bg-white text-[#1F1F1F] hover:bg-[#F2F4FF] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                  >
+                    Next &gt;
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Mobile Cards View (< lg) */}
+            <div className="lg:hidden space-y-3">
+              {paginatedDrawings.map((doc) => {
+                const latest = doc.latestVersion;
+                const latestApproved = doc.latestApprovedVersion;
+
+                return (
+                  <div
+                    key={doc.id}
+                    className="bg-white border border-[#E2E6F0] rounded-2xl p-4 shadow-2xs space-y-3"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <h3 className="text-sm font-bold text-[#1F1F1F]">{doc.title}</h3>
+                        <p className="text-xs text-[#696E82]">
+                          Project: {doc.project.name} • {doc.discipline}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setMobileDetailDoc(doc)}
+                        className="text-[#696E82] hover:text-[#1F1F1F] p-1"
+                      >
+                        <MoreVertical className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-[#E2E6F0]/60">
+                      <div>
+                        <span className="text-[10px] text-[#696E82] uppercase block font-semibold">Latest</span>
+                        <div className="flex items-center gap-1 mt-0.5">
+                          <span className="font-mono font-bold text-[#1F1F1F]">{latest ? latest.revision : "—"}</span>
+                          {latest && getStatusBadge(latest.approvalState)}
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-[#696E82] uppercase block font-semibold">Approved</span>
+                        <div className="flex items-center gap-1 mt-0.5">
+                          {latestApproved ? (
+                            <>
+                              <span className="font-mono font-bold text-emerald-900">{latestApproved.revision}</span>
+                              {getStatusBadge("APPROVED")}
+                            </>
+                          ) : (
+                            <span className="text-[11px] text-[#696E82] italic">— None</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setMobileDetailDoc(doc)}
+                      className="w-full mt-2 py-2 bg-[#F8F9FD] hover:bg-[#F2F4FF] text-[#5A81FA] text-xs font-bold rounded-xl border border-[#E2E6F0] flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                    >
+                      <span>View drawing →</span>
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Right Side: Desktop Drawing Details Panel */}
+          {selectedDrawing && (
+            <div className="hidden lg:block lg:col-span-5 bg-white border border-[#E2E6F0] rounded-2xl p-5 sm:p-6 shadow-2xs space-y-4">
+              <div className="flex items-center justify-between border-b border-[#E2E6F0] pb-3">
+                <h3 className="text-sm font-bold text-[#1F1F1F]">Drawing details</h3>
+                <button
+                  type="button"
+                  onClick={() => setSelectedDrawingId("")}
+                  className="text-[#696E82] hover:text-[#1F1F1F] p-1 rounded-lg hover:bg-[#F2F4FF] cursor-pointer"
+                  title="Close details"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div>
+                <h2 className="text-lg font-bold text-[#1F1F1F] tracking-tight">{selectedDrawing.title}</h2>
+                <p className="text-xs text-[#696E82] mt-0.5">
+                  Project: {selectedDrawing.project.name} • {selectedDrawing.discipline} • {selectedDrawing.documentType}
+                </p>
+              </div>
+
+              {/* Comparison boxes */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl space-y-1">
+                  <span className="text-[10px] font-bold text-[#696E82] uppercase block">Latest revision</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xl font-bold font-mono text-[#1F1F1F]">{selectedDrawing.latestVersion?.revision || "—"}</span>
+                    {selectedDrawing.latestVersion && getStatusBadge(selectedDrawing.latestVersion.approvalState)}
+                  </div>
+                  <span className="text-[10px] text-[#696E82] block truncate">
+                    {selectedDrawing.latestVersion ? `Updated ${new Date(selectedDrawing.latestVersion.updatedAt || selectedDrawing.latestVersion.createdAt).toLocaleDateString()}` : "No revisions"}
+                  </span>
+                </div>
+
+                <div className="p-3 bg-emerald-50/50 border border-emerald-200 rounded-xl space-y-1">
+                  <span className="text-[10px] font-bold text-emerald-800 uppercase block">Approved revision</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xl font-bold font-mono text-emerald-900">{selectedDrawing.latestApprovedVersion?.revision || "—"}</span>
+                    {selectedDrawing.latestApprovedVersion ? getStatusBadge("APPROVED") : <span className="text-[10px] text-gray-500 italic">None</span>}
+                  </div>
+                  <span className="text-[10px] text-emerald-700 block truncate">
+                    {selectedDrawing.latestApprovedVersion ? `Approved ${new Date(selectedDrawing.latestApprovedVersion.updatedAt || selectedDrawing.latestApprovedVersion.createdAt).toLocaleDateString()}` : "No approved revision"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Alert banner if unapproved */}
+              {selectedDrawing.latestVersion?.approvalState !== "APPROVED" && (
+                <div className="bg-[#FFF8E6] border border-[#FFE082] rounded-xl p-3 flex items-start gap-2 text-xs text-amber-900">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <span>
+                    {selectedDrawing.latestApprovedVersion
+                      ? `${selectedDrawing.latestVersion?.revision || "Latest"} is not approved. Use ${selectedDrawing.latestApprovedVersion.revision} as the approved revision.`
+                      : `${selectedDrawing.latestVersion?.revision || "Latest"} is not approved. Construction holds apply.`}
+                  </span>
+                </div>
+              )}
+
+              {/* Sub-tabs */}
+              <div className="flex items-center gap-4 border-b border-[#E2E6F0] pb-2 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setDetailSubTab("history")}
+                  className={`font-semibold pb-1 cursor-pointer transition-colors ${
+                    detailSubTab === "history" ? "text-[#5A81FA] border-b-2 border-[#5A81FA]" : "text-[#696E82]"
+                  }`}
+                >
+                  Revision history
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDetailSubTab("evidence")}
+                  className={`font-semibold pb-1 cursor-pointer transition-colors ${
+                    detailSubTab === "evidence" ? "text-[#5A81FA] border-b-2 border-[#5A81FA]" : "text-[#696E82]"
+                  }`}
+                >
+                  Evidence
+                </button>
+              </div>
+
+              {/* Tab content */}
+              {detailSubTab === "history" ? (
+                <div className="space-y-4 max-h-60 overflow-y-auto pr-1">
+                  {selectedDrawing.versions.map((ver, idx) => (
+                    <div key={ver.id} className="relative pl-6 pb-2 text-xs space-y-1">
+                      {idx < selectedDrawing.versions.length - 1 && (
+                        <div className="absolute left-2.5 top-3 bottom-0 w-0.5 bg-[#E2E6F0]" />
+                      )}
+                      <div className={`absolute left-1 top-1.5 w-3.5 h-3.5 rounded-full ring-2 ring-white ${
+                        ver.approvalState === "APPROVED" ? "bg-emerald-500" : ver.approvalState === "IN_REVIEW" ? "bg-purple-600" : "bg-slate-400"
+                      }`} />
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-bold text-[#1F1F1F]">{ver.revision}</span>
+                          {getStatusBadge(ver.approvalState)}
+                        </div>
+                        <span className="text-[11px] text-[#696E82]">{new Date(ver.createdAt).toLocaleDateString()}</span>
+                      </div>
+                      <p className="text-[#696E82] text-xs">{ver.issuePurpose}</p>
+                      {ver.approvalRequests?.some((ar) => ar.isClientApproval && ar.status === "APPROVED") && (
+                        <button
+                          type="button"
+                          onClick={() => setDetailSubTab("evidence")}
+                          className="text-[11px] text-[#5A81FA] hover:underline font-semibold block"
+                        >
+                          Client approval evidence recorded. View evidence →
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-2 text-xs max-h-60 overflow-y-auto">
+                  {selectedDrawing.versions.flatMap(v => v.approvalRequests).length > 0 ? (
+                    selectedDrawing.versions.flatMap(v => v.approvalRequests).map(req => (
+                      <div key={req.id} className="p-3 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl space-y-1">
+                        <div className="flex items-center justify-between font-semibold">
+                          <span>{req.isClientApproval ? "Client Approval Evidence" : "Review Approval"}</span>
+                          <span className="font-mono text-[10px]">{req.status}</span>
+                        </div>
+                        {req.comment && <p className="text-[#696E82]">{req.comment}</p>}
+                        {req.clientApprovalEvidence && <p className="text-[#1F1F1F] font-medium">Evidence: {req.clientApprovalEvidence}</p>}
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-xs text-[#696E82] italic">No evidence recorded yet.</p>
+                  )}
+                </div>
+              )}
+
+              {/* Action Footer */}
+              <div className="pt-3 border-t border-[#E2E6F0] space-y-2">
+                {selectedDrawing.latestVersion?.approvalState === "IN_REVIEW" && (
+                  (isPrivileged && selectedDrawing.latestVersion.uploaderId !== currentMembershipId) ? (
+                    <button
+                      type="button"
+                      onClick={() => handleApproveRevision(selectedDrawing.latestVersion!.id)}
+                      className="w-full py-2.5 bg-[#5A81FA] hover:bg-[#426EE8] text-white text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer"
+                    >
+                      Review {selectedDrawing.latestVersion.revision}
+                    </button>
+                  ) : (
+                    <div className="w-full py-2 bg-amber-50 border border-amber-200 text-amber-800 text-center text-xs rounded-xl font-semibold">
+                      Awaiting Partner Approval (Self-approval blocked)
+                    </div>
+                  )
+                )}
+                {selectedDrawing.latestVersion?.approvalState === "DRAFT" && (
+                  <button
+                    type="button"
+                    onClick={() => handleSubmitForReview(selectedDrawing.latestVersion!.id)}
+                    className="w-full py-2.5 bg-[#5A81FA] hover:bg-[#426EE8] text-white text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer"
+                  >
+                    Submit {selectedDrawing.latestVersion.revision} for Review
+                  </button>
+                )}
+                {selectedDrawing.latestVersion?.approvalState === "APPROVED" && isPrivileged && (
+                  <button
+                    type="button"
+                    onClick={() => setClientApprovalVersion(selectedDrawing.latestVersion!)}
+                    className="w-full py-2.5 bg-[#5A81FA] hover:bg-[#426EE8] text-white text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer"
+                  >
+                    Record Client Approval Evidence
+                  </button>
+                )}
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setUploadRevisionDoc(selectedDrawing)}
+                    className="flex-1 py-2 bg-[#F8F9FD] border border-[#E2E6F0] hover:bg-[#F2F4FF] text-[#1F1F1F] text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <Upload className="w-3.5 h-3.5 text-[#696E82]" />
+                    <span>Upload revision</span>
+                  </button>
+                  {selectedDrawing.latestVersion && (
+                    <a
+                      href={`/api/storage/files/${selectedDrawing.latestVersion.fileId}?download=true&workspaceSlug=${workspaceSlug}`}
+                      className="flex-1 py-2 bg-[#F8F9FD] border border-[#E2E6F0] hover:bg-[#F2F4FF] text-[#1F1F1F] text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <Download className="w-3.5 h-3.5 text-[#696E82]" />
+                      <span>Download</span>
+                    </a>
+                  )}
+                  {selectedDrawing.latestVersion && (
+                    <button
+                      type="button"
+                      onClick={() => openPreview(selectedDrawing.latestVersion!.fileId, `${selectedDrawing.title}_${selectedDrawing.latestVersion!.revision}.pdf`)}
+                      className="p-2 bg-[#F8F9FD] border border-[#E2E6F0] hover:bg-[#F2F4FF] text-[#696E82] hover:text-[#1F1F1F] rounded-xl cursor-pointer"
+                      title="Preview sheet"
+                    >
+                      <Eye className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ==================================================== */}
       {/* 1. REGISTER NEW DRAWING MODAL (R0)                   */}

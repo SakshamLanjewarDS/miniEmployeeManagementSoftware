@@ -190,6 +190,11 @@ export default function SalaryCalculatorPage() {
   const [leaveModalOpen, setLeaveModalOpen] = useState<boolean>(false);
   const [calculationDetailsOpen, setCalculationDetailsOpen] = useState<boolean>(false);
 
+  // Mobile Accordion States
+  const [mobileSalaryInputsOpen, setMobileSalaryInputsOpen] = useState<boolean>(true);
+  const [mobileLeaveAnalysisOpen, setMobileLeaveAnalysisOpen] = useState<boolean>(true);
+  const [mobileDeductionsOpen, setMobileDeductionsOpen] = useState<boolean>(true);
+
   // Race condition guard
   const activeRequestId = useRef<number>(0);
   const employeeDropdownRef = useRef<HTMLDivElement>(null);
@@ -374,7 +379,8 @@ export default function SalaryCalculatorPage() {
     const componentsSum = Math.round((displayedDayDeduction + displayedHourDeduction) * 100) / 100;
     const roundingAdjustment = Math.round((displayedAggregateLeaveDeduction - componentsSum) * 100) / 100;
 
-    const grossEarnings = safeBaseSalary + (allowances || 0) + (bonus || 0);
+    const additionalEarningsTotal = (allowances || 0) + (bonus || 0);
+    const grossEarnings = safeBaseSalary + additionalEarningsTotal;
     const otherDeductionsTotal =
       (advanceRecovery || 0) + (loanRecovery || 0) + (statutoryDeductions || 0) + (otherDeductions || 0);
     const totalDeductions = displayedAggregateLeaveDeduction + otherDeductionsTotal;
@@ -396,6 +402,7 @@ export default function SalaryCalculatorPage() {
       displayedAggregateLeaveDeduction,
       componentsSum,
       roundingAdjustment,
+      additionalEarningsTotal,
       grossEarnings,
       otherDeductionsTotal,
       totalDeductions,
@@ -419,9 +426,10 @@ export default function SalaryCalculatorPage() {
     otherDeductions,
   ]);
 
-  // Formatter for Indian Currency
-  const formatINR = (val: number, showDecimals: boolean = true) => {
-    return val.toLocaleString("en-IN", {
+  // Formatter for Indian Currency (safe against undefined/null/NaN)
+  const formatINR = (val: number | null | undefined, showDecimals: boolean = true) => {
+    const num = typeof val === "number" && !isNaN(val) ? val : Number(val) || 0;
+    return num.toLocaleString("en-IN", {
       minimumFractionDigits: showDecimals ? 2 : 0,
       maximumFractionDigits: showDecimals ? 2 : 0,
     });
@@ -557,7 +565,7 @@ export default function SalaryCalculatorPage() {
   };
 
   return (
-    <div className="-m-3.5 sm:-m-5 md:-m-6 lg:-m-8 p-3.5 sm:p-5 md:p-6 lg:p-8 min-h-[calc(100vh-64px)] bg-[#F2F4FB] text-[#111827] flex flex-col justify-between">
+    <div className="space-y-4 pb-24 md:pb-12 text-[#1F1F1F]">
       <div className="max-w-[1560px] mx-auto w-full space-y-4">
         {/* Local Payroll Sub-Navigation */}
         <PayrollSubNav workspaceSlug={workspaceSlug} activeTab="calculate" />
@@ -567,41 +575,41 @@ export default function SalaryCalculatorPage() {
         ========================================== */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div>
-            <div className="flex items-center gap-2 text-xs text-[#64748B] mb-1.5">
+            <div className="flex items-center gap-2 text-xs text-[#696E82] mb-1.5">
               <Link
                 href={`/w/${workspaceSlug}/payroll`}
-                className="flex items-center gap-1 hover:text-[#2435A0] transition-colors"
+                className="flex items-center gap-1 hover:text-[#1456F0] transition-colors"
               >
                 <ArrowLeft className="w-3.5 h-3.5" />
                 <span>Studio Payroll</span>
               </Link>
               <span>/</span>
-              <span className="font-medium text-[#111827]">Calculator</span>
+              <span className="font-semibold text-[#1F1F1F]">Calculator</span>
             </div>
 
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-blue-50/80 border border-blue-200/60 flex items-center justify-center text-[#2563EB] shadow-2xs">
+              <div className="w-10 h-10 rounded-2xl bg-[#EBF1FF] text-[#1456F0] flex items-center justify-center shadow-2xs shrink-0">
                 <Calculator className="w-5 h-5" />
               </div>
               <div>
                 <div className="flex items-center gap-2.5">
-                  <h1 className="text-xl md:text-2xl font-bold tracking-tight text-[#111827]">
-                    Salary & leave calculator
+                  <h1 className="text-xl md:text-2xl font-bold tracking-tight text-[#1F1F1F]">
+                    Salary &amp; leave calculator
                   </h1>
                   <button
                     onClick={handleToggleDemoMode}
                     title="Click to toggle between illustrative Sample Data and Live Studio Data"
                     className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full border transition-all ${
                       isDemoMode
-                        ? "bg-blue-50 text-[#2563EB] border-blue-200 hover:bg-blue-100"
+                        ? "bg-[#EBF1FF] text-[#1456F0] border-[#CEDEFF] hover:bg-[#D9E6FF]"
                         : "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
                     }`}
                   >
                     {isDemoMode ? "Sample data" : "Live studio data"}
                   </button>
                 </div>
-                <p className="text-xs text-[#64748B] mt-0.5">
-                  Calculate salary with integrated leave data and see exactly how pay is calculated.
+                <p className="text-xs text-[#696E82] mt-0.5">
+                  Understand every step from salary to net pay.
                 </p>
               </div>
             </div>
@@ -610,7 +618,7 @@ export default function SalaryCalculatorPage() {
           <div className="flex items-center gap-2.5">
             <Link
               href={`/w/${workspaceSlug}/payroll`}
-              className="px-3.5 py-2 text-xs font-semibold rounded-xl bg-white border border-[#E2E6F0] text-[#111827] hover:bg-[#F8F9FE] shadow-2xs transition-all flex items-center gap-1.5"
+              className="px-3.5 py-2 text-xs font-semibold rounded-xl bg-white border border-[#E2E6F0] text-[#1F1F1F] hover:bg-[#F8F9FE] shadow-2xs transition-all flex items-center gap-1.5"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
               <span>Back to payroll</span>
@@ -1331,35 +1339,34 @@ export default function SalaryCalculatorPage() {
           </div>
 
           {/* ------------------------------------------
-              RIGHT PANEL: SALARY CALCULATION
+              RIGHT PANEL: PAY SUMMARY
           ------------------------------------------- */}
           <div className="bg-white rounded-2xl border border-[#E2E6F0] p-4 md:p-5 shadow-2xs space-y-4">
             <div className="flex items-center justify-between border-b border-[#F0F2F7] pb-3">
               <div className="flex items-center gap-2">
-                <FileText className="w-4 h-4 text-[#2563EB]" />
-                <h2 className="text-sm font-bold text-[#111827]">Salary calculation</h2>
+                <FileText className="w-4 h-4 text-[#1456F0]" />
+                <h2 className="text-sm font-bold text-[#1F1F1F]">Pay summary</h2>
               </div>
-              <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-semibold">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                <span>Live estimate</span>
+              <div className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#EBF1FF] text-[#1456F0] border border-[#CEDEFF] text-[11px] font-semibold">
+                <span>Draft estimate</span>
               </div>
             </div>
 
             {/* Top Compact Rate Strip */}
-            <div className="bg-[#EEF4FF] border border-[#CEDEFF] rounded-xl p-3 grid grid-cols-2 divide-x divide-[#CEDEFF] text-center">
+            <div className="bg-[#F8FAFF] border border-[#CEDEFF] rounded-xl p-3 grid grid-cols-2 divide-x divide-[#CEDEFF] text-center">
               <div className="pr-2">
-                <span className="text-[10px] font-semibold text-[#64748B] block uppercase tracking-wider mb-0.5">
+                <span className="text-[10px] font-semibold text-[#696E82] block uppercase tracking-wider mb-0.5">
                   Daily rate
                 </span>
-                <span className="text-base md:text-lg font-bold font-mono text-[#182B6B]">
+                <span className="text-base md:text-lg font-bold font-mono text-[#1F1F1F]">
                   ₹{formatINR(calculation.displayedDailyRate)}
                 </span>
               </div>
               <div className="pl-2">
-                <span className="text-[10px] font-semibold text-[#64748B] block uppercase tracking-wider mb-0.5">
+                <span className="text-[10px] font-semibold text-[#696E82] block uppercase tracking-wider mb-0.5">
                   Hourly rate
                 </span>
-                <span className="text-base md:text-lg font-bold font-mono text-[#182B6B]">
+                <span className="text-base md:text-lg font-bold font-mono text-[#1F1F1F]">
                   ₹{formatINR(calculation.displayedHourlyRate)}
                 </span>
               </div>
@@ -1367,30 +1374,25 @@ export default function SalaryCalculatorPage() {
 
             {/* Accounting-style Ledger */}
             <div className="space-y-2 text-xs">
-              <div className="flex justify-between items-center text-[#111827]">
-                <span className="text-[#64748B]">Base salary</span>
+              <div className="flex justify-between items-center text-[#1F1F1F]">
+                <span className="text-[#696E82]">Base salary</span>
                 <span className="font-mono font-semibold">₹{formatINR(baseSalary)}</span>
               </div>
 
-              <div className="flex justify-between items-center text-[#111827]">
-                <span className="text-[#64748B]">Allowances</span>
-                <span className="font-mono font-semibold">₹{formatINR(allowances || 0)}</span>
-              </div>
-
-              <div className="flex justify-between items-center text-[#111827]">
-                <span className="text-[#64748B]">Bonus</span>
-                <span className="font-mono font-semibold">₹{formatINR(bonus || 0)}</span>
+              <div className="flex justify-between items-center text-[#1F1F1F]">
+                <span className="text-[#696E82]">Additional earnings</span>
+                <span className="font-mono font-semibold">₹{formatINR(calculation.additionalEarningsTotal)}</span>
               </div>
 
               {/* Gross Earnings */}
-              <div className="flex justify-between items-center pt-2 border-t border-[#F0F2F7] font-bold text-sm text-[#111827]">
+              <div className="flex justify-between items-center pt-2 border-t border-[#F0F2F7] font-bold text-sm text-[#1F1F1F]">
                 <span>Gross earnings</span>
                 <span className="font-mono">₹{formatINR(calculation.grossEarnings)}</span>
               </div>
 
               {/* Deductions */}
-              <div className="flex justify-between items-center pt-2 text-[#111827]">
-                <span className="text-[#64748B]">Leave deduction</span>
+              <div className="flex justify-between items-center pt-2 text-[#1F1F1F]">
+                <span className="text-[#696E82]">Leave deduction</span>
                 <span className="font-mono font-semibold text-rose-600">
                   {calculation.displayedAggregateLeaveDeduction > 0
                     ? `-₹${formatINR(calculation.displayedAggregateLeaveDeduction)}`
@@ -1398,33 +1400,37 @@ export default function SalaryCalculatorPage() {
                 </span>
               </div>
 
-              <div className="flex justify-between items-center text-[#111827]">
-                <span className="text-[#64748B]">Other deductions</span>
+              <div className="flex justify-between items-center text-[#1F1F1F]">
+                <span className="text-[#696E82]">Other deductions</span>
                 <span className="font-mono font-semibold">
                   ₹{formatINR(calculation.otherDeductionsTotal)}
                 </span>
               </div>
 
               {/* Total Deductions */}
-              <div className="flex justify-between items-center pt-2 border-t border-[#F0F2F7] font-bold text-sm text-[#111827]">
+              <div className="flex justify-between items-center pt-2 border-t border-[#F0F2F7] font-bold text-sm text-[#1F1F1F]">
                 <span>Total deductions</span>
                 <span className="font-mono">₹{formatINR(calculation.totalDeductions)}</span>
               </div>
             </div>
 
             {/* Prominent Hero Indigo Net-Pay Panel */}
-            <div className="bg-[#182878] rounded-2xl p-5 text-white shadow-md relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-xl pointer-events-none" />
-
-              <span className="text-[11px] font-bold tracking-wider text-blue-200 uppercase block mb-1">
-                NET PAYABLE
-              </span>
-              <div className="text-3xl md:text-4xl font-extrabold font-mono tracking-tight text-white mb-1">
+            <div className="bg-[#10183F] rounded-2xl p-5 text-white shadow-md relative overflow-hidden">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold text-blue-200">
+                  Estimated net pay
+                </span>
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-white/10 text-blue-200 border border-white/20">
+                  Draft estimate
+                </span>
+              </div>
+              <div className="text-3xl md:text-4xl font-extrabold font-mono tracking-tight text-white mb-2">
                 ₹{formatINR(calculation.netPayable)}
               </div>
-              <span className="text-xs text-blue-200 block font-normal">
-                Gross earnings − total deductions
-              </span>
+              <div className="text-[11px] text-blue-200 flex items-center gap-1.5">
+                <Info className="w-3.5 h-3.5" />
+                <span>Estimate only • Not paid</span>
+              </div>
 
               {calculation.excessLiability > 0 && (
                 <div className="mt-3 p-2 bg-amber-500/20 border border-amber-300/30 rounded-lg text-xs text-amber-200">
@@ -1434,18 +1440,14 @@ export default function SalaryCalculatorPage() {
             </div>
 
             {/* Below Indigo Card Controls */}
-            <div className="flex items-center justify-between text-xs pt-1">
-              <span className="text-[11px] text-[#64748B] flex items-center gap-1">
-                <Info className="w-3.5 h-3.5 text-[#2563EB]" />
-                <span>Estimate only · Not paid</span>
-              </span>
+            <div className="pt-1">
               <button
                 type="button"
                 onClick={() => setCalculationDetailsOpen(true)}
-                className="text-xs font-semibold text-[#2563EB] hover:text-[#1E2C87] flex items-center gap-1 transition-colors"
+                className="w-full py-2.5 px-3 rounded-xl bg-[#EBF1FF] text-[#1456F0] font-semibold text-xs hover:bg-[#D9E6FF] flex items-center justify-center gap-1.5 transition-colors"
               >
                 <span>View calculation details</span>
-                <ExternalLink className="w-3 h-3" />
+                <ExternalLink className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
@@ -1456,22 +1458,22 @@ export default function SalaryCalculatorPage() {
           4. FOOTER & ACTIONS
       ========================================== */}
       <div className="max-w-[1560px] mx-auto w-full mt-6 pt-4 border-t border-[#E2E6F0] flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-2 text-xs text-[#64748B]">
-          <Info className="w-4 h-4 text-[#2563EB] shrink-0" />
+        <div className="flex items-center gap-2 text-xs text-[#696E82]">
+          <Info className="w-4 h-4 text-[#1456F0] shrink-0" />
           <span>
             {isDemoMode
-              ? "Sample data · Payroll has not been updated."
-              : "Draft calculation · Payroll has not been updated."}
+              ? "Sample data • Payroll will not be updated."
+              : "Draft calculation • Payroll will not be updated."}
           </span>
         </div>
 
-        <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
+        <div className="hidden sm:flex items-center gap-3 w-full sm:w-auto justify-end">
           <button
             type="button"
             onClick={handleReset}
-            className="px-4 py-2 text-xs font-semibold rounded-xl bg-white border border-[#E2E6F0] text-[#111827] hover:bg-[#F8F9FE] shadow-2xs transition-all flex items-center gap-1.5"
+            className="px-4 py-2 text-xs font-semibold rounded-xl bg-white border border-[#E2E6F0] text-[#1F1F1F] hover:bg-[#F8F9FE] shadow-2xs transition-all flex items-center gap-1.5"
           >
-            <RotateCcw className="w-3.5 h-3.5 text-[#64748B]" />
+            <RotateCcw className="w-3.5 h-3.5 text-[#696E82]" />
             <span>Reset</span>
           </button>
 
@@ -1479,12 +1481,34 @@ export default function SalaryCalculatorPage() {
             type="button"
             onClick={handleSaveDraft}
             disabled={saveLoading}
-            className="px-5 py-2 text-xs font-semibold rounded-xl bg-[#2435A0] hover:bg-[#1E2C87] text-white shadow-xs transition-all disabled:opacity-50 flex items-center gap-2"
+            className="px-5 py-2 text-xs font-semibold rounded-xl bg-[#1456F0] hover:bg-[#0F47D1] text-white shadow-xs transition-all disabled:opacity-50 flex items-center gap-2"
           >
             <Save className="w-3.5 h-3.5" />
             <span>{saveLoading ? "Saving draft..." : "Save draft calculation"}</span>
           </button>
         </div>
+      </div>
+
+      {/* Sticky Bottom Bar on Mobile */}
+      <div className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-[#E2E6F0] p-3 px-4 flex items-center gap-2.5 shadow-lg">
+        <button
+          type="button"
+          onClick={handleReset}
+          className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl border border-[#E2E6F0] bg-white text-[#1F1F1F] text-xs font-bold shadow-2xs"
+        >
+          <RotateCcw className="w-3.5 h-3.5 text-[#696E82]" />
+          <span>Reset</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={handleSaveDraft}
+          disabled={saveLoading}
+          className="flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-[#1456F0] hover:bg-[#0F47D1] text-white text-xs font-bold shadow-xs disabled:opacity-50"
+        >
+          <Save className="w-3.5 h-3.5" />
+          <span>{saveLoading ? "Saving..." : "Save draft calculation"}</span>
+        </button>
       </div>
 
       {/* ==========================================

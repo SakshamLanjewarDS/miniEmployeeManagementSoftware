@@ -908,7 +908,7 @@ export function AppSidebar({ context }: AppSidebarProps) {
               <Link
                 key={item.id}
                 href={item.href}
-                prefetch={true}
+                prefetch={false}
                 aria-current={isActive ? "page" : undefined}
                 className={`flex items-center justify-between px-3.5 py-2.5 rounded-2xl font-medium transition-all duration-150 group press-feedback ${
                   isActive
@@ -1002,7 +1002,7 @@ export function AppSidebar({ context }: AppSidebarProps) {
                           <li key={item.id}>
                             <Link
                               href={item.href}
-                              prefetch={true}
+                              prefetch={false}
                               tabIndex={isExpanded ? 0 : -1}
                               aria-current={isActive ? "page" : undefined}
                               className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all duration-150 group press-feedback ${

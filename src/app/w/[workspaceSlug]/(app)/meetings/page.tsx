@@ -121,8 +121,8 @@ function StudioMeetingsContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // View state: 'list' | 'calendar' | 'history'
-  const [activeTab, setActiveTab] = useState<"list" | "calendar" | "history">("calendar");
+  // View state: 'overview' | 'calendar' | 'list' | 'history'
+  const [activeTab, setActiveTab] = useState<"overview" | "calendar" | "list" | "history">("overview");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedProjectType, setSelectedProjectType] = useState<string>("ALL");
   const [selectedMeetingType, setSelectedMeetingType] = useState<string>("ALL");
@@ -589,6 +589,28 @@ ${m.actionItems?.map((a, i) => `${i + 1}. [${a.status}] ${a.description} ${a.ass
     };
   }, [meetings]);
 
+  const todayStr = useMemo(() => new Date().toISOString().split("T")[0], []);
+
+  const upcomingMeetings = useMemo(() => {
+    return meetings
+      .filter((m) => {
+        const mDate = new Date(m.meetingDate).toISOString().split("T")[0];
+        return mDate >= todayStr && m.status !== "COMPLETED" && m.status !== "CANCELLED";
+      })
+      .sort((a, b) => new Date(a.meetingDate).getTime() - new Date(b.meetingDate).getTime());
+  }, [meetings, todayStr]);
+
+  const needsStatusUpdateMeetings = useMemo(() => {
+    return meetings
+      .filter((m) => {
+        const mDate = new Date(m.meetingDate).toISOString().split("T")[0];
+        return mDate < todayStr && (m.status === "SCHEDULED" || m.status === "IN_PROGRESS");
+      })
+      .sort((a, b) => new Date(b.meetingDate).getTime() - new Date(a.meetingDate).getTime());
+  }, [meetings, todayStr]);
+
+  const activeMeetingForOverview = selectedMeeting || needsStatusUpdateMeetings[0] || upcomingMeetings[0] || meetings[0] || null;
+
   // Filtered Meetings for List and History
   const filteredMeetings = useMemo(() => {
     const today = new Date().toISOString().split("T")[0];
@@ -703,138 +725,84 @@ ${m.actionItems?.map((a, i) => `${i + 1}. [${a.status}] ${a.description} ${a.ass
 
   return (
     <div className="space-y-6">
-      {/* 1. TOP HEADER & MAIN VIEW MODE TOGGLE */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {/* 1. TOP HEADER (Reference: e94f5989) */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 text-xs text-[#696E82] mb-1">
-            <span>Work Management</span>
+            <span>Work management</span>
             <span>/</span>
-            <span className="font-semibold text-[#1F1F1F]">Studio Meetings</span>
+            <span className="font-semibold text-[#0B122B]">Studio meetings</span>
           </div>
-          <h1 className="text-2xl font-bold text-[#1F1F1F] tracking-tight">Studio Meetings & Executive MoM</h1>
-          <p className="text-xs text-[#696E82] mt-0.5">
-            Real-time design reviews, client presentations, MoM decision records, and multi-stakeholder scheduling
+          <h1 className="text-2xl sm:text-3xl font-bold text-[#0B122B] tracking-tight">Studio meetings</h1>
+          <p className="text-xs sm:text-sm text-[#696E82] mt-0.5">
+            Plan discussions. Capture decisions. Track follow-through.
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
-          {/* Main View Switcher */}
-          <div className="inline-flex items-center p-1 bg-white border border-[#E2E6F0] rounded-2xl shadow-2xs">
-            <button
-              type="button"
-              onClick={() => setActiveTab("calendar")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                activeTab === "calendar"
-                  ? "bg-[#3562E8] text-white shadow-xs"
-                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/70"
-              }`}
-            >
-              <CalendarIcon className="w-3.5 h-3.5" />
-              <span>Calendar</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveTab("list")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                activeTab === "list"
-                  ? "bg-[#3562E8] text-white shadow-xs"
-                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/70"
-              }`}
-            >
-              <LayoutList className="w-3.5 h-3.5" />
-              <span>Upcoming</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveTab("history")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                activeTab === "history"
-                  ? "bg-[#3562E8] text-white shadow-xs"
-                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/70"
-              }`}
-            >
-              <History className="w-3.5 h-3.5" />
-              <span>History & MoM</span>
-            </button>
-          </div>
-
-          <button
-            onClick={() => openCreateModal()}
-            className="flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-xl bg-[#3562E8] hover:bg-[#264FCB] text-white shadow-sm transition-all cursor-pointer press-feedback"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Schedule Meeting</span>
-          </button>
-        </div>
+        <button
+          onClick={() => openCreateModal()}
+          className="flex items-center justify-center gap-2 px-5 py-2.5 text-xs font-bold rounded-xl bg-[#3562E8] hover:bg-[#284ebd] text-white shadow-xs transition-all cursor-pointer self-start sm:self-auto w-full sm:w-auto"
+        >
+          <Plus className="w-4 h-4 stroke-[2.5]" />
+          <span>Schedule meeting</span>
+        </button>
       </div>
 
-      {/* 2. ADVANCED EXECUTIVE ANALYTICS STRIP (STUDIO MEETING INTELLIGENCE) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-        {/* KPI 1: Monthly Sessions */}
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs space-y-1">
-          <div className="flex items-center justify-between text-slate-400">
-            <span className="text-[11px] font-bold uppercase tracking-wider">This Month Sessions</span>
+      {/* 2. 4 KPI METRIC CARDS (Reference: e94f5989) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+        {/* Card 1: Meetings this month */}
+        <div className="bg-white p-5 rounded-2xl border border-[#E2E6F0] shadow-2xs space-y-1">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-[#0B122B]">Meetings this month</span>
             <CalendarIcon className="w-4 h-4 text-[#3562E8]" />
           </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-slate-900">{analytics.totalMonth}</span>
-            <span className="text-xs text-slate-500 font-medium">({analytics.completed} completed)</span>
+          <div className="text-2xl sm:text-3xl font-extrabold text-[#0B122B] font-sans tracking-tight mt-1">
+            {analytics.totalMonth}
           </div>
-          <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
-            <div
-              className="bg-[#3562E8] h-full rounded-full transition-all duration-500"
-              style={{ width: `${analytics.completionRate}%` }}
-            />
-          </div>
+          <p className="text-xs text-[#696E82] mt-0.5">{analytics.completed} completed</p>
         </div>
 
-        {/* KPI 2: MoM Action Items Conversion */}
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs space-y-1">
-          <div className="flex items-center justify-between text-slate-400">
-            <span className="text-[11px] font-bold uppercase tracking-wider">Action Items to Deliverables</span>
-            <TrendingUp className="w-4 h-4 text-emerald-600" />
+        {/* Card 2: Actions converted to tasks */}
+        <div className="bg-white p-5 rounded-2xl border border-[#E2E6F0] shadow-2xs space-y-1">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-emerald-700">Actions converted to tasks</span>
+            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
           </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-emerald-700">{analytics.conversionRate}%</span>
-            <span className="text-xs text-slate-500 font-medium">
-              ({analytics.convertedActionItems}/{analytics.totalActionItems} tasks)
-            </span>
+          <div className="text-2xl sm:text-3xl font-extrabold text-[#0B122B] font-sans tracking-tight mt-1">
+            {analytics.convertedActionItems}/{analytics.totalActionItems}
           </div>
-          <p className="text-[10px] text-slate-400">Converted directly into tracked Executive Tasks</p>
+          <p className="text-xs text-[#696E82] mt-0.5">{analytics.conversionRate}% linked to tracked tasks</p>
         </div>
 
-        {/* KPI 3: Cross-Stakeholder Sessions */}
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs space-y-1">
-          <div className="flex items-center justify-between text-slate-400">
-            <span className="text-[11px] font-bold uppercase tracking-wider">External Stakeholder Reach</span>
+        {/* Card 3: External sessions */}
+        <div className="bg-white p-5 rounded-2xl border border-[#E2E6F0] shadow-2xs space-y-1">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-purple-700">External sessions</span>
             <Users className="w-4 h-4 text-purple-600" />
           </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-purple-700">{analytics.multiStakeholder}</span>
-            <span className="text-xs text-slate-500 font-medium">sessions</span>
+          <div className="text-2xl sm:text-3xl font-extrabold text-[#0B122B] font-sans tracking-tight mt-1">
+            {analytics.multiStakeholder}
           </div>
-          <p className="text-[10px] text-slate-400">Joint reviews with contractors, clients, or consultants</p>
+          <p className="text-xs text-[#696E82] mt-0.5">This month</p>
         </div>
 
-        {/* KPI 4: Next Scheduled Session */}
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs space-y-1">
-          <div className="flex items-center justify-between text-slate-400">
-            <span className="text-[11px] font-bold uppercase tracking-wider">Next Upcoming Session</span>
+        {/* Card 4: Next meeting */}
+        <div className="bg-white p-5 rounded-2xl border border-[#E2E6F0] shadow-2xs space-y-1">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-amber-600">Next meeting</span>
             <Clock className="w-4 h-4 text-amber-500" />
           </div>
           {analytics.upcomingNext ? (
-            <div className="truncate">
-              <span className="text-xs font-bold text-slate-900 truncate block">
+            <div className="truncate mt-1">
+              <span className="text-sm font-bold text-[#0B122B] truncate block">
                 {analytics.upcomingNext.title}
               </span>
-              <span className="text-[11px] text-amber-700 font-mono font-medium">
-                {new Date(analytics.upcomingNext.meetingDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })} at {analytics.upcomingNext.startTime}
+              <span className="text-xs text-[#696E82]">
+                {new Date(analytics.upcomingNext.meetingDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })} · {analytics.upcomingNext.startTime}
               </span>
             </div>
           ) : (
-            <span className="text-xs text-slate-400 italic block pt-1">No sessions scheduled</span>
+            <div className="text-sm font-semibold text-[#696E82] pt-1">None scheduled</div>
           )}
         </div>
       </div>
@@ -859,28 +827,78 @@ ${m.actionItems?.map((a, i) => `${i + 1}. [${a.status}] ${a.description} ${a.ass
         </div>
       )}
 
-      {/* 3. SEARCH & FILTER TOOLBAR */}
-      <div className="bg-white p-3.5 rounded-2xl border border-[#E2E6F0] shadow-2xs flex flex-wrap items-center justify-between gap-3 text-xs">
-        <div className="flex items-center gap-2 flex-1 min-w-[240px]">
-          <div className="relative w-full max-w-sm">
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search meetings, agenda, MoM, decisions..."
-              className="w-full pl-9 pr-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-slate-900 text-xs focus:outline-none focus:border-[#3562E8]"
-            />
-          </div>
+      {/* 3. TABS & SEARCH / FILTER TOOLBAR (Reference: e94f5989) */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        {/* 4 Tabs: Overview | Calendar | Upcoming | History & minutes */}
+        <div className="flex items-center gap-1 p-1 bg-white border border-[#E2E6F0] rounded-2xl shadow-2xs overflow-x-auto touch-scroll-x">
+          <button
+            type="button"
+            onClick={() => setActiveTab("overview")}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === "overview"
+                ? "bg-[#3562E8] text-white shadow-2xs"
+                : "text-[#696E82] hover:text-[#0B122B]"
+            }`}
+          >
+            Overview
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("calendar")}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === "calendar"
+                ? "bg-[#3562E8] text-white shadow-2xs"
+                : "text-[#696E82] hover:text-[#0B122B]"
+            }`}
+          >
+            Calendar
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("list")}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === "list"
+                ? "bg-[#3562E8] text-white shadow-2xs"
+                : "text-[#696E82] hover:text-[#0B122B]"
+            }`}
+          >
+            Upcoming
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("history")}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === "history"
+                ? "bg-[#3562E8] text-white shadow-2xs"
+                : "text-[#696E82] hover:text-[#0B122B]"
+            }`}
+          >
+            History & minutes
+          </button>
         </div>
 
+        {/* Search input */}
+        <div className="relative w-full sm:w-64">
+          <Search className="w-3.5 h-3.5 text-[#696E82] absolute left-3 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search meetings or minutes..."
+            className="w-full pl-9 pr-3 py-2 bg-white border border-[#E2E6F0] rounded-xl text-[#0B122B] text-xs focus:outline-none focus:border-[#3562E8] shadow-2xs"
+          />
+        </div>
+      </div>
+
+      {/* Filter Row */}
+      <div className="bg-white p-3 rounded-2xl border border-[#E2E6F0] shadow-2xs flex flex-wrap items-center justify-between gap-3 text-xs">
         <div className="flex items-center gap-2 flex-wrap">
           <select
             value={selectedProjectType}
             onChange={(e) => setSelectedProjectType(e.target.value)}
-            className="px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-slate-700 text-xs focus:outline-none focus:border-[#3562E8] cursor-pointer"
+            className="px-3 py-1.5 bg-[#F8F9FE] border border-[#E2E6F0] rounded-xl text-[#0B122B] font-medium text-xs focus:outline-none focus:border-[#3562E8] cursor-pointer"
           >
-            <option value="ALL">All Projects</option>
+            <option value="ALL">All projects</option>
             {projects.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.code} — {p.name}
@@ -891,9 +909,9 @@ ${m.actionItems?.map((a, i) => `${i + 1}. [${a.status}] ${a.description} ${a.ass
           <select
             value={selectedMeetingType}
             onChange={(e) => setSelectedMeetingType(e.target.value)}
-            className="px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-slate-700 text-xs focus:outline-none focus:border-[#3562E8] cursor-pointer"
+            className="px-3 py-1.5 bg-[#F8F9FE] border border-[#E2E6F0] rounded-xl text-[#0B122B] font-medium text-xs focus:outline-none focus:border-[#3562E8] cursor-pointer"
           >
-            <option value="ALL">All Types</option>
+            <option value="ALL">All meeting types</option>
             <option value="Design Review">Design Review</option>
             <option value="Client Presentation">Client Presentation</option>
             <option value="Site Coordination">Site Coordination</option>
@@ -901,7 +919,293 @@ ${m.actionItems?.map((a, i) => `${i + 1}. [${a.status}] ${a.description} ${a.ass
             <option value="Budget & Financials">Budget & Financials</option>
           </select>
         </div>
+
+        <div className="flex items-center gap-2">
+          <div className="px-3 py-1.5 rounded-xl bg-[#F8F9FE] border border-[#CEDEFF] text-[#3562E8] font-bold text-xs">
+            Today · {new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+          </div>
+        </div>
       </div>
+
+      {/* 4. OVERVIEW WORKBENCH (Reference: e94f5989) */}
+      {activeTab === "overview" && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          {/* LEFT COLUMN: UPCOMING & NEEDS STATUS UPDATE (Cols 1-7) */}
+          <div className="lg:col-span-7 space-y-6">
+            {/* Upcoming meetings section */}
+            <div className="bg-white rounded-3xl border border-[#E2E6F0] p-5 sm:p-6 shadow-2xs space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 font-bold text-[#0B122B] text-base">
+                  <CalendarIcon className="w-5 h-5 text-[#3562E8]" />
+                  <span>Upcoming meetings</span>
+                </div>
+              </div>
+
+              {upcomingMeetings.length === 0 ? (
+                <div className="py-8 px-4 text-center flex flex-col items-center justify-center">
+                  <div className="w-12 h-12 rounded-full bg-[#F8F9FE] text-[#3562E8] flex items-center justify-center mb-3">
+                    <CalendarIcon className="w-6 h-6" />
+                  </div>
+                  <h4 className="text-sm font-bold text-[#0B122B]">No upcoming meetings</h4>
+                  <p className="text-xs text-[#696E82] mt-0.5">Schedule your next studio discussion.</p>
+                  <button
+                    type="button"
+                    onClick={() => openCreateModal()}
+                    className="mt-4 px-4 py-2 rounded-xl border border-[#3562E8] text-[#3562E8] text-xs font-bold hover:bg-[#F8F9FE] flex items-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Schedule meeting</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {upcomingMeetings.map((m) => (
+                    <div
+                      key={m.id}
+                      onClick={() => inspectMeeting(m)}
+                      className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                        selectedMeeting?.id === m.id
+                          ? "border-[#3562E8] bg-blue-50/20 shadow-xs"
+                          : "border-[#E2E6F0] bg-white hover:border-[#CEDEFF]"
+                      }`}
+                    >
+                      <div className="space-y-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-xs text-[#0B122B] truncate">{m.title}</span>
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#F8F9FE] text-[#3562E8] border border-[#CEDEFF]">
+                            {m.meetingType}
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-[#696E82] flex items-center gap-3">
+                          <span>{new Date(m.meetingDate).toLocaleDateString()}</span>
+                          <span>{m.startTime} – {m.endTime}</span>
+                        </div>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-[#696E82] shrink-0" />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Needs status update section */}
+            <div className="bg-[#FFFBF5] rounded-3xl border border-amber-200/80 p-5 sm:p-6 shadow-2xs space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-5 h-5 rounded-full bg-amber-500 text-white flex items-center justify-center text-xs font-bold">
+                    !
+                  </div>
+                  <h3 className="font-bold text-[#0B122B] text-base">
+                    Needs status update
+                  </h3>
+                  <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800">
+                    {needsStatusUpdateMeetings.length}
+                  </span>
+                </div>
+              </div>
+              <p className="text-xs text-[#696E82]">
+                Past meetings still marked as scheduled.
+              </p>
+
+              {needsStatusUpdateMeetings.length === 0 ? (
+                <div className="py-4 text-xs text-[#696E82]">
+                  All past meetings have recorded minutes and final status.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {needsStatusUpdateMeetings.map((m) => {
+                    const mDate = new Date(m.meetingDate);
+                    const monthStr = mDate.toLocaleString("en-US", { month: "short" }).toUpperCase();
+                    const dayNum = mDate.getDate();
+                    const weekdayStr = mDate.toLocaleString("en-US", { weekday: "short" }).toUpperCase();
+
+                    return (
+                      <div
+                        key={m.id}
+                        className="p-4 bg-white rounded-2xl border border-amber-200 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                      >
+                        <div className="flex items-start gap-3.5">
+                          {/* OCT 12 MON Date Box */}
+                          <div className="w-14 h-14 rounded-2xl bg-[#F8F9FE] border border-[#CEDEFF] flex flex-col items-center justify-center shrink-0 text-center font-mono">
+                            <span className="text-[10px] font-bold text-[#3562E8] leading-none">{monthStr}</span>
+                            <span className="text-lg font-extrabold text-[#0B122B] leading-tight">{dayNum}</span>
+                            <span className="text-[9px] font-semibold text-[#696E82] leading-none">{weekdayStr}</span>
+                          </div>
+
+                          <div className="space-y-1 min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h4 className="font-bold text-xs sm:text-sm text-[#0B122B]">{m.title}</h4>
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                {m.meetingType}
+                              </span>
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                Needs update
+                              </span>
+                            </div>
+
+                            <div className="text-xs text-[#696E82] flex flex-wrap items-center gap-3">
+                              <span>{mDate.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })} · {m.startTime} – {m.endTime} IST</span>
+                              <span>•</span>
+                              <span>Recorded status: <strong className="text-[#0B122B]">{m.status}</strong></span>
+                            </div>
+
+                            {m.agenda && (
+                              <p className="text-xs text-[#696E82] line-clamp-1 mt-0.5">
+                                {m.agenda}
+                              </p>
+                            )}
+
+                            <div className="text-[11px] text-[#696E82] flex items-center gap-3 pt-1">
+                              <span>{m.attendeesJson?.employeeIds?.length ? `${m.attendeesJson.employeeIds.length} participants` : "No participants listed"}</span>
+                              <span>•</span>
+                              <span>{m.actionItems?.length || 0} action items</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => inspectMeeting(m)}
+                          className="px-3.5 py-1.5 rounded-xl border border-[#3562E8] text-[#3562E8] hover:bg-[#F8F9FE] text-xs font-bold shrink-0 self-start sm:self-auto cursor-pointer"
+                        >
+                          Review meeting →
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* RIGHT COLUMN: MEETING OVERVIEW PANEL (Cols 8-12) */}
+          <div className="lg:col-span-5">
+            {activeMeetingForOverview ? (
+              <div className="bg-white rounded-3xl border border-[#E2E6F0] p-5 sm:p-6 shadow-2xs space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-[#E2E6F0]">
+                  <div className="flex items-center gap-2 font-bold text-[#0B122B] text-base">
+                    <FileText className="w-5 h-5 text-[#3562E8]" />
+                    <span>Meeting overview</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => inspectMeeting(activeMeetingForOverview)}
+                    className="text-[#696E82] hover:text-[#0B122B] p-1 cursor-pointer"
+                    title="Open details"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Meeting Identity */}
+                <div className="space-y-1.5">
+                  <h3 className="text-lg font-bold text-[#0B122B]">
+                    {activeMeetingForOverview.title}
+                  </h3>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                      {activeMeetingForOverview.meetingType}
+                    </span>
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                      {activeMeetingForOverview.status}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Warning Banner if past scheduled */}
+                {new Date(activeMeetingForOverview.meetingDate).toISOString().split("T")[0] < todayStr && activeMeetingForOverview.status === "SCHEDULED" && (
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl flex items-center gap-2 text-xs text-amber-800 font-semibold">
+                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>This meeting date has passed. Confirm its status.</span>
+                  </div>
+                )}
+
+                {/* Grid details */}
+                <div className="grid grid-cols-2 gap-3 text-xs pt-1">
+                  <div>
+                    <span className="text-[#696E82] block text-[11px]">Date</span>
+                    <span className="font-semibold text-[#0B122B]">
+                      {new Date(activeMeetingForOverview.meetingDate).toLocaleDateString("en-US", { weekday: "short", day: "numeric", month: "short", year: "numeric" })}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[#696E82] block text-[11px]">Time</span>
+                    <span className="font-semibold text-[#0B122B] font-mono">
+                      {activeMeetingForOverview.startTime} – {activeMeetingForOverview.endTime} IST
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[#696E82] block text-[11px]">Organizer</span>
+                    <span className="font-semibold text-[#0B122B]">
+                      {activeMeetingForOverview.creator?.user?.fullName || "Studio Leadership"}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[#696E82] block text-[11px]">Participants</span>
+                    <span className="font-semibold text-[#0B122B]">
+                      {activeMeetingForOverview.attendeesJson?.employeeIds?.length ? `${activeMeetingForOverview.attendeesJson.employeeIds.length} members` : "No participants listed"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Agenda */}
+                <div className="space-y-1.5 pt-2 border-t border-[#E2E6F0]">
+                  <span className="text-xs font-bold text-[#0B122B] block">Agenda</span>
+                  <p className="text-xs text-[#696E82] bg-[#F8F9FE] p-3 rounded-2xl border border-[#E2E6F0]">
+                    {activeMeetingForOverview.agenda || "No specific agenda items recorded."}
+                  </p>
+                </div>
+
+                {/* Action Items */}
+                <div className="space-y-1.5 pt-2 border-t border-[#E2E6F0]">
+                  <span className="text-xs font-bold text-[#0B122B] block">
+                    Action items ({activeMeetingForOverview.actionItems?.length || 0})
+                  </span>
+                  {activeMeetingForOverview.actionItems && activeMeetingForOverview.actionItems.length > 0 ? (
+                    <div className="space-y-1.5">
+                      {activeMeetingForOverview.actionItems.map((a) => (
+                        <div key={a.id} className="p-2.5 rounded-xl border border-[#E2E6F0] bg-[#F8F9FE] text-xs flex items-center justify-between">
+                          <span className="font-medium text-[#0B122B] truncate">{a.description}</span>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-[#3562E8]">
+                            {a.status}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-[#696E82] bg-[#F8F9FE] p-3 rounded-2xl border border-[#E2E6F0]">
+                      No action items recorded.
+                    </p>
+                  )}
+                </div>
+
+                {/* Footer Action Buttons */}
+                <div className="flex items-center gap-2 pt-3 border-t border-[#E2E6F0]">
+                  <button
+                    type="button"
+                    onClick={() => openEditModal(activeMeetingForOverview)}
+                    className="flex-1 py-2.5 rounded-xl bg-[#3562E8] hover:bg-[#284ebd] text-white text-xs font-bold transition-colors cursor-pointer text-center"
+                  >
+                    Update status
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => inspectMeeting(activeMeetingForOverview)}
+                    className="px-4 py-2.5 rounded-xl border border-[#E2E6F0] bg-white hover:bg-[#F8F9FE] text-[#0B122B] text-xs font-bold transition-colors cursor-pointer"
+                  >
+                    Open details
+                  </button>
+                </div>
+                <div className="text-[10px] text-[#696E82] text-center">Times shown in IST</div>
+              </div>
+            ) : (
+              <div className="bg-white rounded-3xl border border-[#E2E6F0] p-8 text-center text-xs text-[#696E82]">
+                Select a meeting to view its overview and minutes.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* 4. CALENDAR VIEW WITH INTERACTIVE DAY SELECTION */}
       {activeTab === "calendar" && (

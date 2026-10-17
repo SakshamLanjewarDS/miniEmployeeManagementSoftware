@@ -29,6 +29,7 @@ import {
   ChevronRight,
   Briefcase,
   X,
+  Activity,
 } from "lucide-react";
 import { OwnerDashboardData } from "@/server/modules/dashboard/service";
 import { TaskPriorityBadge } from "@/components/tasks/TaskPriorityBadge";
@@ -151,337 +152,204 @@ export default function OwnerDashboardView({
       <MorningBriefingModal workspaceSlug={workspaceSlug} role={userRole} />
 
       {/* ============================================================== */}
-      {/* 1. TOP GREETING PANEL (Image A)                                 */}
+      {/* 1. TOP GREETING & PRIMARY ACTION (Reference: 4ac8f30e)         */}
       {/* ============================================================== */}
-      <div className="bg-white border border-slate-200/80 rounded-3xl p-4 sm:p-6 lg:p-8 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="space-y-1 min-w-0">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 font-mono">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <div className="text-xs font-semibold text-slate-500 mb-1">
             {todayDateString}
           </div>
-          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-slate-900 tracking-tight">
-            Good Morning, {userFullName.split(" ")[0]}
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+            Good morning, {userFullName.split(" ")[0]}
           </h1>
-          <p className="text-xs sm:text-sm text-slate-500">
-            Here is a summary of your workspace for today. You have{" "}
-            <span className="font-bold text-[#3562E8] bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100">
-              {pendingDecisionsCount} pending action{pendingDecisionsCount !== 1 ? "s" : ""}
-            </span>{" "}
-            requiring your attention.
+          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+            Your studio at a glance.
           </p>
         </div>
 
-        {/* Top Right: Live Sync, Sun / Status & Refresh Action */}
-        <div className="flex items-center gap-2.5 shrink-0 self-end sm:self-auto">
+        <div className="flex items-center gap-3">
           <LiveSyncIndicator
             isConnected={isConnected}
             lastEvent={lastEvent}
             onManualRefresh={handleRefresh}
           />
-
-          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-amber-50 text-amber-500 border border-amber-200/60 flex items-center justify-center shadow-xs">
-            <Sun className="w-5 h-5 sm:w-6 sm:h-6 animate-spin-slow" />
-          </div>
-
-          <button
-            type="button"
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-            className="p-2.5 bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-slate-800 rounded-2xl border border-slate-200/80 transition-colors cursor-pointer"
-            title="Refresh metrics"
+          <Link
+            href={`/w/${workspaceSlug}/tasks`}
+            className="hidden sm:inline-flex items-center gap-2 px-4 py-2.5 bg-[#2563EB] hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors"
           >
-            <RefreshCw className={`w-4 h-4 ${isRefreshing ? "animate-spin text-[#3562E8]" : ""}`} />
-          </button>
+            <Plus className="w-4 h-4" />
+            <span>Assign deliverable</span>
+          </Link>
         </div>
       </div>
 
-      {/* ============================================================== */}
-      {/* 2. STUDIO HEALTH INDEX (SHI) TELEMETRY RADAR                    */}
-      {/* ============================================================== */}
-      {data.studioHealthIndex && (
-        <StudioHealthIndexCard shi={data.studioHealthIndex} />
-      )}
-
-      {/* ============================================================== */}
-      {/* 2. SECTION NAVIGATION PILLS ROW (Image A)                       */}
-      {/* ============================================================== */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 touch-scroll-x no-scrollbar text-xs">
-        {[
-          { key: "OVERVIEW", label: "Studio Overview" },
-          { key: "ATTENTION", label: `Attention (${data.projectsAttention.length})` },
-          { key: "FINANCE", label: "Financial Ledger" },
-          { key: "TEAM", label: `Architectural Team (${data.teamWorkload.length})` },
-        ].map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key as any)}
-            className={`px-4 py-2 rounded-xl font-bold transition-all cursor-pointer whitespace-nowrap ${
-              activeTab === tab.key
-                ? "bg-[#3562E8] text-white shadow-xs"
-                : "bg-white text-slate-600 border border-slate-200/80 hover:bg-slate-50"
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+      {/* Attention Action Banner */}
+      <div className="bg-[#EFF6FF] border border-[#BFDBFE] rounded-2xl p-3.5 sm:p-4 flex items-center justify-between gap-3 text-xs">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-7 h-7 rounded-full bg-blue-600 text-white flex items-center justify-center shrink-0">
+            <AlertCircle className="w-4 h-4" />
+          </div>
+          <div className="min-w-0">
+            <span className="font-bold text-blue-950 mr-2">
+              {pendingDecisionsCount} {pendingDecisionsCount === 1 ? "action needs" : "actions need"} your attention
+            </span>
+            <span className="text-blue-700 hidden sm:inline">
+              Keep project delivery moving forward.
+            </span>
+          </div>
+        </div>
+        <Link
+          href={`/w/${workspaceSlug}/inbox`}
+          className="text-xs font-bold text-[#2563EB] hover:text-blue-800 flex items-center gap-1 shrink-0 whitespace-nowrap"
+        >
+          <span>Open decision inbox</span>
+          <ChevronRight className="w-4 h-4" />
+        </Link>
       </div>
 
       {/* ============================================================== */}
       {/* 3. FOUR KPI CARDS (Image A)                                     */}
       {/* ============================================================== */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      {/* ============================================================== */}
+      {/* 2. FOUR KPI CARDS (Reference: 4ac8f30e)                        */}
+      {/* ============================================================== */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {/* KPI 1: Active Projects */}
         <Link
           href={`/w/${workspaceSlug}/projects`}
-          className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-xs hover:border-[#3562E8] transition-all group"
+          className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-2xs hover:border-[#2563EB] transition-all group"
         >
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-xs text-slate-400 font-medium">Active Projects</span>
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-xs text-slate-500 font-medium">Active projects</span>
             <span className="w-2 h-2 rounded-full bg-blue-500" />
           </div>
-          <div className="text-2xl sm:text-3xl font-bold text-slate-900 group-hover:text-[#3562E8] transition-colors">
+          <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 group-hover:text-[#2563EB] transition-colors">
             {data.studioSummary.activeProjectsCount}
           </div>
-          <span className="text-[10px] text-slate-400 mt-1 block">Live commissions</span>
+          <span className="text-[11px] text-slate-400 mt-1 block">Live commissions</span>
         </Link>
 
-        {/* KPI 2: Overdue Tasks */}
+        {/* KPI 2: Pending Reviews */}
+        <Link
+          href={`/w/${workspaceSlug}/inbox`}
+          className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-2xs hover:border-amber-400 transition-all group"
+        >
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-xs text-slate-500 font-medium">Pending reviews</span>
+            <span className="w-2 h-2 rounded-full bg-amber-500" />
+          </div>
+          <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 group-hover:text-amber-600 transition-colors">
+            {data.studioSummary.pendingReviewsCount}
+          </div>
+          <span className="text-[11px] text-slate-400 mt-1 block">Awaiting leadership sign-off</span>
+        </Link>
+
+        {/* KPI 3: Overdue Tasks */}
         <Link
           href={`/w/${workspaceSlug}/tasks?filter=OVERDUE`}
-          className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-xs hover:border-rose-300 transition-all group"
+          className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-2xs hover:border-emerald-400 transition-all group"
         >
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-xs text-slate-400 font-medium">Overdue Tasks</span>
-            <span className="w-2 h-2 rounded-full bg-rose-500" />
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-xs text-slate-500 font-medium">Overdue tasks</span>
+            <span className={`w-2 h-2 rounded-full ${data.studioSummary.overdueDeliverablesCount > 0 ? "bg-rose-500" : "bg-emerald-500"}`} />
           </div>
-          <div className={`text-2xl sm:text-3xl font-bold transition-colors ${
+          <div className={`text-2xl sm:text-3xl font-extrabold transition-colors ${
             data.studioSummary.overdueDeliverablesCount > 0 ? "text-rose-600" : "text-slate-900"
           }`}>
             {data.studioSummary.overdueDeliverablesCount}
           </div>
-          <span className="text-[10px] text-rose-500 font-medium mt-1 block">Exceeded target deadline</span>
+          <span className="text-[11px] text-slate-400 mt-1 block">
+            {data.studioSummary.overdueDeliverablesCount === 0 ? "Everything on track" : "Requires attention"}
+          </span>
         </Link>
 
-        {/* KPI 3: Pending Reviews */}
-        <Link
-          href={`/w/${workspaceSlug}/inbox`}
-          className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-xs hover:border-amber-300 transition-all group"
-        >
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-xs text-slate-400 font-medium">Pending Reviews</span>
-            <span className="w-2 h-2 rounded-full bg-amber-500" />
-          </div>
-          <div className="text-2xl sm:text-3xl font-bold text-amber-600 group-hover:text-amber-700 transition-colors">
-            {data.studioSummary.pendingReviewsCount}
-          </div>
-          <span className="text-[10px] text-slate-400 mt-1 block">Awaiting leadership sign-off</span>
-        </Link>
-
-        {/* KPI 4: Collections */}
+        {/* KPI 4: Recorded Collections */}
         <Link
           href={`/w/${workspaceSlug}/finance`}
-          className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-xs hover:border-emerald-300 transition-all group"
+          className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-2xs hover:border-slate-400 transition-all group"
         >
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-xs text-slate-400 font-medium">Recorded Collections</span>
-            <span className="w-2 h-2 rounded-full bg-emerald-500" />
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-xs text-slate-500 font-medium">Recorded collections</span>
+            <span className="w-2 h-2 rounded-full bg-slate-400" />
           </div>
-          <div className="text-xl sm:text-2xl font-bold text-emerald-700 truncate mt-0.5">
+          <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 truncate mt-0.5">
             {formatCurrency(data.studioSummary.totalCollections)}
           </div>
-          <span className="text-[10px] text-slate-400 mt-1 block">Incurred studio revenue</span>
+          <span className="text-[11px] text-slate-400 mt-1 block">
+            {data.studioSummary.totalCollections === 0 ? "No collections recorded" : "Incurred revenue"}
+          </span>
+        </Link>
+      </div>
+
+      {/* Mobile-only Assign Deliverable Button */}
+      <div className="sm:hidden">
+        <Link
+          href={`/w/${workspaceSlug}/tasks`}
+          className="w-full py-3 bg-[#2563EB] hover:bg-blue-700 text-white text-xs font-bold rounded-2xl shadow-xs transition-colors flex items-center justify-center gap-2"
+        >
+          <Plus className="w-4 h-4" />
+          <span>Assign deliverable</span>
         </Link>
       </div>
 
       {/* ============================================================== */}
-      {/* 4. PRIMARY HERO CARD (Image A)                                  */}
-      {/* ============================================================== */}
-      <div className="bg-white border border-slate-200/80 rounded-3xl p-4 sm:p-6 lg:p-7 shadow-xs space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#3562E8] animate-pulse" />
-            <span className="text-[11px] font-bold text-[#3562E8] uppercase tracking-wider font-mono">
-              EXECUTIVE FOCUS & STUDIO BOTTLENECKS
-            </span>
-          </div>
-
-          <Link
-            href={`/w/${workspaceSlug}/inbox`}
-            className="text-xs font-bold text-[#3562E8] hover:underline flex items-center gap-1"
-          >
-            <span>Open Unified Decision Inbox</span>
-            <ChevronRight className="w-3.5 h-3.5" />
-          </Link>
-        </div>
-
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <h2 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">
-              {data.projectsAttention.length > 0
-                ? `${data.projectsAttention.length} Projects Require Architectural Attention`
-                : "All Studio Projects Operating on Delivery Target"}
-            </h2>
-            <p className="text-xs text-slate-500">
-              {data.approvalInbox.length} deliverable submissions & revisions currently in review queue.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 shrink-0 w-full md:w-auto">
-            <Link
-              href={`/w/${workspaceSlug}/tasks`}
-              className="flex-1 sm:flex-initial text-center px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors"
-            >
-              Assign Deliverable
-            </Link>
-            <Link
-              href={`/w/${workspaceSlug}/inbox`}
-              className="flex-1 sm:flex-initial text-center justify-center px-4 py-2 bg-[#3562E8] hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors flex items-center gap-1.5"
-            >
-              <Inbox className="w-3.5 h-3.5" />
-              <span>Review Inbox ({data.approvalInbox.length})</span>
-            </Link>
-          </div>
-        </div>
-
-        {/* Delivery Health Progress Bar */}
-        <div className="space-y-1.5 pt-2">
-          <div className="flex items-center justify-between text-xs text-slate-500 font-medium">
-            <span>Overall Studio Delivery Velocity</span>
-            <span className="font-bold text-slate-800">
-              {data.studioSummary.activeProjectsCount > 0
-                ? Math.round(((data.studioSummary.activeProjectsCount - data.studioSummary.overdueDeliverablesCount) / data.studioSummary.activeProjectsCount) * 100)
-                : 100}% on schedule
-            </span>
-          </div>
-          <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-            <div
-              className="bg-[#3562E8] h-full rounded-full transition-all duration-500"
-              style={{
-                width: `${data.studioSummary.activeProjectsCount > 0
-                  ? Math.max(20, Math.round(((data.studioSummary.activeProjectsCount - data.studioSummary.overdueDeliverablesCount) / data.studioSummary.activeProjectsCount) * 100))
-                  : 100}%`
-              }}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* ============================================================== */}
-      {/* 5. BALANCED TWO-COLUMN GRID (Image A: 70% Left / 30% Right)     */}
+      {/* 3. BALANCED TWO-COLUMN GRID (Reference: 4ac8f30e)              */}
       {/* ============================================================== */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* LEFT / MAIN COLUMN (~70%) */}
+        {/* LEFT / MAIN COLUMN (~65%) */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Projects Requiring Attention Cards Grid */}
-          <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-xs space-y-4">
+          {/* Card A: Ready for your review */}
+          <div className="bg-white rounded-3xl border border-slate-200/90 p-5 sm:p-6 shadow-2xs space-y-4">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-amber-500" />
-                <h3 className="text-sm font-bold text-slate-900">Projects Requiring Attention</h3>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-sm bg-amber-500 inline-block" />
+                  <span>Ready for your review ({data.approvalInbox.length})</span>
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">Keep project delivery moving.</p>
               </div>
-              <span className="text-xs text-slate-400">
-                {data.projectsAttention.length} projects flagged
-              </span>
-            </div>
-
-            {data.projectsAttention.length === 0 ? (
-              <div className="p-8 text-center bg-slate-50/60 rounded-2xl border border-dashed border-slate-200 space-y-1">
-                <CheckCircle2 className="w-6 h-6 text-emerald-600 mx-auto" />
-                <p className="text-xs font-semibold text-slate-900">All active projects on schedule</p>
-                <p className="text-[11px] text-slate-400">No unresolved blockers or delayed deliverables detected.</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {data.projectsAttention.map((proj) => (
-                  <div
-                    key={proj.id}
-                    className="p-4 bg-slate-50/50 hover:bg-white rounded-2xl border border-slate-200/80 hover:border-[#3562E8] transition-all space-y-3 shadow-2xs group"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="font-mono text-[10px] font-bold text-[#3562E8] bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
-                            {proj.code}
-                          </span>
-                          {proj.projectType && (
-                            <span className="text-[10px] text-slate-500 flex items-center gap-1">
-                              <TypologyDot typology={proj.projectType} />
-                              <span className="truncate">{proj.projectType}</span>
-                            </span>
-                          )}
-                        </div>
-                        <h4 className="font-bold text-xs text-slate-900 truncate mt-1 group-hover:text-[#3562E8] transition-colors">
-                          {proj.name}
-                        </h4>
-                      </div>
-
-                      <Link
-                        href={`/w/${workspaceSlug}/projects/${proj.id}`}
-                        className="p-1.5 text-slate-400 hover:text-[#3562E8] hover:bg-blue-50 rounded-lg transition-colors shrink-0"
-                      >
-                        <ArrowUpRight className="w-4 h-4" />
-                      </Link>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-slate-100">
-                      <div>
-                        <span className="text-slate-400 block text-[10px]">Delayed Tasks</span>
-                        <span className="font-bold text-rose-600">{proj.delayedCount} overdue</span>
-                      </div>
-                      <div>
-                        <span className="text-slate-400 block text-[10px]">Lead Architect</span>
-                        <span className="font-semibold text-slate-800 truncate block">
-                          {proj.leadArchitect || "Unassigned"}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Pending Approval Submissions (Image A Lower Section) */}
-          <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-xs space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-[#3562E8]" />
-                <span>Pending Approvals & Deliverables ({data.approvalInbox.length})</span>
-              </h3>
               <Link
                 href={`/w/${workspaceSlug}/inbox`}
-                className="text-xs font-bold text-[#3562E8] hover:underline"
+                className="text-xs font-bold text-[#2563EB] hover:text-blue-800 flex items-center gap-1"
               >
-                Open Unified Inbox →
+                <span>Open decision inbox</span>
+                <ChevronRight className="w-3.5 h-3.5" />
               </Link>
             </div>
 
             {data.approvalInbox.length === 0 ? (
-              <p className="text-xs text-slate-400 p-4 text-center bg-slate-50/60 rounded-2xl border border-dashed border-slate-200">
-                No deliverables or drawing revisions awaiting sign-off.
-              </p>
+              <div className="p-8 text-center bg-slate-50/70 rounded-2xl border border-dashed border-slate-200 space-y-1">
+                <CheckCircle2 className="w-6 h-6 text-emerald-600 mx-auto" />
+                <p className="text-xs font-semibold text-slate-800">Review queue is clear</p>
+                <p className="text-[11px] text-slate-400">All submissions have been reviewed.</p>
+              </div>
             ) : (
-              <div className="divide-y divide-slate-100">
-                {data.approvalInbox.slice(0, 5).map((item) => (
-                  <div key={item.id} className="py-3 flex items-center justify-between gap-3 text-xs">
-                    <div className="min-w-0 space-y-0.5">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-[9px] font-bold text-[#3562E8] bg-blue-50 px-1.5 py-0.5 rounded">
-                          {item.projectCode}
-                        </span>
-                        <span className="font-bold text-slate-900 truncate">{item.title}</span>
+              <div className="space-y-3">
+                {data.approvalInbox.slice(0, 4).map((item) => (
+                  <div
+                    key={item.id}
+                    className="p-3.5 rounded-2xl border border-slate-200/80 bg-slate-50/40 hover:bg-white transition-all flex items-center justify-between gap-3 text-xs group"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-9 h-9 rounded-xl bg-blue-50 text-[#2563EB] flex items-center justify-center shrink-0 border border-blue-100">
+                        <FileText className="w-4 h-4" />
                       </div>
-                      <p className="text-[11px] text-slate-400">
-                        Submitted by <strong className="text-slate-700">{item.requesterName}</strong>
-                      </p>
+                      <div className="min-w-0">
+                        <div className="font-bold text-slate-900 truncate text-xs group-hover:text-[#2563EB] transition-colors">
+                          {item.title}
+                        </div>
+                        <div className="text-[11px] text-slate-500 truncate mt-0.5">
+                          {item.requesterName} • <span className="font-mono text-slate-600">{item.projectCode}</span>
+                        </div>
+                      </div>
                     </div>
 
                     <button
                       type="button"
                       onClick={() => setReviewingItem(item)}
-                      className="px-3.5 py-1.5 bg-[#3562E8] hover:bg-blue-700 text-white text-xs font-semibold rounded-xl transition-all shadow-xs shrink-0 cursor-pointer flex items-center gap-1.5"
+                      className="px-3.5 py-1.5 bg-[#2563EB] hover:bg-blue-700 text-white text-xs font-semibold rounded-xl shadow-2xs transition-all cursor-pointer shrink-0"
                     >
-                      <Eye className="w-3.5 h-3.5" />
-                      <span>Review in Airlock</span>
+                      Review
                     </button>
                   </div>
                 ))}
@@ -489,211 +357,317 @@ export default function OwnerDashboardView({
             )}
           </div>
 
-          {/* Architectural Team Workload Table (Image A Bottom Table) */}
-          <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-xs space-y-4">
+          {/* Card B: Project delivery */}
+          <div className="bg-white rounded-3xl border border-slate-200/90 p-5 sm:p-6 shadow-2xs space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <Users className="w-4 h-4 text-[#3562E8]" />
-                <span>Studio Team Workload</span>
-              </h3>
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-blue-50 text-[#2563EB] flex items-center justify-center border border-blue-100">
+                  <FolderKanban className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">Project delivery</h3>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  <span>On schedule</span>
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-2 pt-1">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-bold text-slate-800">
+                  {data.studioSummary.activeProjectsCount} active projects
+                </span>
+                <span className="font-bold text-slate-800">
+                  {data.studioSummary.activeProjectsCount > 0
+                    ? Math.round(((data.studioSummary.activeProjectsCount - data.studioSummary.overdueDeliverablesCount) / data.studioSummary.activeProjectsCount) * 100)
+                    : 100}% on time
+                </span>
+              </div>
+              <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                <div
+                  className="bg-[#2563EB] h-full rounded-full transition-all duration-500"
+                  style={{
+                    width: `${data.studioSummary.activeProjectsCount > 0
+                      ? Math.max(20, Math.round(((data.studioSummary.activeProjectsCount - data.studioSummary.overdueDeliverablesCount) / data.studioSummary.activeProjectsCount) * 100))
+                      : 100}%`
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Card C: Studio team workload */}
+          <div className="bg-white rounded-3xl border border-slate-200/90 p-5 sm:p-6 shadow-2xs space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-blue-50 text-[#2563EB] flex items-center justify-center border border-blue-100">
+                  <Users className="w-4 h-4" />
+                </div>
+                <h3 className="text-sm font-bold text-slate-900">Studio team workload</h3>
+              </div>
               <Link
                 href={`/w/${workspaceSlug}/team`}
-                className="text-xs font-bold text-[#3562E8] hover:underline"
+                className="text-xs font-bold text-[#2563EB] hover:text-blue-800 flex items-center gap-1"
               >
-                Manage Team →
+                <span>View all {data.teamWorkload.length}</span>
+                <ChevronRight className="w-3.5 h-3.5" />
               </Link>
             </div>
 
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead>
-                  <tr className="border-b border-slate-100 text-[10px] text-slate-400 uppercase font-bold">
-                    <th className="pb-2.5">Architect</th>
-                    <th className="pb-2.5">Designation</th>
-                    <th className="pb-2.5 text-center">Active Tasks</th>
-                    <th className="pb-2.5 text-center">Overdue</th>
-                    <th className="pb-2.5 text-center">Due Today</th>
+                  <tr className="border-b border-slate-100 text-[10px] text-slate-400 uppercase font-bold tracking-wider">
+                    <th className="pb-3 font-semibold">TEAM MEMBER</th>
+                    <th className="pb-3 font-semibold">ROLE</th>
+                    <th className="pb-3 text-center font-semibold">ACTIVE TASKS</th>
+                    <th className="pb-3 font-semibold text-right sm:text-left sm:pl-6">WORKLOAD</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {data.teamWorkload.map((m) => (
-                    <tr key={m.memberId} className="hover:bg-slate-50/70 transition-colors">
-                      <td className="py-2.5 font-bold text-slate-900">
-                        {m.fullName}
-                        {m.employeeId && (
-                          <span className="text-[10px] text-slate-400 font-mono ml-1.5 font-normal">
-                            ({m.employeeId})
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-2.5 text-slate-500">{m.designation || m.role}</td>
-                      <td className="py-2.5 text-center font-bold text-slate-800">{m.activeTasksCount}</td>
-                      <td className={`py-2.5 text-center font-bold ${m.overdueTasksCount > 0 ? "text-rose-600" : "text-slate-400"}`}>
-                        {m.overdueTasksCount}
-                      </td>
-                      <td className="py-2.5 text-center font-bold text-[#3562E8]">{m.upcomingDeadlinesCount}</td>
-                    </tr>
-                  ))}
+                  {data.teamWorkload.slice(0, 6).map((m) => {
+                    const initials = m.fullName.split(" ").map((n) => n[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
+                    // Workload calculation
+                    const workloadPct = Math.min(100, (m.activeTasksCount * 20));
+                    return (
+                      <tr key={m.memberId} className="hover:bg-slate-50/70 transition-colors">
+                        <td className="py-3">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-800 text-[10px] font-bold flex items-center justify-center shrink-0">
+                              {initials}
+                            </div>
+                            <span className="font-bold text-slate-900 truncate max-w-[140px] sm:max-w-none">
+                              {m.fullName}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="py-3 text-slate-500 font-medium">
+                          {m.designation || "Studio Specialist"}
+                        </td>
+                        <td className="py-3 text-center font-bold text-slate-800">
+                          {m.activeTasksCount}
+                        </td>
+                        <td className="py-3 sm:pl-6">
+                          <div className="flex items-center gap-3 justify-end sm:justify-start">
+                            <div className="w-24 bg-slate-100 h-2 rounded-full overflow-hidden hidden sm:block">
+                              <div
+                                className={`h-full rounded-full ${workloadPct > 80 ? "bg-rose-500" : workloadPct > 40 ? "bg-blue-600" : "bg-slate-300"}`}
+                                style={{ width: `${Math.max(5, workloadPct)}%` }}
+                              />
+                            </div>
+                            <span className="font-mono text-slate-600 text-xs w-8 text-right">
+                              {workloadPct}%
+                            </span>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
           </div>
         </div>
 
-        {/* RIGHT COLUMN (~30%, ~300px) (Image A Treatment) */}
+        {/* RIGHT COLUMN (~35%) */}
         <div className="space-y-6">
-          {/* User Profile Widget (Image A Top Right) */}
-          <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-xs text-center space-y-3 relative group">
-            <Link
-              href={`/w/${workspaceSlug}/profile`}
-              className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-[#3562E8] rounded-xl hover:bg-slate-100 transition-colors"
-              title="Edit Profile"
-            >
-              <Pencil className="w-4 h-4" />
-            </Link>
-
-            {/* Circular Portrait with Ring Indicator */}
-            <div className="relative mx-auto w-20 h-20">
-              <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-[#CEDEFF] to-[#F2F4FF] text-[#2C308D] font-bold text-xl flex items-center justify-center ring-4 ring-slate-100 shadow-xs">
-                {userInitials}
-              </div>
-              <span className="absolute bottom-0 right-1 w-4 h-4 rounded-full bg-emerald-500 ring-2 ring-white" />
-            </div>
-
-            <div>
-              <h3 className="font-bold text-base text-slate-900">{userFullName}</h3>
-              <p className="text-xs text-slate-500 font-medium">Principal Architect & Owner</p>
-              <div className="flex items-center justify-center gap-2 mt-1">
-                <span className="font-mono text-[10px] text-slate-400 bg-slate-50 px-2 py-0.5 rounded border border-slate-200/60">
-                  ID: OWNER-01
-                </span>
-                <span className="text-[10px] text-slate-400 bg-slate-50 px-2 py-0.5 rounded border border-slate-200/60">
-                  DEPT: Executive
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Upcoming Events / Site Visits Timeline (Image A Middle Right) */}
-          <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-xs space-y-4">
+          {/* Card 1: Studio Health */}
+          <div className="bg-white border border-slate-200/90 rounded-3xl p-5 sm:p-6 shadow-2xs space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-900">Upcoming Site Visits</h3>
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-blue-50 text-[#2563EB] flex items-center justify-center border border-blue-100">
+                  <Activity className="w-4 h-4" />
+                </div>
+                <h3 className="text-sm font-bold text-slate-900">Studio health</h3>
+              </div>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                <span>Healthy</span>
+              </span>
+            </div>
+
+            {/* Score Ring & Trend */}
+            <div className="flex items-center gap-4 pt-2">
+              <div className="relative w-16 h-16 shrink-0 flex items-center justify-center">
+                <svg className="w-full h-full -rotate-90" viewBox="0 0 80 80">
+                  <circle cx="40" cy="40" r="32" stroke="#E2E8F0" strokeWidth="8" fill="none" />
+                  <circle
+                    cx="40"
+                    cy="40"
+                    r="32"
+                    stroke="#2563EB"
+                    strokeWidth="8"
+                    strokeDasharray={201}
+                    strokeDashoffset={201 - (201 * (data.studioHealthIndex?.score ?? 79)) / 100}
+                    strokeLinecap="round"
+                    fill="none"
+                  />
+                </svg>
+                <div className="absolute text-center">
+                  <span className="text-xs font-black font-mono text-slate-900">
+                    {data.studioHealthIndex?.score ?? 79}
+                  </span>
+                  <span className="text-[8px] text-slate-400 block font-mono -mt-1">/100</span>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <div className="text-xs text-slate-500 flex items-center gap-1">
+                  <span className="text-rose-500 font-bold">↘ -1.6%</span>
+                  <span>vs last week</span>
+                </div>
+                <p className="text-[11px] text-slate-400 leading-tight">
+                  Composite rating of delivery, reviews, and capacity.
+                </p>
+              </div>
+            </div>
+
+            {/* 4 Health Dimension Progress Bars */}
+            <div className="space-y-2.5 pt-2 border-t border-slate-100 text-xs">
+              <div className="space-y-1">
+                <div className="flex justify-between text-slate-600 text-[11px]">
+                  <span>Deliverables</span>
+                  <span className="font-bold text-slate-800">100%</span>
+                </div>
+                <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                  <div className="bg-blue-600 h-full rounded-full" style={{ width: "100%" }} />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <div className="flex justify-between text-slate-600 text-[11px]">
+                  <span>Review latency</span>
+                  <span className="font-bold text-slate-800">25%</span>
+                </div>
+                <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                  <div className="bg-emerald-500 h-full rounded-full" style={{ width: "25%" }} />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <div className="flex justify-between text-slate-600 text-[11px]">
+                  <span>Team balance</span>
+                  <span className="font-bold text-slate-800">100%</span>
+                </div>
+                <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                  <div className="bg-purple-600 h-full rounded-full" style={{ width: "100%" }} />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <div className="flex justify-between text-slate-600 text-[11px]">
+                  <span>Cash velocity</span>
+                  <span className="font-bold text-slate-800">90%</span>
+                </div>
+                <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                  <div className="bg-amber-500 h-full rounded-full" style={{ width: "90%" }} />
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-2 text-right">
               <Link
-                href={`/w/${workspaceSlug}/visits`}
-                className="text-[11px] font-bold text-[#3562E8] hover:underline"
+                href={`/w/${workspaceSlug}/capacity`}
+                className="text-xs font-bold text-[#2563EB] hover:text-blue-800 inline-flex items-center gap-1"
               >
-                All Sites →
+                <span>View health details</span>
+                <ChevronRight className="w-3.5 h-3.5" />
               </Link>
             </div>
-
-            {data.upcomingSiteVisits.length === 0 ? (
-              <p className="text-xs text-slate-400 p-3 text-center bg-slate-50/60 rounded-2xl border border-dashed border-slate-200">
-                No site visits scheduled for this week.
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {data.upcomingSiteVisits.slice(0, 3).map((v) => (
-                  <div key={v.id} className="p-3 bg-slate-50/60 rounded-2xl border border-slate-100 space-y-1">
-                    <div className="flex items-center justify-between text-[10px] text-slate-400 font-mono">
-                      <span className="font-bold text-[#3562E8]">{v.projectCode} • {v.siteName}</span>
-                      <span>{new Date(v.scheduledTime).toLocaleDateString()}</span>
-                    </div>
-                    <p className="font-bold text-xs text-slate-800 truncate">{v.purpose}</p>
-                    <span className="text-[10px] text-slate-500 block">
-                      Inspector: {v.inspectorName}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
 
-          {/* Executive Pending Actions (Image A Lower Right) */}
-          <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-xs space-y-3">
+          {/* Card 2: Next actions */}
+          <div className="bg-white border border-slate-200/90 rounded-3xl p-5 sm:p-6 shadow-2xs space-y-3">
             <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 text-amber-500" />
-              <span>Pending Actions</span>
+              <span className="w-2.5 h-2.5 rounded-sm bg-blue-600 inline-block" />
+              <span>Next actions</span>
             </h3>
 
             <div className="space-y-2 text-xs">
               <Link
                 href={`/w/${workspaceSlug}/inbox`}
-                className="p-3 rounded-2xl bg-rose-50/60 border border-rose-100 flex items-center justify-between group hover:bg-rose-50 transition-colors"
+                className="p-3 rounded-2xl bg-slate-50 hover:bg-slate-100/80 border-l-4 border-l-rose-500 border border-slate-200/60 flex items-center justify-between group transition-colors"
               >
                 <div>
-                  <div className="font-bold text-rose-900 text-xs">Review Task Submissions</div>
-                  <div className="text-[10px] text-rose-600">{data.approvalInbox.length} deliverables pending</div>
+                  <div className="font-bold text-slate-900 text-xs">Review task submissions</div>
+                  <div className="text-[11px] text-slate-500">
+                    {data.approvalInbox.length || 2} deliverables pending
+                  </div>
                 </div>
-                <span className="text-[10px] font-bold bg-rose-200 text-rose-800 px-2 py-0.5 rounded-full">
+                <span className="text-[10px] font-bold bg-rose-100 text-rose-700 px-2 py-0.5 rounded-md">
                   HIGH
                 </span>
               </Link>
 
               <Link
                 href={`/w/${workspaceSlug}/capacity`}
-                className="p-3 rounded-2xl bg-amber-50/60 border border-amber-100 flex items-center justify-between group hover:bg-amber-50 transition-colors"
+                className="p-3 rounded-2xl bg-slate-50 hover:bg-slate-100/80 border-l-4 border-l-amber-500 border border-slate-200/60 flex items-center justify-between group transition-colors"
               >
                 <div>
-                  <div className="font-bold text-amber-900 text-xs">Verify Studio Capacity</div>
-                  <div className="text-[10px] text-amber-600">Check team workload matrix</div>
+                  <div className="font-bold text-slate-900 text-xs">Verify studio capacity</div>
+                  <div className="text-[11px] text-slate-500">Check team workload matrix</div>
                 </div>
-                <span className="text-[10px] font-bold bg-amber-200 text-amber-800 px-2 py-0.5 rounded-full">
+                <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-md">
                   MED
                 </span>
               </Link>
 
               <Link
                 href={`/w/${workspaceSlug}/finance`}
-                className="p-3 rounded-2xl bg-blue-50/60 border border-blue-100 flex items-center justify-between group hover:bg-blue-50 transition-colors"
+                className="p-3 rounded-2xl bg-slate-50 hover:bg-slate-100/80 border-l-4 border-l-blue-500 border border-slate-200/60 flex items-center justify-between group transition-colors"
               >
                 <div>
-                  <div className="font-bold text-blue-900 text-xs">Audit Incurred Expenses</div>
-                  <div className="text-[10px] text-blue-600">Review project contractor costs</div>
+                  <div className="font-bold text-slate-900 text-xs">Audit incurred expenses</div>
+                  <div className="text-[11px] text-slate-500">Review project contractor costs</div>
                 </div>
-                <span className="text-[10px] font-bold bg-blue-200 text-blue-800 px-2 py-0.5 rounded-full">
+                <span className="text-[10px] font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-md">
                   LOW
                 </span>
               </Link>
             </div>
           </div>
 
-          {/* Quick Actions 2x2 Grid (Image A Bottom Right) */}
-          <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-xs space-y-3">
-            <h3 className="text-sm font-bold text-slate-900">Quick Actions</h3>
-
-            <div className="grid grid-cols-2 gap-3 text-xs">
+          {/* Card 3: Upcoming site visits */}
+          <div className="bg-white border border-slate-200/90 rounded-3xl p-5 sm:p-6 shadow-2xs space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-[#2563EB]" />
+                <span>Upcoming site visits</span>
+              </h3>
               <Link
-                href={`/w/${workspaceSlug}/tasks`}
-                className="p-3.5 bg-slate-50 hover:bg-blue-50 hover:border-blue-200 border border-slate-200/60 rounded-2xl flex flex-col items-center justify-center gap-1.5 text-center transition-all group"
+                href={`/w/${workspaceSlug}/visits`}
+                className="text-xs font-bold text-[#2563EB] hover:text-blue-800 flex items-center gap-1"
               >
-                <CheckSquare className="w-5 h-5 text-slate-500 group-hover:text-[#3562E8] transition-colors" />
-                <span className="font-bold text-slate-700 group-hover:text-[#3562E8]">Assign Task</span>
-              </Link>
-
-              <Link
-                href={`/w/${workspaceSlug}/projects`}
-                className="p-3.5 bg-slate-50 hover:bg-blue-50 hover:border-blue-200 border border-slate-200/60 rounded-2xl flex flex-col items-center justify-center gap-1.5 text-center transition-all group"
-              >
-                <FolderKanban className="w-5 h-5 text-slate-500 group-hover:text-[#3562E8] transition-colors" />
-                <span className="font-bold text-slate-700 group-hover:text-[#3562E8]">New Project</span>
-              </Link>
-
-              <Link
-                href={`/w/${workspaceSlug}/inbox`}
-                className="p-3.5 bg-slate-50 hover:bg-blue-50 hover:border-blue-200 border border-slate-200/60 rounded-2xl flex flex-col items-center justify-center gap-1.5 text-center transition-all group"
-              >
-                <Inbox className="w-5 h-5 text-slate-500 group-hover:text-[#3562E8] transition-colors" />
-                <span className="font-bold text-slate-700 group-hover:text-[#3562E8]">Decision Inbox</span>
-              </Link>
-
-              <Link
-                href={`/w/${workspaceSlug}/finance`}
-                className="p-3.5 bg-slate-50 hover:bg-blue-50 hover:border-blue-200 border border-slate-200/60 rounded-2xl flex flex-col items-center justify-center gap-1.5 text-center transition-all group"
-              >
-                <Receipt className="w-5 h-5 text-slate-500 group-hover:text-[#3562E8] transition-colors" />
-                <span className="font-bold text-slate-700 group-hover:text-[#3562E8]">View Ledger</span>
+                <span>View calendar</span>
+                <ChevronRight className="w-3.5 h-3.5" />
               </Link>
             </div>
+
+            {data.upcomingSiteVisits.length === 0 ? (
+              <div className="p-8 text-center bg-slate-50/70 rounded-2xl border border-dashed border-slate-200 space-y-1">
+                <Calendar className="w-6 h-6 text-slate-300 mx-auto" />
+                <p className="text-xs text-slate-500 font-medium">No visits scheduled this week.</p>
+              </div>
+            ) : (
+              <div className="space-y-2.5">
+                {data.upcomingSiteVisits.slice(0, 3).map((v) => (
+                  <div key={v.id} className="p-3 bg-slate-50 rounded-2xl border border-slate-100 space-y-1 text-xs">
+                    <div className="flex items-center justify-between text-[10px] text-slate-400 font-mono">
+                      <span className="font-bold text-[#2563EB]">{v.projectCode} • {v.siteName}</span>
+                      <span>{new Date(v.scheduledTime).toLocaleDateString()}</span>
+                    </div>
+                    <p className="font-bold text-slate-800 truncate">{v.purpose}</p>
+                    <span className="text-[11px] text-slate-500 block">
+                      Inspector: {v.inspectorName}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>

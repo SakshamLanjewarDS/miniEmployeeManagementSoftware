@@ -162,40 +162,20 @@ export default async function VisitsPage({ params }: VisitsPageProps) {
   ]);
 
   return (
-    <div className="space-y-6">
-      <div className="border-b border-[#E2E6F0] pb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-[#1F1F1F]">
-            Site Visits & Issues
-          </h1>
-          <p className="text-xs text-[#696E82] mt-0.5">
-            Real-time GPS inspections, movement verification, and site snag issue management
-          </p>
-        </div>
-
-        <a
-          href={`/api/visits/export?workspaceSlug=${ctx.tenantSlug}`}
-          className="px-3.5 py-2 bg-white hover:bg-[#F2F4FF] border border-[#E2E6F0] text-[#1F1F1F] text-xs font-semibold rounded-xl shadow-2xs transition-colors flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
-        >
-          <span>Export CSV (Audit Protected)</span>
-        </a>
-      </div>
-
-      <VisitsClientView
-        workspaceSlug={ctx.tenantSlug}
-        currentMembershipId={ctx.membershipId}
-        userRole={ctx.role}
-        activeVisit={serializeForClient(activeVisit) as any}
-        scheduledVisits={serializeForClient(scheduledVisits) as any}
-        allVisits={serializeForClient(allVisits) as any}
-        availableSites={serializeForClient(sites) as any}
-        availableProjects={serializeForClient(projects) as any}
-        teamMembers={serializeForClient(teamMembers) as any}
-        availableTasks={serializeForClient(availableTasks) as any}
-        availableMilestones={serializeForClient(availableMilestones) as any}
-        contractors={serializeForClient(contractors.map((c) => ({ ...c, phone: c.contact }))) as any}
-        consultants={serializeForClient(consultants.map((c) => ({ ...c, phone: c.contact }))) as any}
-      />
-    </div>
+    <VisitsClientView
+      workspaceSlug={ctx.tenantSlug}
+      currentMembershipId={ctx.membershipId}
+      userRole={ctx.role}
+      activeVisit={serializeForClient(activeVisit) as any}
+      scheduledVisits={serializeForClient(scheduledVisits) as any}
+      allVisits={serializeForClient(allVisits) as any}
+      availableSites={serializeForClient(sites) as any}
+      availableProjects={serializeForClient(projects) as any}
+      teamMembers={serializeForClient(teamMembers) as any}
+      availableTasks={serializeForClient(availableTasks) as any}
+      availableMilestones={serializeForClient(availableMilestones) as any}
+      contractors={serializeForClient(contractors.map((c) => ({ ...c, phone: c.contact }))) as any}
+      consultants={serializeForClient(consultants.map((c) => ({ ...c, phone: c.contact }))) as any}
+    />
   );
 }

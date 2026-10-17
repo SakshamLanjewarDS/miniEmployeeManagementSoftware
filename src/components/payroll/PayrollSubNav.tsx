@@ -19,7 +19,7 @@ export function PayrollSubNav({ workspaceSlug, activeTab }: PayrollSubNavProps) 
     },
     {
       id: "calculate",
-      label: "Salary Calculator",
+      label: "Calculator",
       href: `/w/${workspaceSlug}/payroll/calculate`,
       icon: Calculator,
     },
@@ -28,7 +28,7 @@ export function PayrollSubNav({ workspaceSlug, activeTab }: PayrollSubNavProps) 
   return (
     <nav
       aria-label="Payroll local navigation"
-      className="inline-flex items-center gap-1.5 p-1 bg-white border border-[#E2E6F0] rounded-2xl shadow-2xs mb-2"
+      className="inline-flex items-center gap-1 p-1 bg-[#F4F6FB] border border-[#E2E6F0] rounded-xl mb-3 shadow-2xs"
     >
       {tabs.map((tab) => {
         const isActive = activeTab === tab.id;
@@ -38,15 +38,15 @@ export function PayrollSubNav({ workspaceSlug, activeTab }: PayrollSubNavProps) 
           <Link
             key={tab.id}
             href={tab.href}
-            prefetch={true}
+            prefetch={false}
             aria-current={isActive ? "page" : undefined}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
               isActive
-                ? "bg-[#3562E8] text-white shadow-xs"
-                : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/70"
+                ? "bg-[#1456F0] text-white shadow-2xs"
+                : "text-[#696E82] hover:text-[#1F1F1F] hover:bg-white/60"
             }`}
           >
-            <Icon className={`w-3.5 h-3.5 ${isActive ? "text-white" : "text-slate-400"}`} />
+            <Icon className="w-3.5 h-3.5" />
             <span>{tab.label}</span>
           </Link>
         );

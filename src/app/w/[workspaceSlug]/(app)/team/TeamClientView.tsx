@@ -38,6 +38,13 @@ import {
   List,
   MoreVertical,
   Clock,
+  ArrowLeft,
+  ArrowRight,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
+  ChevronUp,
+  MoreHorizontal,
 } from "lucide-react";
 import { CsvImportExportModal } from "@/components/csv/CsvImportExportModal";
 import BulkMailModal from "@/components/team/BulkMailModal";
@@ -140,11 +147,16 @@ export default function TeamClientView({
   };
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("ALL");
+  const [departmentFilter, setDepartmentFilter] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState<"ALL" | "ACTIVE" | "INACTIVE">("ALL");
   const [teamSortBy, setTeamSortBy] = useState<string>("JOIN_DATE_DESC");
   const [currentPage, setCurrentPage] = useState(1);
   const [viewMode, setViewMode] = useState<"GRID" | "TABLE">("GRID");
   const [activeCardMenuId, setActiveCardMenuId] = useState<string | null>(null);
+  const [selectedProfileEmployee, setSelectedProfileEmployee] = useState<EmployeeItem | null>(null);
+  const [profileTab, setProfileTab] = useState<"OVERVIEW" | "PROJECTS" | "ACTIVITY">("OVERVIEW");
+  const [accountManagementOpen, setAccountManagementOpen] = useState(false);
+  const [moreOptionsOpen, setMoreOptionsOpen] = useState(false);
   const pageSize = 12;
 
   // Modals state
@@ -305,6 +317,7 @@ export default function TeamClientView({
       if (statusFilter === "ACTIVE" && !emp.isActive) return false;
       if (statusFilter === "INACTIVE" && emp.isActive) return false;
       if (roleFilter !== "ALL" && emp.role !== roleFilter) return false;
+      if (departmentFilter !== "ALL" && emp.department !== departmentFilter) return false;
 
       if (search.trim()) {
         const q = search.toLowerCase();
@@ -840,209 +853,293 @@ export default function TeamClientView({
         </div>
       )}
 
-      {/* Control Bar */}
-      <div className="bg-white border border-[#E2E6F0] rounded-2xl p-4 shadow-2xs space-y-4" suppressHydrationWarning>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          {/* Status Tabs */}
-          <div className="flex items-center gap-1 bg-[#F8F9FD] p-1 rounded-xl border border-[#E2E6F0]">
-            <button
-              type="button"
-              suppressHydrationWarning
-              onClick={() => {
-                setStatusFilter("ALL");
-                setCurrentPage(1);
-              }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                statusFilter === "ALL"
-                  ? "bg-white text-[#1F1F1F] shadow-xs border border-[#E2E6F0]"
-                  : "text-[#696E82] hover:text-[#1F1F1F]"
-              }`}
-            >
-              All ({employees.length})
-            </button>
-            <button
-              type="button"
-              suppressHydrationWarning
-              onClick={() => {
-                setStatusFilter("ACTIVE");
-                setCurrentPage(1);
-              }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                statusFilter === "ACTIVE"
-                  ? "bg-white text-emerald-800 shadow-xs border border-emerald-200"
-                  : "text-[#696E82] hover:text-[#1F1F1F]"
-              }`}
-            >
-              Active ({employees.filter((e) => e.isActive).length})
-            </button>
-            <button
-              type="button"
-              suppressHydrationWarning
-              onClick={() => {
-                setStatusFilter("INACTIVE");
-                setCurrentPage(1);
-              }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                statusFilter === "INACTIVE"
-                  ? "bg-white text-red-800 shadow-xs border border-red-200"
-                  : "text-[#696E82] hover:text-[#1F1F1F]"
-              }`}
-            >
-              Inactive ({employees.filter((e) => !e.isActive).length})
-            </button>
-          </div>
-
-          {/* Add Employee & CSV Buttons (Privileged only) */}
-          {isPrivileged && (
-            <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
-              <button
-                type="button"
-                suppressHydrationWarning
-                onClick={fetchFreshEmployees}
-                disabled={isRefreshing}
-                title="Synchronize live changes with database"
-                className="p-2 bg-white border border-[#E2E6F0] hover:bg-[#F8F9FD] rounded-xl text-[#696E82] hover:text-[#1F1F1F] transition-all shadow-xs cursor-pointer flex items-center justify-center gap-1.5 text-xs font-semibold"
-              >
-                <RotateCcw className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin text-[#5A81FA]" : "text-[#696E82]"}`} />
-                <span className="hidden sm:inline text-[11px]">{isRefreshing ? "Syncing..." : "Sync Live"}</span>
-              </button>
-              <button
-                type="button"
-                suppressHydrationWarning
-                onClick={() => setIsBulkMailModalOpen(true)}
-                className="bg-white border border-[#E2E6F0] text-[#1F1F1F] hover:bg-[#F8F9FD] hover:border-[#EA4335] px-3.5 py-2 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-2 shadow-xs shrink-0 cursor-pointer flex-1 sm:flex-initial"
-                title="Send personalized bulk mail (leave notices, festive greetings, circulars)"
-              >
-                <Mail className="w-3.5 h-3.5 text-[#EA4335]" />
-                <span>Bulk Mail</span>
-                {selectedEmployeeIds.length > 0 && (
-                  <span className="px-1.5 py-0.2 bg-[#EA4335] text-white text-[10px] font-bold rounded-full">
-                    {selectedEmployeeIds.length}
-                  </span>
-                )}
-              </button>
-              <button
-                type="button"
-                suppressHydrationWarning
-                onClick={() => setCustomFieldsModalOpen(true)}
-                className="bg-white border border-[#E2E6F0] text-slate-700 hover:bg-[#F8F9FD] px-3.5 py-2 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 shadow-2xs shrink-0 cursor-pointer flex-1 sm:flex-initial"
-                title="Configure dynamic fields for Team & Employees without changing code"
-              >
-                <SlidersHorizontal className="w-3.5 h-3.5 text-[#5A81FA]" />
-                <span>Form Fields</span>
-              </button>
-              <button
-                type="button"
-                suppressHydrationWarning
-                onClick={() => setIsCsvModalOpen(true)}
-                className="bg-white border border-[#CEDEFF] text-[#2C308D] hover:bg-[#F2F4FF] px-3.5 py-2 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-2 shadow-xs shrink-0 cursor-pointer flex-1 sm:flex-initial"
-                title="Bulk import studio team employees from CSV"
-              >
-                <FileSpreadsheet className="w-3.5 h-3.5 text-[#5A81FA]" />
-                <span>Import CSV</span>
-              </button>
-              <button
-                type="button"
-                suppressHydrationWarning
-                onClick={openAddEmployeeModal}
-                className="bg-[#5A81FA] text-white px-3.5 py-2 rounded-xl text-xs font-semibold hover:bg-[#426EE8] transition-all flex items-center justify-center gap-2 shadow-xs shrink-0 cursor-pointer w-full sm:w-auto"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Add Employee</span>
-              </button>
-            </div>
-          )}
+      {/* Top Header & Breadcrumbs matching reference 28a4d685-5954-4e11-8024-f9712ec61888.png */}
+      <div className="space-y-4">
+        {/* Desktop Breadcrumbs */}
+        <div className="hidden sm:flex items-center gap-2 text-xs text-[#696E82]">
+          <span>People & HR</span>
+          <span>/</span>
+          <span className="font-medium text-[#1F1F1F]">Studio Team</span>
         </div>
 
-        {/* Search & Filters */}
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-3 border-t border-[#E2E6F0]">
-          <div className="sm:col-span-2 relative">
-            <Search className="w-4 h-4 absolute left-3 top-2.5 text-[#696E82]" />
+        {/* Title & Actions Row */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#1F1F1F]">
+              Studio team
+            </h1>
+            <p className="text-xs sm:text-sm text-[#696E82] mt-0.5">
+              <span className="hidden sm:inline">People, roles and connections across your studio.</span>
+              <span className="sm:hidden">{employees.length} members</span>
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 self-stretch sm:self-auto">
+            <button
+              type="button"
+              onClick={fetchFreshEmployees}
+              disabled={isRefreshing}
+              className="px-3.5 py-2 bg-white hover:bg-[#F8F9FD] text-[#1F1F1F] text-xs font-semibold rounded-xl border border-[#E2E6F0] shadow-2xs transition-all flex items-center justify-center gap-1.5 cursor-pointer min-h-[44px]"
+            >
+              <RotateCcw className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin text-[#5A81FA]" : "text-[#696E82]"}`} />
+              <span>Sync</span>
+            </button>
+
+            {/* More Options Popover Menu */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setMoreOptionsOpen(!moreOptionsOpen)}
+                className="p-2.5 bg-white hover:bg-[#F8F9FD] text-[#696E82] hover:text-[#1F1F1F] rounded-xl border border-[#E2E6F0] shadow-2xs transition-all cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center"
+                title="More Options"
+              >
+                <MoreVertical className="w-4 h-4" />
+              </button>
+
+              {moreOptionsOpen && (
+                <div className="absolute right-0 top-full mt-1.5 w-48 bg-white border border-[#E2E6F0] rounded-xl shadow-xl z-30 py-1 text-xs divide-y divide-[#E2E6F0]">
+                  <div className="p-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsBulkMailModalOpen(true);
+                        setMoreOptionsOpen(false);
+                      }}
+                      className="w-full text-left px-3 py-2 text-slate-700 hover:bg-slate-50 rounded-lg flex items-center gap-2 cursor-pointer"
+                    >
+                      <Mail className="w-4 h-4 text-[#EA4335]" />
+                      <span>Bulk Mail ({selectedEmployeeIds.length})</span>
+                    </button>
+                    {isPrivileged && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCustomFieldsModalOpen(true);
+                          setMoreOptionsOpen(false);
+                        }}
+                        className="w-full text-left px-3 py-2 text-slate-700 hover:bg-slate-50 rounded-lg flex items-center gap-2 cursor-pointer"
+                      >
+                        <SlidersHorizontal className="w-4 h-4 text-[#5A81FA]" />
+                        <span>Configure Fields</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {isPrivileged && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setIsCsvModalOpen(true)}
+                  className="hidden sm:inline-flex items-center justify-center gap-2 px-3.5 py-2 bg-white hover:bg-[#F8F9FD] text-[#1F1F1F] text-xs font-semibold rounded-xl border border-[#E2E6F0] shadow-2xs transition-all cursor-pointer min-h-[44px]"
+                >
+                  <FileSpreadsheet className="w-4 h-4 text-[#5A81FA]" />
+                  <span>Import CSV</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={openAddEmployeeModal}
+                  className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 bg-[#5A81FA] hover:bg-[#426EE8] text-white text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer min-h-[44px]"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Add employee</span>
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Status Tabs pill bar */}
+        <div className="flex items-center gap-1 border-b border-[#E2E6F0] pb-2 overflow-x-auto touch-scroll-x">
+          <button
+            type="button"
+            onClick={() => {
+              setStatusFilter("ALL");
+              setCurrentPage(1);
+            }}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+              statusFilter === "ALL"
+                ? "bg-[#5A81FA] text-white shadow-xs"
+                : "bg-white text-[#696E82] hover:text-[#1F1F1F] border border-[#E2E6F0]"
+            }`}
+          >
+            All members ({employees.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setStatusFilter("ACTIVE");
+              setCurrentPage(1);
+            }}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+              statusFilter === "ACTIVE"
+                ? "bg-[#5A81FA] text-white shadow-xs"
+                : "bg-white text-[#696E82] hover:text-[#1F1F1F] border border-[#E2E6F0]"
+            }`}
+          >
+            Active ({employees.filter((e) => e.isActive).length})
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setStatusFilter("INACTIVE");
+              setCurrentPage(1);
+            }}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+              statusFilter === "INACTIVE"
+                ? "bg-[#5A81FA] text-white shadow-xs"
+                : "bg-white text-[#696E82] hover:text-[#1F1F1F] border border-[#E2E6F0]"
+            }`}
+          >
+            Inactive ({employees.filter((e) => !e.isActive).length})
+          </button>
+        </div>
+
+        {/* Filter bar: Search, Role, Discipline, Sort, View mode */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-[#E2E6F0]">
+          <div className="relative flex-1 min-w-[220px]">
+            <Search className="w-3.5 h-3.5 text-[#696E82] absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              suppressHydrationWarning
-              placeholder="Search by name, employee ID (EMP-...), email, or designation..."
+              placeholder="Search name, employee ID or email..."
               value={search}
               onChange={(e) => {
                 setSearch(e.target.value);
                 setCurrentPage(1);
               }}
-              className="w-full pl-9 pr-3 py-2 text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:outline-hidden focus:ring-1 focus:ring-[#5A81FA] text-[#1F1F1F]"
+              className="w-full pl-8 pr-3 py-1.5 text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-lg text-[#1F1F1F] focus:outline-hidden focus:ring-1 focus:ring-[#5A81FA]"
             />
           </div>
 
-          <div className="min-w-[150px]">
-            <SearchableDropdown
-              size="sm"
-              optionType="status"
-              value={roleFilter}
-              onChange={(val) => {
-                setRoleFilter(val);
-                setCurrentPage(1);
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="min-w-[130px]">
+              <SearchableDropdown
+                size="sm"
+                value={roleFilter}
+                onChange={(val) => {
+                  setRoleFilter(val);
+                  setCurrentPage(1);
+                }}
+                placeholder="All roles"
+                searchable={false}
+                clearable={false}
+                options={[
+                  { value: "ALL", label: "All roles" },
+                  { value: "OWNER", label: "Owner / Partner" },
+                  { value: "ADMIN", label: "Administrator" },
+                  { value: "EMPLOYEE", label: "Employee" },
+                ]}
+              />
+            </div>
+
+            <div className="min-w-[140px]">
+              <SearchableDropdown
+                size="sm"
+                value={departmentFilter}
+                onChange={(val) => {
+                  setDepartmentFilter(val);
+                  setCurrentPage(1);
+                }}
+                placeholder="All disciplines"
+                searchable={false}
+                clearable={false}
+                options={[
+                  { value: "ALL", label: "All disciplines" },
+                  ...DEPARTMENT_OPTIONS.map((d) => ({ value: d.value, label: d.label })),
+                ]}
+              />
+            </div>
+
+            <div className="min-w-[140px]">
+              <SearchableDropdown
+                size="sm"
+                value={teamSortBy}
+                onChange={(val) => {
+                  setTeamSortBy(val);
+                  setCurrentPage(1);
+                }}
+                placeholder="Sort"
+                searchable={false}
+                clearable={false}
+                options={[
+                  { value: "JOIN_DATE_DESC", label: "Newest first" },
+                  { value: "JOIN_DATE_ASC", label: "Oldest first" },
+                  { value: "ALPHA_NAME_ASC", label: "Name (A → Z)" },
+                  { value: "ALPHA_NAME_DESC", label: "Name (Z → A)" },
+                  { value: "ALPHA_EMP_ID_ASC", label: "Employee ID (A → Z)" },
+                ]}
+              />
+            </div>
+
+            {/* View Mode Toggle: Grid vs List */}
+            <div className="flex items-center bg-[#F8F9FD] p-0.5 rounded-xl border border-[#E2E6F0] shrink-0">
+              <button
+                type="button"
+                onClick={() => setViewMode("GRID")}
+                className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                  viewMode === "GRID"
+                    ? "bg-[#5A81FA] text-white shadow-2xs font-semibold"
+                    : "text-slate-500 hover:text-slate-900"
+                }`}
+                title="Card Grid View"
+                aria-label="Grid View"
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("TABLE")}
+                className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                  viewMode === "TABLE"
+                    ? "bg-[#5A81FA] text-white shadow-2xs font-semibold"
+                    : "text-slate-500 hover:text-slate-900"
+                }`}
+                title="Table List View"
+                aria-label="Table View"
+              >
+                <List className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Batch Selection Bar */}
+        <div className="flex items-center justify-between text-xs text-[#696E82] px-1">
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={
+                paginatedEmployees.length > 0 &&
+                paginatedEmployees.every((e) => selectedEmployeeIds.includes(e.membershipId))
+              }
+              onChange={() => {
+                const allCurrentSelected =
+                  paginatedEmployees.length > 0 &&
+                  paginatedEmployees.every((e) => selectedEmployeeIds.includes(e.membershipId));
+                if (allCurrentSelected) {
+                  setSelectedEmployeeIds((prev) =>
+                    prev.filter((id) => !paginatedEmployees.some((e) => e.membershipId === id))
+                  );
+                } else {
+                  const toAdd = paginatedEmployees
+                    .map((e) => e.membershipId)
+                    .filter((id) => !selectedEmployeeIds.includes(id));
+                  setSelectedEmployeeIds((prev) => [...prev, ...toAdd]);
+                }
               }}
-              placeholder="All Roles"
-              searchable={false}
-              clearable={false}
-              options={[
-                { value: "ALL", label: "All Roles" },
-                { value: "OWNER", label: "Owner / Partner" },
-                { value: "ADMIN", label: "Administrator" },
-                { value: "EMPLOYEE", label: "Employee" },
-              ]}
+              className="w-4 h-4 rounded text-[#5A81FA] border-slate-300 focus:ring-[#5A81FA] cursor-pointer"
             />
-          </div>
+            <span className="font-medium text-[#1F1F1F]">Select members</span>
+          </label>
 
-          <div className="min-w-[190px]">
-            <SearchableDropdown
-              size="sm"
-              value={teamSortBy}
-              onChange={(val) => {
-                setTeamSortBy(val);
-                setCurrentPage(1);
-              }}
-              placeholder="Sort team..."
-              searchable={false}
-              clearable={false}
-              options={[
-                { value: "JOIN_DATE_DESC", label: "Sort: Date (Newest First)" },
-                { value: "JOIN_DATE_ASC", label: "Sort: Date (Oldest First)" },
-                { value: "ALPHA_NAME_ASC", label: "Sort: Name (A → Z)" },
-                { value: "ALPHA_NAME_DESC", label: "Sort: Name (Z → A)" },
-                { value: "ALPHA_EMP_ID_ASC", label: "Sort: Employee ID (A → Z)" },
-                { value: "ALPHA_EMP_ID_DESC", label: "Sort: Employee ID (Z → A)" },
-              ]}
-            />
-          </div>
-
-          {/* View Mode Toggle: Grid vs Table (Image C) */}
-          <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200/80 shrink-0">
-            <button
-              type="button"
-              onClick={() => setViewMode("GRID")}
-              className={`p-1.5 rounded-lg transition-all cursor-pointer ${
-                viewMode === "GRID"
-                  ? "bg-white text-[#3562E8] shadow-xs font-semibold"
-                  : "text-slate-500 hover:text-slate-900"
-              }`}
-              title="Card Grid View"
-              aria-label="Grid View"
-            >
-              <LayoutGrid className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode("TABLE")}
-              className={`p-1.5 rounded-lg transition-all cursor-pointer ${
-                viewMode === "TABLE"
-                  ? "bg-white text-[#3562E8] shadow-xs font-semibold"
-                  : "text-slate-500 hover:text-slate-900"
-              }`}
-              title="Table List View"
-              aria-label="Table View"
-            >
-              <List className="w-4 h-4" />
-            </button>
-          </div>
+          {selectedEmployeeIds.length > 0 && (
+            <span className="font-semibold text-[#5A81FA]">
+              {selectedEmployeeIds.length} selected
+            </span>
+          )}
         </div>
       </div>
 
@@ -1091,16 +1188,13 @@ export default function TeamClientView({
             <p className="text-xs text-[#696E82] mt-1">Try adjusting your search query or filters.</p>
           </div>
         ) : viewMode === "GRID" ? (
-          <div className="p-3.5 sm:p-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
+          <div className="p-4 sm:p-6">
+            {/* Desktop 3-column Cards (hidden on mobile) */}
+            <div className="hidden sm:grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
               {paginatedEmployees.map((emp) => {
                 const isSelected = selectedEmployeeIds.includes(emp.membershipId);
                 const isSelf = emp.membershipId === currentUserId;
                 const canManageThisEmployee = isPrivileged && !isSelf;
-                const allocationPercent = emp.isActive
-                  ? Math.min(100, Math.max(45, ((emp.fullName.charCodeAt(0) * 7) % 65) + 35))
-                  : 0;
-
                 const initials = emp.fullName
                   .split(" ")
                   .map((n) => n[0])
@@ -1111,35 +1205,238 @@ export default function TeamClientView({
                 return (
                   <div
                     key={emp.id}
-                    className={`bg-white rounded-2xl border transition-all duration-200 p-4 sm:p-5 flex flex-col justify-between relative group shadow-[0_1px_3px_rgba(15,23,42,0.04)] hover:shadow-md hover:border-slate-300 ${
+                    className={`bg-white rounded-2xl border transition-all duration-200 p-5 flex flex-col justify-between shadow-2xs hover:shadow-md ${
                       !emp.isActive
-                        ? "bg-slate-50/60 border-slate-200 opacity-80"
+                        ? "bg-slate-50/70 border-slate-200 opacity-80"
                         : isSelected
-                        ? "border-[#3562E8] ring-2 ring-[#3562E8]/20"
-                        : "border-slate-200/80"
+                        ? "border-[#5A81FA] ring-2 ring-[#5A81FA]/20"
+                        : "border-[#E2E6F0] hover:border-slate-300"
                     }`}
                   >
-                    {/* Top Row: Checkbox Selection & Status Badge */}
-                    <div className="flex items-center justify-between gap-2 mb-3">
-                      <div className="flex items-center gap-2">
-                        {isPrivileged && (
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={() => toggleSelectEmployee(emp.membershipId)}
-                            className="w-4 h-4 rounded text-[#3562E8] border-slate-300 focus:ring-[#3562E8] cursor-pointer"
-                            title="Select for bulk actions"
-                          />
-                        )}
-                        <span className="text-[10px] font-bold tracking-wider uppercase px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200/60">
-                          {emp.role.replace("_", " ")}
-                        </span>
-                      </div>
+                    {/* Top Row: Checkbox, Status Pill, Three-dots menu */}
+                    <div className="flex items-center justify-between gap-2 mb-4">
+                      {isPrivileged ? (
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleSelectEmployee(emp.membershipId)}
+                          className="w-4 h-4 rounded text-[#5A81FA] border-slate-300 focus:ring-[#5A81FA] cursor-pointer"
+                        />
+                      ) : (
+                        <div className="w-4 h-4" />
+                      )}
 
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
+                            emp.isActive
+                              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                              : "bg-slate-100 text-slate-500 border-slate-200"
+                          }`}
+                        >
+                          <span
+                            className={`w-1.5 h-1.5 rounded-full ${
+                              emp.isActive ? "bg-emerald-500" : "bg-slate-400"
+                            }`}
+                          />
+                          {emp.isActive ? "Active" : "Inactive"}
+                        </span>
+
+                        {/* Popover Menu Trigger */}
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setActiveCardMenuId(
+                                activeCardMenuId === emp.membershipId ? null : emp.membershipId
+                              )
+                            }
+                            className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg cursor-pointer"
+                          >
+                            <MoreVertical className="w-4 h-4" />
+                          </button>
+
+                          {activeCardMenuId === emp.membershipId && (
+                            <div className="absolute right-0 top-full mt-1 w-44 bg-white border border-[#E2E6F0] rounded-xl shadow-xl z-20 py-1 text-xs divide-y divide-[#E2E6F0]">
+                              <div className="p-1">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedProfileEmployee(emp);
+                                    setActiveCardMenuId(null);
+                                  }}
+                                  className="w-full text-left px-3 py-1.5 text-slate-700 hover:bg-slate-50 rounded-lg flex items-center gap-2"
+                                >
+                                  <Eye className="w-3.5 h-3.5 text-slate-400" />
+                                  <span>View Dossier</span>
+                                </button>
+                                {isPrivileged && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        openEditModal(emp);
+                                        setActiveCardMenuId(null);
+                                      }}
+                                      className="w-full text-left px-3 py-1.5 text-slate-700 hover:bg-slate-50 rounded-lg flex items-center gap-2"
+                                    >
+                                      <Edit className="w-3.5 h-3.5 text-[#5A81FA]" />
+                                      <span>Edit Member</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setResetPasswordEmployee(emp);
+                                        setActiveCardMenuId(null);
+                                      }}
+                                      className="w-full text-left px-3 py-1.5 text-slate-700 hover:bg-slate-50 rounded-lg flex items-center gap-2"
+                                    >
+                                      <KeyRound className="w-3.5 h-3.5 text-amber-500" />
+                                      <span>Reset Password</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        openDirectDispatchModal(emp);
+                                        setActiveCardMenuId(null);
+                                      }}
+                                      className="w-full text-left px-3 py-1.5 text-slate-700 hover:bg-slate-50 rounded-lg flex items-center gap-2"
+                                    >
+                                      <Send className="w-3.5 h-3.5 text-blue-500" />
+                                      <span>Send Credentials</span>
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                              {canManageThisEmployee && (
+                                <div className="p-1">
+                                  {emp.isActive ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        handleDeactivate(emp.membershipId, emp.fullName);
+                                        setActiveCardMenuId(null);
+                                      }}
+                                      className="w-full text-left px-3 py-1.5 text-rose-600 hover:bg-rose-50 rounded-lg flex items-center gap-2"
+                                    >
+                                      <UserX className="w-3.5 h-3.5" />
+                                      <span>Deactivate</span>
+                                    </button>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        handleReactivate(emp.membershipId, emp.fullName);
+                                        setActiveCardMenuId(null);
+                                      }}
+                                      className="w-full text-left px-3 py-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg flex items-center gap-2"
+                                    >
+                                      <CheckCircle2 className="w-3.5 h-3.5" />
+                                      <span>Reactivate</span>
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      handleRemove(emp.membershipId, emp.fullName);
+                                      setActiveCardMenuId(null);
+                                    }}
+                                    className="w-full text-left px-3 py-1.5 text-rose-700 hover:bg-rose-50 rounded-lg flex items-center gap-2"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                    <span>Delete Record</span>
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Middle: Avatar & Employee Identity */}
+                    <div className="flex items-center gap-3.5 my-2">
+                      <div className="w-12 h-12 rounded-full bg-[#EBF0FF] text-[#3562E8] font-bold text-base flex items-center justify-center shrink-0 shadow-2xs">
+                        {initials}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h3 className="font-bold text-sm text-[#1F1F1F] truncate" title={emp.fullName}>
+                          {emp.fullName}
+                        </h3>
+                        <p className="text-xs text-[#696E82] truncate mt-0.5">
+                          {emp.designation || emp.department || "Architect"}
+                        </p>
+                        <p className="font-mono text-[11px] text-[#696E82] mt-0.5">
+                          {emp.employeeId}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Bottom Actions Row */}
+                    <div className="mt-4 pt-3 border-t border-[#E2E6F0] flex items-center justify-between">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedProfileEmployee(emp)}
+                        className="text-xs font-semibold text-[#5A81FA] hover:text-[#426EE8] flex items-center gap-1 transition-colors cursor-pointer"
+                      >
+                        <span>View profile</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </button>
+
+                      {isPrivileged && (
+                        <button
+                          type="button"
+                          onClick={() => openEditModal(emp)}
+                          className="p-1.5 text-slate-400 hover:text-[#5A81FA] hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                          title="Edit Profile"
+                        >
+                          <Edit className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Mobile Compact Cards List (visible only on mobile) */}
+            <div className="sm:hidden divide-y divide-[#E2E6F0] -mx-4">
+              {paginatedEmployees.map((emp) => {
+                const initials = emp.fullName
+                  .split(" ")
+                  .map((n) => n[0])
+                  .join("")
+                  .substring(0, 2)
+                  .toUpperCase();
+
+                return (
+                  <div
+                    key={emp.id}
+                    onClick={() => setSelectedProfileEmployee(emp)}
+                    className="p-4 flex items-center justify-between gap-3 hover:bg-[#F8F9FD] active:bg-[#F2F4FF] cursor-pointer transition-colors"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-11 h-11 rounded-full bg-[#EBF0FF] text-[#3562E8] font-bold text-sm flex items-center justify-center shrink-0">
+                        {initials}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="font-bold text-sm text-[#1F1F1F] truncate">
+                          {emp.fullName}
+                        </div>
+                        <div className="text-xs text-[#696E82] truncate">
+                          {emp.designation || emp.department || "Architect"}
+                        </div>
+                        <div className="font-mono text-[10px] text-[#696E82]">
+                          {emp.employeeId}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
                       <span
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
                           emp.isActive
-                            ? "bg-emerald-50 text-emerald-700 border-emerald-200/70"
+                            ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                             : "bg-slate-100 text-slate-500 border-slate-200"
                         }`}
                       >
@@ -1148,196 +1445,9 @@ export default function TeamClientView({
                             emp.isActive ? "bg-emerald-500" : "bg-slate-400"
                           }`}
                         />
-                        {emp.isActive ? "Active" : "Deactivated"}
+                        {emp.isActive ? "Active" : "Inactive"}
                       </span>
-                    </div>
-
-                    {/* Centered Circular Portrait & Name */}
-                    <div className="text-center my-1">
-                      <div className="relative mx-auto w-16 h-16 mb-2.5">
-                        {emp.avatarUrl ? (
-                          <img
-                            src={emp.avatarUrl}
-                            alt={emp.fullName}
-                            className="w-16 h-16 rounded-full object-cover ring-4 ring-slate-100 shadow-xs"
-                          />
-                        ) : (
-                          <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-[#CEDEFF] to-[#F2F4FF] text-[#2C308D] font-bold text-lg flex items-center justify-center ring-4 ring-slate-100 shadow-xs">
-                            {initials}
-                          </div>
-                        )}
-                      </div>
-
-                      <h3 className="font-bold text-[15px] text-slate-900 truncate">
-                        {emp.fullName}
-                      </h3>
-                      <div className="flex items-center justify-center gap-2 mt-0.5">
-                        <span className="font-mono text-[11px] font-semibold text-[#3562E8] bg-[#3562E8]/10 px-2 py-0.5 rounded border border-[#3562E8]/20">
-                          {emp.employeeId}
-                        </span>
-                        <span className="text-xs font-medium text-slate-600 truncate">
-                          {emp.designation || "Studio Specialist"}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Rich Details Section */}
-                    <div className="my-3 py-2.5 border-y border-slate-100 space-y-1.5 text-left">
-                      {/* Email */}
-                      <div className="flex items-center gap-2 text-xs text-slate-600">
-                        <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                        <span className="truncate" title={emp.email}>{emp.email}</span>
-                      </div>
-
-                      {/* Phone */}
-                      <div className="flex items-center gap-2 text-xs text-slate-600">
-                        <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                        <span className="truncate">{emp.phone || "No phone added"}</span>
-                      </div>
-
-                      {/* Department */}
-                      <div className="flex items-center gap-2 text-xs text-slate-600">
-                        <Building className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                        <span className="truncate font-medium">{emp.department || "General Operations"}</span>
-                      </div>
-
-                      {/* Join Date */}
-                      <div className="flex items-center gap-2 text-xs text-slate-500">
-                        <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                        <span>
-                          {emp.joinDate
-                            ? `Joined ${new Date(emp.joinDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
-                            : "Active studio member"}
-                        </span>
-                      </div>
-
-                      {/* Assigned Projects */}
-                      {emp.projects && emp.projects.length > 0 ? (
-                        <div className="pt-1 flex flex-wrap items-center gap-1.5">
-                          <span className="text-[11px] text-slate-400 flex items-center gap-1 font-medium">
-                            <Briefcase className="w-3 h-3 text-[#3562E8]" /> Projects ({emp.projects.length}):
-                          </span>
-                          {emp.projects.slice(0, 3).map((p) => (
-                            <span
-                              key={p.id}
-                              className="inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200"
-                              title={p.name}
-                            >
-                              {p.code || p.name}
-                            </span>
-                          ))}
-                          {emp.projects.length > 3 && (
-                            <span className="text-[10px] text-slate-400 font-medium">
-                              +{emp.projects.length - 3} more
-                            </span>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="pt-0.5 text-[11px] text-slate-400 flex items-center gap-1">
-                          <Briefcase className="w-3 h-3 text-slate-300" />
-                          <span>No assigned projects</span>
-                        </div>
-                      )}
-
-                      {/* Dynamic Custom Fields if available */}
-                      <DynamicCardFields
-                        fields={customFields}
-                        values={customValuesByEmployee[emp.id] || {}}
-                      />
-                    </div>
-
-                    {/* Direct Action Buttons on Card Face (No 3-dots) */}
-                    <div className="mt-2 pt-1 space-y-1.5">
-                      {isPrivileged && (
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openEditModal(emp);
-                            }}
-                            className="flex-1 inline-flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-700 transition cursor-pointer shadow-2xs hover:border-slate-300"
-                            title="Edit Profile"
-                          >
-                            <Edit className="w-3.5 h-3.5 text-slate-500" />
-                            <span>Edit</span>
-                          </button>
-
-                          {emp.isActive && (
-                            <>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  openDirectDispatchModal(emp);
-                                }}
-                                className="flex-1 inline-flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg bg-[#3562E8]/10 hover:bg-[#3562E8]/20 border border-[#3562E8]/20 text-xs font-semibold text-[#3562E8] transition cursor-pointer shadow-2xs"
-                                title="Send Login Credentials"
-                              >
-                                <Send className="w-3.5 h-3.5" />
-                                <span>Send Pass</span>
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setResetPasswordEmployee(emp);
-                                }}
-                                className="inline-flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg bg-amber-50 hover:bg-amber-100 border border-amber-200 text-xs font-semibold text-amber-700 transition cursor-pointer shadow-2xs"
-                                title="Reset Password"
-                              >
-                                <KeyRound className="w-3.5 h-3.5 text-amber-600" />
-                                <span>Reset</span>
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      )}
-
-                      {canManageThisEmployee && (
-                        <div className="flex items-center gap-1.5 pt-0.5">
-                          {emp.isActive ? (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeactivate(emp.membershipId, emp.fullName);
-                              }}
-                              className="flex-1 inline-flex items-center justify-center gap-1 py-1 px-2 rounded-lg bg-slate-50 hover:bg-amber-50 border border-slate-200 hover:border-amber-200 text-[11px] font-medium text-amber-700 transition cursor-pointer"
-                              title="Deactivate Account"
-                            >
-                              <UserX className="w-3 h-3 text-amber-600" />
-                              <span>Deactivate</span>
-                            </button>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleReactivate(emp.membershipId, emp.fullName);
-                              }}
-                              className="flex-1 inline-flex items-center justify-center gap-1 py-1 px-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-[11px] font-medium text-emerald-700 transition cursor-pointer"
-                              title="Reactivate Account"
-                            >
-                              <RotateCcw className="w-3 h-3 text-emerald-600" />
-                              <span>Reactivate</span>
-                            </button>
-                          )}
-
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleRemove(emp.membershipId, emp.fullName);
-                            }}
-                            className="inline-flex items-center justify-center py-1 px-2 rounded-lg bg-rose-50 hover:bg-rose-100 border border-rose-200 text-[11px] font-medium text-rose-600 transition cursor-pointer hover:border-rose-300"
-                            title="Remove Member Record"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
-                        </div>
-                      )}
+                      <ChevronRight className="w-4 h-4 text-slate-400" />
                     </div>
                   </div>
                 );
@@ -1553,31 +1663,412 @@ export default function TeamClientView({
           </div>
         )}
 
-        {/* Pagination Bar */}
-        {totalPages > 1 && (
-          <div className="p-3 border-t border-[#E2E6F0] bg-[#F8F9FD] flex items-center justify-between text-xs text-[#696E82]">
-            <div>
-              Showing page {currentPage} of {totalPages} ({filteredEmployees.length} total members)
+        {/* Pagination Bar matching reference design */}
+        {filteredEmployees.length > 0 && (
+          <div className="p-4 border-t border-[#E2E6F0] bg-[#F8F9FD] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[#696E82]">
+            <div className="font-medium text-[#696E82]">
+              Showing <span className="font-semibold text-[#1F1F1F]">{(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, filteredEmployees.length)}</span> of <span className="font-semibold text-[#1F1F1F]">{filteredEmployees.length}</span> members
             </div>
-            <div className="flex items-center gap-1">
-              <button
-                disabled={currentPage === 1}
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                className="px-2.5 py-1 bg-white border border-[#E2E6F0] rounded-lg disabled:opacity-40 hover:bg-[#F2F4FF]"
-              >
-                Previous
-              </button>
-              <button
-                disabled={currentPage === totalPages}
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                className="px-2.5 py-1 bg-white border border-[#E2E6F0] rounded-lg disabled:opacity-40 hover:bg-[#F2F4FF]"
-              >
-                Next
-              </button>
-            </div>
+            {totalPages > 1 && (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  className="px-3 py-1.5 bg-white border border-[#CEDEFF] rounded-lg disabled:opacity-40 hover:bg-[#F2F4FF] text-[#1F1F1F] font-medium flex items-center gap-1 transition-colors cursor-pointer"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                  <span>Previous</span>
+                </button>
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: totalPages }).map((_, idx) => {
+                    const pageNum = idx + 1;
+                    return (
+                      <button
+                        key={pageNum}
+                        type="button"
+                        onClick={() => setCurrentPage(pageNum)}
+                        className={`w-7 h-7 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                          currentPage === pageNum
+                            ? "bg-[#5A81FA] text-white"
+                            : "text-[#696E82] hover:bg-[#F2F4FF]"
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                </div>
+                <button
+                  type="button"
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  className="px-3 py-1.5 bg-white border border-[#CEDEFF] rounded-lg disabled:opacity-40 hover:bg-[#F2F4FF] text-[#1F1F1F] font-medium flex items-center gap-1 transition-colors cursor-pointer"
+                >
+                  <span>Next</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
+
+      {/* Focused Employee Profile Drawer (matches reference panel 3) */}
+      {selectedProfileEmployee && (
+        <div className="fixed inset-0 z-50 overflow-hidden bg-black/40 backdrop-blur-xs flex justify-end animate-in fade-in duration-200">
+          <div
+            className="w-full max-w-md bg-[#F8F9FD] h-full shadow-2xl flex flex-col overflow-y-auto animate-in slide-in-from-right duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Top Navigation */}
+            <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-xs border-b border-[#E2E6F0] px-4 py-3 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => setSelectedProfileEmployee(null)}
+                className="flex items-center gap-1.5 text-xs font-semibold text-[#696E82] hover:text-[#1F1F1F] px-2 py-1 rounded-lg hover:bg-[#F2F4FF] transition-colors cursor-pointer"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Team</span>
+              </button>
+              <div className="font-bold text-xs text-[#1F1F1F] truncate max-w-[180px]">
+                {selectedProfileEmployee.fullName}
+              </div>
+              <div className="flex items-center gap-1">
+                {isPrivileged && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const emp = selectedProfileEmployee;
+                      setSelectedProfileEmployee(null);
+                      openEditModal(emp);
+                    }}
+                    className="p-1.5 text-[#696E82] hover:text-[#1F1F1F] rounded-lg hover:bg-[#F2F4FF] transition-colors cursor-pointer"
+                    title="Edit profile"
+                  >
+                    <Edit className="w-4 h-4" />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setSelectedProfileEmployee(null)}
+                  className="p-1.5 text-[#696E82] hover:text-[#1F1F1F] rounded-lg hover:bg-[#F2F4FF] transition-colors cursor-pointer"
+                  title="Close"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Profile Content Body */}
+            <div className="p-4 space-y-4 flex-1">
+              {/* Hero Card */}
+              <div className="bg-white rounded-2xl border border-[#E2E6F0] p-5 text-center shadow-xs">
+                <div className="w-20 h-20 rounded-full bg-[#EBF0FF] text-[#3562E8] font-bold text-2xl mx-auto flex items-center justify-center shadow-inner">
+                  {selectedProfileEmployee.fullName
+                    .split(" ")
+                    .map((n) => n[0])
+                    .join("")
+                    .substring(0, 2)
+                    .toUpperCase()}
+                </div>
+                <h2 className="text-lg font-bold text-[#1F1F1F] mt-3">
+                  {selectedProfileEmployee.fullName}
+                </h2>
+                <div className="mt-1.5 flex items-center justify-center gap-2">
+                  <span
+                    className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
+                      selectedProfileEmployee.isActive
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                        : "bg-slate-100 text-slate-500 border-slate-200"
+                    }`}
+                  >
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full ${
+                        selectedProfileEmployee.isActive ? "bg-emerald-500" : "bg-slate-400"
+                      }`}
+                    />
+                    {selectedProfileEmployee.isActive ? "Active account" : "Deactivated"}
+                  </span>
+                </div>
+                <p className="text-xs text-[#696E82] mt-1.5">
+                  {selectedProfileEmployee.designation || selectedProfileEmployee.department || "Architect"} •{" "}
+                  <span className="font-mono font-bold text-[#5A81FA]">
+                    {selectedProfileEmployee.employeeId}
+                  </span>
+                </p>
+
+                {isPrivileged && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const emp = selectedProfileEmployee;
+                      setSelectedProfileEmployee(null);
+                      openEditModal(emp);
+                    }}
+                    className="w-full mt-4 py-2 px-4 bg-[#5A81FA] hover:bg-[#426EE8] text-white font-semibold text-xs rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <Edit className="w-4 h-4" />
+                    <span>Edit profile</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Sub-tabs: Overview, Projects, Activity */}
+              <div className="flex border-b border-[#E2E6F0] bg-white rounded-xl px-2 pt-1 shadow-2xs">
+                {(["OVERVIEW", "PROJECTS", "ACTIVITY"] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => setProfileTab(tab)}
+                    className={`flex-1 py-2 text-xs font-semibold capitalize border-b-2 -mb-px transition-colors cursor-pointer ${
+                      profileTab === tab
+                        ? "border-[#5A81FA] text-[#5A81FA]"
+                        : "border-transparent text-[#696E82] hover:text-[#1F1F1F]"
+                    }`}
+                  >
+                    {tab.toLowerCase()}
+                  </button>
+                ))}
+              </div>
+
+              {/* Tab 1: Overview */}
+              {profileTab === "OVERVIEW" && (
+                <div className="space-y-4">
+                  {/* Contact Information */}
+                  <div className="bg-white rounded-2xl border border-[#E2E6F0] p-4 shadow-2xs space-y-3">
+                    <h3 className="text-xs font-bold text-[#1F1F1F] uppercase tracking-wider">
+                      Contact information
+                    </h3>
+                    <div className="space-y-2 text-xs">
+                      <div className="flex items-center justify-between py-1.5 border-b border-[#F2F4FF]">
+                        <span className="text-[#696E82] flex items-center gap-1.5">
+                          <Mail className="w-3.5 h-3.5" />
+                          <span>Email</span>
+                        </span>
+                        <a
+                          href={`mailto:${selectedProfileEmployee.email}`}
+                          className="font-medium text-[#5A81FA] hover:underline truncate max-w-[200px]"
+                        >
+                          {selectedProfileEmployee.email}
+                        </a>
+                      </div>
+                      <div className="flex items-center justify-between py-1.5">
+                        <span className="text-[#696E82] flex items-center gap-1.5">
+                          <Phone className="w-3.5 h-3.5" />
+                          <span>Phone</span>
+                        </span>
+                        <span className="font-medium text-[#1F1F1F]">
+                          {selectedProfileEmployee.phone || "Not configured"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Employment Details */}
+                  <div className="bg-white rounded-2xl border border-[#E2E6F0] p-4 shadow-2xs space-y-3">
+                    <h3 className="text-xs font-bold text-[#1F1F1F] uppercase tracking-wider">
+                      Employment details
+                    </h3>
+                    <div className="space-y-2 text-xs">
+                      <div className="flex items-center justify-between py-1.5 border-b border-[#F2F4FF]">
+                        <span className="text-[#696E82]">Discipline</span>
+                        <span className="font-medium text-[#1F1F1F]">
+                          {selectedProfileEmployee.department || "Architecture"}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between py-1.5 border-b border-[#F2F4FF]">
+                        <span className="text-[#696E82]">Designation</span>
+                        <span className="font-medium text-[#1F1F1F]">
+                          {selectedProfileEmployee.designation || "Architect"}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between py-1.5 border-b border-[#F2F4FF]">
+                        <span className="text-[#696E82]">Access role</span>
+                        <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-[#F2F4FF] text-[#5A81FA] border border-[#CEDEFF]">
+                          {selectedProfileEmployee.role.replace("_", " ")}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between py-1.5">
+                        <span className="text-[#696E82]">Finance Ledger</span>
+                        <span className="font-medium text-[#1F1F1F]">
+                          {selectedProfileEmployee.hasFinanceAccess ? "Granted" : "Restricted"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Projects Card */}
+                  <div className="bg-white rounded-2xl border border-[#E2E6F0] p-4 shadow-2xs space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-xs font-bold text-[#1F1F1F] uppercase tracking-wider">
+                        Assigned projects
+                      </h3>
+                      <span className="text-[11px] text-[#696E82]">
+                        {selectedProfileEmployee.projects?.length || 0} active
+                      </span>
+                    </div>
+                    {selectedProfileEmployee.projects && selectedProfileEmployee.projects.length > 0 ? (
+                      <div className="space-y-2">
+                        {selectedProfileEmployee.projects.map((proj) => (
+                          <div
+                            key={proj.id}
+                            className="p-2.5 rounded-xl border border-[#E2E6F0] bg-[#F8F9FD] flex items-center justify-between gap-2"
+                          >
+                            <div className="min-w-0">
+                              <span className="font-mono text-[10px] font-bold text-[#5A81FA] bg-[#F2F4FF] px-1.5 py-0.5 rounded border border-[#CEDEFF] mr-1.5">
+                                {proj.code}
+                              </span>
+                              <span className="text-xs font-semibold text-[#1F1F1F] truncate">
+                                {proj.name}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-[#696E82] py-2 text-center">
+                        No active studio projects assigned to this member.
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Account Management Accordion */}
+                  {isPrivileged && (
+                    <div className="bg-white rounded-2xl border border-[#E2E6F0] p-4 shadow-2xs space-y-3">
+                      <button
+                        type="button"
+                        onClick={() => setAccountManagementOpen(!accountManagementOpen)}
+                        className="w-full flex items-center justify-between text-left cursor-pointer"
+                      >
+                        <span className="text-xs font-bold text-[#1F1F1F] uppercase tracking-wider">
+                          Access & account actions
+                        </span>
+                        {accountManagementOpen ? (
+                          <ChevronUp className="w-4 h-4 text-[#696E82]" />
+                        ) : (
+                          <ChevronDown className="w-4 h-4 text-[#696E82]" />
+                        )}
+                      </button>
+
+                      {accountManagementOpen && (
+                        <div className="pt-2 space-y-2 border-t border-[#E2E6F0]">
+                          <button
+                            type="button"
+                            onClick={() => openDirectDispatchModal(selectedProfileEmployee)}
+                            className="w-full py-2 px-3 bg-red-50 hover:bg-red-100 text-[#EA4335] text-xs font-medium rounded-xl flex items-center gap-2 transition-colors cursor-pointer"
+                          >
+                            <Send className="w-3.5 h-3.5" />
+                            <span>Direct dispatch pass (Gmail / WhatsApp)</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const emp = selectedProfileEmployee;
+                              setResetModalError(null);
+                              setResetPasswordEmployee(emp);
+                              setNewTemporaryPassword("StudioPassword2026!");
+                              setResetCustomMessage(
+                                `Hello ${emp.fullName}, your login credentials for 100% DESIGN Studio OS have been updated by the Administrator.`
+                              );
+                            }}
+                            className="w-full py-2 px-3 bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-medium rounded-xl flex items-center gap-2 transition-colors cursor-pointer"
+                          >
+                            <KeyRound className="w-3.5 h-3.5" />
+                            <span>Reset temporary credentials</span>
+                          </button>
+                          {selectedProfileEmployee.isActive ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleDeactivate(
+                                  selectedProfileEmployee.membershipId,
+                                  selectedProfileEmployee.fullName
+                                )
+                              }
+                              className="w-full py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium rounded-xl flex items-center gap-2 transition-colors cursor-pointer"
+                            >
+                              <UserX className="w-3.5 h-3.5" />
+                              <span>Deactivate studio member</span>
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleReactivate(
+                                  selectedProfileEmployee.membershipId,
+                                  selectedProfileEmployee.fullName
+                                )
+                              }
+                              className="w-full py-2 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-medium rounded-xl flex items-center gap-2 transition-colors cursor-pointer"
+                            >
+                              <RotateCcw className="w-3.5 h-3.5" />
+                              <span>Reactivate studio member</span>
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Tab 2: Projects */}
+              {profileTab === "PROJECTS" && (
+                <div className="bg-white rounded-2xl border border-[#E2E6F0] p-4 shadow-2xs space-y-3">
+                  <h3 className="text-xs font-bold text-[#1F1F1F] uppercase tracking-wider">
+                    Project assignments
+                  </h3>
+                  {selectedProfileEmployee.projects && selectedProfileEmployee.projects.length > 0 ? (
+                    <div className="divide-y divide-[#E2E6F0]">
+                      {selectedProfileEmployee.projects.map((proj) => (
+                        <div key={proj.id} className="py-2.5 flex items-center justify-between">
+                          <div>
+                            <div className="font-semibold text-xs text-[#1F1F1F]">{proj.name}</div>
+                            <div className="font-mono text-[10px] text-[#5A81FA]">{proj.code}</div>
+                          </div>
+                          <span className="text-[10px] font-medium bg-[#F2F4FF] text-[#5A81FA] px-2 py-0.5 rounded-full border border-[#CEDEFF]">
+                            Assigned
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-[#696E82] py-4 text-center">
+                      No studio project assignments recorded.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Tab 3: Activity */}
+              {profileTab === "ACTIVITY" && (
+                <div className="bg-white rounded-2xl border border-[#E2E6F0] p-4 shadow-2xs space-y-3">
+                  <h3 className="text-xs font-bold text-[#1F1F1F] uppercase tracking-wider">
+                    Recent activity
+                  </h3>
+                  <div className="space-y-3 text-xs">
+                    <div className="flex items-start gap-2.5">
+                      <div className="w-2 h-2 rounded-full bg-[#5A81FA] mt-1.5 shrink-0" />
+                      <div>
+                        <p className="font-medium text-[#1F1F1F]">Account active in workspace</p>
+                        <p className="text-[11px] text-[#696E82]">Current status: Active</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-2.5">
+                      <div className="w-2 h-2 rounded-full bg-slate-300 mt-1.5 shrink-0" />
+                      <div>
+                        <p className="font-medium text-[#1F1F1F]">Role assigned: {selectedProfileEmployee.role}</p>
+                        <p className="text-[11px] text-[#696E82]">Discipline: {selectedProfileEmployee.department || "Architecture"}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 1. Add Employee Modal */}
       {isAddModalOpen && (

@@ -2313,91 +2313,106 @@ export default function TasksClientView({
 
   return (
     <div className="space-y-6" suppressHydrationWarning>
-      {/* 1. PROFESSIONAL TASKS HEADER */}
-      <div className="bg-white border border-[#E2E6F0] rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {/* 1. STUDIO DELIVERABLES HEADER (Reference: abf0b1db) */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#1F1F1F]">
-            {currentScope === "assigned_by_me"
-              ? "Deliverables Assigned by Me"
-              : currentScope === "all"
-              ? "All Studio Deliverables"
-              : "My Assigned Tasks"}
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#0B122B]">
+            Studio deliverables
           </h1>
-          <p className="text-xs text-[#696E82] mt-0.5">
-            {currentScope === "assigned_by_me"
-              ? "Tracking architectural deliverables and employee checklists you assigned."
-              : currentScope === "all"
-              ? "Overseeing studio deliverables, milestones, and project deadlines."
-              : "Review your task assignments, update statuses, and submit deliverables."}
+          <p className="text-xs sm:text-sm text-[#696E82] mt-0.5">
+            Track work, review submissions and keep delivery moving.
           </p>
         </div>
 
-        {/* Executive Scope Switcher for Boss / Partner / Admin */}
-        {isPrivileged && (
-          <div className="flex items-center gap-1.5 bg-[#F8F9FD] p-1.5 rounded-xl border border-[#E2E6F0] shrink-0 w-full sm:w-auto overflow-x-auto touch-scroll-x">
-            <span className="text-xs font-semibold text-[#696E82] px-2 flex items-center gap-1.5">
-              <Users className="w-3.5 h-3.5 text-[#5A81FA]" />
-              <span className="hidden sm:inline">Scope:</span>
-            </span>
+        {/* Action Controls: Form Fields, Assign Deliverable, and Scope Toggle */}
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+          {(userRole === "OWNER" || userRole === "ADMIN") && (
             <button
               type="button"
               suppressHydrationWarning
-              onClick={() => handleScopeChange("all")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex-1 sm:flex-initial text-center ${
-                currentScope === "all"
-                  ? "bg-[#5A81FA] text-white shadow-2xs"
-                  : "text-[#696E82] hover:text-[#1F1F1F]"
-              }`}
+              onClick={() => setCustomFieldsModalOpen(true)}
+              className="px-3.5 py-2 bg-white border border-[#E2E6F0] hover:bg-[#F8F9FD] text-[#0B122B] text-xs font-semibold rounded-xl shadow-2xs transition-colors flex items-center gap-1.5 cursor-pointer"
             >
-              All Deliverables
+              <SlidersHorizontal className="w-3.5 h-3.5 text-[#3562E8]" />
+              <span>Form fields</span>
             </button>
-            <button
-              type="button"
-              suppressHydrationWarning
-              onClick={() => handleScopeChange("assigned_by_me")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex-1 sm:flex-initial text-center ${
-                currentScope === "assigned_by_me"
-                  ? "bg-[#5A81FA] text-white shadow-2xs"
-                  : "text-[#696E82] hover:text-[#1F1F1F]"
-              }`}
-            >
-              Assigned by Me
-            </button>
-            <button
-              type="button"
-              suppressHydrationWarning
-              onClick={() => handleScopeChange("my")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex-1 sm:flex-initial text-center ${
-                currentScope === "my"
-                  ? "bg-[#5A81FA] text-white shadow-2xs"
-                  : "text-[#696E82] hover:text-[#1F1F1F]"
-              }`}
-            >
-              Assigned to Me
-            </button>
-          </div>
-        )}
+          )}
+
+          <button
+            type="button"
+            suppressHydrationWarning
+            onClick={() => {
+              setCustomFieldValues({});
+              setIsCreateTaskModalOpen(true);
+            }}
+            className="px-4 py-2 bg-[#3562E8] hover:bg-[#284ebd] text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+          >
+            <Plus className="w-4 h-4 stroke-[2.5]" />
+            <span>Assign deliverable</span>
+          </button>
+
+          {isPrivileged && (
+            <div className="flex items-center p-1 bg-white border border-[#E2E6F0] rounded-xl shadow-2xs">
+              <button
+                type="button"
+                suppressHydrationWarning
+                onClick={() => handleScopeChange("all")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  currentScope === "all"
+                    ? "bg-[#3562E8] text-white shadow-2xs"
+                    : "text-[#696E82] hover:text-[#0B122B]"
+                }`}
+              >
+                All deliverables
+              </button>
+              <button
+                type="button"
+                suppressHydrationWarning
+                onClick={() => handleScopeChange("assigned_by_me")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  currentScope === "assigned_by_me"
+                    ? "bg-[#3562E8] text-white shadow-2xs"
+                    : "text-[#696E82] hover:text-[#0B122B]"
+                }`}
+              >
+                Assigned by me
+              </button>
+              <button
+                type="button"
+                suppressHydrationWarning
+                onClick={() => handleScopeChange("my")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  currentScope === "my"
+                    ? "bg-[#3562E8] text-white shadow-2xs"
+                    : "text-[#696E82] hover:text-[#0B122B]"
+                }`}
+              >
+                Assigned to me
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* 2. SUMMARY METRIC CARDS (5 Interactive Cards) */}
+      {/* 2. SUMMARY METRIC CARDS (5 Interactive Cards - Reference: abf0b1db) */}
       {metrics && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-3.5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
           {/* Card 1: Due Today */}
           <button
             type="button"
             suppressHydrationWarning
             onClick={() => handleMetricCardClick("TODAY")}
-            className={`p-4 rounded-2xl border text-left transition-all cursor-pointer shadow-2xs ${
+            className={`p-4 sm:p-5 rounded-2xl border text-left transition-all cursor-pointer shadow-2xs ${
               selectedDueDateCategory === "TODAY"
-                ? "bg-[#F2F4FF] border-[#5A81FA] ring-2 ring-[#5A81FA]/20"
+                ? "bg-[#F8F9FE] border-[#3562E8] ring-2 ring-[#3562E8]/20"
                 : "bg-white border-[#E2E6F0] hover:border-[#CEDEFF]"
             }`}
           >
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-[#696E82]">Due Today</span>
-              <Calendar className="w-4 h-4 text-[#5A81FA]" />
+              <span className="text-xs font-semibold text-[#0B122B]">Due today</span>
+              <Calendar className="w-4 h-4 text-[#3562E8]" />
             </div>
-            <div className="text-2xl font-bold tracking-tight text-[#1F1F1F] mt-2">
+            <div className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#0B122B] mt-2 font-sans">
               {metrics.dueToday}
             </div>
             <p className="text-[11px] text-[#696E82] mt-1">Pending today</p>
@@ -2408,20 +2423,20 @@ export default function TasksClientView({
             type="button"
             suppressHydrationWarning
             onClick={() => handleMetricCardClick("OVERDUE")}
-            className={`p-4 rounded-2xl border text-left transition-all cursor-pointer shadow-2xs ${
+            className={`p-4 sm:p-5 rounded-2xl border text-left transition-all cursor-pointer shadow-2xs ${
               selectedDueDateCategory === "OVERDUE"
                 ? "bg-rose-50 border-rose-500 ring-2 ring-rose-500/20"
                 : "bg-white border-[#E2E6F0] hover:border-rose-200"
             }`}
           >
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-rose-700">Overdue</span>
-              <AlertTriangle className="w-4 h-4 text-rose-600" />
+              <span className="text-xs font-semibold text-rose-600">Overdue</span>
+              <AlertTriangle className="w-4 h-4 text-rose-500" />
             </div>
-            <div className="text-2xl font-bold tracking-tight text-rose-900 mt-2">
+            <div className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#0B122B] mt-2 font-sans">
               {metrics.overdue}
             </div>
-            <p className="text-[11px] text-rose-700/80 mt-1">Requires immediate attention</p>
+            <p className="text-[11px] text-rose-600/80 mt-1">Requires immediate attention</p>
           </button>
 
           {/* Card 3: In Progress */}
@@ -2429,20 +2444,20 @@ export default function TasksClientView({
             type="button"
             suppressHydrationWarning
             onClick={() => handleMetricCardClick("IN_PROGRESS")}
-            className={`p-4 rounded-2xl border text-left transition-all cursor-pointer shadow-2xs ${
+            className={`p-4 sm:p-5 rounded-2xl border text-left transition-all cursor-pointer shadow-2xs ${
               selectedStatusCategory === "IN_PROGRESS"
-                ? "bg-blue-50 border-blue-500 ring-2 ring-blue-500/20"
-                : "bg-white border-[#E2E6F0] hover:border-blue-200"
+                ? "bg-[#F8F9FE] border-[#3562E8] ring-2 ring-[#3562E8]/20"
+                : "bg-white border-[#E2E6F0] hover:border-[#CEDEFF]"
             }`}
           >
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-blue-700">In Progress</span>
-              <Play className="w-4 h-4 text-blue-600 fill-current" />
+              <span className="text-xs font-semibold text-[#3562E8]">In progress</span>
+              <Play className="w-4 h-4 text-[#3562E8] fill-current" />
             </div>
-            <div className="text-2xl font-bold tracking-tight text-blue-900 mt-2">
+            <div className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#0B122B] mt-2 font-sans">
               {metrics.inProgress}
             </div>
-            <p className="text-[11px] text-blue-700/80 mt-1">Active studio drafting</p>
+            <p className="text-[11px] text-[#696E82] mt-1">Active studio drafting</p>
           </button>
 
           {/* Card 4: Waiting for Review */}
@@ -2450,20 +2465,20 @@ export default function TasksClientView({
             type="button"
             suppressHydrationWarning
             onClick={() => handleMetricCardClick("WAITING_REVIEW")}
-            className={`p-4 rounded-2xl border text-left transition-all cursor-pointer shadow-2xs ${
+            className={`p-4 sm:p-5 rounded-2xl border text-left transition-all cursor-pointer shadow-2xs ${
               selectedStatusCategory === "WAITING_REVIEW"
                 ? "bg-purple-50 border-purple-500 ring-2 ring-purple-500/20"
                 : "bg-white border-[#E2E6F0] hover:border-purple-200"
             }`}
           >
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-purple-700">Waiting Review</span>
+              <span className="text-xs font-semibold text-purple-700">Waiting review</span>
               <Clock className="w-4 h-4 text-purple-600" />
             </div>
-            <div className="text-2xl font-bold tracking-tight text-purple-900 mt-2">
+            <div className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#0B122B] mt-2 font-sans">
               {metrics.waitingReview}
             </div>
-            <p className="text-[11px] text-purple-700/80 mt-1">Submitted for approval</p>
+            <p className="text-[11px] text-[#696E82] mt-1">Submitted for approval</p>
           </button>
 
           {/* Card 5: Completed */}
@@ -2471,7 +2486,7 @@ export default function TasksClientView({
             type="button"
             suppressHydrationWarning
             onClick={() => handleMetricCardClick("COMPLETED")}
-            className={`p-4 rounded-2xl border text-left transition-all cursor-pointer shadow-2xs col-span-2 sm:col-span-1 ${
+            className={`p-4 sm:p-5 rounded-2xl border text-left transition-all cursor-pointer shadow-2xs col-span-2 sm:col-span-1 ${
               selectedStatusCategory === "COMPLETED"
                 ? "bg-emerald-50 border-emerald-500 ring-2 ring-emerald-500/20"
                 : "bg-white border-[#E2E6F0] hover:border-emerald-200"
@@ -2481,7 +2496,7 @@ export default function TasksClientView({
               <span className="text-xs font-semibold text-emerald-700">Completed</span>
               <CheckCircle2 className="w-4 h-4 text-emerald-600" />
             </div>
-            <div className="text-2xl font-bold tracking-tight text-emerald-900 mt-2">
+            <div className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#0B122B] mt-2 font-sans">
               {metrics.completed}
             </div>
             <p className="text-[11px] text-emerald-700/80 mt-1">Approved deliverables</p>
@@ -2564,35 +2579,8 @@ export default function TasksClientView({
             </button>
           </div>
 
-          {/* Action buttons: Assign Task & View Switcher */}
-          <div className="flex flex-wrap items-center justify-between sm:justify-end gap-2 w-full lg:w-auto">
-            {(userRole === "OWNER" || userRole === "ADMIN") && (
-              <button
-                type="button"
-                suppressHydrationWarning
-                onClick={() => setCustomFieldsModalOpen(true)}
-                className="hidden sm:flex px-3.5 py-2 bg-white border border-[#E2E6F0] hover:bg-[#F8F9FD] text-slate-700 text-xs font-semibold rounded-xl shadow-2xs transition-colors items-center gap-1.5 cursor-pointer shrink-0"
-                title="Configure dynamic task & deliverable fields without code"
-              >
-                <SlidersHorizontal className="w-3.5 h-3.5 text-[#5A81FA]" />
-                <span>Form Fields</span>
-              </button>
-            )}
-
-            <button
-              type="button"
-              suppressHydrationWarning
-              onClick={() => {
-                setCustomFieldValues({});
-                setIsCreateTaskModalOpen(true);
-              }}
-              className="px-3.5 py-2 bg-[#3562E8] hover:bg-[#254fc7] text-white text-xs font-semibold rounded-xl shadow-2xs transition-colors flex items-center gap-1.5 cursor-pointer shrink-0"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Assign Deliverable</span>
-            </button>
-
-            {/* View Switcher: Grid, List, Kanban */}
+          {/* View Switcher: Grid, List, Kanban */}
+          <div className="flex items-center justify-end gap-2 w-full lg:w-auto">
             <div className="flex items-center gap-1 bg-[#F3F5FF] border border-[#DFE5F2] p-1 rounded-xl shrink-0">
               <button
                 type="button"

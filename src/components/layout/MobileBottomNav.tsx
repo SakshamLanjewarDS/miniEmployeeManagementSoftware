@@ -1,17 +1,16 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { TenantContext } from "@/server/tenancy/context";
 import {
   LayoutDashboard,
-  CheckSquare,
-  FolderKanban,
-  HardHat,
+  Layers,
+  MapPin,
   Clock,
   Calendar,
-  Menu,
+  MoreHorizontal,
 } from "lucide-react";
 
 interface MobileBottomNavProps {
@@ -23,96 +22,155 @@ export function MobileBottomNav({ context }: MobileBottomNavProps) {
   const slug = context.tenantSlug;
   const isLeader = context.role === "OWNER" || context.role === "ADMIN";
 
-  const handleOpenMenu = () => {
+  const [decisionCount, setDecisionCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchDecisionCount = async () => {
+      try {
+        const res = await fetch(`/api/inbox?workspaceSlug=${encodeURIComponent(slug)}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!isMounted) return;
+        const count = isLeader ? (data?.counts?.myDecisions ?? data?.counts?.total ?? null) : (data?.counts?.total ?? null);
+        if (typeof count === "number" && count > 0) {
+          setDecisionCount(count);
+        } else {
+          setDecisionCount(null);
+        }
+      } catch {
+        if (isMounted) setDecisionCount(null);
+      }
+    };
+
+    fetchDecisionCount();
+    return () => {
+      isMounted = false;
+    };
+  }, [slug, isLeader]);
+
+  const handleOpenMore = () => {
     window.dispatchEvent(new CustomEvent("open-mobile-sidebar"));
   };
 
+  // Role-specific navigation items exactly as requested:
+  // Owner & Admin: Dashboard - Studio Task - Site Visits - Meetings - More
+  // Employee: Dashboard - Task - Site Visits - Meetings - Leaves - More
   const navItems = isLeader
     ? [
         {
-          name: "Day",
+          name: "Dashboard",
           href: `/w/${slug}/dashboard/${context.role.toLowerCase()}`,
           icon: LayoutDashboard,
+          isActive: pathname?.includes("/dashboard"),
         },
         {
-          name: "Projects",
-          href: `/w/${slug}/projects`,
-          icon: FolderKanban,
-        },
-        {
-          name: "Tasks",
+          name: "Studio Task",
           href: `/w/${slug}/tasks`,
-          icon: CheckSquare,
+          icon: Layers,
+          isActive: pathname?.includes("/tasks"),
         },
         {
-          name: "Visits",
+          name: "Site Visits",
           href: `/w/${slug}/visits`,
-          icon: HardHat,
+          icon: MapPin,
+          isActive: pathname?.includes("/visits"),
+        },
+        {
+          name: "Meetings",
+          href: `/w/${slug}/meetings`,
+          icon: Clock,
+          isActive: pathname?.includes("/meetings"),
         },
       ]
     : [
         {
-          name: "Day",
+          name: "Dashboard",
           href: `/w/${slug}/dashboard/employee`,
           icon: LayoutDashboard,
+          isActive: pathname?.includes("/dashboard"),
         },
         {
-          name: "Tasks",
+          name: "Task",
           href: `/w/${slug}/tasks`,
-          icon: CheckSquare,
+          icon: Layers,
+          isActive: pathname?.includes("/tasks") || pathname?.includes("/my-work"),
         },
         {
-          name: "Attendance",
-          href: `/w/${slug}/attendance`,
+          name: "Site Visits",
+          href: `/w/${slug}/visits`,
+          icon: MapPin,
+          isActive: pathname?.includes("/visits"),
+        },
+        {
+          name: "Meetings",
+          href: `/w/${slug}/meetings`,
           icon: Clock,
+          isActive: pathname?.includes("/meetings"),
         },
         {
           name: "Leaves",
           href: `/w/${slug}/leave/my-leave`,
           icon: Calendar,
+          isActive: pathname?.includes("/leave"),
         },
       ];
 
   return (
     <nav
       aria-label="Mobile studio navigation"
-      className="fixed bottom-2.5 inset-x-3 sm:inset-x-6 z-40 max-w-md mx-auto bg-slate-950/90 backdrop-blur-xl border border-white/10 shadow-[0_12px_36px_rgba(0,0,0,0.36)] rounded-2xl p-1.5 lg:hidden pb-safe select-none"
+      className="fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200/90 shadow-[0_-4px_16px_rgba(0,0,0,0.04)] lg:hidden pb-[max(env(safe-area-inset-bottom),0.35rem)] select-none"
     >
-      <div className="grid grid-cols-5 items-center gap-1">
+      <div
+        className={`grid ${
+          isLeader ? "grid-cols-5" : "grid-cols-6"
+        } items-center h-14 max-w-lg mx-auto px-1`}
+      >
         {navItems.map((item) => {
-          const isActive =
-            pathname === item.href ||
-            (item.href.includes("dashboard") && pathname?.includes("dashboard"));
           const Icon = item.icon;
-
           return (
             <Link
               key={item.name}
               href={item.href}
-              prefetch={true}
-              className={`flex flex-col items-center justify-center py-1.5 px-1 rounded-xl transition-all duration-150 active:scale-95 ${
-                isActive
-                  ? "bg-[#3562E8] text-white shadow-md shadow-[#3562E8]/40 font-bold"
-                  : "text-slate-400 hover:text-white hover:bg-white/5 font-medium"
+              prefetch={false}
+              className={`relative flex flex-col items-center justify-center py-1 px-0.5 rounded-xl transition-all duration-150 active:scale-95 ${
+                item.isActive
+                  ? "text-[#2563EB] font-bold"
+                  : "text-[#64748B] hover:text-[#0F172A] font-medium"
               }`}
             >
-              <Icon className="w-4 h-4 shrink-0" />
-              <span className="text-[10px] font-mono tracking-tight truncate mt-0.5">
+              <div className="relative">
+                <Icon
+                  className={`w-5 h-5 shrink-0 transition-transform ${
+                    item.isActive ? "stroke-[2.2]" : "stroke-[1.8]"
+                  }`}
+                />
+              </div>
+              <span className="text-[10px] sm:text-[11px] tracking-tight mt-0.5 truncate max-w-full text-center leading-none">
                 {item.name}
               </span>
             </Link>
           );
         })}
 
-        {/* Studio Menu Button */}
+        {/* More Button */}
         <button
           type="button"
-          onClick={handleOpenMenu}
-          aria-label="Open full studio menu"
-          className="flex flex-col items-center justify-center py-1.5 px-1 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 font-medium transition-all duration-150 active:scale-95 cursor-pointer"
+          onClick={handleOpenMore}
+          aria-label="Open more studio options"
+          className="relative flex flex-col items-center justify-center py-1 px-0.5 rounded-xl text-[#64748B] hover:text-[#0F172A] font-medium transition-all duration-150 active:scale-95 cursor-pointer"
         >
-          <Menu className="w-4 h-4 shrink-0" />
-          <span className="text-[10px] font-mono tracking-tight truncate mt-0.5">Menu</span>
+          <div className="relative">
+            <MoreHorizontal className="w-5 h-5 shrink-0 stroke-[1.8]" />
+            {decisionCount !== null && decisionCount > 0 && (
+              <span className="absolute -top-1 -right-1.5 min-w-[14px] h-3.5 px-0.5 rounded-full bg-rose-500 text-white text-[9px] font-bold flex items-center justify-center border-2 border-white shadow-xs">
+                {decisionCount > 99 ? "99+" : decisionCount}
+              </span>
+            )}
+          </div>
+          <span className="text-[10px] sm:text-[11px] tracking-tight mt-0.5 truncate max-w-full text-center leading-none">
+            More
+          </span>
         </button>
       </div>
     </nav>

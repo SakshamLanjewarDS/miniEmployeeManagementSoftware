@@ -84,78 +84,59 @@ export default function AdminDashboardView({
       <MorningBriefingModal workspaceSlug={workspaceSlug} role={userRole} />
 
       {/* ============================================================== */}
-      {/* 1. TOP GREETING PANEL (Image A)                                 */}
+      {/* 1. TOP GREETING & PRIMARY ACTION (Reference: 4ac8f30e)         */}
       {/* ============================================================== */}
-      <div className="bg-white border border-slate-200/80 rounded-3xl p-4 sm:p-6 lg:p-8 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="space-y-1 min-w-0">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 font-mono">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <div className="text-xs font-semibold text-slate-500 mb-1">
             {todayDateString}
           </div>
-          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-slate-900 tracking-tight">
-            Good Morning, {userFullName.split(" ")[0]}
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+            Good morning, {userFullName.split(" ")[0]}
           </h1>
-          <p className="text-xs sm:text-sm text-slate-500">
-            Daily Studio Operations Coordinator. You have{" "}
-            <span className="font-bold text-[#3562E8] bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100">
-              {pendingOperationalActions} pending action{pendingOperationalActions !== 1 ? "s" : ""}
-            </span>{" "}
-            requiring administrative coordination.
+          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+            Your studio at a glance.
           </p>
         </div>
 
-        {/* Top Right: Live Sync, Sun / Status & Refresh Action */}
-        <div className="flex items-center gap-2.5 shrink-0 self-end sm:self-auto">
+        <div className="flex items-center gap-3">
           <LiveSyncIndicator
             isConnected={isConnected}
             lastEvent={lastEvent}
             onManualRefresh={handleRefresh}
           />
-
-          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-amber-50 text-amber-500 border border-amber-200/60 flex items-center justify-center shadow-xs">
-            <Sun className="w-5 h-5 sm:w-6 sm:h-6 animate-spin-slow" />
-          </div>
-
-          <button
-            type="button"
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-            className="p-2.5 bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-slate-800 rounded-2xl border border-slate-200/80 transition-colors cursor-pointer"
-            title="Refresh operational metrics"
+          <Link
+            href={`/w/${workspaceSlug}/tasks`}
+            className="hidden sm:inline-flex items-center gap-2 px-4 py-2.5 bg-[#2563EB] hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors"
           >
-            <RefreshCw className={`w-4 h-4 ${isRefreshing ? "animate-spin text-[#3562E8]" : ""}`} />
-          </button>
+            <CheckSquare className="w-4 h-4" />
+            <span>Assign deliverable</span>
+          </Link>
         </div>
       </div>
 
-      {/* ============================================================== */}
-      {/* 2. STUDIO HEALTH INDEX (SHI) TELEMETRY RADAR                    */}
-      {/* ============================================================== */}
-      {data.studioHealthIndex && (
-        <StudioHealthIndexCard shi={data.studioHealthIndex} />
-      )}
-
-      {/* ============================================================== */}
-      {/* 2. SECTION NAVIGATION PILLS ROW (Image A)                       */}
-      {/* ============================================================== */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 touch-scroll-x no-scrollbar text-xs">
-        {[
-          { key: "OPERATIONS", label: "Studio Operations" },
-          { key: "REVIEWS", label: `Review Queue (${data.reviewQueue.length})` },
-          { key: "ASSIGNMENTS", label: `Assignment Queue (${data.assignmentQueue.length})` },
-          { key: "TEAM", label: `Team Workload (${data.teamDistribution.length})` },
-        ].map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key as any)}
-            className={`px-4 py-2 rounded-xl font-bold transition-all cursor-pointer whitespace-nowrap ${
-              activeTab === tab.key
-                ? "bg-[#3562E8] text-white shadow-xs"
-                : "bg-white text-slate-600 border border-slate-200/80 hover:bg-slate-50"
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+      {/* Attention Action Banner */}
+      <div className="bg-[#EFF6FF] border border-[#BFDBFE] rounded-2xl p-3.5 sm:p-4 flex items-center justify-between gap-3 text-xs">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-7 h-7 rounded-full bg-blue-600 text-white flex items-center justify-center shrink-0">
+            <AlertCircle className="w-4 h-4" />
+          </div>
+          <div className="min-w-0">
+            <span className="font-bold text-blue-950 mr-2">
+              {pendingOperationalActions} {pendingOperationalActions === 1 ? "action needs" : "actions need"} your attention
+            </span>
+            <span className="text-blue-700 hidden sm:inline">
+              Keep studio delivery and operations moving forward.
+            </span>
+          </div>
+        </div>
+        <Link
+          href={`/w/${workspaceSlug}/inbox`}
+          className="text-xs font-bold text-[#2563EB] hover:text-blue-800 flex items-center gap-1 shrink-0 whitespace-nowrap"
+        >
+          <span>Open decision inbox</span>
+          <ChevronRight className="w-4 h-4" />
+        </Link>
       </div>
 
       {/* ============================================================== */}

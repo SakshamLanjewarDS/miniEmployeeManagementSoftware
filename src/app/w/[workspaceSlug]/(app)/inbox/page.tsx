@@ -28,6 +28,7 @@ import {
   Undo2,
   Sliders,
   Compass,
+  MoreVertical,
 } from "lucide-react";
 import MobileFilterDrawer from "@/components/ui/MobileFilterDrawer";
 import { VisualDrawingAirlock } from "@/components/drawings/VisualDrawingAirlock";
@@ -687,34 +688,212 @@ export default function OwnerDecisionInboxPage() {
         </div>
       </div>
 
+      {/* Mobile Dedicated Fullscreen Review Screen (Reference: 49a549db) */}
+      {selectedItem && (
+        <div className="lg:hidden fixed inset-0 z-50 bg-[#F8F9FD] overflow-y-auto pb-28 animate-in fade-in duration-150">
+          {/* Mobile Top Bar */}
+          <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-md border-b border-slate-200/90 px-4 py-3 flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => setSelectedItem(null)}
+              className="flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-slate-900"
+            >
+              <ChevronRight className="w-4 h-4 rotate-180" />
+              <span>Inbox</span>
+            </button>
+            <span className="text-xs font-bold text-slate-900">Request details</span>
+            <button type="button" className="p-1 text-slate-400">
+              <MoreVertical className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="p-4 space-y-4">
+            {/* Category Pill */}
+            <div>
+              <span className="inline-block px-2.5 py-1 rounded-full text-[11px] font-bold bg-cyan-50 text-cyan-700 border border-cyan-200">
+                {getTypeBadge(selectedItem.type).label}
+              </span>
+            </div>
+
+            {/* Title */}
+            <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">
+              {selectedItem.title}
+            </h2>
+
+            {/* Requester Row */}
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-blue-100 text-[#2563EB] font-bold text-xs flex items-center justify-center shrink-0">
+                {selectedItem.requesterName.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase()}
+              </div>
+              <div className="min-w-0">
+                <div className="font-bold text-slate-900 text-xs">{selectedItem.requesterName}</div>
+                <div className="text-[11px] text-slate-500">
+                  {selectedItem.requesterRole || "Studio Team"} • <span className="font-mono">{selectedItem.requesterId}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-4 text-xs text-slate-400 pt-1">
+              <div className="flex items-center gap-1">
+                <Calendar className="w-3.5 h-3.5" />
+                <span>Submitted {new Date(selectedItem.submittedAt).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" })}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Clock className="w-3.5 h-3.5" />
+                <span>Waiting {selectedItem.ageHours < 24 ? `${selectedItem.ageHours}h` : `${Math.floor(selectedItem.ageHours / 24)}d ${selectedItem.ageHours % 24}h`}</span>
+              </div>
+            </div>
+
+            {/* Self-approval Warning Notice */}
+            {!selectedItem.canApprove && (
+              <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-2xl flex items-start gap-3 text-xs text-amber-900">
+                <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <div>
+                  <div className="font-bold text-amber-950">Another approver is required</div>
+                  <div className="text-amber-800 text-[11px] mt-0.5">
+                    {selectedItem.cannotApproveReason || "You submitted this request and cannot approve it."}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Tabs */}
+            <div className="flex items-center gap-4 border-b border-slate-200 text-xs font-bold text-slate-500 pt-1">
+              <button className="pb-2 text-[#2563EB] border-b-2 border-[#2563EB]">Overview</button>
+              <button className="pb-2 hover:text-slate-800">Activity</button>
+            </div>
+
+            {/* Request Details */}
+            <div className="space-y-1.5">
+              <h4 className="text-xs font-bold text-slate-900">Request details</h4>
+              <div className="p-3.5 bg-white rounded-2xl border border-slate-200 text-xs text-slate-700 leading-relaxed">
+                {selectedItem.summary || "No description provided."}
+              </div>
+            </div>
+
+            {/* Impact & Context */}
+            <div className="space-y-2">
+              <h4 className="text-xs font-bold text-slate-900">Impact & context</h4>
+              <div className="space-y-2">
+                <div className="p-3 bg-white rounded-2xl border border-slate-200/90 flex items-center gap-3 text-xs">
+                  <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                    <Compass className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="font-bold text-slate-900 block">Financial impact</span>
+                    <span className="text-[11px] text-slate-500">Standard operational decision</span>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-white rounded-2xl border border-slate-200/90 flex items-center gap-3 text-xs">
+                  <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+                    <Calendar className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="font-bold text-slate-900 block">Schedule</span>
+                    <span className="text-[11px] text-slate-500">Aligned with project targets</span>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-white rounded-2xl border border-slate-200/90 flex items-center gap-3 text-xs">
+                  <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                    <User className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="font-bold text-slate-900 block">Affected team</span>
+                    <span className="text-[11px] text-slate-500">Architectural Team</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Review Note */}
+            <div className="space-y-2 pt-2">
+              <h4 className="text-xs font-bold text-slate-900">Review note</h4>
+              <textarea
+                rows={3}
+                placeholder="Add feedback or explain the changes needed..."
+                value={decisionFeedback}
+                onChange={(e) => setDecisionFeedback(e.target.value)}
+                className="w-full p-3 text-xs bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-900"
+              />
+              <div className="flex flex-wrap gap-1.5">
+                {["Clarification needed", "Please verify details"].map((tag) => (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => setDecisionFeedback(tag)}
+                    className="px-2.5 py-1 bg-white hover:bg-slate-50 border border-slate-200 rounded-full text-[10px] text-slate-600 font-medium"
+                  >
+                    {tag}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Sticky Mobile Action Buttons */}
+          <div className="fixed bottom-0 inset-x-0 z-30 bg-white/95 backdrop-blur-md border-t border-slate-200 p-3 flex flex-col gap-2 pb-safe">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => handleExecuteDecision(selectedItem, "REQUEST_CHANGES", decisionFeedback)}
+                disabled={isSubmitting}
+                className="flex-1 py-2.5 bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 font-bold text-xs rounded-xl transition"
+              >
+                Request changes
+              </button>
+              <button
+                type="button"
+                onClick={() => handleExecuteDecision(selectedItem, "APPROVE", decisionFeedback)}
+                disabled={isSubmitting || !selectedItem.canApprove}
+                className={`flex-1 py-2.5 font-bold text-xs rounded-xl transition flex items-center justify-center gap-1.5 ${
+                  selectedItem.canApprove
+                    ? "bg-[#2563EB] hover:bg-blue-700 text-white shadow-xs"
+                    : "bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed"
+                }`}
+              >
+                {!selectedItem.canApprove && <ShieldAlert className="w-3.5 h-3.5" />}
+                <span>Approve request</span>
+              </button>
+            </div>
+            {!selectedItem.canApprove && (
+              <span className="text-[10px] text-slate-400 text-center">
+                Another authorized reviewer must approve.
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* ============================================================== */}
-      {/* 4. MAIN AIRLOCK VIEWPORT                                       */}
+      {/* 4. MAIN AIRLOCK VIEWPORT (Reference: 49a549db)                 */}
       {/* ============================================================== */}
       {loading && !data ? (
         <div className="p-16 text-center bg-white rounded-3xl border border-slate-200 shadow-2xs space-y-3">
-          <RefreshCw className="w-8 h-8 text-[#3562E8] animate-spin mx-auto" />
-          <p className="text-sm text-slate-500 font-medium">Connecting to studio decision airlock...</p>
+          <RefreshCw className="w-8 h-8 text-[#2563EB] animate-spin mx-auto" />
+          <p className="text-sm text-slate-500 font-medium">Connecting to studio decision inbox...</p>
         </div>
       ) : !data || data.items.length === 0 ? (
         <div className="p-16 text-center bg-white rounded-3xl border border-slate-200 shadow-2xs space-y-3">
           <div className="w-14 h-14 rounded-3xl bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center mx-auto shadow-inner">
             <CheckCircle2 className="w-8 h-8" />
           </div>
-          <h3 className="text-lg font-bold text-slate-900">Decision Airlock is Clear</h3>
+          <h3 className="text-lg font-bold text-slate-900">Decision Inbox is Clear</h3>
           <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto">
-            Zero pending deliverables, drawing revisions, or site blockers require executive review under this filter.
+            Zero pending deliverables, drawing revisions, or site blockers require review under this filter.
           </p>
         </div>
       ) : viewLayout === "COCKPIT" ? (
         // ============================================================
-        // A. 3-ZONE SPLIT-SCREEN WORKBENCH (Desktop Default)
+        // A. 2-COLUMN SPLIT-SCREEN WORKBENCH (Reference: 49a549db)
         // ============================================================
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start min-h-[640px]">
-          {/* ZONE 1: TRIAGE QUEUE MATRIX (Cols 1-4) */}
-          <div className="lg:col-span-4 space-y-3 max-h-[820px] overflow-y-auto pr-1 select-none">
-            {/* Fast Select All Bar */}
-            <div className="flex items-center justify-between px-3.5 py-2.5 bg-white rounded-2xl border border-slate-200 text-xs text-slate-600 shadow-2xs shrink-0">
-              <label className="flex items-center gap-2.5 cursor-pointer font-medium select-none">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start min-h-[640px]">
+          {/* LEFT COLUMN: REQUEST QUEUE (Cols 1-5) */}
+          <div className="lg:col-span-5 bg-white rounded-3xl border border-slate-200/90 shadow-2xs p-4 sm:p-5 space-y-3 select-none">
+            {/* Header */}
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={
@@ -722,209 +901,246 @@ export default function OwnerDecisionInboxPage() {
                     selectedIds.size === data.items.filter((i) => i.canApprove).length
                   }
                   onChange={handleSelectAll}
-                  className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  className="w-4 h-4 rounded border-slate-300 text-[#2563EB] focus:ring-blue-500 cursor-pointer"
                 />
-                <span className="font-bold text-slate-800 text-[11px]">
-                  All Actionable ({data.items.filter((i) => i.canApprove).length})
+                <span className="text-xs font-bold text-slate-900">
+                  Request queue ({data.items.length})
                 </span>
               </label>
 
-              <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-mono">
-                <span>Nav:</span>
-                <kbd className="px-1 py-0.5 bg-slate-100 rounded border border-slate-200 text-slate-700 font-bold">J</kbd>
-                <kbd className="px-1 py-0.5 bg-slate-100 rounded border border-slate-200 text-slate-700 font-bold">K</kbd>
-              </div>
+              <span className="text-[11px] font-mono text-slate-400">
+                Oldest first ⇅
+              </span>
             </div>
 
-            {/* Grouped Queue Items */}
-            {groupedItems.map((group, gIdx) => (
-              <div key={gIdx} className="space-y-2">
-                {groupBy !== "NONE" && (
-                  <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 px-1 pt-1 font-mono">
-                    {group.groupName} ({group.items.length})
-                  </div>
-                )}
+            {/* Request Card List */}
+            <div className="space-y-2 max-h-[720px] overflow-y-auto pr-1">
+              {data.items.map((item) => {
+                const badge = getTypeBadge(item.type);
+                const isSelected = selectedItem?.id === item.id;
+                const initials = item.requesterName.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase();
 
-                {group.items.map((item) => {
-                  const badge = getTypeBadge(item.type);
-                  const Icon = badge.icon;
-                  const isChecked = selectedIds.has(item.id);
-                  const isFocused = selectedItem?.id === item.id;
-
-                  return (
-                    <div
-                      key={item.id}
-                      onClick={() => setSelectedItem(item)}
-                      className={`p-3.5 bg-white rounded-2xl border transition-all cursor-pointer shadow-2xs relative ${
-                        isFocused
-                          ? "border-[#3562E8] ring-2 ring-blue-500/15 bg-blue-50/20"
-                          : "border-slate-200 hover:border-slate-300"
-                      } ${item.urgency === "CRITICAL" ? "border-l-4 border-l-rose-500" : ""}`}
-                    >
-                      <div className="flex items-start gap-3">
-                        {item.canApprove && (
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            onChange={() => toggleSelectItem(item.id)}
-                            onClick={(e) => e.stopPropagation()}
-                            className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer mt-1 shrink-0"
-                          />
-                        )}
-
-                        <div className={`p-2 rounded-xl border shrink-0 ${badge.bg}`}>
-                          <Icon className="w-3.5 h-3.5" />
+                return (
+                  <div
+                    key={item.id}
+                    onClick={() => setSelectedItem(item)}
+                    className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                      isSelected
+                        ? "border-[#2563EB] ring-2 ring-blue-500/15 bg-blue-50/20"
+                        : "border-slate-200/80 hover:border-slate-300 bg-white"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-9 h-9 rounded-full bg-blue-50 text-[#2563EB] font-bold text-xs flex items-center justify-center shrink-0 border border-blue-100">
+                        <User className="w-4 h-4" />
+                      </div>
+                      <div className="min-w-0 space-y-1">
+                        <h4 className="text-xs font-bold text-slate-900 truncate">
+                          {item.title}
+                        </h4>
+                        <div className="text-[11px] text-slate-500 truncate">
+                          {item.requesterName}
                         </div>
-
-                        <div className="min-w-0 flex-1 space-y-1">
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${badge.bg}`}>
-                              {badge.label}
-                            </span>
-                            {item.projectCode && (
-                              <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700">
-                                {item.projectCode}
-                              </span>
-                            )}
-                            {getUrgencyBadge(item.urgency, item.ageHours)}
-                          </div>
-
-                          <h4 className="text-xs font-bold text-slate-900 truncate leading-snug">
-                            {item.title}
-                          </h4>
-
-                          <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono pt-0.5">
-                            <span className="truncate">{item.requesterName}</span>
-                            <span>{item.ageHours}h ago</span>
-                          </div>
+                        <div className="flex items-center gap-2 pt-0.5">
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
+                            {badge.label}
+                          </span>
+                          <span className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200/60 px-2 py-0.5 rounded-full flex items-center gap-1 font-mono">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                            <span>Waiting {item.ageHours < 24 ? `${item.ageHours}h` : `${Math.floor(item.ageHours / 24)}d ${item.ageHours % 24}h`}</span>
+                          </span>
                         </div>
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-            ))}
+
+                    <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
-          {/* ZONE 2: VISUAL EVIDENCE CANVAS & VECTOR AIRLOCK (Cols 5-8) */}
-          <div className="lg:col-span-5 flex flex-col space-y-3">
+          {/* RIGHT COLUMN: REQUEST DETAILS (Cols 6-12) */}
+          <div className="lg:col-span-7 bg-white rounded-3xl border border-slate-200/90 shadow-2xs p-5 sm:p-7 space-y-5">
             {selectedItem ? (
-              <div className="bg-white rounded-3xl border border-slate-200/90 shadow-2xs p-4 sm:p-5 flex flex-col space-y-4">
-                <div className="flex items-start justify-between gap-3 pb-3 border-b border-slate-100">
-                  <div className="space-y-0.5">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 font-mono">
-                      VISUAL EVIDENCE AIRLOCK
-                    </span>
-                    <h3 className="text-base font-bold text-slate-900 tracking-tight">
-                      {selectedItem.title}
-                    </h3>
-                    <p className="text-xs text-slate-500">
-                      {selectedItem.projectCode} — {selectedItem.projectName || "Studio"}
-                    </p>
-                  </div>
-
-                  <span className="font-mono text-xs text-slate-400 shrink-0">
-                    {new Date(selectedItem.submittedAt).toLocaleDateString()}
+              <div className="space-y-5">
+                {/* Category Pill & Top Menu */}
+                <div className="flex items-center justify-between">
+                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-cyan-50 text-cyan-700 border border-cyan-200">
+                    {getTypeBadge(selectedItem.type).label}
                   </span>
+                  <button type="button" className="p-1 text-slate-400 hover:text-slate-600">
+                    <MoreVertical className="w-4 h-4" />
+                  </button>
                 </div>
 
-                {/* Vector CAD Blueprint Diff Canvas (when drawing/deliverable) */}
-                {selectedItem.type === "DELIVERABLE_SUBMISSION" || selectedItem.type === "DRAWING_REVISION" ? (
-                  <VisualDrawingAirlock
-                    data={{
-                      drawingCode: selectedItem.projectCode ? `${selectedItem.projectCode}-GFC-302` : "100D-ARC-GFC-302",
-                      drawingTitle: selectedItem.title,
-                      projectCode: selectedItem.projectCode,
-                      projectName: selectedItem.projectName,
-                      discipline: selectedItem.type === "DRAWING_REVISION" ? "ARCHITECTURAL" : "INTERIOR_DETAIL",
-                      revisionB: {
-                        code: "Rev 03",
-                        label: "Submission in Review",
-                        date: "Today",
-                        author: selectedItem.requesterName,
-                        status: selectedItem.status,
-                        changeSummary: selectedItem.summary || "Deliverable submission awaiting architectural review.",
-                      },
-                    }}
-                    onApprove={(notes) => handleExecuteDecision(selectedItem, "APPROVE", notes)}
-                    onRequestChanges={(notes) => handleExecuteDecision(selectedItem, "REQUEST_CHANGES", notes)}
-                    onReject={(notes) => handleExecuteDecision(selectedItem, "REJECT", notes)}
-                    isSubmitting={isSubmitting}
-                  />
-                ) : (
-                  // Deep Comparative Cards for Scope/Extensions/Blockers
-                  <div className="space-y-3">
-                    <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 text-xs text-slate-800 leading-relaxed whitespace-pre-wrap">
-                      {selectedItem.summary}
+                {/* Title */}
+                <div>
+                  <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">
+                    {selectedItem.title}
+                  </h2>
+                </div>
+
+                {/* Requester Row */}
+                <div className="flex items-center justify-between flex-wrap gap-3 pb-3 border-b border-slate-100">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-blue-100 text-[#2563EB] font-bold text-xs flex items-center justify-center shrink-0">
+                      {selectedItem.requesterName.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase()}
                     </div>
-
-                    {selectedItem.type === "SCOPE_CHANGE" && (
-                      <div className="p-4 bg-purple-50/60 border border-purple-200 rounded-2xl space-y-2 text-xs">
-                        <div className="font-bold text-purple-900 text-sm">Contractual Variation Impact</div>
-                        <div className="grid grid-cols-2 gap-3 pt-1">
-                          <div className="p-2.5 bg-white rounded-xl border border-purple-100">
-                            <span className="text-slate-500 block text-[11px]">Fee Impact:</span>
-                            <span className="font-bold text-purple-700 text-sm">
-                              +₹{Number(selectedItem.details?.feeImpactAmount || 0).toLocaleString("en-IN")}
-                            </span>
-                          </div>
-                          <div className="p-2.5 bg-white rounded-xl border border-purple-100">
-                            <span className="text-slate-500 block text-[11px]">Program Extension:</span>
-                            <span className="font-bold text-slate-900 text-sm">
-                              +{selectedItem.details?.scheduleImpactDays || 0} calendar days
-                            </span>
-                          </div>
-                        </div>
+                    <div>
+                      <div className="font-bold text-slate-900 text-xs">{selectedItem.requesterName}</div>
+                      <div className="text-[11px] text-slate-500">
+                        {selectedItem.requesterRole || "Studio Administrator"} • <span className="font-mono">{selectedItem.requesterId}</span>
                       </div>
-                    )}
+                    </div>
+                  </div>
 
-                    {selectedItem.type === "DEADLINE_EXTENSION" && (
-                      <div className="p-4 bg-blue-50/60 border border-blue-200 rounded-2xl space-y-2 text-xs">
-                        <div className="font-bold text-blue-900 text-sm">Milestone Delivery Comparison</div>
-                        <div className="grid grid-cols-2 gap-3 pt-1">
-                          <div className="p-2.5 bg-white rounded-xl border border-blue-100">
-                            <span className="text-slate-500 block text-[11px]">Current Target:</span>
-                            <span className="font-bold text-slate-700">
-                              {selectedItem.details?.currentDueDate
-                                ? new Date(selectedItem.details.currentDueDate).toLocaleDateString()
-                                : "Unscheduled"}
-                            </span>
-                          </div>
-                          <div className="p-2.5 bg-white rounded-xl border border-blue-100">
-                            <span className="text-slate-500 block text-[11px]">Proposed Date:</span>
-                            <span className="font-bold text-blue-700">
-                              {selectedItem.details?.proposedDueDate
-                                ? new Date(selectedItem.details.proposedDueDate).toLocaleDateString()
-                                : "None"}
-                            </span>
-                          </div>
-                        </div>
+                  <div className="flex items-center gap-4 text-xs text-slate-500">
+                    <div className="flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                      <span>Submitted {new Date(selectedItem.submittedAt).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" })}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 font-mono">
+                      <Clock className="w-3.5 h-3.5 text-slate-400" />
+                      <span>Waiting {selectedItem.ageHours < 24 ? `${selectedItem.ageHours}h` : `${Math.floor(selectedItem.ageHours / 24)}d ${selectedItem.ageHours % 24}h`}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Self-approval Warning Notice (Reference: 49a549db) */}
+                {!selectedItem.canApprove && (
+                  <div className="p-4 bg-[#FFFBEB] border border-[#FDE68A] rounded-2xl flex items-start gap-3 text-xs">
+                    <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <div className="font-bold text-amber-950">Another approver is required</div>
+                      <div className="text-amber-800 text-[11px] mt-0.5">
+                        {selectedItem.cannotApproveReason || "You submitted this request and cannot approve it."}
                       </div>
-                    )}
+                    </div>
                   </div>
                 )}
-              </div>
-            ) : (
-              <div className="p-12 text-center bg-white rounded-3xl border border-slate-200 shadow-2xs space-y-2">
-                <Compass className="w-8 h-8 text-slate-300 mx-auto" />
-                <p className="text-xs text-slate-400">Select an item from the queue to inspect</p>
-              </div>
-            )}
-          </div>
 
-          {/* ZONE 3: CONSEQUENCE & GOVERNANCE COCKPIT (Cols 9-12) */}
-          <div className="lg:col-span-3">
-            {selectedItem ? (
-              <DecisionConsequenceCard
-                item={selectedItem}
-                feedback={decisionFeedback}
-                onFeedbackChange={setDecisionFeedback}
-                onExecute={(action) => handleExecuteDecision(selectedItem, action)}
-                isSubmitting={isSubmitting}
-              />
+                {/* Tabs */}
+                <div className="flex items-center gap-6 border-b border-slate-200 text-xs font-bold text-slate-500">
+                  <button className="pb-2.5 text-[#2563EB] border-b-2 border-[#2563EB]">Overview</button>
+                  <button className="pb-2.5 hover:text-slate-800 transition">Activity</button>
+                </div>
+
+                {/* Section: Request Details */}
+                <div className="space-y-1.5">
+                  <h4 className="text-xs font-bold text-slate-900">Request details</h4>
+                  <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 text-xs text-slate-700 leading-relaxed">
+                    {selectedItem.summary || "No additional description provided."}
+                  </div>
+                </div>
+
+                {/* Section: Impact & context */}
+                <div className="space-y-2">
+                  <h4 className="text-xs font-bold text-slate-900">Impact & context</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                    <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-1">
+                      <div className="text-blue-600 font-bold flex items-center gap-1.5">
+                        <Compass className="w-3.5 h-3.5" />
+                        <span>Financial impact</span>
+                      </div>
+                      <p className="text-[11px] text-slate-600 leading-tight">Standard operational decision</p>
+                    </div>
+
+                    <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-1">
+                      <div className="text-purple-600 font-bold flex items-center gap-1.5">
+                        <Calendar className="w-3.5 h-3.5" />
+                        <span>Schedule</span>
+                      </div>
+                      <p className="text-[11px] text-slate-600 leading-tight">Aligned with project targets</p>
+                    </div>
+
+                    <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-1">
+                      <div className="text-indigo-600 font-bold flex items-center gap-1.5">
+                        <User className="w-3.5 h-3.5" />
+                        <span>Affected team</span>
+                      </div>
+                      <p className="text-[11px] text-slate-600 leading-tight">Architectural Team</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Review note */}
+                <div className="space-y-2 pt-1">
+                  <h4 className="text-xs font-bold text-slate-900">Review note</h4>
+                  <textarea
+                    rows={3}
+                    placeholder="Add feedback or explain the changes needed..."
+                    value={decisionFeedback}
+                    onChange={(e) => setDecisionFeedback(e.target.value)}
+                    className="w-full p-3 text-xs bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue-500/20 text-slate-900"
+                  />
+                  <div className="flex flex-wrap gap-2">
+                    {["Clarification needed", "Please verify details"].map((tag) => (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => setDecisionFeedback(tag)}
+                        className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 rounded-full text-[10px] text-slate-600 font-medium transition cursor-pointer"
+                      >
+                        {tag}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Bottom Actions Row */}
+                <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(selectedItem.summary || selectedItem.title);
+                      setActionSuccessMessage("Copied details to clipboard");
+                      setTimeout(() => setActionSuccessMessage(null), 2500);
+                    }}
+                    className="text-xs font-semibold text-slate-500 hover:text-slate-800 flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
+                  >
+                    <Compass className="w-3.5 h-3.5" />
+                    <span>Copy update</span>
+                  </button>
+
+                  <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2">
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleExecuteDecision(selectedItem, "REQUEST_CHANGES", decisionFeedback)}
+                        disabled={isSubmitting}
+                        className="px-4 py-2 bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 font-bold text-xs rounded-xl transition cursor-pointer"
+                      >
+                        Request changes
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleExecuteDecision(selectedItem, "APPROVE", decisionFeedback)}
+                        disabled={isSubmitting || !selectedItem.canApprove}
+                        className={`px-4 py-2 font-bold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer ${
+                          selectedItem.canApprove
+                            ? "bg-[#2563EB] hover:bg-blue-700 text-white shadow-xs"
+                            : "bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed"
+                        }`}
+                      >
+                        {!selectedItem.canApprove && <ShieldAlert className="w-3.5 h-3.5" />}
+                        <span>Approve request</span>
+                      </button>
+                    </div>
+
+                    {!selectedItem.canApprove && (
+                      <span className="text-[10px] text-slate-400 block text-right mt-1">
+                        Approval requires another authorized reviewer.
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
             ) : (
-              <div className="p-8 text-center bg-white rounded-2xl border border-slate-200 text-xs text-slate-400">
-                Awaiting ticket selection
+              <div className="p-16 text-center text-slate-400 space-y-2">
+                <Compass className="w-8 h-8 text-slate-300 mx-auto" />
+                <p className="text-xs">Select a request from the queue to review.</p>
               </div>
             )}
           </div>

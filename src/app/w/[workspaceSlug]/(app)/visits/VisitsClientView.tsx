@@ -46,6 +46,10 @@ import {
   CheckSquare,
   Square,
   ShieldAlert,
+  ClipboardCheck,
+  BookOpen,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { SearchableDropdown, SearchableSelect } from "@/components/ui/SearchableDropdown";
 import {
@@ -416,6 +420,55 @@ export default function VisitsClientView({
   const [visitReviewFilter, setVisitReviewFilter] = useState("ALL");
   const [visitCategoryFilter, setVisitCategoryFilter] = useState("ALL");
   const [visitSortBy, setVisitSortBy] = useState<string>("DATE_DESC");
+  const [howItWorksOpen, setHowItWorksOpen] = useState(true);
+
+  const handleExportCsv = () => {
+    if (allVisits.length === 0) {
+      alert("No visit records to export.");
+      return;
+    }
+    const headers = [
+      "ID",
+      "Project Code",
+      "Project Name",
+      "Site Name",
+      "Visitor",
+      "Status",
+      "Inspection Type",
+      "Purpose",
+      "Scheduled Time",
+      "Check-In Time",
+      "Check-Out Time",
+      "Check-In Address",
+    ];
+    const rows = allVisits.map((v) => [
+      v.id,
+      v.project?.code || "",
+      `"${(v.project?.name || "").replace(/"/g, '""')}"`,
+      `"${(v.site?.name || "").replace(/"/g, '""')}"`,
+      `"${(v.visitor?.name || v.employee?.user?.fullName || "").replace(/"/g, '""')}"`,
+      v.operationalState || v.status,
+      v.inspectionType,
+      `"${(v.purpose || "").replace(/"/g, '""')}"`,
+      v.scheduledTime ? new Date(v.scheduledTime).toISOString() : "",
+      v.checkInTime ? new Date(v.checkInTime).toISOString() : "",
+      v.checkOutTime ? new Date(v.checkOutTime).toISOString() : "",
+      `"${(v.checkInAddress || "").replace(/"/g, '""')}"`,
+    ]);
+    const csvContent =
+      "data:text/csv;charset=utf-8," +
+      [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute(
+      "download",
+      `site_visits_audit_${workspaceSlug}_${new Date().toISOString().split("T")[0]}.csv`
+    );
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   const dynamicTypologies = useMemo(() => {
     return getAllTypologies(availableProjects);
@@ -1400,75 +1453,128 @@ export default function VisitsClientView({
 
   return (
     <div className="space-y-6" suppressHydrationWarning>
-      {/* Top Banner Actions */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-[#E2E6F0] shadow-2xs">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-[#5A81FA] text-white flex items-center justify-center font-bold">
-            <Compass className="w-5 h-5" />
-          </div>
+      {/* Top Header & Breadcrumbs matching reference 218b9c47-bc2e-4d3f-95d4-f3be0501bfa4.png */}
+      <div className="space-y-4">
+        {/* Desktop Breadcrumb */}
+        <div className="hidden sm:flex items-center gap-2 text-xs text-[#696E82]">
+          <span>Projects & Delivery</span>
+          <span>/</span>
+          <span className="font-medium text-[#1F1F1F]">Site visits & issues</span>
+        </div>
+
+        {/* Title & Actions Row */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h2 className="text-sm font-bold text-[#1F1F1F]">
-              Field Geolocation & Inspection Protocol
-            </h2>
-            <p className="text-xs text-[#696E82]">
-              Interactive GPS verification, reverse-geocoded locality, defect registers, and exportable inspection reports
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#1F1F1F]">
+              Site visits & issues
+            </h1>
+            <p className="text-xs sm:text-sm text-[#696E82] mt-0.5">
+              Plan site visits, capture field records and follow up on issues.
             </p>
+          </div>
+
+          <div className="flex items-center gap-2.5 self-stretch sm:self-auto">
+            <button
+              type="button"
+              onClick={handleExportCsv}
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 bg-white hover:bg-[#F8F9FD] text-[#1F1F1F] text-xs font-semibold rounded-xl border border-[#E2E6F0] shadow-2xs transition-all cursor-pointer min-h-[44px]"
+            >
+              <ShieldCheck className="w-4 h-4 text-[#5A81FA]" />
+              <span>Export CSV (Audit Protected)</span>
+            </button>
+
+            {isPrivileged && (
+              <button
+                type="button"
+                onClick={() => setAssignModalOpen(true)}
+                className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 bg-[#5A81FA] hover:bg-[#426EE8] text-white text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer min-h-[44px]"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Assign a site visit</span>
+              </button>
+            )}
           </div>
         </div>
 
-        {/* OWNER & ADMIN ASSIGN BUTTON */}
-        {isPrivileged && (
+        {/* Combined Modules Switcher: Field Visits & GPS vs Site Issues & Snags */}
+        <div className="flex items-center gap-2 border-b border-[#E2E6F0] pb-2 overflow-x-auto touch-scroll-x">
           <button
             type="button"
-            onClick={() => setAssignModalOpen(true)}
-            className="px-4 py-2 bg-[#5A81FA] hover:bg-[#426EE8] text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer self-start sm:self-auto"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Assign Site Visit</span>
-          </button>
-        )}
-      </div>
-
-      {/* Combined Modules Switcher: Field Visits & GPS vs Site Issues & Snags */}
-      <div className="flex items-center gap-2 border-b border-[#E2E6F0] pb-2 overflow-x-auto touch-scroll-x">
-        <button
-          type="button"
-          onClick={() => setMainViewTab("VISITS")}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
-            mainViewTab === "VISITS"
-              ? "bg-[#5A81FA] text-white shadow-xs"
-              : "bg-white text-[#696E82] hover:text-[#1F1F1F] border border-[#E2E6F0]"
-          }`}
-        >
-          <Compass className="w-3.5 h-3.5" />
-          <span>Site Visits & GPS Logs</span>
-          <span
-            className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
-              mainViewTab === "VISITS" ? "bg-white/20 text-white" : "bg-slate-100 text-slate-700"
+            onClick={() => setMainViewTab("VISITS")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+              mainViewTab === "VISITS"
+                ? "bg-[#5A81FA] text-white shadow-xs"
+                : "bg-white text-[#696E82] hover:text-[#1F1F1F] border border-[#E2E6F0]"
             }`}
           >
-            {allVisits.length}
-          </span>
-        </button>
+            <Calendar className="w-3.5 h-3.5" />
+            <span>Site visits</span>
+            <span
+              className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
+                mainViewTab === "VISITS" ? "bg-white/20 text-white" : "bg-slate-100 text-slate-700"
+              }`}
+            >
+              {allVisits.length}
+            </span>
+          </button>
 
-        <button
-          type="button"
-          onClick={() => setMainViewTab("ISSUES")}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
-            mainViewTab === "ISSUES"
-              ? "bg-[#5A81FA] text-white shadow-xs"
-              : "bg-white text-[#696E82] hover:text-[#1F1F1F] border border-[#E2E6F0]"
-          }`}
-        >
-          <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
-          <span>Site Issues & Snags Tracker</span>
-        </button>
+          <button
+            type="button"
+            onClick={() => setMainViewTab("ISSUES")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+              mainViewTab === "ISSUES"
+                ? "bg-[#5A81FA] text-white shadow-xs"
+                : "bg-white text-[#696E82] hover:text-[#1F1F1F] border border-[#E2E6F0]"
+            }`}
+          >
+            <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+            <span>Issues & snags</span>
+          </button>
+        </div>
       </div>
 
       {mainViewTab === "ISSUES" ? (
         <SiteIssuesView workspaceSlug={workspaceSlug} hideHeader={true} />
       ) : (
         <>
+          {/* 3 Metric Cards */}
+          <div className="grid grid-cols-3 gap-3 sm:gap-5">
+            <div className="bg-white border border-[#E2E6F0] rounded-2xl p-4 sm:p-5 flex items-center gap-3.5 shadow-2xs">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-[#F2F4FF] border border-[#CEDEFF] text-[#5A81FA] flex items-center justify-center shrink-0">
+                <Calendar className="w-5 h-5 sm:w-6 sm:h-6" />
+              </div>
+              <div>
+                <div className="text-[11px] sm:text-xs text-[#696E82] font-medium">Assigned to me</div>
+                <div className="text-xl sm:text-2xl font-bold text-[#1F1F1F] font-mono leading-none mt-1">
+                  {scheduledVisits.length}
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white border border-[#E2E6F0] rounded-2xl p-4 sm:p-5 flex items-center gap-3.5 shadow-2xs">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-[#F2F4FF] border border-[#CEDEFF] text-[#5A81FA] flex items-center justify-center shrink-0">
+                <Clock className="w-5 h-5 sm:w-6 sm:h-6" />
+              </div>
+              <div>
+                <div className="text-[11px] sm:text-xs text-[#696E82] font-medium">Pending check-in</div>
+                <div className="text-xl sm:text-2xl font-bold text-[#1F1F1F] font-mono leading-none mt-1">
+                  {scheduledVisits.filter((s) => s.operationalState === "SCHEDULED").length}
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white border border-[#E2E6F0] rounded-2xl p-4 sm:p-5 flex items-center gap-3.5 shadow-2xs">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-[#F2F4FF] border border-[#CEDEFF] text-[#5A81FA] flex items-center justify-center shrink-0">
+                <FileText className="w-5 h-5 sm:w-6 sm:h-6" />
+              </div>
+              <div>
+                <div className="text-[11px] sm:text-xs text-[#696E82] font-medium">Recorded visits</div>
+                <div className="text-xl sm:text-2xl font-bold text-[#1F1F1F] font-mono leading-none mt-1">
+                  {allVisits.filter((v) => v.operationalState === "CHECKED_OUT" || v.checkOutTime).length}
+                </div>
+              </div>
+            </div>
+          </div>
           {/* Alert Messages */}
       {statusMessage && (
         <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-xl text-xs flex items-center justify-between">
@@ -1500,10 +1606,14 @@ export default function VisitsClientView({
         </div>
       )}
 
-      {/* ======================================================== */}
-      {/* SECTION 1: ACTIVE VISIT (Currently On-Site) */}
-      {/* ======================================================== */}
-      {activeVisit && (
+      {/* Main 2-Column Responsive Layout (Mobile prioritizes My assigned visits first) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* Left Column: Inspection Log & Active Workbench */}
+        <div className="lg:col-span-8 space-y-6 order-2 lg:order-1">
+          {/* ======================================================== */}
+          {/* SECTION 1: ACTIVE VISIT (Currently On-Site) */}
+          {/* ======================================================== */}
+          {activeVisit && (
         <div className="bg-white border-2 border-[#5A81FA] rounded-2xl shadow-sm p-4 sm:p-6 relative overflow-hidden space-y-5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[#E2E6F0]">
             <div className="space-y-1">
@@ -1821,117 +1931,24 @@ export default function VisitsClientView({
         </div>
       )}
 
-      {/* ======================================================== */}
-      {/* SECTION 2: SCHEDULED VISITS (With ONE-CLICK "ENTER SITE") */}
-      {/* ======================================================== */}
-      <div className="bg-white border border-[#E2E6F0] rounded-2xl shadow-xs p-6 space-y-4">
-        <div className="flex items-center justify-between border-b border-[#E2E6F0] pb-3">
-          <div>
-            <h3 className="text-sm font-bold text-[#1F1F1F]">My Assigned Scheduled Visits</h3>
-            <p className="text-xs text-[#696E82]">
-              Visits assigned to you ready for one-click field check-in
-            </p>
-          </div>
-          <span className="text-xs font-mono font-bold text-[#5A81FA] bg-[#F2F4FF] px-2.5 py-1 rounded-md border border-[#CEDEFF]">
-            {scheduledVisits.length} Pending Check-In
-          </span>
-        </div>
-
-        {scheduledVisits.length === 0 ? (
-          <div className="text-center py-8 text-xs text-[#696E82] space-y-1">
-            <CheckCircle2 className="w-8 h-8 text-emerald-600 mx-auto" />
-            <p className="font-semibold text-[#1F1F1F]">No pending scheduled visits.</p>
-            <p>You have no upcoming visits waiting for check-in.</p>
-          </div>
-        ) : (
-          <div className="divide-y divide-[#E2E6F0]">
-            {scheduledVisits.map((v) => (
-              <div
-                key={v.id}
-                className="py-4 flex flex-col md:flex-row md:items-center justify-between gap-4"
-              >
-                <div className="space-y-1.5 max-w-xl">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-mono text-xs font-bold text-[#5A81FA] bg-[#F2F4FF] px-2 py-0.5 rounded border border-[#CEDEFF]">
-                      {v.project.code}
-                    </span>
-                    {getCategoryBadge(v.inspectionType)}
-                    {getPriorityBadge(v.priority)}
-                    <h4 className="text-sm font-bold text-[#1F1F1F]">{v.purpose}</h4>
-                  </div>
-                  <div className="text-xs text-[#696E82] flex items-center gap-2">
-                    <MapPin className="w-3.5 h-3.5 text-[#5A81FA] shrink-0" />
-                    <span className="font-medium text-[#1F1F1F]">{v.site.name}</span>
-                    <span>•</span>
-                    <span className="text-[#696E82] truncate">{v.site.address}</span>
-                  </div>
-                  <div className="text-[11px] text-[#696E82] flex items-center gap-3">
-                    <span className="flex items-center gap-1 font-mono">
-                      <Clock className="w-3 h-3 text-[#5A81FA]" />
-                      <span>Scheduled: {new Date(v.scheduledTime).toLocaleString("en-IN")}</span>
-                    </span>
-                    <span>•</span>
-                    <span>Radius: {v.site.radiusMeters}m</span>
-                  </div>
-                </div>
-
-                {/* THE ONE-CLICK ENTER BUTTON */}
-                <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    type="button"
-                    disabled={loading || activeVisit !== null}
-                    onClick={() => handleOneClickEnterSite(v.id)}
-                    className="px-5 py-2.5 bg-[#5A81FA] hover:bg-[#426EE8] text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer hover:scale-[1.02] active:scale-95 disabled:opacity-40"
-                    title="Click when you arrive at the site to automatically store Enter Date, Time & GPS Location"
-                  >
-                    <LogIn className="w-4 h-4" />
-                    <span>ENTER SITE (Check-In)</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    disabled={loading || activeVisit !== null}
-                    onClick={() => handleSimulateEnterSite(v.id, v.site.latitude, v.site.longitude)}
-                    className="px-3 py-2 bg-[#F8F9FD] hover:bg-[#F2F4FF] border border-[#E2E6F0] text-[11px] text-[#696E82] font-semibold rounded-xl transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-40"
-                    title="Simulate within-radius GPS for desktop testing"
-                  >
-                    <Sparkles className="w-3 h-3 text-[#5A81FA]" />
-                    <span>Simulate GPS</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    disabled={loading || activeVisit !== null}
-                    onClick={() => setExceptionModal({ visitId: v.id })}
-                    className="px-2.5 py-2 text-rose-700 hover:bg-rose-50 text-[11px] font-semibold rounded-xl transition-colors cursor-pointer disabled:opacity-40"
-                  >
-                    <span>No GPS Signal?</span>
-                  </button>
-                </div>
+          {/* ======================================================== */}
+          {/* SECTION 3: RECENT SITE INSPECTION LOG (Full Audit Feed) */}
+          {/* ======================================================== */}
+          <div className="bg-white border border-[#E2E6F0] rounded-2xl shadow-xs p-5 sm:p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-[#E2E6F0] pb-3">
+              <div>
+                <h3 className="text-sm font-bold text-[#1F1F1F]">
+                  Inspection log
+                </h3>
+                <p className="text-xs text-[#696E82]">
+                  Entry and exit times, location evidence, photos and reviews.
+                </p>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* ======================================================== */}
-      {/* SECTION 3: RECENT SITE INSPECTION LOG (Full Audit Feed) */}
-      {/* ======================================================== */}
-      <div className="bg-white border border-[#E2E6F0] rounded-2xl shadow-xs p-6 space-y-4">
-        <div className="flex items-center justify-between border-b border-[#E2E6F0] pb-3">
-          <div>
-            <h3 className="text-sm font-bold text-[#1F1F1F]">
-              Recent Studio Site Inspection Log
-            </h3>
-            <p className="text-xs text-[#696E82]">
-              Audited field check-ins with Enter/Exit timestamps, GPS evidence, photo galleries, snag registers, and architectural reviews
-            </p>
-          </div>
-          <span className="text-[11px] font-mono text-[#696E82] flex items-center gap-1">
-            <RefreshCw className="w-3 h-3 animate-spin" />
-            <span>Auto-synced</span>
-          </span>
-        </div>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span>Synced</span>
+              </span>
+            </div>
 
         {/* Inspection Log Filter & Sort Bar */}
         <div className="bg-[#FAFBFD] p-3 rounded-xl border border-[#E2E6F0] space-y-2.5">
@@ -2291,7 +2308,27 @@ export default function VisitsClientView({
         </MobileFilterDrawer>
 
         <div className="overflow-x-auto">
-          {filteredAndSortedVisits.length === 0 ? (
+          {allVisits.length === 0 ? (
+            <div className="py-12 px-4 text-center">
+              <div className="w-16 h-16 rounded-2xl bg-[#F2F4FF] border border-[#CEDEFF] text-[#5A81FA] flex items-center justify-center mx-auto mb-3">
+                <ClipboardCheck className="w-8 h-8" />
+              </div>
+              <h4 className="text-base font-bold text-[#1F1F1F]">No inspections recorded yet</h4>
+              <p className="text-xs text-[#696E82] mt-1 max-w-sm mx-auto">
+                Visit records will appear here after the first site check-in.
+              </p>
+              {isPrivileged && (
+                <button
+                  type="button"
+                  onClick={() => setAssignModalOpen(true)}
+                  className="mt-4 px-4 py-2 bg-white hover:bg-slate-50 border border-[#CEDEFF] text-[#5A81FA] text-xs font-bold rounded-xl transition-all inline-flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Assign a site visit</span>
+                </button>
+              )}
+            </div>
+          ) : filteredAndSortedVisits.length === 0 ? (
             <div className="p-8 text-center text-[#696E82] space-y-1">
               <Calendar className="w-8 h-8 text-[#A8B1CE] mx-auto mb-1" />
               <p className="font-semibold text-[#1F1F1F] text-xs">
@@ -2505,9 +2542,195 @@ export default function VisitsClientView({
             </table>
           )}
         </div>
+
+        <div className="pt-3 border-t border-[#E2E6F0] text-xs text-[#696E82]">
+          {filteredAndSortedVisits.length} records
+        </div>
       </div>
-      </>
-      )}
+
+      {/* Bottom Inspection Records Info Card */}
+      <div className="bg-[#F8F9FD] border border-[#E2E6F0] rounded-2xl p-4 flex items-center gap-3.5 shadow-2xs">
+        <div className="w-10 h-10 rounded-xl bg-[#F2F4FF] border border-[#CEDEFF] text-[#5A81FA] flex items-center justify-center shrink-0">
+          <ShieldCheck className="w-5 h-5" />
+        </div>
+        <div>
+          <h4 className="text-xs font-bold text-[#1F1F1F]">Inspection records</h4>
+          <p className="text-[11px] text-[#696E82]">
+            Keep visit evidence and review history together for better project documentation and accountability.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    {/* Right Column: Assigned Visits & Workflow Guide (on mobile order-1 so displayed above Inspection log) */}
+    <div className="lg:col-span-4 space-y-6 order-1 lg:order-2">
+      {/* SECTION 2: MY ASSIGNED VISITS */}
+      <div className="bg-white border border-[#E2E6F0] rounded-2xl shadow-xs p-5 sm:p-6 space-y-4">
+        <div className="flex items-center justify-between border-b border-[#E2E6F0] pb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-[#F2F4FF] border border-[#CEDEFF] text-[#5A81FA] flex items-center justify-center shrink-0">
+              <Calendar className="w-4 h-4" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-[#1F1F1F]">My assigned visits</h3>
+              <p className="text-[11px] text-[#696E82]">
+                Visits assigned to you for field check-in.
+              </p>
+            </div>
+          </div>
+          {scheduledVisits.length > 0 && (
+            <span className="text-xs font-mono font-bold text-[#5A81FA] bg-[#F2F4FF] px-2.5 py-1 rounded-md border border-[#CEDEFF]">
+              {scheduledVisits.length}
+            </span>
+          )}
+        </div>
+
+        {scheduledVisits.length === 0 ? (
+          <div className="py-8 px-4 text-center">
+            <div className="w-14 h-14 rounded-2xl bg-[#F2F4FF] border border-[#CEDEFF] text-[#5A81FA] flex items-center justify-center mx-auto mb-3">
+              <Calendar className="w-7 h-7" />
+            </div>
+            <h4 className="text-sm font-bold text-[#1F1F1F]">No visits assigned to you</h4>
+            <p className="text-xs text-[#696E82] mt-1">
+              Your scheduled visits will appear here when assigned.
+            </p>
+            <div className="mt-5 pt-3 border-t border-[#E2E6F0] flex items-center justify-center gap-1.5 text-xs text-[#696E82]">
+              <MapPin className="w-3.5 h-3.5 text-[#5A81FA]" />
+              <span>Location is requested when you check in.</span>
+            </div>
+          </div>
+        ) : (
+          <div className="divide-y divide-[#E2E6F0]">
+            {scheduledVisits.map((v) => (
+              <div key={v.id} className="py-4 space-y-3">
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-mono text-xs font-bold text-[#5A81FA] bg-[#F2F4FF] px-2 py-0.5 rounded border border-[#CEDEFF]">
+                      {v.project.code}
+                    </span>
+                    {getCategoryBadge(v.inspectionType)}
+                    {getPriorityBadge(v.priority)}
+                  </div>
+                  <h4 className="text-sm font-bold text-[#1F1F1F]">{v.purpose}</h4>
+                  <div className="text-xs text-[#696E82] flex items-center gap-2">
+                    <MapPin className="w-3.5 h-3.5 text-[#5A81FA] shrink-0" />
+                    <span className="font-medium text-[#1F1F1F]">{v.site.name}</span>
+                    <span>•</span>
+                    <span className="text-[#696E82] truncate">{v.site.address}</span>
+                  </div>
+                  <div className="text-[11px] text-[#696E82] flex items-center gap-3">
+                    <span className="flex items-center gap-1 font-mono">
+                      <Clock className="w-3 h-3 text-[#5A81FA]" />
+                      <span>Scheduled: {new Date(v.scheduledTime).toLocaleString("en-IN")}</span>
+                    </span>
+                    <span>•</span>
+                    <span>Radius: {v.site.radiusMeters}m</span>
+                  </div>
+                </div>
+
+                {/* THE ONE-CLICK ENTER BUTTON */}
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    disabled={loading || activeVisit !== null}
+                    onClick={() => handleOneClickEnterSite(v.id)}
+                    className="flex-1 px-4 py-2 bg-[#5A81FA] hover:bg-[#426EE8] text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer hover:scale-[1.02] active:scale-95 disabled:opacity-40 min-h-[40px]"
+                    title="Click when you arrive at the site to automatically store Enter Date, Time & GPS Location"
+                  >
+                    <LogIn className="w-4 h-4" />
+                    <span>ENTER SITE (Check-In)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={loading || activeVisit !== null}
+                    onClick={() => handleSimulateEnterSite(v.id, v.site.latitude, v.site.longitude)}
+                    className="px-3 py-2 bg-[#F8F9FD] hover:bg-[#F2F4FF] border border-[#E2E6F0] text-[11px] text-[#696E82] font-semibold rounded-xl transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-40 min-h-[40px]"
+                    title="Simulate within-radius GPS for desktop testing"
+                  >
+                    <Sparkles className="w-3 h-3 text-[#5A81FA]" />
+                    <span>Simulate GPS</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={loading || activeVisit !== null}
+                    onClick={() => setExceptionModal({ visitId: v.id })}
+                    className="px-2.5 py-2 text-rose-700 hover:bg-rose-50 text-[11px] font-semibold rounded-xl transition-colors cursor-pointer disabled:opacity-40"
+                  >
+                    <span>No GPS Signal?</span>
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Visit Workflow / How site visits work card */}
+      <div className="bg-white border border-[#E2E6F0] rounded-2xl p-5 shadow-xs space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-[#F2F4FF] border border-[#CEDEFF] text-[#5A81FA] flex items-center justify-center shrink-0">
+              <BookOpen className="w-4 h-4" />
+            </div>
+            <div>
+              <h3 className="text-xs font-bold text-[#1F1F1F]">
+                <span className="hidden sm:inline">Visit workflow</span>
+                <span className="sm:hidden">How site visits work</span>
+              </h3>
+              <p className="text-[11px] text-[#696E82]">
+                From assignment to inspection record.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setHowItWorksOpen(!howItWorksOpen)}
+            className="sm:hidden p-1.5 text-slate-500 hover:text-slate-800 rounded-lg hover:bg-slate-100"
+          >
+            {howItWorksOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </button>
+        </div>
+
+        {howItWorksOpen && (
+          <div className="space-y-4 pt-1 border-t border-[#E2E6F0]/60">
+            <div className="flex items-start gap-3">
+              <div className="w-6 h-6 rounded-full bg-[#5A81FA] text-white font-bold text-xs flex items-center justify-center shrink-0">
+                1
+              </div>
+              <div className="space-y-0.5">
+                <div className="text-xs font-bold text-[#1F1F1F]">Assign a visit</div>
+                <div className="text-[11px] text-[#696E82]">Choose project and visitor details.</div>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <div className="w-6 h-6 rounded-full bg-slate-400 text-white font-bold text-xs flex items-center justify-center shrink-0">
+                2
+              </div>
+              <div className="space-y-0.5">
+                <div className="text-xs font-bold text-[#1F1F1F]">Check in on site</div>
+                <div className="text-[11px] text-[#696E82]">Capture entry time and location evidence.</div>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <div className="w-6 h-6 rounded-full bg-slate-400 text-white font-bold text-xs flex items-center justify-center shrink-0">
+                3
+              </div>
+              <div className="space-y-0.5">
+                <div className="text-xs font-bold text-[#1F1F1F]">Record & review</div>
+                <div className="text-[11px] text-[#696E82]">Add photos, notes and findings.</div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  </div>
+  </>
+  )}
 
       {/* ======================================================== */}
       {/* MODAL 1: OWNER & ADMIN ASSIGN SITE VISIT MODAL */}
