@@ -25,6 +25,9 @@ import {
 import { AdminDashboardData } from "@/server/modules/dashboard/service";
 import { TaskPriorityBadge } from "@/components/tasks/TaskPriorityBadge";
 import { MorningBriefingModal } from "@/components/dashboard/MorningBriefingModal";
+import { useStudioRealtime } from "@/components/realtime/useStudioRealtime";
+import { LiveSyncIndicator } from "@/components/realtime/LiveSyncIndicator";
+import { StudioHealthIndexCard } from "@/components/dashboard/StudioHealthIndexCard";
 
 interface AdminDashboardViewProps {
   data: AdminDashboardData;
@@ -45,9 +48,15 @@ export default function AdminDashboardView({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<"OPERATIONS" | "REVIEWS" | "ASSIGNMENTS" | "TEAM">("OPERATIONS");
 
+  // Realtime Live SSE Bus
+  const { isConnected, lastEvent, forceRefresh } = useStudioRealtime({
+    workspaceSlug,
+    autoRefresh: true,
+  });
+
   const handleRefresh = () => {
     setIsRefreshing(true);
-    router.refresh();
+    forceRefresh();
     setTimeout(() => setIsRefreshing(false), 600);
   };
 
@@ -94,8 +103,14 @@ export default function AdminDashboardView({
           </p>
         </div>
 
-        {/* Top Right: Sun / Status & Refresh Action */}
-        <div className="flex items-center gap-3 shrink-0 self-end sm:self-auto">
+        {/* Top Right: Live Sync, Sun / Status & Refresh Action */}
+        <div className="flex items-center gap-2.5 shrink-0 self-end sm:self-auto">
+          <LiveSyncIndicator
+            isConnected={isConnected}
+            lastEvent={lastEvent}
+            onManualRefresh={handleRefresh}
+          />
+
           <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-amber-50 text-amber-500 border border-amber-200/60 flex items-center justify-center shadow-xs">
             <Sun className="w-5 h-5 sm:w-6 sm:h-6 animate-spin-slow" />
           </div>
@@ -111,6 +126,13 @@ export default function AdminDashboardView({
           </button>
         </div>
       </div>
+
+      {/* ============================================================== */}
+      {/* 2. STUDIO HEALTH INDEX (SHI) TELEMETRY RADAR                    */}
+      {/* ============================================================== */}
+      {data.studioHealthIndex && (
+        <StudioHealthIndexCard shi={data.studioHealthIndex} />
+      )}
 
       {/* ============================================================== */}
       {/* 2. SECTION NAVIGATION PILLS ROW (Image A)                       */}

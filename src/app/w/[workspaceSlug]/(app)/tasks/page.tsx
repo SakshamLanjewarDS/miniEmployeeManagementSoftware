@@ -11,12 +11,12 @@ import TasksClientView from "./TasksClientView";
 
 interface TasksPageProps {
   params: Promise<{ workspaceSlug: string }>;
-  searchParams: Promise<{ filter?: string; view?: string; scope?: string }>;
+  searchParams: Promise<{ filter?: string; view?: string; scope?: string; projectId?: string; assigneeId?: string }>;
 }
 
 export default async function TasksPage({ params, searchParams }: TasksPageProps) {
   const { workspaceSlug } = await params;
-  const { filter = "ALL", view = "grid", scope } = await searchParams;
+  const { filter = "ALL", view = "grid", scope, projectId, assigneeId } = await searchParams;
 
   const ctx = await getCurrentTenantContext(workspaceSlug);
   if (!ctx) return null;
@@ -32,6 +32,8 @@ export default async function TasksPage({ params, searchParams }: TasksPageProps
     findTasks(ctx, {
       myTasksOnly,
       filter: filter as any,
+      projectId,
+      assigneeId,
     }),
     prisma.project.findMany({
       where: { tenantId: ctx.tenantId },

@@ -84,6 +84,75 @@ export default function TeamLeaveCalendarPage() {
     "July", "August", "September", "October", "November", "December",
   ];
 
+  // Real calendar grid computation with proper weekday alignment
+  const realCalendarGrid = React.useMemo(() => {
+    const firstDayIndex = new Date(currentYear, currentMonth - 1, 1).getDay(); // 0 = Sun, 1 = Mon ...
+    const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
+    const prevMonthDaysCount = new Date(currentYear, currentMonth - 1, 0).getDate();
+
+    const daysMap = new Map<string, any>();
+    if (matrixData?.days) {
+      for (const d of matrixData.days) {
+        daysMap.set(d.date, d);
+      }
+    }
+
+    const cells: Array<{
+      dateStr: string;
+      dayNum: number;
+      isCurrentMonth: boolean;
+      data: any | null;
+    }> = [];
+
+    // 1. Previous month padding cells
+    for (let i = firstDayIndex - 1; i >= 0; i--) {
+      const dNum = prevMonthDaysCount - i;
+      const prevDate = new Date(currentYear, currentMonth - 2, dNum);
+      const prevDateStr = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, "0")}-${String(dNum).padStart(2, "0")}`;
+      cells.push({
+        dateStr: prevDateStr,
+        dayNum: dNum,
+        isCurrentMonth: false,
+        data: null,
+      });
+    }
+
+    // 2. Current month cells
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateStr = `${currentYear}-${String(currentMonth).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+      cells.push({
+        dateStr,
+        dayNum: d,
+        isCurrentMonth: true,
+        data: daysMap.get(dateStr) || {
+          date: dateStr,
+          totalAbsent: 0,
+          approvedCount: 0,
+          pendingCount: 0,
+          hasCollision: false,
+          isBottleneck: false,
+          departmentCounts: {},
+          absentEmployees: [],
+        },
+      });
+    }
+
+    // 3. Next month trailing padding cells to complete 35 or 42 grid cells
+    const remaining = (7 - (cells.length % 7)) % 7;
+    for (let d = 1; d <= remaining; d++) {
+      const nextDate = new Date(currentYear, currentMonth, d);
+      const nextDateStr = `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+      cells.push({
+        dateStr: nextDateStr,
+        dayNum: d,
+        isCurrentMonth: false,
+        data: null,
+      });
+    }
+
+    return cells;
+  }, [currentYear, currentMonth, matrixData]);
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -213,6 +282,75 @@ export default function TeamLeaveCalendarPage() {
             </div>
           </div>
 
+  // Real calendar grid computation with proper weekday alignment
+  const realCalendarGrid = React.useMemo(() => {
+    const firstDayIndex = new Date(currentYear, currentMonth - 1, 1).getDay(); // 0 = Sun, 1 = Mon ...
+    const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
+    const prevMonthDaysCount = new Date(currentYear, currentMonth - 1, 0).getDate();
+
+    const daysMap = new Map<string, any>();
+    if (matrixData?.days) {
+      for (const d of matrixData.days) {
+        daysMap.set(d.date, d);
+      }
+    }
+
+    const cells: Array<{
+      dateStr: string;
+      dayNum: number;
+      isCurrentMonth: boolean;
+      data: any | null;
+    }> = [];
+
+    // 1. Previous month padding cells
+    for (let i = firstDayIndex - 1; i >= 0; i--) {
+      const dNum = prevMonthDaysCount - i;
+      const prevDate = new Date(currentYear, currentMonth - 2, dNum);
+      const prevDateStr = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, "0")}-${String(dNum).padStart(2, "0")}`;
+      cells.push({
+        dateStr: prevDateStr,
+        dayNum: dNum,
+        isCurrentMonth: false,
+        data: null,
+      });
+    }
+
+    // 2. Current month cells
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateStr = `${currentYear}-${String(currentMonth).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+      cells.push({
+        dateStr,
+        dayNum: d,
+        isCurrentMonth: true,
+        data: daysMap.get(dateStr) || {
+          date: dateStr,
+          totalAbsent: 0,
+          approvedCount: 0,
+          pendingCount: 0,
+          hasCollision: false,
+          isBottleneck: false,
+          departmentCounts: {},
+          absentEmployees: [],
+        },
+      });
+    }
+
+    // 3. Next month trailing padding cells to complete 35 or 42 grid cells
+    const remaining = (7 - (cells.length % 7)) % 7;
+    for (let d = 1; d <= remaining; d++) {
+      const nextDate = new Date(currentYear, currentMonth, d);
+      const nextDateStr = `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+      cells.push({
+        dateStr: nextDateStr,
+        dayNum: d,
+        isCurrentMonth: false,
+        data: null,
+      });
+    }
+
+    return cells;
+  }, [currentYear, currentMonth, matrixData]);
+
           {loading ? (
             <div className="p-16 text-center text-xs text-[#696E82]">Calculating team leave matrix...</div>
           ) : (
@@ -227,39 +365,62 @@ export default function TeamLeaveCalendarPage() {
                 </div>
               ))}
 
-              {/* Day cells */}
-              {matrixData?.days?.map((day: any) => {
-                const dayNum = parseInt(day.date.split("-")[2], 10);
-                const isSelected = selectedDay?.date === day.date;
+              {/* Day cells with authentic weekday alignment */}
+              {realCalendarGrid.map((cell, idx) => {
+                if (!cell.isCurrentMonth) {
+                  return (
+                    <div
+                      key={`pad-${idx}`}
+                      className="min-h-[76px] p-2 rounded-2xl border border-slate-100 bg-slate-50/40 text-slate-300 select-none flex flex-col justify-between"
+                    >
+                      <span className="text-xs font-mono font-semibold">{cell.dayNum}</span>
+                      <span className="text-[10px] text-slate-300 italic">Prev/Next</span>
+                    </div>
+                  );
+                }
+
+                const day = cell.data;
+                const isSelected = selectedDay?.date === cell.dateStr;
+                const isToday =
+                  cell.dateStr ===
+                  `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 
                 let badgeColor = "bg-gray-50 border-gray-100 text-gray-500";
-                if (day.isBottleneck) {
+                if (day?.isBottleneck) {
                   badgeColor = "bg-rose-50 border-rose-200 text-rose-800 font-bold";
-                } else if (day.hasCollision) {
+                } else if (day?.hasCollision) {
                   badgeColor = "bg-amber-50 border-amber-200 text-amber-800 font-bold";
-                } else if (day.totalAbsent > 0) {
+                } else if (day?.totalAbsent > 0) {
                   badgeColor = "bg-emerald-50 border-emerald-200 text-emerald-800";
                 }
 
                 return (
                   <button
-                    key={day.date}
-                    onClick={() => setSelectedDay(day)}
+                    key={cell.dateStr}
+                    onClick={() => day && setSelectedDay(day)}
                     className={`min-h-[76px] p-2 rounded-2xl border text-left transition-all flex flex-col justify-between cursor-pointer ${
                       isSelected
-                        ? "border-[#5A81FA] ring-2 ring-[#5A81FA]/30 bg-[#F2F4FF]"
-                        : "border-[#E2E6F0] hover:bg-[#F8F9FE]"
+                        ? "border-[#3562E8] ring-2 ring-[#3562E8]/40 bg-[#F2F4FF] shadow-xs"
+                        : isToday
+                        ? "border-[#3562E8]/60 bg-blue-50/20"
+                        : "border-[#E2E6F0] bg-white hover:bg-[#F8F9FE]"
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-[#1F1F1F] font-mono">{dayNum}</span>
-                      {day.isBottleneck && <Flame className="w-3.5 h-3.5 text-rose-500" />}
-                      {!day.isBottleneck && day.hasCollision && (
+                      <span
+                        className={`text-xs font-bold font-mono px-1.5 py-0.5 rounded-lg ${
+                          isToday ? "bg-[#3562E8] text-white" : "text-[#1F1F1F]"
+                        }`}
+                      >
+                        {cell.dayNum}
+                      </span>
+                      {day?.isBottleneck && <Flame className="w-3.5 h-3.5 text-rose-500" />}
+                      {!day?.isBottleneck && day?.hasCollision && (
                         <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
                       )}
                     </div>
 
-                    {day.totalAbsent > 0 ? (
+                    {day && day.totalAbsent > 0 ? (
                       <div className={`mt-1 p-1 rounded-lg text-[10px] text-center border ${badgeColor}`}>
                         <span>{day.totalAbsent} absent</span>
                       </div>

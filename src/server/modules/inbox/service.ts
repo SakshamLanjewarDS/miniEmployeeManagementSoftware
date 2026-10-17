@@ -19,6 +19,8 @@ import {
   SiteVisitReviewDecision,
   SiteVisitOperationalState,
 } from "@prisma/client";
+import { broadcastStudioEvent } from "../../realtime/eventBus";
+import { clearDashboardCache } from "../dashboard/service";
 
 export type InboxItemType =
   | "DELIVERABLE_SUBMISSION"
@@ -76,6 +78,26 @@ export interface DecisionInboxOverview {
   };
 }
 
+// In-memory Decision Inbox cache (skips 9 database queries per route navigation / sidebar count)
+interface CachedInboxEntry {
+  data: DecisionInboxOverview;
+  cachedAt: number;
+}
+const inboxOverviewCache = new Map<string, CachedInboxEntry>();
+const INBOX_CACHE_TTL_MS = 15 * 1000; // 15 seconds
+
+export function clearInboxCache(tenantId?: string) {
+  if (tenantId) {
+    for (const key of inboxOverviewCache.keys()) {
+      if (key.startsWith(tenantId + ":")) {
+        inboxOverviewCache.delete(key);
+      }
+    }
+  } else {
+    inboxOverviewCache.clear();
+  }
+}
+
 /**
  * Aggregates all pending decision items across the studio workspace.
  * Strictly guarded by Studio Leadership (Owner / Admin) authorization.
@@ -92,6 +114,17 @@ export async function getOwnerDecisionInbox(
   assertAdminOrOwner(ctx, "Only Studio Owners or Administrators can access the Decision Inbox.");
 
   const tab = params?.tab || "all-authorized";
+  const typeFilter = params?.type || "ALL";
+  const urgencyFilter = params?.urgency || "ALL";
+  const searchQuery = params?.searchQuery?.trim() || "";
+
+  const cacheKey = `${ctx.tenantId}:${ctx.membershipId}:${tab}:${typeFilter}:${urgencyFilter}:${searchQuery}`;
+  const nowMs = Date.now();
+  const cached = inboxOverviewCache.get(cacheKey);
+  if (cached && nowMs - cached.cachedAt < INBOX_CACHE_TTL_MS) {
+    return cached.data;
+  }
+
   const now = new Date();
 
   // 1. Fetch Pending Deliverable Submissions
@@ -771,10 +804,17 @@ export async function getOwnerDecisionInbox(
     );
   }
 
-  return {
+  const result: DecisionInboxOverview = {
     items: filteredItems,
     counts,
   };
+
+  inboxOverviewCache.set(cacheKey, {
+    data: result,
+    cachedAt: nowMs,
+  });
+
+  return result;
 }
 
 /**
@@ -791,45 +831,56 @@ export async function executeInboxDecision(
 ) {
   assertAdminOrOwner(ctx, "Only Studio Owners or Administrators can make decisions.");
 
+  // Invalidate cached counts and items immediately
+  clearInboxCache(ctx.tenantId);
+  clearDashboardCache(ctx.tenantId);
+
   const { type, id, action, feedback } = params;
+
+  let executionResult: any;
 
   switch (type) {
     case "DELIVERABLE_SUBMISSION": {
       const decision = action === "APPROVE" ? "APPROVE" : "REQUEST_CHANGES";
-      return await reviewTaskSubmission(ctx, id, {
+      executionResult = await reviewTaskSubmission(ctx, id, {
         decision,
         feedback: feedback?.trim() || (action === "APPROVE" ? "Approved by leadership." : "Changes requested."),
       });
+      break;
     }
 
     case "DEADLINE_EXTENSION": {
       const decision = action === "APPROVE" ? "APPROVE" : "REJECT";
-      return await decideDeadlineExtension(ctx, id, {
+      executionResult = await decideDeadlineExtension(ctx, id, {
         decision,
         decisionReason: feedback?.trim() || (action === "APPROVE" ? "Extension granted." : "Extension denied."),
       });
+      break;
     }
 
     case "SCOPE_CHANGE": {
       const decision = action === "APPROVE" ? "APPROVE" : "REJECT";
-      return await decideProjectScopeChange(ctx, id, {
+      executionResult = await decideProjectScopeChange(ctx, id, {
         decision,
         decisionNotes: feedback?.trim() || (action === "APPROVE" ? "Scope change approved." : "Scope change rejected."),
         autoApply: true,
       });
+      break;
     }
 
     case "PROFILE_CHANGE": {
       const decision = action === "APPROVE" ? "APPROVE" : "REJECT";
-      return await decideProfileRecordChangeRequest(ctx, id, {
+      executionResult = await decideProfileRecordChangeRequest(ctx, id, {
         decision,
         decisionNote: feedback?.trim() || (action === "APPROVE" ? "Profile change verified." : "Profile change rejected."),
       });
+      break;
     }
 
     case "DRAWING_REVISION": {
       const decision = action === "APPROVE" ? "APPROVED" : "CHANGES_REQUESTED";
-      return await reviewRevision(ctx, id, decision, feedback?.trim() || (action === "APPROVE" ? "Drawing revision approved." : "Corrections needed."));
+      executionResult = await reviewRevision(ctx, id, decision, feedback?.trim() || (action === "APPROVE" ? "Drawing revision approved." : "Corrections needed."));
+      break;
     }
 
     case "SITE_VISIT": {
@@ -837,12 +888,13 @@ export async function executeInboxDecision(
         action === "APPROVE"
           ? SiteVisitReviewDecision.ACCEPTED
           : SiteVisitReviewDecision.NEEDS_CLARIFICATION;
-      return await reviewSiteVisit(
+      executionResult = await reviewSiteVisit(
         ctx,
         id,
         decision,
         feedback?.trim() || (action === "APPROVE" ? "Inspection verified." : "Additional information requested.")
       );
+      break;
     }
 
     case "TASK_BLOCKER": {
@@ -886,32 +938,44 @@ export async function executeInboxDecision(
         return u;
       });
 
-      return { success: true, task: updated };
+      executionResult = { success: true, task: updated };
+      break;
     }
 
     case "LEAVE_APPLICATION": {
       if (action === "APPROVE") {
-        return await approveLeaveRequest(ctx, id, feedback?.trim());
+        executionResult = await approveLeaveRequest(ctx, id, feedback?.trim());
       } else {
-        return await rejectLeaveRequest(
+        executionResult = await rejectLeaveRequest(
           ctx,
           id,
           feedback?.trim() || "Rejected by studio leadership"
         );
       }
+      break;
     }
 
     case "LEAVE_CANCELLATION": {
       const decision = action === "APPROVE" ? "APPROVE" : "REJECT";
-      return await reviewLeaveCancellation(ctx, {
+      executionResult = await reviewLeaveCancellation(ctx, {
         cancellationRequestId: id,
         decision,
         rejectionReason:
           feedback?.trim() || (action === "REJECT" ? "Cancellation rejected by studio leadership" : undefined),
       });
+      break;
     }
 
     default:
       throw new Error(`Unsupported decision inbox item type: ${type}`);
   }
+
+  // Realtime Broadcast across active tabs and clients
+  broadcastStudioEvent(ctx.tenantId, {
+    type: "DECISION_UPDATED",
+    actorId: ctx.membershipId,
+    payload: { type, id, action },
+  });
+
+  return executionResult;
 }

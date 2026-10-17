@@ -517,7 +517,7 @@ export function TaskCard({
 
   return (
     <article
-      className="task-card rounded-2xl bg-white border border-[#e2e8f0] shadow-[0_1px_4px_rgba(15,23,42,0.04)] p-4 sm:p-5 flex flex-col justify-between hover:shadow-[0_8px_24px_rgba(15,23,42,0.08)] hover:border-slate-300 transition-all duration-200 group relative min-w-0 gap-4"
+      className="task-card rounded-2xl bg-white border border-[#e2e8f0] shadow-[0_1px_4px_rgba(15,23,42,0.04)] p-4 sm:p-5 flex flex-col justify-between hover:shadow-[0_8px_24px_rgba(15,23,42,0.08)] hover:border-slate-300 transition-all duration-150 group relative min-w-0 gap-4 virtual-render press-feedback"
       style={{ overflowWrap: "anywhere" }}
       aria-label={`Deliverable: ${task.title}`}
     >

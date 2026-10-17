@@ -17,7 +17,6 @@ import {
   Sparkles,
   CheckCircle2,
 } from "lucide-react";
-import { PwaInstallButton } from "@/components/pwa/PwaInstallButton";
 
 export default function WorkspaceLoginPage() {
   const params = useParams();
@@ -389,11 +388,6 @@ export default function WorkspaceLoginPage() {
                   </div>
                 </div>
               </div>
-            </div>
-
-            {/* Panel Bottom: Dedicated PWA Install Dock */}
-            <div className="relative z-10 pt-6 mt-6 border-t border-white/80">
-              <PwaInstallButton />
             </div>
           </div>
         </div>

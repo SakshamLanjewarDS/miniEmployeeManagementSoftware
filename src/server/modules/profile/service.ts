@@ -94,6 +94,15 @@ export async function getProfileOverview(ctx: TenantContext, targetMembershipId?
     });
   }
 
+  // Fetch tenant settings for user avatars
+  const tenant = await prisma.tenant.findUnique({
+    where: { id: ctx.tenantId },
+    select: { settings: true },
+  });
+  const currentSettings = (tenant?.settings as Record<string, any>) || {};
+  const userAvatars = (currentSettings.userAvatars as Record<string, string>) || {};
+  const avatarUrl = userAvatars[membership.id] || null;
+
   // 1. My Profile Tier (Self-Service)
   const myProfile = {
     userId: membership.user.id,
@@ -102,6 +111,7 @@ export async function getProfileOverview(ctx: TenantContext, targetMembershipId?
     email: membership.user.email,
     role: membership.role,
     phone: membership.employee?.phone || null,
+    avatarUrl,
     joinedAt: membership.joinedAt,
     isSelf,
   };
@@ -112,6 +122,7 @@ export async function getProfileOverview(ctx: TenantContext, targetMembershipId?
     fullName: membership.user.fullName,
     email: membership.user.email,
     role: membership.role,
+    avatarUrl,
     designation: membership.employee?.designation || (membership.role === "OWNER" ? "Studio Boss / Partner" : "Studio Staff"),
     department: membership.employee?.department || "Architecture",
     phone: membership.employee?.phone || null,
@@ -135,6 +146,7 @@ export async function getProfileOverview(ctx: TenantContext, targetMembershipId?
       officialEmployeeId: membership.employee?.employeeId || "OWNER-RECORD",
       officialDesignation: membership.employee?.designation || "Executive Leadership",
       officialDepartment: membership.employee?.department || "Studio Management",
+      avatarUrl,
       hireDate: membership.employee?.joinDate || membership.joinedAt,
       reportingManagerId: membership.employee?.reportingManagerId || null,
       isActive: membership.isActive,
@@ -196,6 +208,62 @@ export async function updateSelfProfile(
 
     return { success: true };
   });
+}
+
+/**
+ * Updates or removes a profile photo uploaded from device.
+ */
+export async function updateProfileAvatar(
+  ctx: TenantContext,
+  data: {
+    avatarUrl: string;
+    targetMembershipId?: string;
+  }
+) {
+  const targetId = data.targetMembershipId || ctx.membershipId;
+  const isSelf = targetId === ctx.membershipId;
+  const canManage = isAdminOrOwner(ctx);
+
+  if (!isSelf && !canManage) {
+    throw new ForbiddenException("You do not have permission to update this profile picture.");
+  }
+
+  const tenant = await prisma.tenant.findUnique({
+    where: { id: ctx.tenantId },
+    select: { settings: true },
+  });
+
+  const currentSettings = (tenant?.settings as Record<string, any>) || {};
+  const userAvatars = { ...(currentSettings.userAvatars || {}) };
+
+  if (data.avatarUrl && data.avatarUrl.trim()) {
+    userAvatars[targetId] = data.avatarUrl.trim();
+  } else {
+    delete userAvatars[targetId];
+  }
+
+  await prisma.tenant.update({
+    where: { id: ctx.tenantId },
+    data: {
+      settings: {
+        ...currentSettings,
+        userAvatars,
+      },
+    },
+  });
+
+  await prisma.auditEvent.create({
+    data: {
+      tenantId: ctx.tenantId,
+      actorId: ctx.membershipId,
+      action: "PROFILE_UPDATED",
+      entityType: "TenantMembership",
+      entityId: targetId,
+      safeChangeSummary: `${ctx.userFullName} updated profile photo.`,
+    },
+  }).catch(() => {});
+
+  return { success: true, avatarUrl: data.avatarUrl ? data.avatarUrl.trim() : null };
 }
 
 /**

@@ -11,6 +11,22 @@ export interface NotificationItem {
   createdAt: string;
 }
 
+// In-memory Notifications cache (skips 15s polling DB roundtrips)
+interface CachedNotificationEntry {
+  data: { notifications: NotificationItem[]; unreadCount: number };
+  cachedAt: number;
+}
+const notificationCache = new Map<string, CachedNotificationEntry>();
+const NOTIFICATION_CACHE_TTL_MS = 10 * 1000; // 10 seconds
+
+export function clearNotificationCache(recipientId?: string) {
+  if (recipientId) {
+    notificationCache.delete(recipientId);
+  } else {
+    notificationCache.clear();
+  }
+}
+
 /**
  * Get notifications for the current membership.
  * If empty, seeds realistic role-tailored notifications so the inbox is vibrant and useful immediately.
@@ -19,6 +35,12 @@ export async function getNotificationsService(ctx: TenantContext): Promise<{
   notifications: NotificationItem[];
   unreadCount: number;
 }> {
+  const nowMs = Date.now();
+  const cached = notificationCache.get(ctx.membershipId);
+  if (cached && nowMs - cached.cachedAt < NOTIFICATION_CACHE_TTL_MS) {
+    return cached.data;
+  }
+
   let dbNotifications = await prisma.notification.findMany({
     where: {
       tenantId: ctx.tenantId,
@@ -137,7 +159,13 @@ export async function getNotificationsService(ctx: TenantContext): Promise<{
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
-  return { notifications, unreadCount };
+  const result = { notifications, unreadCount };
+  notificationCache.set(ctx.membershipId, {
+    data: result,
+    cachedAt: nowMs,
+  });
+
+  return result;
 }
 
 /**
@@ -147,6 +175,8 @@ export async function markNotificationsReadService(
   ctx: TenantContext,
   params: { notificationId?: string; markAll?: boolean }
 ): Promise<{ success: boolean; unreadCount: number }> {
+  clearNotificationCache(ctx.membershipId);
+
   if (params.markAll) {
     await prisma.notification.updateMany({
       where: {

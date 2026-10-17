@@ -397,15 +397,12 @@ export default function FinanceClientView({
               type="button"
               onClick={() => setIsNavDrawerOpen(true)}
               aria-label="Open Navigation Menu"
-              className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-700 hover:bg-slate-100 transition-colors"
+              className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-700 hover:bg-slate-100 transition-colors lg:!hidden topbar-mobile-menu-btn"
             >
               <Menu className="w-5 h-5" />
             </button>
 
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-[#0B122B] text-white flex items-center justify-center font-black text-xs tracking-tight shadow-xs">
-                100%
-              </div>
               <div className="flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                 <span className="font-bold text-sm text-[#0F172A] tracking-tight">100% DESIGN Studio</span>

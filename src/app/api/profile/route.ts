@@ -3,6 +3,7 @@ import { getCurrentTenantContext } from "@/server/auth/session";
 import {
   getProfileOverview,
   updateSelfProfile,
+  updateProfileAvatar,
   submitOfficialRecordChangeRequest,
 } from "@/server/modules/profile/service";
 
@@ -37,6 +38,14 @@ export async function PATCH(req: NextRequest) {
       const result = await updateSelfProfile(ctx, {
         fullName: payload.fullName,
         phone: payload.phone,
+      });
+      return NextResponse.json(result);
+    }
+
+    if (action === "UPDATE_AVATAR") {
+      const result = await updateProfileAvatar(ctx, {
+        avatarUrl: payload.avatarUrl,
+        targetMembershipId: payload.targetMembershipId,
       });
       return NextResponse.json(result);
     }

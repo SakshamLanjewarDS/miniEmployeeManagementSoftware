@@ -14,6 +14,7 @@ export interface TenantContext {
   readonly phone?: string | null;
   readonly role: TenantRole;
   readonly hasFinanceAccess: boolean;
+  readonly avatarUrl?: string | null;
   readonly timezone: string;
   readonly currency: string;
 }

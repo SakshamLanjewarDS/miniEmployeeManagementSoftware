@@ -3,15 +3,29 @@ import { TenantContext, assertAdminOrOwner } from "../../tenancy/context";
 import { parseDateOnly } from "../leave/policy";
 import { createExecutiveTask } from "./tasks";
 
+export interface MeetingAttendeesPayload {
+  allEmployees?: boolean;
+  employeeIds?: string[];
+  contractorIds?: string[];
+  clientIds?: string[];
+  consultantIds?: string[];
+  locationType?: "STUDIO" | "SITE" | "CLIENT_OFFICE" | "VIRTUAL";
+  meetingLink?: string;
+  siteLocation?: string;
+}
+
 export interface CreateMeetingInput {
   title: string;
   meetingDate: string; // YYYY-MM-DD
   startTime: string;   // "11:00"
   endTime: string;     // "12:30"
-  meetingType: string; // Design Review, Client Presentation, Site Coordination, Partner Strategy
+  meetingType: string; // Design Review, Client Presentation, Site Coordination, Partner Strategy, etc.
   projectId?: string;
   agenda?: string;
-  attendeeMembershipIds?: string[];
+  notes?: string;
+  decisions?: string;
+  attendees?: MeetingAttendeesPayload;
+  attendeeMembershipIds?: string[]; // backwards compatibility
 }
 
 /**
@@ -43,6 +57,14 @@ export async function createStudioMeeting(context: TenantContext, input: CreateM
 
   const meetingDate = parseDateOnly(input.meetingDate);
 
+  const attendeesJson = input.attendees || {
+    allEmployees: false,
+    employeeIds: input.attendeeMembershipIds || [context.membershipId],
+    contractorIds: [],
+    clientIds: [],
+    consultantIds: [],
+  };
+
   return await prisma.studioMeeting.create({
     data: {
       tenantId: context.tenantId,
@@ -53,9 +75,55 @@ export async function createStudioMeeting(context: TenantContext, input: CreateM
       meetingType: input.meetingType || "Design Review",
       projectId: input.projectId || null,
       agenda: input.agenda?.trim() || null,
+      notes: input.notes?.trim() || null,
+      decisions: input.decisions?.trim() || null,
       creatorId: context.membershipId,
-      attendeesJson: input.attendeeMembershipIds || [context.membershipId],
+      attendeesJson: attendeesJson as any,
     },
+  });
+}
+
+/**
+ * Updates an existing studio meeting (notes, decisions, agenda, status, attendees)
+ */
+export async function updateStudioMeeting(
+  context: TenantContext,
+  meetingId: string,
+  input: Partial<CreateMeetingInput> & { status?: string }
+) {
+  assertAdminOrOwner(context);
+
+  const existing = await prisma.studioMeeting.findFirst({
+    where: { id: meetingId, tenantId: context.tenantId },
+  });
+  if (!existing) throw new Error("Meeting not found");
+
+  const updateData: any = {};
+  if (input.title !== undefined) updateData.title = input.title.trim();
+  if (input.meetingDate !== undefined) updateData.meetingDate = parseDateOnly(input.meetingDate);
+  if (input.startTime !== undefined) updateData.startTime = input.startTime;
+  if (input.endTime !== undefined) updateData.endTime = input.endTime;
+  if (input.meetingType !== undefined) updateData.meetingType = input.meetingType;
+  if (input.projectId !== undefined) updateData.projectId = input.projectId || null;
+  if (input.agenda !== undefined) updateData.agenda = input.agenda?.trim() || null;
+  if (input.notes !== undefined) updateData.notes = input.notes?.trim() || null;
+  if (input.decisions !== undefined) updateData.decisions = input.decisions?.trim() || null;
+  if (input.status !== undefined) updateData.status = input.status;
+  if (input.attendees !== undefined) updateData.attendeesJson = input.attendees;
+
+  return await prisma.studioMeeting.update({
+    where: { id: meetingId },
+    data: updateData,
+  });
+}
+
+/**
+ * Deletes a studio meeting
+ */
+export async function deleteStudioMeeting(context: TenantContext, meetingId: string) {
+  assertAdminOrOwner(context);
+  return await prisma.studioMeeting.delete({
+    where: { id: meetingId, tenantId: context.tenantId },
   });
 }
 

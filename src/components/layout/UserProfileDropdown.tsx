@@ -81,9 +81,17 @@ export function UserProfileDropdown({ context }: UserProfileDropdownProps) {
       >
         {/* Avatar with status indicator */}
         <div className="relative">
-          <div className="w-8 h-8 rounded-lg bg-[#5A81FA] text-white font-bold text-xs flex items-center justify-center shadow-2xs tracking-wider">
-            {initials}
-          </div>
+          {context.avatarUrl ? (
+            <img
+              src={context.avatarUrl}
+              alt={context.userFullName}
+              className="w-8 h-8 rounded-lg object-cover shadow-2xs"
+            />
+          ) : (
+            <div className="w-8 h-8 rounded-lg bg-[#5A81FA] text-white font-bold text-xs flex items-center justify-center shadow-2xs tracking-wider">
+              {initials}
+            </div>
+          )}
           <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white" />
         </div>
 
@@ -113,9 +121,17 @@ export function UserProfileDropdown({ context }: UserProfileDropdownProps) {
           <div className="p-5 bg-gradient-to-b from-[#F8F9FD] to-white border-b border-[#E2E6F0]">
             <div className="flex items-start gap-3.5">
               <div className="relative shrink-0">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#5A81FA] to-[#2C308D] text-white font-bold text-base flex items-center justify-center shadow-sm">
-                  {initials}
-                </div>
+                {context.avatarUrl ? (
+                  <img
+                    src={context.avatarUrl}
+                    alt={context.userFullName}
+                    className="w-12 h-12 rounded-xl object-cover shadow-sm"
+                  />
+                ) : (
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#5A81FA] to-[#2C308D] text-white font-bold text-base flex items-center justify-center shadow-sm">
+                    {initials}
+                  </div>
+                )}
                 <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white" />
               </div>
 

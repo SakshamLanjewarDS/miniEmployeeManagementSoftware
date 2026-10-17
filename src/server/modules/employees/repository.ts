@@ -28,6 +28,7 @@ export interface EmployeeListItem {
   isActive: boolean;
   joinDate: Date | null;
   hasFinanceAccess: boolean;
+  avatarUrl?: string | null;
   projects?: ProjectAssignmentItem[];
   notification?: CredentialNotificationResult;
 }
@@ -70,29 +71,38 @@ export interface UpdateEmployeeData {
 }
 
 export async function findEmployeesByTenant(ctx: TenantContext): Promise<EmployeeListItem[]> {
-  const memberships = await prisma.tenantMembership.findMany({
-    where: {
-      tenantId: ctx.tenantId,
-    },
-    include: {
-      user: true,
-      employee: true,
-      projectMembers: {
-        include: {
-          project: {
-            select: {
-              id: true,
-              code: true,
-              name: true,
+  const [memberships, tenant] = await Promise.all([
+    prisma.tenantMembership.findMany({
+      where: {
+        tenantId: ctx.tenantId,
+      },
+      include: {
+        user: true,
+        employee: true,
+        projectMembers: {
+          include: {
+            project: {
+              select: {
+                id: true,
+                code: true,
+                name: true,
+              },
             },
           },
         },
       },
-    },
-    orderBy: {
-      joinedAt: "asc",
-    },
-  });
+      orderBy: {
+        joinedAt: "asc",
+      },
+    }),
+    prisma.tenant.findUnique({
+      where: { id: ctx.tenantId },
+      select: { settings: true },
+    }),
+  ]);
+
+  const currentSettings = (tenant?.settings as Record<string, any>) || {};
+  const userAvatars = (currentSettings.userAvatars as Record<string, string>) || {};
 
   return memberships.map((m) => ({
     id: m.employee?.id ?? m.id,
@@ -107,6 +117,7 @@ export async function findEmployeesByTenant(ctx: TenantContext): Promise<Employe
     isActive: m.isActive,
     joinDate: m.employee?.joinDate ?? m.joinedAt,
     hasFinanceAccess: m.hasFinanceAccess,
+    avatarUrl: userAvatars[m.id] || null,
     projects: m.projectMembers.map((pm) => ({
       id: pm.project.id,
       code: pm.project.code,

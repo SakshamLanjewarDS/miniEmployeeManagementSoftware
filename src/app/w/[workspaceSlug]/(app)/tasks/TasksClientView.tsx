@@ -5334,15 +5334,11 @@ export default function TasksClientView({
                   <label className="font-semibold text-[#1F1F1F]">
                     Architectural Brief & Instructions <span className="text-red-600">*</span>
                   </label>
-                  <span className="text-[10px] text-[#696E82]">
-                    Speech & Grammar Assistant enabled
-                  </span>
                 </div>
                 <textarea
                   id="task-description-input"
                   rows={3}
                   required
-                  data-enable-assistant="true"
                   value={taskDescription}
                   onChange={(e) => {
                     setTaskDescription(e.target.value);
@@ -5510,7 +5506,6 @@ export default function TasksClientView({
                                       <input
                                         id={`chk-text-${row.id}`}
                                         type="text"
-                                        data-enable-assistant="true"
                                         value={row.title}
                                         onChange={(e) =>
                                           handleUpdateEmployeeTask(empId, row.id, {

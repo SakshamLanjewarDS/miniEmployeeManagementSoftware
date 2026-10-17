@@ -183,6 +183,9 @@ export async function resolveSessionAndTenant(
     throw new UnauthorizedException(`User is not an active member of workspace '${workspaceSlug}'`);
   }
 
+  const tenantSettings = (tenant.settings as Record<string, any>) || {};
+  const userAvatars = (tenantSettings.userAvatars as Record<string, string>) || {};
+
   const result: TenantContext = {
     tenantId: tenant.id,
     tenantSlug: tenant.slug,
@@ -197,6 +200,7 @@ export async function resolveSessionAndTenant(
     phone: membership.employee?.phone ?? null,
     role: membership.role,
     hasFinanceAccess: membership.hasFinanceAccess,
+    avatarUrl: userAvatars[membership.id] ?? null,
     timezone: tenant.timezone,
     currency: tenant.currency,
   };

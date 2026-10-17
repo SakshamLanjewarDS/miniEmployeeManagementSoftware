@@ -3,6 +3,8 @@ import { TenantContext, canApproveWork, isAdminOrOwner, ForbiddenException } fro
 import { TaskPriority, TaskWorkflowStatus } from "@prisma/client";
 import { evaluateTaskCompletionGovernance, getTaskGovernancePolicy } from "./governance";
 import { sendDevicePushNotification, sendDevicePushToRoles } from "../notifications/push";
+import { broadcastStudioEvent } from "../../realtime/eventBus";
+import { clearDashboardCache } from "../dashboard/service";
 
 export interface TaskFilterParams {
   filter?: "TODAY" | "UPCOMING" | "OVERDUE" | "IN_PROGRESS" | "WAITING_REVIEW" | "COMPLETED" | "ALL";
@@ -1058,7 +1060,7 @@ export async function transitionTaskStatus(
     : `Workflow transition from ${oldStatus} to ${newStatus} by ${ctx.userFullName}`;
 
   // Execute update in transaction with activity history
-  return await prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const updated = await tx.task.update({
       where: { id: taskId },
       data: {
@@ -1214,6 +1216,22 @@ export async function transitionTaskStatus(
 
     return updated;
   });
+
+  // Realtime studio broadcast & instant cache invalidation
+  clearDashboardCache(ctx.tenantId);
+  broadcastStudioEvent(ctx.tenantId, {
+    type: "TASK_UPDATED",
+    actorId: ctx.membershipId,
+    actorName: ctx.userFullName,
+    payload: {
+      taskId: task.id,
+      oldStatus,
+      newStatus: effectiveNewStatus,
+      projectId: task.projectId,
+    },
+  });
+
+  return result;
 }
 
 /**

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { TenantContext } from "@/server/tenancy/context";
@@ -31,6 +31,9 @@ import {
   MoreHorizontal,
   ArrowUpRight,
   ShieldCheck,
+  Camera,
+  Trash2,
+  Loader2,
 } from "lucide-react";
 import { ProjectProfileCircle } from "@/lib/typology";
 
@@ -64,12 +67,128 @@ export function ProfileClientView({ context, initialData }: ProfileClientViewPro
   const canManage = initialData.canManage;
   const isSelf = initialData.isSelf;
 
-  const initials = (initialData.myProfile?.fullName || context.userFullName)
+  const targetMembershipId = initialData.directoryProfile?.membershipId || initialData.myProfile?.membershipId || context.membershipId;
+  const initialAvatar = initialData.myProfile?.avatarUrl || initialData.directoryProfile?.avatarUrl || initialData.managementRecord?.avatarUrl || null;
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(initialAvatar);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const initials = (initialData.myProfile?.fullName || initialData.directoryProfile?.fullName || context.userFullName)
     .split(" ")
     .map((n: string) => n[0])
     .join("")
     .slice(0, 2)
     .toUpperCase();
+
+  const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setErrorMessage("Please select a valid image file (PNG, JPG, JPEG, WEBP).");
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      setErrorMessage("Image file size exceeds 10MB. Please select a smaller photo.");
+      return;
+    }
+
+    setIsUploadingPhoto(true);
+    setErrorMessage(null);
+
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (readerEvent) => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement("canvas");
+            const maxSize = 512;
+            let width = img.width;
+            let height = img.height;
+
+            if (width > height) {
+              if (width > maxSize) {
+                height = Math.round((height * maxSize) / width);
+                width = maxSize;
+              }
+            } else {
+              if (height > maxSize) {
+                width = Math.round((width * maxSize) / height);
+                height = maxSize;
+              }
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            const ctx2d = canvas.getContext("2d");
+            if (!ctx2d) {
+              resolve(readerEvent.target?.result as string);
+              return;
+            }
+            ctx2d.drawImage(img, 0, 0, width, height);
+            resolve(canvas.toDataURL("image/jpeg", 0.85));
+          };
+          img.onerror = () => reject(new Error("Failed to process image"));
+          img.src = readerEvent.target?.result as string;
+        };
+        reader.onerror = () => reject(new Error("Failed to read image file"));
+        reader.readAsDataURL(file);
+      });
+
+      setAvatarUrl(dataUrl);
+
+      const res = await fetch(`/api/profile?workspaceSlug=${context.tenantSlug}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "UPDATE_AVATAR",
+          avatarUrl: dataUrl,
+          targetMembershipId,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to upload profile photo");
+
+      setSuccessMessage("✓ Profile photo updated successfully from your device!");
+      router.refresh();
+    } catch (err: any) {
+      setErrorMessage(err.message || "Failed to upload photo");
+      setAvatarUrl(initialAvatar);
+    } finally {
+      setIsUploadingPhoto(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handleRemovePhoto = async () => {
+    if (!avatarUrl) return;
+    setIsUploadingPhoto(true);
+    setErrorMessage(null);
+    try {
+      const res = await fetch(`/api/profile?workspaceSlug=${context.tenantSlug}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "UPDATE_AVATAR",
+          avatarUrl: "",
+          targetMembershipId,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to remove photo");
+
+      setAvatarUrl(null);
+      setSuccessMessage("✓ Profile photo removed.");
+      router.refresh();
+    } catch (err: any) {
+      setErrorMessage(err.message || "Failed to remove photo");
+    } finally {
+      setIsUploadingPhoto(false);
+    }
+  };
 
   const handleUpdateSelfProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -197,12 +316,76 @@ export function ProfileClientView({ context, initialData }: ProfileClientViewPro
       {/* 1. HERO PROFILE CARD (Image D Layout)                           */}
       {/* ============================================================== */}
       <div className="bg-white border border-slate-200/80 rounded-3xl p-4 sm:p-6 md:p-8 shadow-xs flex flex-col md:flex-row items-start md:items-center gap-5 sm:gap-8">
-        {/* Large Rounded Rectangular Portrait (Image D) */}
-        <div className="w-24 h-24 sm:w-36 sm:h-36 md:w-44 md:h-44 rounded-2xl sm:rounded-3xl bg-gradient-to-tr from-[#CEDEFF] via-[#F2F4FF] to-white border border-slate-200/80 flex items-center justify-center shrink-0 shadow-sm relative overflow-hidden group">
-          <span className="font-bold text-3xl sm:text-4xl md:text-5xl text-[#2C308D] tracking-tight">
-            {initials}
-          </span>
-          <div className="absolute inset-0 bg-blue-600/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+        {/* Large Rounded Rectangular Portrait with Device Photo Upload */}
+        <div className="flex flex-col items-center shrink-0">
+          <div className="w-28 h-28 sm:w-36 sm:h-36 md:w-44 md:h-44 rounded-2xl sm:rounded-3xl bg-gradient-to-tr from-[#CEDEFF] via-[#F2F4FF] to-white border border-slate-200/80 flex items-center justify-center shadow-sm relative overflow-hidden group">
+            {avatarUrl ? (
+              <img
+                src={avatarUrl}
+                alt={initialData.myProfile?.fullName || context.userFullName}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <span className="font-bold text-3xl sm:text-4xl md:text-5xl text-[#2C308D] tracking-tight">
+                {initials}
+              </span>
+            )}
+
+            {/* Hover Camera Overlay Button */}
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploadingPhoto}
+              className="absolute inset-0 bg-slate-900/50 text-white flex flex-col items-center justify-center gap-1.5 opacity-0 group-hover:opacity-100 transition-all duration-200 cursor-pointer backdrop-blur-[2px]"
+              title="Upload photo from device"
+            >
+              {isUploadingPhoto ? (
+                <Loader2 className="w-6 h-6 animate-spin text-white" />
+              ) : (
+                <>
+                  <Camera className="w-6 h-6 sm:w-7 sm:h-7" />
+                  <span className="text-[11px] sm:text-xs font-semibold px-2 text-center">
+                    {avatarUrl ? "Change Photo" : "Upload Photo"}
+                  </span>
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* Quick Action Buttons directly below Portrait */}
+          <div className="flex items-center gap-1.5 mt-2.5">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploadingPhoto}
+              className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-[#3562E8] hover:text-white text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+              title="Upload photo from device"
+            >
+              <Camera className="w-3.5 h-3.5" />
+              <span>{avatarUrl ? "Change Photo" : "Upload Photo"}</span>
+            </button>
+
+            {avatarUrl && (
+              <button
+                type="button"
+                onClick={handleRemovePhoto}
+                disabled={isUploadingPhoto}
+                className="px-2 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
+                title="Remove photo"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Remove</span>
+              </button>
+            )}
+          </div>
+
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handlePhotoSelect}
+            accept="image/png,image/jpeg,image/jpg,image/webp"
+            className="hidden"
+          />
         </div>
 
         {/* Profile Details & Metadata (Image D) */}

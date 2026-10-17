@@ -48,6 +48,8 @@ import {
 } from "lucide-react";
 import { EmployeeDashboardData } from "@/server/modules/dashboard/service";
 import { TaskPriorityBadge } from "@/components/tasks/TaskPriorityBadge";
+import { useStudioRealtime } from "@/components/realtime/useStudioRealtime";
+import { LiveSyncIndicator } from "@/components/realtime/LiveSyncIndicator";
 
 interface EmployeeDashboardViewProps {
   data: EmployeeDashboardData;
@@ -91,6 +93,18 @@ export default function EmployeeDashboardView({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<"MY_DAY" | "QUEUE" | "DRAWINGS" | "VISITS" | "SCRATCHPAD">("MY_DAY");
   const [filterTab, setFilterTab] = useState<"ALL" | "PENDING" | "TODAY" | "OVERDUE" | "REVIEW" | "CHANGES">("ALL");
+
+  // Realtime Live SSE Bus Sync
+  const { isConnected, lastEvent, forceRefresh } = useStudioRealtime({
+    workspaceSlug,
+    autoRefresh: true,
+  });
+
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    forceRefresh();
+    setTimeout(() => setIsRefreshing(false), 600);
+  };
 
   // Focus Mode state
   const [isFocusMode, setIsFocusMode] = useState(false);
@@ -649,8 +663,14 @@ export default function EmployeeDashboardView({
           </p>
         </div>
 
-        {/* Top Right: Sun / Status & Actions */}
-        <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 shrink-0 self-end sm:self-auto">
+        {/* Top Right: Live Sync, Sun / Status & Actions */}
+        <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 shrink-0 self-end sm:self-auto">
+          <LiveSyncIndicator
+            isConnected={isConnected}
+            lastEvent={lastEvent}
+            onManualRefresh={handleRefresh}
+          />
+
           {/* Next-Up Focus Cockpit Trigger */}
           <button
             type="button"

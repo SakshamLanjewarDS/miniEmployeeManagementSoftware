@@ -185,8 +185,88 @@ a, button, input, select, textarea {
   justify-content: center;
 }
 
+/* Ensure mobile topbar hamburger is strictly never visible on desktop screens (>=1024px) */
+@media (min-width: 1024px) {
+  .topbar-mobile-menu-btn,
+  button.topbar-mobile-menu-btn {
+    display: none !important;
+  }
+}
+
 /* Mobile responsive tabular number container */
 .tabular-nums {
   font-variant-numeric: tabular-nums;
 }
+
+/* =========================================================================
+   SUPER SMOOTH UI & PERFORMANCE ACCELERATION (60FPS HARDWARE ACCELERATED)
+   ========================================================================= */
+
+/* GPU Compositing Layer Acceleration */
+.gpu-smooth {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+  will-change: transform, opacity;
+}
+
+/* Butter-Smooth CSS Grid Accordion Transition (Zero JS Height Calculation, Zero Jitter) */
+.smooth-accordion-grid {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 220ms cubic-bezier(0.16, 1, 0.3, 1), opacity 180ms cubic-bezier(0.16, 1, 0.3, 1);
+  opacity: 0;
+}
+
+.smooth-accordion-grid.open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.smooth-accordion-inner {
+  overflow: hidden;
+}
+
+/* Ultra-Tactile Interactive Button & Card Feedback */
+.press-feedback {
+  transition: transform 120ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 150ms ease, background-color 150ms ease;
+}
+
+.press-feedback:hover {
+  transform: translateY(-1px);
+}
+
+.press-feedback:active {
+  transform: scale(0.982) translateY(0);
+}
+
+/* Off-screen DOM Virtualization & Layout Optimization (Skips off-screen layout work) */
+.virtual-render {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 100px;
+}
+
+/* Subtle Premium Glass Sheen */
+.glass-surface {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* Shimmer Loading Animation for Skeletons */
+@keyframes studio-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, #F1F4F9 0%, #E4E9F2 50%, #F1F4F9 100%);
+  background-size: 200% 100%;
+  animation: studio-shimmer 1.6s infinite ease-in-out;
+}
+
 

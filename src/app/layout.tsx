@@ -118,7 +118,8 @@ export default function RootLayout({
                   }
                 });
 
-                // 2. Safe DOM stub generator for missing extension elements
+                // 2. Safe DOM stub generator for missing extension elements (fast, zero stack trace overhead)
+                var EXT_QUERY_RE = /share|modal|chext|chrome-extension|inspector/i;
                 function createSafeStub(tag) {
                   var el = document.createElement(tag || 'div');
                   el.style.display = 'none';
@@ -126,33 +127,15 @@ export default function RootLayout({
                   return el;
                 }
 
-                function shouldStub(query, stack) {
-                  var q = String(query || '').toLowerCase();
-                  var s = String(stack || '').toLowerCase();
-                  return (
-                    s.indexOf('share-modal') !== -1 ||
-                    s.indexOf('chext_') !== -1 ||
-                    s.indexOf('inspector') !== -1 ||
-                    s.indexOf('chrome-extension') !== -1 ||
-                    s.indexOf('extension') !== -1 ||
-                    q.indexOf('share') !== -1 ||
-                    q.indexOf('modal') !== -1
-                  );
-                }
-
-                // Patch Document.prototype to guarantee coverage across all queries
+                // Patch Document.prototype with ultra-fast regex guard without expensive Error().stack generation
                 var origGetElementById = Document.prototype.getElementById;
                 Document.prototype.getElementById = function(id) {
                   var el = origGetElementById.apply(this, arguments);
-                  if (!el && typeof id === 'string') {
-                    var stack = '';
-                    try { stack = (new Error().stack) || ''; } catch(e) {}
-                    if (shouldStub(id, stack)) {
-                      var isBtn = /btn|button|close/i.test(id);
-                      var stub = createSafeStub(isBtn ? 'button' : 'div');
-                      stub.id = id;
-                      return stub;
-                    }
+                  if (!el && typeof id === 'string' && EXT_QUERY_RE.test(id)) {
+                    var isBtn = /btn|button|close/i.test(id);
+                    var stub = createSafeStub(isBtn ? 'button' : 'div');
+                    stub.id = id;
+                    return stub;
                   }
                   return el;
                 };
@@ -160,13 +143,9 @@ export default function RootLayout({
                 var origQuerySelector = Document.prototype.querySelector;
                 Document.prototype.querySelector = function(sel) {
                   var el = origQuerySelector.apply(this, arguments);
-                  if (!el && typeof sel === 'string') {
-                    var stack = '';
-                    try { stack = (new Error().stack) || ''; } catch(e) {}
-                    if (shouldStub(sel, stack)) {
-                      var isBtn = /btn|button|close/i.test(sel);
-                      return createSafeStub(isBtn ? 'button' : 'div');
-                    }
+                  if (!el && typeof sel === 'string' && EXT_QUERY_RE.test(sel)) {
+                    var isBtn = /btn|button|close/i.test(sel);
+                    return createSafeStub(isBtn ? 'button' : 'div');
                   }
                   return el;
                 };
@@ -174,12 +153,8 @@ export default function RootLayout({
                 var origGetElementsByClassName = Document.prototype.getElementsByClassName;
                 Document.prototype.getElementsByClassName = function(className) {
                   var list = origGetElementsByClassName.apply(this, arguments);
-                  if ((!list || list.length === 0) && typeof className === 'string') {
-                    var stack = '';
-                    try { stack = (new Error().stack) || ''; } catch(e) {}
-                    if (shouldStub(className, stack)) {
-                      return [createSafeStub('div')];
-                    }
+                  if ((!list || list.length === 0) && typeof className === 'string' && EXT_QUERY_RE.test(className)) {
+                    return [createSafeStub('div')];
                   }
                   return list;
                 };

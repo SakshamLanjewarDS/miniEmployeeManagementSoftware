@@ -14,6 +14,35 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
+
+    // Support batch execution: { items: Array<{ type, id, action, feedback }> }
+    if (Array.isArray(body.items) && body.items.length > 0) {
+      const results: any[] = [];
+      const errors: any[] = [];
+
+      for (const item of body.items) {
+        try {
+          const res = await executeInboxDecision(ctx, {
+            type: item.type,
+            id: item.id,
+            action: item.action,
+            feedback: item.feedback,
+          });
+          results.push({ id: item.id, success: true, res });
+        } catch (err: any) {
+          errors.push({ id: item.id, error: err.message || "Failed to execute decision" });
+        }
+      }
+
+      return NextResponse.json({
+        success: errors.length === 0,
+        processedCount: results.length,
+        failedCount: errors.length,
+        results,
+        errors,
+      });
+    }
+
     const { type, id, action, feedback } = body;
 
     if (!type || !id || !action) {

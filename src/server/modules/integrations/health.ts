@@ -72,6 +72,22 @@ function getMinutesAgo(d: Date | null | undefined): number | null {
   return Math.max(0, Math.round((Date.now() - new Date(d).getTime()) / (1000 * 60)));
 }
 
+// In-memory Integration Health cache (skips 5 DB roundtrips for sidebar attention checks)
+interface CachedHealthEntry {
+  data: IntegrationHealthDashboardData;
+  cachedAt: number;
+}
+const healthOverviewCache = new Map<string, CachedHealthEntry>();
+const HEALTH_CACHE_TTL_MS = 30 * 1000; // 30 seconds
+
+export function clearIntegrationHealthCache(tenantId?: string) {
+  if (tenantId) {
+    healthOverviewCache.delete(tenantId);
+  } else {
+    healthOverviewCache.clear();
+  }
+}
+
 /**
  * Retrieves the comprehensive Integration Health Dashboard for the tenant
  */
@@ -79,6 +95,12 @@ export async function getIntegrationHealthOverview(
   ctx: TenantContext
 ): Promise<IntegrationHealthDashboardData> {
   assertAdminOrOwner(ctx, "Only Studio Owners or Administrators can view integration health.");
+
+  const nowMs = Date.now();
+  const cached = healthOverviewCache.get(ctx.tenantId);
+  if (cached && nowMs - cached.cachedAt < HEALTH_CACHE_TTL_MS) {
+    return cached.data;
+  }
 
   const now = new Date();
   const connectors: ConnectorHealthSummary[] = [];
@@ -327,6 +349,13 @@ export async function getIntegrationHealthOverview(
       sanitizedError: sanitizeErrorMessage(r.errorDetails),
     })),
   };
+
+  healthOverviewCache.set(ctx.tenantId, {
+    data: result,
+    cachedAt: nowMs,
+  });
+
+  return result;
 }
 
 /**
@@ -334,6 +363,8 @@ export async function getIntegrationHealthOverview(
  */
 export async function triggerManualConnectorSync(ctx: TenantContext, syncType: string) {
   assertAdminOrOwner(ctx, "Only Studio Owners or Administrators can trigger manual connector sync.");
+
+  clearIntegrationHealthCache(ctx.tenantId);
 
   const { syncLiveLeaveSheet, syncLiveVendorSheet } = await import("./google-sheets-sync");
   let syncResult;
@@ -383,6 +414,8 @@ export async function triggerManualConnectorSync(ctx: TenantContext, syncType: s
 export async function retryFailedOutboxItems(ctx: TenantContext) {
   assertAdminOrOwner(ctx, "Only Studio Owners or Administrators can retry failed email outbox items.");
 
+  clearIntegrationHealthCache(ctx.tenantId);
+
   const failedItems = await prisma.studioEmailOutbox.findMany({
     where: { tenantId: ctx.tenantId, status: "FAILED" },
     take: 50,
@@ -427,6 +460,8 @@ export async function toggleConnectorSchedule(
   isEnabled: boolean
 ) {
   assertAdminOrOwner(ctx, "Only Studio Owners or Administrators can toggle connector schedules.");
+
+  clearIntegrationHealthCache(ctx.tenantId);
 
   const config = await prisma.studioSyncConfig.upsert({
     where: { tenantId_syncType: { tenantId: ctx.tenantId, syncType } },

@@ -28,11 +28,16 @@ import {
   ExternalLink,
   ChevronRight,
   Briefcase,
+  X,
 } from "lucide-react";
 import { OwnerDashboardData } from "@/server/modules/dashboard/service";
 import { TaskPriorityBadge } from "@/components/tasks/TaskPriorityBadge";
 import { TypologyDot } from "@/lib/typology";
 import { MorningBriefingModal } from "@/components/dashboard/MorningBriefingModal";
+import { useStudioRealtime } from "@/components/realtime/useStudioRealtime";
+import { LiveSyncIndicator } from "@/components/realtime/LiveSyncIndicator";
+import { StudioHealthIndexCard } from "@/components/dashboard/StudioHealthIndexCard";
+import { VisualDrawingAirlock } from "@/components/drawings/VisualDrawingAirlock";
 
 interface OwnerDashboardViewProps {
   data: OwnerDashboardData;
@@ -53,9 +58,67 @@ export default function OwnerDashboardView({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<"OVERVIEW" | "ATTENTION" | "FINANCE" | "TEAM">("OVERVIEW");
 
+  // Realtime Studio SSE Bus
+  const { isConnected, lastEvent, forceRefresh } = useStudioRealtime({
+    workspaceSlug,
+    autoRefresh: true,
+  });
+
+  // Visual Drawing Airlock State
+  const [reviewingItem, setReviewingItem] = useState<{
+    id: string;
+    title: string;
+    projectCode: string;
+    projectName: string;
+    requesterName: string;
+    type: string;
+    taskId?: string;
+  } | null>(null);
+  const [isSubmittingAirlock, setIsSubmittingAirlock] = useState(false);
+  const [airlockToast, setAirlockToast] = useState<string | null>(null);
+
+  const handleAirlockDecision = async (
+    action: "APPROVE" | "REQUEST_CHANGES" | "REJECT",
+    notes?: string
+  ) => {
+    if (!reviewingItem) return;
+    setIsSubmittingAirlock(true);
+    try {
+      const res = await fetch("/api/inbox", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          workspaceSlug,
+          type: reviewingItem.type === "DRAWING" ? "DRAWING_REVISION" : "DELIVERABLE_SUBMISSION",
+          id: reviewingItem.id,
+          action: action === "APPROVE" ? "APPROVE" : action === "REQUEST_CHANGES" ? "REQUEST_CHANGES" : "REJECT",
+          feedback: notes || (action === "APPROVE" ? "Approved & stamped in Visual Airlock" : "Corrections needed"),
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Failed to process decision in airlock");
+      }
+
+      setAirlockToast(
+        action === "APPROVE"
+          ? `✓ Approved & stamped "${reviewingItem.title}" for GFC release`
+          : `Changes requested on "${reviewingItem.title}"`
+      );
+      setReviewingItem(null);
+      forceRefresh();
+      setTimeout(() => setAirlockToast(null), 4000);
+    } catch (err: any) {
+      alert(err.message || "Failed to process review");
+    } finally {
+      setIsSubmittingAirlock(false);
+    }
+  };
+
   const handleRefresh = () => {
     setIsRefreshing(true);
-    router.refresh();
+    forceRefresh();
     setTimeout(() => setIsRefreshing(false), 600);
   };
 
@@ -107,8 +170,14 @@ export default function OwnerDashboardView({
           </p>
         </div>
 
-        {/* Top Right: Sun / Status & Refresh Action */}
-        <div className="flex items-center gap-3 shrink-0 self-end sm:self-auto">
+        {/* Top Right: Live Sync, Sun / Status & Refresh Action */}
+        <div className="flex items-center gap-2.5 shrink-0 self-end sm:self-auto">
+          <LiveSyncIndicator
+            isConnected={isConnected}
+            lastEvent={lastEvent}
+            onManualRefresh={handleRefresh}
+          />
+
           <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-amber-50 text-amber-500 border border-amber-200/60 flex items-center justify-center shadow-xs">
             <Sun className="w-5 h-5 sm:w-6 sm:h-6 animate-spin-slow" />
           </div>
@@ -124,6 +193,13 @@ export default function OwnerDashboardView({
           </button>
         </div>
       </div>
+
+      {/* ============================================================== */}
+      {/* 2. STUDIO HEALTH INDEX (SHI) TELEMETRY RADAR                    */}
+      {/* ============================================================== */}
+      {data.studioHealthIndex && (
+        <StudioHealthIndexCard shi={data.studioHealthIndex} />
+      )}
 
       {/* ============================================================== */}
       {/* 2. SECTION NAVIGATION PILLS ROW (Image A)                       */}
@@ -399,12 +475,14 @@ export default function OwnerDashboardView({
                       </p>
                     </div>
 
-                    <Link
-                      href={`/w/${workspaceSlug}/inbox`}
-                      className="px-3.5 py-1.5 bg-[#3562E8] hover:bg-blue-700 text-white text-xs font-semibold rounded-xl transition-colors shrink-0"
+                    <button
+                      type="button"
+                      onClick={() => setReviewingItem(item)}
+                      className="px-3.5 py-1.5 bg-[#3562E8] hover:bg-blue-700 text-white text-xs font-semibold rounded-xl transition-all shadow-xs shrink-0 cursor-pointer flex items-center gap-1.5"
                     >
-                      Review
-                    </Link>
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>Review in Airlock</span>
+                    </button>
                   </div>
                 ))}
               </div>
@@ -619,6 +697,60 @@ export default function OwnerDashboardView({
           </div>
         </div>
       </div>
+
+      {/* Toast Notification */}
+      {airlockToast && (
+        <div className="fixed bottom-6 right-6 z-50 px-4 py-3 bg-slate-900 text-white text-xs font-semibold rounded-2xl shadow-2xl border border-slate-800 flex items-center gap-2 animate-in fade-in slide-in-from-bottom-3 duration-200">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+          <span>{airlockToast}</span>
+        </div>
+      )}
+
+      {/* VISUAL DRAWING AIRLOCK MODAL DRAWER */}
+      {reviewingItem && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-200"
+          onClick={() => !isSubmittingAirlock && setReviewingItem(null)}
+        >
+          <div
+            className="relative w-full max-w-5xl max-h-[95vh] flex flex-col bg-slate-950 rounded-3xl border border-slate-800 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Close Button */}
+            <button
+              type="button"
+              onClick={() => setReviewingItem(null)}
+              disabled={isSubmittingAirlock}
+              className="absolute top-4 right-4 z-40 p-2 rounded-full bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            {/* Visual Drawing Airlock Component */}
+            <VisualDrawingAirlock
+              data={{
+                drawingCode: reviewingItem.projectCode ? `${reviewingItem.projectCode}-GFC-302` : "100D-ARC-GFC-302",
+                drawingTitle: reviewingItem.title,
+                projectCode: reviewingItem.projectCode,
+                projectName: reviewingItem.projectName,
+                discipline: reviewingItem.type === "DRAWING" ? "ARCHITECTURAL" : "INTERIOR_DETAIL",
+                revisionB: {
+                  code: "Rev 03",
+                  label: "Submitted for Executive Sign-Off",
+                  date: "Today",
+                  author: reviewingItem.requesterName,
+                  status: "PENDING_APPROVAL",
+                  changeSummary: `Submitted by ${reviewingItem.requesterName} for architectural review: "${reviewingItem.title}". Verify dimension clearances and coordinate with MEP risers before issuing GFC seal.`,
+                },
+              }}
+              onApprove={(notes) => handleAirlockDecision("APPROVE", notes)}
+              onRequestChanges={(notes) => handleAirlockDecision("REQUEST_CHANGES", notes)}
+              onReject={(notes) => handleAirlockDecision("REJECT", notes)}
+              isSubmitting={isSubmittingAirlock}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

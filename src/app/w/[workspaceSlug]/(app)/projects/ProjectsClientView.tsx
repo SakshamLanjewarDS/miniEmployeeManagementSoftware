@@ -1818,28 +1818,35 @@ export function ProjectsClientView({
       {filteredProjects.length > 0 && (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-2 py-1">
           <div className="flex items-center gap-3">
-            <button
-              type="button"
-              suppressHydrationWarning
-              onClick={handleToggleSelectAll}
-              className="inline-flex items-center gap-2 text-xs font-semibold text-[#1F1F1F] hover:text-[#5A81FA] cursor-pointer"
-            >
-              {isAllSelected ? (
-                <CheckSquare className="w-4 h-4 text-[#5A81FA]" />
-              ) : (
-                <Square className="w-4 h-4 text-[#696E82]" />
-              )}
-              <span>{isAllSelected ? "Deselect All" : "Select All"}</span>
-            </button>
+            {canManage && (
+              <button
+                type="button"
+                suppressHydrationWarning
+                onClick={handleToggleSelectAll}
+                className="inline-flex items-center gap-2 text-xs font-semibold text-[#1F1F1F] hover:text-[#5A81FA] cursor-pointer"
+              >
+                {isAllSelected ? (
+                  <CheckSquare className="w-4 h-4 text-[#5A81FA]" />
+                ) : (
+                  <Square className="w-4 h-4 text-[#696E82]" />
+                )}
+                <span>{isAllSelected ? "Deselect All" : "Select All"}</span>
+              </button>
+            )}
             <span className="text-xs text-[#696E82]">
               Showing <span className="font-bold text-[#1F1F1F]">{filteredProjects.length}</span>{" "}
               {filteredProjects.length === 1 ? "project" : "projects"}
-              {selectedProjectIds.length > 0 && (
+              {canManage && selectedProjectIds.length > 0 && (
                 <span className="ml-1 text-[#5A81FA] font-bold">
                   ({selectedProjectIds.length} selected)
                 </span>
               )}
             </span>
+            {!canManage && (
+              <span className="px-2 py-0.5 text-[10px] font-semibold bg-slate-100 text-slate-500 rounded-md border border-slate-200">
+                Read-Only Mode
+              </span>
+            )}
           </div>
 
           {canManage && selectedProjectIds.length > 0 && (
@@ -1891,7 +1898,7 @@ export function ProjectsClientView({
             return (
               <div
                 key={p.id}
-                className={`bg-white border rounded-2xl p-4 sm:p-6 shadow-2xs hover:shadow-md transition-all flex flex-col justify-between space-y-4 group relative ${
+                className={`bg-white border rounded-2xl p-4 sm:p-6 shadow-2xs hover:shadow-md transition-all duration-150 flex flex-col justify-between space-y-4 group relative virtual-render press-feedback ${
                   isSelected
                     ? "border-[#5A81FA] ring-2 ring-[#5A81FA]/25 bg-[#F2F4FF]/30"
                     : "border-[#E2E6F0] hover:border-[#5A81FA]/50"
@@ -1901,22 +1908,24 @@ export function ProjectsClientView({
                   {/* Header Top: Select Checkbox, Code, Typology & Actions */}
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 flex-wrap">
-                      {/* Selection Checkbox */}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleToggleSelect(p.id);
-                        }}
-                        className="text-[#5A81FA] hover:text-[#426EE8] transition-colors cursor-pointer p-0.5"
-                        title={isSelected ? "Deselect project" : "Select project"}
-                      >
-                        {isSelected ? (
-                          <CheckSquare className="w-4 h-4 text-[#5A81FA]" />
-                        ) : (
-                          <Square className="w-4 h-4 text-[#A8B1CE] hover:text-[#5A81FA]" />
-                        )}
-                      </button>
+                      {/* Selection Checkbox (Managers/Admins only) */}
+                      {canManage && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleToggleSelect(p.id);
+                          }}
+                          className="text-[#5A81FA] hover:text-[#426EE8] transition-colors cursor-pointer p-0.5"
+                          title={isSelected ? "Deselect project" : "Select project"}
+                        >
+                          {isSelected ? (
+                            <CheckSquare className="w-4 h-4 text-[#5A81FA]" />
+                          ) : (
+                            <Square className="w-4 h-4 text-[#A8B1CE] hover:text-[#5A81FA]" />
+                          )}
+                        </button>
+                      )}
 
                       {/* 1. Project Code */}
                       <span className="font-mono text-xs font-bold text-[#2C308D] bg-[#F2F4FF] px-2.5 py-1 rounded-md border border-[#CEDEFF]">

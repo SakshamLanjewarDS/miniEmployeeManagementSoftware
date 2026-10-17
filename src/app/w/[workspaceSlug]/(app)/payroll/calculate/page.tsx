@@ -25,6 +25,7 @@ import {
   AlertTriangle,
   Sparkles,
 } from "lucide-react";
+import { PayrollSubNav } from "@/components/payroll/PayrollSubNav";
 
 // ==========================================
 // Types
@@ -558,6 +559,9 @@ export default function SalaryCalculatorPage() {
   return (
     <div className="-m-3.5 sm:-m-5 md:-m-6 lg:-m-8 p-3.5 sm:p-5 md:p-6 lg:p-8 min-h-[calc(100vh-64px)] bg-[#F2F4FB] text-[#111827] flex flex-col justify-between">
       <div className="max-w-[1560px] mx-auto w-full space-y-4">
+        {/* Local Payroll Sub-Navigation */}
+        <PayrollSubNav workspaceSlug={workspaceSlug} activeTab="calculate" />
+
         {/* ==========================================
             1. BREADCRUMB & PAGE HEADER
         ========================================== */}

@@ -1155,9 +1155,17 @@ export default function TeamClientView({
                     {/* Centered Circular Portrait & Name */}
                     <div className="text-center my-1">
                       <div className="relative mx-auto w-16 h-16 mb-2.5">
-                        <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-[#CEDEFF] to-[#F2F4FF] text-[#2C308D] font-bold text-lg flex items-center justify-center ring-4 ring-slate-100 shadow-xs">
-                          {initials}
-                        </div>
+                        {emp.avatarUrl ? (
+                          <img
+                            src={emp.avatarUrl}
+                            alt={emp.fullName}
+                            className="w-16 h-16 rounded-full object-cover ring-4 ring-slate-100 shadow-xs"
+                          />
+                        ) : (
+                          <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-[#CEDEFF] to-[#F2F4FF] text-[#2C308D] font-bold text-lg flex items-center justify-center ring-4 ring-slate-100 shadow-xs">
+                            {initials}
+                          </div>
+                        )}
                       </div>
 
                       <h3 className="font-bold text-[15px] text-slate-900 truncate">

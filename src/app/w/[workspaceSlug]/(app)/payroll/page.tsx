@@ -26,6 +26,7 @@ import {
   X,
   Check,
 } from "lucide-react";
+import { PayrollSubNav } from "@/components/payroll/PayrollSubNav";
 
 export default function PayrollManagementPage() {
   const params = useParams();
@@ -213,6 +214,9 @@ export default function PayrollManagementPage() {
 
   return (
     <div className="space-y-6">
+      {/* Local Payroll Sub-Navigation */}
+      <PayrollSubNav workspaceSlug={workspaceSlug} activeTab="overview" />
+
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
