@@ -103,6 +103,7 @@ export default function EmployeeDashboardView({
   const handleRefresh = () => {
     setIsRefreshing(true);
     forceRefresh();
+    router.refresh();
     setTimeout(() => setIsRefreshing(false), 600);
   };
 
@@ -223,12 +224,6 @@ export default function EmployeeDashboardView({
       }
     }
   }, [data.activeSiteInspection]);
-
-  const handleRefresh = () => {
-    setIsRefreshing(true);
-    router.refresh();
-    setTimeout(() => setIsRefreshing(false), 600);
-  };
 
   // Timer format (HH:MM:SS)
   const formatTime = (totalSeconds: number) => {
