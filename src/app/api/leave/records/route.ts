@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
     const startDateFrom = searchParams.get("startDateFrom") || undefined;
     const startDateTo = searchParams.get("startDateTo") || undefined;
     const page = searchParams.get("page") ? parseInt(searchParams.get("page")!, 10) : 1;
-    const pageSize = searchParams.get("pageSize") ? parseInt(searchParams.get("pageSize")!, 10) : 20;
+    const pageSize = searchParams.get("pageSize") ? parseInt(searchParams.get("pageSize")!, 10) : 200;
 
     const result = await listLeaveRecords(ctx, {
       status,

@@ -135,14 +135,21 @@ export default function LeaveManagementPage() {
     return `${daysNum} ${daysNum === 1 ? "day" : "days"}`;
   };
 
-  const fetchSyncStatus = async () => {
+  const fetchSyncStatus = async (triggerAuto = false) => {
     try {
-      const res = await fetch(`/api/integrations/google-sheets/sync?workspaceSlug=${workspaceSlug}&syncType=LEAVE_SHEET`);
+      const res = await fetch(
+        `/api/integrations/google-sheets/sync?workspaceSlug=${workspaceSlug}&syncType=LEAVE_SHEET${
+          triggerAuto ? "&auto=true" : ""
+        }`
+      );
       const data = await res.json();
       if (res.ok && data.leaveSheet) {
         setSyncStatus(data.leaveSheet);
         if (data.leaveSheet.webhookUrl) {
           setWebhookUrlInput(data.leaveSheet.webhookUrl);
+        }
+        if (triggerAuto) {
+          fetchLeaves(true);
         }
       }
     } catch {
@@ -230,6 +237,7 @@ export default function LeaveManagementPage() {
     try {
       const queryParams = new URLSearchParams({
         workspaceSlug,
+        pageSize: "200",
         ...(statusFilter ? { status: statusFilter } : {}),
         ...(leaveTypeFilter ? { leaveType: leaveTypeFilter } : {}),
         ...(searchQuery ? { search: searchQuery } : {}),
@@ -267,7 +275,7 @@ export default function LeaveManagementPage() {
   useEffect(() => {
     fetchLeaves();
     fetchEmployees();
-    fetchSyncStatus();
+    fetchSyncStatus(true);
   }, [workspaceSlug, statusFilter, leaveTypeFilter]);
 
   useRealtimeSubscription(

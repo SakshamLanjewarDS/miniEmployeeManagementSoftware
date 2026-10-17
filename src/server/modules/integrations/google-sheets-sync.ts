@@ -255,42 +255,66 @@ async function findOrCreateEmployeeForSheetRow(
   const cleanEmail = email.trim().toLowerCase();
   const cleanName = fullName.trim();
 
-  // 1. Try finding existing employee by email
-  const existingEmployee = await prisma.employee.findFirst({
-    where: {
-      tenantId,
-      membership: {
-        user: {
-          email: { equals: cleanEmail },
+  // 1. Try finding existing employee by exact email
+  if (cleanEmail) {
+    const existingEmployee = await prisma.employee.findFirst({
+      where: {
+        tenantId,
+        membership: {
+          user: {
+            email: { equals: cleanEmail },
+          },
         },
       },
-    },
-    include: { membership: { include: { user: true } } },
-  });
+      include: { membership: { include: { user: true } } },
+    });
 
-  if (existingEmployee) return existingEmployee;
+    if (existingEmployee) return existingEmployee;
+  }
 
-  // 2. Try finding employee by user fullName
-  const nameMatch = await prisma.employee.findFirst({
-    where: {
-      tenantId,
-      membership: {
-        user: {
-          fullName: { equals: cleanName },
+  // 2. Try finding employee by user fullName (exact match)
+  if (cleanName) {
+    const nameMatch = await prisma.employee.findFirst({
+      where: {
+        tenantId,
+        membership: {
+          user: {
+            fullName: { equals: cleanName },
+          },
         },
       },
-    },
-    include: { membership: { include: { user: true } } },
-  });
+      include: { membership: { include: { user: true } } },
+    });
 
-  if (nameMatch) return nameMatch;
+    if (nameMatch) return nameMatch;
 
-  // 3. Auto-provision user & employee record for this team member
-  let user = await prisma.user.findUnique({
-    where: { email: cleanEmail },
-  });
+    // 2b. Fuzzy / partial name matching (e.g. "Prutha T" matching "Prutha Tembhekar" or vice versa)
+    const firstName = cleanName.split(" ")[0].trim();
+    if (firstName && firstName.length >= 3) {
+      const fuzzyMatch = await prisma.employee.findFirst({
+        where: {
+          tenantId,
+          membership: {
+            user: {
+              fullName: { contains: firstName },
+            },
+          },
+        },
+        include: { membership: { include: { user: true } } },
+      });
 
-  if (!user) {
+      if (fuzzyMatch) return fuzzyMatch;
+    }
+  }
+
+  // 3. Auto-provision user & employee record for this team member safely
+  let user = cleanEmail
+    ? await prisma.user.findUnique({
+        where: { email: cleanEmail },
+      })
+    : null;
+
+  if (!user && cleanEmail) {
     user = await prisma.user.create({
       data: {
         email: cleanEmail,
@@ -301,35 +325,89 @@ async function findOrCreateEmployeeForSheetRow(
     });
   }
 
-  let membership = await prisma.tenantMembership.findUnique({
-    where: {
-      tenantId_userId: {
-        tenantId,
-        userId: user.id,
-      },
-    },
-  });
-
-  if (!membership) {
-    membership = await prisma.tenantMembership.create({
-      data: {
-        tenantId,
-        userId: user.id,
-        role: "EMPLOYEE",
-        isActive: true,
+  if (user) {
+    let membership = await prisma.tenantMembership.findUnique({
+      where: {
+        tenantId_userId: {
+          tenantId,
+          userId: user.id,
+        },
       },
     });
+
+    if (!membership) {
+      membership = await prisma.tenantMembership.create({
+        data: {
+          tenantId,
+          userId: user.id,
+          role: "EMPLOYEE",
+          isActive: true,
+        },
+      });
+    }
+
+    // CRITICAL: Check if employee already exists for this membershipId before creating!
+    const existingByMembership = await prisma.employee.findUnique({
+      where: { membershipId: membership.id },
+      include: { membership: { include: { user: true } } },
+    });
+
+    if (existingByMembership) return existingByMembership;
+
+    // Generate guaranteed-unique employee ID safely
+    const count = await prisma.employee.count({ where: { tenantId } });
+    let employeeId = `EMP-GS${String(count + 1).padStart(3, "0")}`;
+    let collision = await prisma.employee.findUnique({
+      where: { tenantId_employeeId: { tenantId, employeeId } },
+    });
+    let attempt = 1;
+    while (collision && attempt < 50) {
+      attempt++;
+      employeeId = `EMP-GS${String(count + attempt).padStart(3, "0")}`;
+      collision = await prisma.employee.findUnique({
+        where: { tenantId_employeeId: { tenantId, employeeId } },
+      });
+    }
+
+    const newEmployee = await prisma.employee.create({
+      data: {
+        tenantId,
+        membershipId: membership.id,
+        employeeId,
+        department: department?.trim() || "Architecture",
+        designation: "Studio Specialist",
+        employmentStatus: "ACTIVE",
+        joinDate: new Date(),
+      },
+      include: { membership: { include: { user: true } } },
+    });
+
+    return newEmployee;
   }
 
-  // Generate unique employee ID
-  const count = await prisma.employee.count({ where: { tenantId } });
-  const employeeId = `EMP-GS${String(count + 1).padStart(3, "0")}`;
-
-  const newEmployee = await prisma.employee.create({
+  // Fallback if email was completely blank
+  const fallbackCount = await prisma.employee.count({ where: { tenantId } });
+  const fallbackUser = await prisma.user.create({
+    data: {
+      email: `staff.${Date.now()}.${Math.random().toString(36).substring(2, 7)}@100percentdesign.internal`,
+      fullName: cleanName || "Staff Member",
+      passwordHash: "$2b$10$e5XqN/K3xS/Z2Z0B7T9Y0.zD5w0Zk1e5XqN/K3xS/Z2Z0B7T9Y0.",
+      accountState: "ACTIVE",
+    },
+  });
+  const fallbackMembership = await prisma.tenantMembership.create({
     data: {
       tenantId,
-      membershipId: membership.id,
-      employeeId,
+      userId: fallbackUser.id,
+      role: "EMPLOYEE",
+      isActive: true,
+    },
+  });
+  return prisma.employee.create({
+    data: {
+      tenantId,
+      membershipId: fallbackMembership.id,
+      employeeId: `EMP-GS${String(fallbackCount + 1).padStart(3, "0")}`,
       department: department?.trim() || "Architecture",
       designation: "Studio Specialist",
       employmentStatus: "ACTIVE",
@@ -337,8 +415,6 @@ async function findOrCreateEmployeeForSheetRow(
     },
     include: { membership: { include: { user: true } } },
   });
-
-  return newEmployee;
 }
 
 export interface SyncResult {
@@ -434,202 +510,207 @@ export async function syncLiveLeaveSheet(
 
     // Iterate data rows (row 1 onwards)
     for (let r = 1; r < rows.length; r++) {
-      const row = rows[r];
-      if (!row || row.every((c) => !c.trim())) continue;
+      try {
+        const row = rows[r];
+        if (!row || row.every((c) => !c.trim())) continue;
 
-      const timestampRaw = row[colTimestamp] || "";
-      const emailRaw = row[colEmail] || "";
-      const nameRaw = (row[colName] || "").trim();
-      const deptRaw = (row[colDept] || "").trim();
-      const leaveTypeRaw = (row[colLeaveType] || "").trim();
-      const statusRaw = (row[colStatus] || "").trim();
-      const processedByRaw = (row[colProcessedBy] || "").trim();
-      const actionDateRaw = (row[colActionDate] || "").trim();
-      const medicalCertRaw = (row[colMedicalCert] || "").trim();
+        const timestampRaw = row[colTimestamp] || "";
+        const emailRaw = row[colEmail] || "";
+        const nameRaw = (row[colName] || "").trim();
+        const deptRaw = (row[colDept] || "").trim();
+        const leaveTypeRaw = (row[colLeaveType] || "").trim();
+        const statusRaw = (row[colStatus] || "").trim();
+        const processedByRaw = (row[colProcessedBy] || "").trim();
+        const actionDateRaw = (row[colActionDate] || "").trim();
+        const medicalCertRaw = (row[colMedicalCert] || "").trim();
 
-      if (!timestampRaw && !emailRaw) continue;
+        if (!timestampRaw && !emailRaw) continue;
 
-      // Unique stable identifier for this sheet submission
-      const sourceRecordId = `LEAVE_${cleanIdentifier(timestampRaw)}_${cleanIdentifier(emailRaw)}`;
+        // Unique stable identifier for this sheet submission
+        const sourceRecordId = `LEAVE_${cleanIdentifier(timestampRaw)}_${cleanIdentifier(emailRaw)}`;
 
-      // Determine leave typology & mode
-      const isHourly = /few hours|hourly/i.test(leaveTypeRaw);
-      const isHalfDay = /half[- ]day/i.test(leaveTypeRaw);
+        // Determine leave typology & mode
+        const isHourly = /few hours|hourly/i.test(leaveTypeRaw);
+        const isHalfDay = /half[- ]day/i.test(leaveTypeRaw);
 
-      // Reason handling: if hourly, prefer hourly reason column; otherwise regular reason
-      const reasonRaw = (
-        isHourly
-          ? (row[colHourlyReason] || row[colRegularReason] || row[9] || row[4] || "")
-          : (row[colRegularReason] || row[colHourlyReason] || row[4] || row[9] || "")
-      ).trim();
+        // Reason handling: if hourly, prefer hourly reason column; otherwise regular reason
+        const reasonRaw = (
+          isHourly
+            ? (row[colHourlyReason] || row[colRegularReason] || row[9] || row[4] || "")
+            : (row[colRegularReason] || row[colHourlyReason] || row[4] || row[9] || "")
+        ).trim();
 
-      let leaveType = "CASUAL";
-      if (/sick/i.test(leaveTypeRaw)) leaveType = "SICK";
-      else if (/emergency/i.test(leaveTypeRaw)) leaveType = "EMERGENCY";
-      else if (/annual/i.test(leaveTypeRaw)) leaveType = "ANNUAL";
-      else if (isHalfDay) leaveType = "HALF_DAY";
-      else if (isHourly) leaveType = "HOURLY";
+        let leaveType = "CASUAL";
+        if (/sick/i.test(leaveTypeRaw)) leaveType = "SICK";
+        else if (/emergency/i.test(leaveTypeRaw)) leaveType = "EMERGENCY";
+        else if (/annual/i.test(leaveTypeRaw)) leaveType = "ANNUAL";
+        else if (isHalfDay) leaveType = "HALF_DAY";
+        else if (isHourly) leaveType = "HOURLY";
 
-      // Date resolution
-      let startDate: Date | null = null;
-      let endDate: Date | null = null;
-      let startMinutes: number | null = null;
-      let endMinutes: number | null = null;
-      let totalMinutes: number | null = null;
-      let days = new Decimal(1.0);
+        // Date resolution
+        let startDate: Date | null = null;
+        let endDate: Date | null = null;
+        let startMinutes: number | null = null;
+        let endMinutes: number | null = null;
+        let totalMinutes: number | null = null;
+        let days = new Decimal(1.0);
 
-      if (isHourly) {
-        startDate = parseSheetDateOnly(row[colHourlyDate] || row[colFromDate]) || parseSheetDateOnly(timestampRaw);
-        endDate = startDate;
-        startMinutes = parseSheetTimeMinutes(row[colFromTime]);
-        endMinutes = parseSheetTimeMinutes(row[colToTime]);
-        if (startMinutes !== null && endMinutes !== null) {
-          totalMinutes = Math.max(0, endMinutes - startMinutes);
-          if (totalMinutes === 0) totalMinutes = 60; // fallback if identical times entered
-          days = new Decimal(Number((totalMinutes / (8 * 60)).toFixed(3)));
-        } else {
-          totalMinutes = 120;
-          days = new Decimal(0.25);
-        }
-      } else if (isHalfDay) {
-        startDate = parseSheetDateOnly(row[colFromDate]) || parseSheetDateOnly(timestampRaw);
-        endDate = parseSheetDateOnly(row[colToDate]) || startDate;
-        days = new Decimal(0.5);
-      } else {
-        startDate = parseSheetDateOnly(row[colFromDate]) || parseSheetDateOnly(timestampRaw);
-        endDate = parseSheetDateOnly(row[colToDate]) || startDate;
-        if (startDate && endDate) {
-          if (endDate < startDate) {
-            endDate = startDate;
-            days = new Decimal(1.0);
+        if (isHourly) {
+          startDate = parseSheetDateOnly(row[colHourlyDate] || row[colFromDate]) || parseSheetDateOnly(timestampRaw);
+          endDate = startDate;
+          startMinutes = parseSheetTimeMinutes(row[colFromTime]);
+          endMinutes = parseSheetTimeMinutes(row[colToTime]);
+          if (startMinutes !== null && endMinutes !== null) {
+            totalMinutes = Math.max(0, endMinutes - startMinutes);
+            if (totalMinutes === 0) totalMinutes = 60; // fallback if identical times entered
+            days = new Decimal(Number((totalMinutes / (8 * 60)).toFixed(3)));
           } else {
-            const diffMs = endDate.getTime() - startDate.getTime();
-            const diffDays = Math.max(1, Math.round(diffMs / (1000 * 60 * 60 * 24)) + 1);
-            days = new Decimal(diffDays);
+            totalMinutes = 120;
+            days = new Decimal(0.25);
+          }
+        } else if (isHalfDay) {
+          startDate = parseSheetDateOnly(row[colFromDate]) || parseSheetDateOnly(timestampRaw);
+          endDate = parseSheetDateOnly(row[colToDate]) || startDate;
+          days = new Decimal(0.5);
+        } else {
+          startDate = parseSheetDateOnly(row[colFromDate]) || parseSheetDateOnly(timestampRaw);
+          endDate = parseSheetDateOnly(row[colToDate]) || startDate;
+          if (startDate && endDate) {
+            if (endDate < startDate) {
+              endDate = startDate;
+              days = new Decimal(1.0);
+            } else {
+              const diffMs = endDate.getTime() - startDate.getTime();
+              const diffDays = Math.max(1, Math.round(diffMs / (1000 * 60 * 60 * 24)) + 1);
+              days = new Decimal(diffDays);
+            }
           }
         }
-      }
 
-      if (!startDate) {
-        startDate = parseSheetDateOnly(timestampRaw) || new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0));
-      }
-      if (!endDate) {
-        endDate = startDate;
-      }
+        if (!startDate) {
+          startDate = parseSheetDateOnly(timestampRaw) || new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0));
+        }
+        if (!endDate) {
+          endDate = startDate;
+        }
 
-      // Status resolution from sheet
-      let mappedStatus = "PENDING";
-      let isRejectedInSheet = false;
-      const lowerStatus = statusRaw.toLowerCase();
+        // Status resolution from sheet
+        let mappedStatus = "PENDING";
+        let isRejectedInSheet = false;
+        const lowerStatus = statusRaw.toLowerCase();
 
-      if (lowerStatus.includes("approved")) {
-        mappedStatus = "APPROVED";
-      } else if (lowerStatus.includes("reject")) {
-        mappedStatus = "REJECTED";
-        isRejectedInSheet = true;
-      } else {
-        mappedStatus = "PENDING";
-      }
+        if (lowerStatus.includes("approved")) {
+          mappedStatus = "APPROVED";
+        } else if (lowerStatus.includes("reject")) {
+          mappedStatus = "REJECTED";
+          isRejectedInSheet = true;
+        } else {
+          mappedStatus = "PENDING";
+        }
 
-      // Check existing database record
-      const existing = await prisma.studioLeaveRequest.findFirst({
-        where: {
-          tenantId: ctx.tenantId,
-          sourceSystem: "GOOGLE_SHEETS",
-          sourceRecordId,
-        },
-      });
-
-      // 🛡️ TOMBSTONE SHIELD: If deleted in app, NEVER resurrect!
-      if (existing && existing.deletedAt !== null) {
-        skippedTombstonesCount++;
-        continue;
-      }
-
-      // 🛡️ LOCAL AUTHORITY SHIELD:
-      // If approved or rejected in app, do NOT revert to PENDING from sheet!
-      if (existing && existing.status !== "PENDING" && mappedStatus === "PENDING") {
-        preservedLocalDecisionsCount++;
-        unchangedCount++;
-        continue;
-      }
-
-      // Find or provision employee
-      const employee = await findOrCreateEmployeeForSheetRow(
-        ctx.tenantId,
-        emailRaw,
-        nameRaw,
-        deptRaw
-      );
-
-      const submittedAt = parseSheetTimestamp(timestampRaw) || now;
-      const reviewedAt = parseSheetTimestamp(actionDateRaw);
-
-      if (!existing) {
-        // Create new record
-        await prisma.studioLeaveRequest.create({
-          data: {
+        // Check existing database record
+        const existing = await prisma.studioLeaveRequest.findFirst({
+          where: {
             tenantId: ctx.tenantId,
-            employeeId: employee.id,
-            employeeNameRaw: nameRaw,
-            employeeEmailRaw: emailRaw,
-            startDate,
-            endDate,
-            startMinutes,
-            endMinutes,
-            totalMinutes,
-            days,
-            status: mappedStatus,
-            leaveType,
-            reason: reasonRaw || "Google Form submission",
-            isHalfDay,
-            isHourly,
-            supportingFileId: medicalCertRaw || null,
-            submittedAt,
-            reviewedAt,
-            reviewNotes: processedByRaw ? `Processed by ${processedByRaw}` : null,
-            rejectionReason: isRejectedInSheet ? statusRaw : null,
             sourceSystem: "GOOGLE_SHEETS",
             sourceRecordId,
           },
         });
-        importedCount++;
-      } else {
-        // Update if dates, status, or counts changed
-        const shouldUpdate =
-          existing.status !== mappedStatus ||
-          existing.days.toNumber() !== days.toNumber() ||
-          existing.startDate.toISOString().slice(0, 10) !== startDate.toISOString().slice(0, 10) ||
-          existing.endDate.toISOString().slice(0, 10) !== endDate.toISOString().slice(0, 10) ||
-          existing.submittedAt.toISOString().slice(0, 10) !== submittedAt.toISOString().slice(0, 10) ||
-          existing.leaveType !== leaveType ||
-          existing.reason !== (reasonRaw || existing.reason) ||
-          (medicalCertRaw && existing.supportingFileId !== medicalCertRaw);
 
-        if (shouldUpdate) {
-          await prisma.studioLeaveRequest.update({
-            where: { id: existing.id },
+        // 🛡️ TOMBSTONE SHIELD: If deleted in app, NEVER resurrect!
+        if (existing && existing.deletedAt !== null) {
+          skippedTombstonesCount++;
+          continue;
+        }
+
+        // 🛡️ LOCAL AUTHORITY SHIELD:
+        // If approved or rejected in app, do NOT revert to PENDING from sheet!
+        if (existing && existing.status !== "PENDING" && mappedStatus === "PENDING") {
+          preservedLocalDecisionsCount++;
+          unchangedCount++;
+          continue;
+        }
+
+        // Find or provision employee
+        const employee = await findOrCreateEmployeeForSheetRow(
+          ctx.tenantId,
+          emailRaw,
+          nameRaw,
+          deptRaw
+        );
+
+        const submittedAt = parseSheetTimestamp(timestampRaw) || now;
+        const reviewedAt = parseSheetTimestamp(actionDateRaw);
+
+        if (!existing) {
+          // Create new record
+          await prisma.studioLeaveRequest.create({
             data: {
-              status: mappedStatus,
+              tenantId: ctx.tenantId,
+              employeeId: employee.id,
+              employeeNameRaw: nameRaw,
+              employeeEmailRaw: emailRaw,
               startDate,
               endDate,
               startMinutes,
               endMinutes,
               totalMinutes,
               days,
+              status: mappedStatus,
               leaveType,
-              reason: reasonRaw || existing.reason,
-              supportingFileId: medicalCertRaw || existing.supportingFileId,
+              reason: reasonRaw || "Google Form submission",
+              isHalfDay,
+              isHourly,
+              supportingFileId: medicalCertRaw || null,
               submittedAt,
-              reviewedAt: reviewedAt || existing.reviewedAt,
-              reviewNotes: processedByRaw ? `Processed by ${processedByRaw}` : existing.reviewNotes,
-              rejectionReason: isRejectedInSheet ? statusRaw : existing.rejectionReason,
+              reviewedAt,
+              reviewNotes: processedByRaw ? `Processed by ${processedByRaw}` : null,
+              rejectionReason: isRejectedInSheet ? statusRaw : null,
+              sourceSystem: "GOOGLE_SHEETS",
+              sourceRecordId,
             },
           });
-          updatedCount++;
+          importedCount++;
         } else {
-          unchangedCount++;
+          // Update if dates, status, or counts changed
+          const shouldUpdate =
+            existing.status !== mappedStatus ||
+            existing.days.toNumber() !== days.toNumber() ||
+            existing.startDate.toISOString().slice(0, 10) !== startDate.toISOString().slice(0, 10) ||
+            existing.endDate.toISOString().slice(0, 10) !== endDate.toISOString().slice(0, 10) ||
+            existing.submittedAt.toISOString().slice(0, 10) !== submittedAt.toISOString().slice(0, 10) ||
+            existing.leaveType !== leaveType ||
+            existing.reason !== (reasonRaw || existing.reason) ||
+            (medicalCertRaw && existing.supportingFileId !== medicalCertRaw);
+
+          if (shouldUpdate) {
+            await prisma.studioLeaveRequest.update({
+              where: { id: existing.id },
+              data: {
+                status: mappedStatus,
+                startDate,
+                endDate,
+                startMinutes,
+                endMinutes,
+                totalMinutes,
+                days,
+                leaveType,
+                reason: reasonRaw || existing.reason,
+                supportingFileId: medicalCertRaw || existing.supportingFileId,
+                submittedAt,
+                reviewedAt: reviewedAt || existing.reviewedAt,
+                reviewNotes: processedByRaw ? `Processed by ${processedByRaw}` : existing.reviewNotes,
+                rejectionReason: isRejectedInSheet ? statusRaw : existing.rejectionReason,
+              },
+            });
+            updatedCount++;
+          } else {
+            unchangedCount++;
+          }
         }
+      } catch (rowErr: any) {
+        console.error(`[GoogleSheetsSync] Row ${r} failed:`, rowErr?.message || rowErr);
+        failedCount++;
       }
     }
   } catch (err: any) {

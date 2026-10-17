@@ -202,3 +202,50 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: err.message || "Sync execution failed" }, { status: 500 });
   }
 }
+
+export async function PUT(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const workspaceSlug = searchParams.get("workspaceSlug") || req.headers.get("x-workspace-slug");
+
+    if (!workspaceSlug) {
+      return NextResponse.json({ error: "Missing workspaceSlug" }, { status: 400 });
+    }
+
+    const ctx = await getCurrentTenantContext(workspaceSlug);
+    if (!ctx) {
+      return NextResponse.json({ error: "Unauthorized session" }, { status: 401 });
+    }
+
+    if (ctx.role !== "OWNER" && ctx.role !== "ADMIN") {
+      return NextResponse.json(
+        { error: "Forbidden: Leadership privileges required to trigger sync" },
+        { status: 403 }
+      );
+    }
+
+    const syncType = searchParams.get("syncType") || "LEAVE_SHEET";
+    let leaveResult = null;
+    let vendorResult = null;
+
+    if (syncType === "ALL" || syncType === "LEAVE_SHEET") {
+      leaveResult = await syncLiveLeaveSheet(ctx);
+    }
+
+    if (syncType === "ALL" || syncType === "VENDOR_SHEET") {
+      vendorResult = await syncLiveVendorSheet(ctx);
+    }
+
+    return NextResponse.json({
+      success: true,
+      inserted: leaveResult?.importedCount ?? 0,
+      updated: leaveResult?.updatedCount ?? 0,
+      leaveResult,
+      vendorResult,
+      message: "Sync completed successfully.",
+    });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message || "Manual sync execution failed" }, { status: 500 });
+  }
+}
+

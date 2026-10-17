@@ -86,7 +86,7 @@ export async function listLeaveRecords(context: TenantContext, options: LeaveFil
   assertAdminOrOwner(context);
 
   const page = Math.max(1, options.page || 1);
-  const pageSize = Math.min(100, Math.max(1, options.pageSize || 20));
+  const pageSize = Math.min(500, Math.max(1, options.pageSize || 100));
   const skip = (page - 1) * pageSize;
 
   const whereClause: any = {
