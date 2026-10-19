@@ -715,6 +715,21 @@ export default function ContractorsClientView({
                 ]}
               />
             </div>
+
+            {(selectedTrade !== "ALL" || contractorSortBy !== "DATE_DESC" || searchQuery || statusTab !== "active") && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedTrade("ALL");
+                  setContractorSortBy("DATE_DESC");
+                  setSearchQuery("");
+                  setStatusTab("active");
+                }}
+                className="text-xs text-[#5A81FA] hover:text-[#3562E8] font-semibold underline cursor-pointer"
+              >
+                Reset
+              </button>
+            )}
           </div>
         </div>
       </div>

@@ -287,7 +287,7 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
 
   // Close when clicking outside
   useEffect(() => {
-    const handleOutsideClick = (e: MouseEvent) => {
+    const handleOutsideClick = (e: MouseEvent | TouchEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setIsOpen(false);
       }
@@ -295,9 +295,11 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
 
     if (isOpen) {
       document.addEventListener("mousedown", handleOutsideClick);
+      document.addEventListener("touchstart", handleOutsideClick);
     }
     return () => {
       document.removeEventListener("mousedown", handleOutsideClick);
+      document.removeEventListener("touchstart", handleOutsideClick);
     };
   }, [isOpen]);
 
@@ -364,6 +366,15 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
     return filteredOptions.some((opt) => values.includes(opt.value));
   }, [isMulti, isAllSelected, filteredOptions, values]);
 
+  // Determines whether the current value is empty or the default "ALL" filter option
+  const isDefaultOrAll = useMemo(() => {
+    if (isMulti) return values.length === 0;
+    if (!value) return true;
+    return options.some(
+      (opt) => opt.value.toUpperCase() === "ALL" && opt.value === value
+    );
+  }, [isMulti, values, value, options]);
+
   // Handlers
   const handleSelect = useCallback(
     (val: string) => {
@@ -400,10 +411,15 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
       if (isMulti) {
         if (onMultiChange) onMultiChange([]);
       } else {
-        if (onChange) onChange("");
+        const allOption = options.find((opt) => opt.value.toUpperCase() === "ALL");
+        if (allOption) {
+          if (onChange) onChange(allOption.value);
+        } else {
+          if (onChange) onChange("");
+        }
       }
     },
-    [isMulti, onMultiChange, onChange]
+    [isMulti, options, onMultiChange, onChange]
   );
 
   const handleQuickAddAsOther = useCallback(() => {
@@ -791,7 +807,7 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
 
           {/* Right Action Icons: Clear & Chevron */}
           <div className="flex items-center gap-1 shrink-0 ml-1">
-            {clearable && !disabled && (isMulti ? values.length > 0 : Boolean(value)) && (
+            {clearable && !disabled && !isDefaultOrAll && (
               <span
                 role="button"
                 tabIndex={0}

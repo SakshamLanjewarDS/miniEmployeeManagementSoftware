@@ -631,6 +631,12 @@ export default function EmployeeDashboardView({
     data.mySummary.overdueCount +
     (data.unacknowledgedAssignments?.length || 0);
 
+  // Filter selectable tasks based on chosen project for dependent switcher
+  const selectableTasks = useMemo(() => {
+    if (!selectedProjectId) return data.workQueue;
+    return data.workQueue.filter((wq) => wq.projectId === selectedProjectId);
+  }, [data.workQueue, selectedProjectId]);
+
   // Active task details for Hero Active Session Card (Image A)
   const currentActiveTask = data.workQueue.find((t) => t.taskId === selectedTaskId) || data.workQueue[0];
   const currentProjectName = (data.projectsList || []).find((p) => p.id === selectedProjectId)?.name || currentActiveTask?.projectName || "100% DESIGN Studio";
@@ -958,10 +964,20 @@ export default function EmployeeDashboardView({
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 border-t border-slate-100 text-xs">
           <select
             value={selectedProjectId}
-            onChange={(e) => setSelectedProjectId(e.target.value)}
+            onChange={(e) => {
+              const newProjId = e.target.value;
+              setSelectedProjectId(newProjId);
+              if (newProjId && selectedTaskId) {
+                const currentTask = data.workQueue.find((t) => t.taskId === selectedTaskId);
+                if (currentTask && currentTask.projectId !== newProjId) {
+                  setSelectedTaskId("");
+                }
+              }
+            }}
+            aria-label="Filter by project"
             className="px-2.5 py-1.5 rounded-xl border border-slate-200/80 bg-white cursor-pointer focus:outline-hidden"
           >
-            <option value="">Switch Project...</option>
+            <option value="">All Projects ({data.projectsList?.length || 0})</option>
             {(data.projectsList || []).map((p) => (
               <option key={p.id} value={p.id}>
                 [{p.code}] {p.name}
@@ -971,15 +987,33 @@ export default function EmployeeDashboardView({
 
           <select
             value={selectedTaskId}
-            onChange={(e) => setSelectedTaskId(e.target.value)}
+            onChange={(e) => {
+              const newTaskId = e.target.value;
+              setSelectedTaskId(newTaskId);
+              if (newTaskId) {
+                const task = data.workQueue.find((t) => t.taskId === newTaskId);
+                if (task && task.projectId) {
+                  setSelectedProjectId(task.projectId);
+                }
+              }
+            }}
+            aria-label="Select active deliverable"
             className="px-2.5 py-1.5 rounded-xl border border-slate-200/80 bg-white cursor-pointer focus:outline-hidden"
           >
-            <option value="">Switch Active Task...</option>
-            {data.workQueue.map((wq) => (
-              <option key={wq.id} value={wq.taskId}>
-                [{wq.projectCode}] {wq.title}
-              </option>
-            ))}
+            <option value="">
+              {selectedProjectId
+                ? `Active Tasks (${selectableTasks.length})`
+                : "Switch Active Task..."}
+            </option>
+            {selectableTasks.length === 0 && selectedProjectId ? (
+              <option value="" disabled>No active tasks in this project</option>
+            ) : (
+              selectableTasks.map((wq) => (
+                <option key={wq.id} value={wq.taskId}>
+                  [{wq.projectCode}] {wq.title}
+                </option>
+              ))
+            )}
           </select>
 
           <input

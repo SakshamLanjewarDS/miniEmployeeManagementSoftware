@@ -999,10 +999,14 @@ export function ProjectDetailClientView({
                 </button>
 
                 {isActionsMenuOpen && (
-                  <div
-                    className="absolute right-0 mt-2 w-56 bg-white border border-[#E2E6F0] rounded-xl shadow-lg py-1.5 z-30 divide-y divide-[#E2E6F0]/60 animate-in fade-in zoom-in-95 duration-150"
-                    onMouseLeave={() => setIsActionsMenuOpen(false)}
-                  >
+                  <>
+                    <div
+                      className="fixed inset-0 z-20"
+                      onClick={() => setIsActionsMenuOpen(false)}
+                    />
+                    <div
+                      className="absolute right-0 mt-2 w-56 bg-white border border-[#E2E6F0] rounded-xl shadow-lg py-1.5 z-30 divide-y divide-[#E2E6F0]/60 animate-in fade-in zoom-in-95 duration-150"
+                    >
                     <div className="py-1">
                       {project.status === "ACTIVE" && (
                         <>
@@ -1112,7 +1116,8 @@ export function ProjectDetailClientView({
                       )}
                     </div>
                   </div>
-                )}
+                </>
+              )}
               </div>
             )}
 

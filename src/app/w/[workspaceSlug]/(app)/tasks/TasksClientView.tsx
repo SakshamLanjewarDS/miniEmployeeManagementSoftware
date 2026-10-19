@@ -45,7 +45,7 @@ import { DynamicCardFields } from "@/components/custom-fields/DynamicCardFields"
 import { SearchableDropdown, SearchableSelect } from "@/components/ui/SearchableDropdown";
 import { MobileFilterDrawer } from "@/components/ui/MobileFilterDrawer";
 import { TaskGrid } from "@/components/tasks/TaskGrid";
-import { sanitizeTaskDescription } from "@/components/tasks/task-utils";
+import { sanitizeTaskDescription, compareTasksByWorkflow, getTaskWorkflowRank } from "@/components/tasks/task-utils";
 import { CustomFieldDefinition } from "@/server/modules/custom-fields/repository";
 import {
   getAllTypologies,
@@ -795,34 +795,7 @@ export default function TasksClientView({
       }
 
       return true;
-    }).sort((a, b) => {
-      switch (taskSortBy) {
-        case "DUE_DATE_ASC": {
-          if (!a.dueDate && !b.dueDate) return 0;
-          if (!a.dueDate) return 1;
-          if (!b.dueDate) return -1;
-          return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
-        }
-        case "DUE_DATE_DESC": {
-          if (!a.dueDate && !b.dueDate) return 0;
-          if (!a.dueDate) return 1;
-          if (!b.dueDate) return -1;
-          return new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime();
-        }
-        case "CREATED_DESC":
-          return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
-        case "CREATED_ASC":
-          return new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime();
-        case "ALPHA_ASC":
-          return a.title.localeCompare(b.title);
-        case "ALPHA_DESC":
-          return b.title.localeCompare(a.title);
-        case "PROJ_ALPHA_ASC":
-          return a.project.code.localeCompare(b.project.code);
-        default:
-          return 0;
-      }
-    });
+    }).sort((a, b) => compareTasksByWorkflow(a, b, taskSortBy));
   }, [
     tasks,
     searchQuery,
@@ -1171,16 +1144,43 @@ export default function TasksClientView({
 
     // 1. INSTANT MILLISECOND UI UPDATE
     setTasks((prev) =>
-      prev.map((t) => (t.id === taskId ? { ...t, status: newStatus as any } : t))
+      prev.map((t) =>
+        t.id === taskId
+          ? {
+              ...t,
+              status: newStatus as any,
+              completionDate:
+                newStatus === "COMPLETED"
+                  ? new Date().toISOString()
+                  : previousTask.completionDate ?? null,
+            }
+          : t
+      )
     );
     if (drawerTask && drawerTask.id === taskId) {
-      setDrawerTask((prev) => (prev ? { ...prev, status: newStatus as any } : null));
+      setDrawerTask((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: newStatus as any,
+              completionDate:
+                newStatus === "COMPLETED"
+                  ? new Date().toISOString()
+                  : prev.completionDate ?? null,
+            }
+          : null
+      );
     }
     setChangeRequestModal(null);
     setOverrideModal(null);
     setChangeComment("");
     setOverrideReason("");
     setErrorMessage(null);
+    if (newStatus === "COMPLETED") {
+      setSuccessMessage(`Deliverable "${previousTask.title}" marked as completed and moved down.`);
+    } else if (newStatus === "CHECKING") {
+      setSuccessMessage(`Deliverable "${previousTask.title}" moved to Checking.`);
+    }
 
     // 2. BACKGROUND SERVER SYNC
     try {

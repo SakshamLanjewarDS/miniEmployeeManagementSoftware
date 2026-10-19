@@ -496,6 +496,19 @@ export default function VisitsClientView({
     return availableMilestones.filter((m) => m.projectId === assignProjectId);
   }, [availableMilestones, assignProjectId]);
 
+  // Clean up dependent child selections when project changes
+  useEffect(() => {
+    if (assignTaskId && !filteredTasks.some((t) => t.id === assignTaskId)) {
+      setAssignTaskId("");
+    }
+  }, [filteredTasks, assignTaskId]);
+
+  useEffect(() => {
+    if (assignMilestoneId && !filteredMilestones.some((m) => m.id === assignMilestoneId)) {
+      setAssignMilestoneId("");
+    }
+  }, [filteredMilestones, assignMilestoneId]);
+
   // Filtered and sorted visits for Recent Studio Site Inspection Log
   const filteredAndSortedVisits = useMemo(() => {
     return allVisits
@@ -2864,14 +2877,21 @@ export default function VisitsClientView({
                   <select
                     value={assignTaskId}
                     onChange={(e) => setAssignTaskId(e.target.value)}
-                    className="w-full p-2 bg-white border border-[#E2E6F0] rounded-xl text-xs text-[#1F1F1F] focus:outline-none"
+                    disabled={!assignProjectId}
+                    className="w-full p-2 bg-white border border-[#E2E6F0] rounded-xl text-xs text-[#1F1F1F] focus:outline-none disabled:bg-[#F1F3F9] disabled:text-[#94A3B8]"
                   >
                     <option value="">None (Stand-alone visit)</option>
-                    {filteredTasks.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.title} ({t.priority})
-                      </option>
-                    ))}
+                    {!assignProjectId ? (
+                      <option disabled>Select a project first</option>
+                    ) : filteredTasks.length === 0 ? (
+                      <option disabled>No open deliverables for this project</option>
+                    ) : (
+                      filteredTasks.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.title} ({t.priority})
+                        </option>
+                      ))
+                    )}
                   </select>
                 </div>
 
@@ -2882,14 +2902,21 @@ export default function VisitsClientView({
                   <select
                     value={assignMilestoneId}
                     onChange={(e) => setAssignMilestoneId(e.target.value)}
-                    className="w-full p-2 bg-white border border-[#E2E6F0] rounded-xl text-xs text-[#1F1F1F] focus:outline-none"
+                    disabled={!assignProjectId}
+                    className="w-full p-2 bg-white border border-[#E2E6F0] rounded-xl text-xs text-[#1F1F1F] focus:outline-none disabled:bg-[#F1F3F9] disabled:text-[#94A3B8]"
                   >
                     <option value="">None (Routine visit)</option>
-                    {filteredMilestones.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.title}
-                      </option>
-                    ))}
+                    {!assignProjectId ? (
+                      <option disabled>Select a project first</option>
+                    ) : filteredMilestones.length === 0 ? (
+                      <option disabled>No milestones for this project</option>
+                    ) : (
+                      filteredMilestones.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.title}
+                        </option>
+                      ))
+                    )}
                   </select>
                 </div>
               </div>

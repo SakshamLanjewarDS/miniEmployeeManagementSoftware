@@ -527,8 +527,21 @@ export default function PayrollManagementPage() {
                   setSearchQuery(e.target.value);
                   setPage(1);
                 }}
-                className="w-full pl-9 pr-3 py-1.5 text-xs bg-[#F8F9FE] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] placeholder-[#696E82] focus:outline-none focus:border-[#1456F0]"
+                className="w-full pl-9 pr-8 py-1.5 text-xs bg-[#F8F9FE] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] placeholder-[#696E82] focus:outline-none focus:border-[#1456F0]"
               />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery("");
+                    setPage(1);
+                  }}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#696E82] hover:text-[#1F1F1F] p-0.5 cursor-pointer"
+                  title="Clear search"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
 
             <select
@@ -537,13 +550,29 @@ export default function PayrollManagementPage() {
                 setMethodFilter(e.target.value);
                 setPage(1);
               }}
-              className="text-xs bg-[#F8F9FE] border border-[#E2E6F0] rounded-xl px-3 py-1.5 text-[#1F1F1F] font-medium focus:outline-none focus:border-[#1456F0]"
+              aria-label="Filter by calculation method"
+              className="text-xs bg-[#F8F9FE] border border-[#E2E6F0] rounded-xl px-3 py-1.5 text-[#1F1F1F] font-medium focus:outline-none focus:border-[#1456F0] cursor-pointer"
             >
               <option value="ALL">All calculation methods</option>
               <option value="FIXED_30">Fixed 30 days (Standard)</option>
               <option value="CALENDAR_DAYS">Calendar days</option>
               <option value="WORKING_DAYS">Working days (26d)</option>
             </select>
+
+            {(searchQuery || methodFilter !== "ALL") && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery("");
+                  setMethodFilter("ALL");
+                  setPage(1);
+                }}
+                className="text-xs font-semibold text-rose-600 hover:text-rose-800 hover:underline px-1 cursor-pointer"
+                title="Reset payroll filters"
+              >
+                Reset
+              </button>
+            )}
           </div>
         </div>
 

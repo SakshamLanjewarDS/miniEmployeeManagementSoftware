@@ -8,6 +8,7 @@ import {
   getCustomFieldValues,
 } from "@/server/modules/custom-fields/repository";
 import TasksClientView from "./TasksClientView";
+import { compareTasksByWorkflow } from "@/components/tasks/task-utils";
 
 interface TasksPageProps {
   params: Promise<{ workspaceSlug: string }>;
@@ -227,6 +228,10 @@ export default async function TasksPage({ params, searchParams }: TasksPageProps
     })) || [],
     customFields: (customFieldValues && (customFieldValues as Record<string, any>)[t.id]) || {},
   }));
+
+  // Initial sort strictly honoring the studio workflow priority:
+  // checking > ongoing > then others > at the end completed
+  serializedTasks.sort((a, b) => compareTasksByWorkflow(a, b, "DUE_DATE_ASC"));
 
   return (
     <div className="space-y-6">

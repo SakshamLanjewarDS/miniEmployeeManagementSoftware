@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { TenantContext } from "@/server/tenancy/context";
 import {
   TrendingUp,
@@ -64,6 +64,23 @@ export function PerformanceClientView({ context }: PerformanceClientViewProps) {
   const [tablePage, setTablePage] = useState(1);
   const tablePageSize = 8;
   const [advancedViewsOpen, setAdvancedViewsOpen] = useState(false);
+  const advancedViewsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent | TouchEvent) {
+      if (advancedViewsRef.current && !advancedViewsRef.current.contains(e.target as Node)) {
+        setAdvancedViewsOpen(false);
+      }
+    }
+    if (advancedViewsOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("touchstart", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
+    };
+  }, [advancedViewsOpen]);
   const [metricDefinitionsOpen, setMetricDefinitionsOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"dossier" | "matrix" | "burnout" | "waterfall">("dossier");
 
@@ -615,7 +632,7 @@ export function PerformanceClientView({ context }: PerformanceClientViewProps) {
             Employees
           </button>
 
-          <div className="relative">
+          <div className="relative" ref={advancedViewsRef}>
             <button
               type="button"
               onClick={() => setAdvancedViewsOpen(!advancedViewsOpen)}

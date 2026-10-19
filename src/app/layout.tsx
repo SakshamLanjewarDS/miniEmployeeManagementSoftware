@@ -118,66 +118,153 @@ export default function RootLayout({
                   }
                 });
 
-                // 2. Safe DOM stub generator for missing extension elements (fast, zero stack trace overhead)
-                var EXT_QUERY_RE = /share|modal|chext|chrome-extension|inspector/i;
-                function createSafeStub(tag) {
-                  var el = document.createElement(tag || 'div');
+                // 2. Safe DOM stub generator for missing extension elements
+                var EXT_QUERY_RE = /share|modal|chext|chrome-extension|inspector|copy/i;
+
+                function createSafeStub(tag, hint) {
+                  var isBtn = /btn|button|close|trigger|copy|submit/i.test(hint || tag || '');
+                  var isInput = /input|link|url|text/i.test(hint || tag || '');
+                  var el = document.createElement(isBtn ? 'button' : (isInput ? 'input' : (tag || 'div')));
                   el.style.display = 'none';
                   el.setAttribute('aria-hidden', 'true');
+                  el.setAttribute('tabindex', '-1');
+                  if (isInput) el.value = '';
                   return el;
                 }
 
-                // Patch Document.prototype with ultra-fast regex guard without expensive Error().stack generation
-                var origGetElementById = Document.prototype.getElementById;
+                function isExtensionCaller(query) {
+                  if (typeof query === 'string' && EXT_QUERY_RE.test(query)) return true;
+                  try {
+                    var stack = (new Error().stack || '').toLowerCase();
+                    return (
+                      stack.indexOf('share-modal') !== -1 ||
+                      stack.indexOf('chext') !== -1 ||
+                      stack.indexOf('chrome-extension') !== -1 ||
+                      stack.indexOf('inspector') !== -1
+                    );
+                  } catch (e) {
+                    return false;
+                  }
+                }
+
+                // Patch Document prototype methods
+                var origDocGetElementById = Document.prototype.getElementById;
                 Document.prototype.getElementById = function(id) {
-                  var el = origGetElementById.apply(this, arguments);
-                  if (!el && typeof id === 'string' && EXT_QUERY_RE.test(id)) {
-                    var isBtn = /btn|button|close/i.test(id);
-                    var stub = createSafeStub(isBtn ? 'button' : 'div');
+                  var el = origDocGetElementById.apply(this, arguments);
+                  if (!el && isExtensionCaller(id)) {
+                    var stub = createSafeStub('div', id);
                     stub.id = id;
                     return stub;
                   }
                   return el;
                 };
 
-                var origQuerySelector = Document.prototype.querySelector;
+                var origDocQuerySelector = Document.prototype.querySelector;
                 Document.prototype.querySelector = function(sel) {
-                  var el = origQuerySelector.apply(this, arguments);
-                  if (!el && typeof sel === 'string' && EXT_QUERY_RE.test(sel)) {
-                    var isBtn = /btn|button|close/i.test(sel);
-                    return createSafeStub(isBtn ? 'button' : 'div');
+                  var el = origDocQuerySelector.apply(this, arguments);
+                  if (!el && isExtensionCaller(sel)) {
+                    return createSafeStub('div', sel);
                   }
                   return el;
                 };
 
-                var origGetElementsByClassName = Document.prototype.getElementsByClassName;
-                Document.prototype.getElementsByClassName = function(className) {
-                  var list = origGetElementsByClassName.apply(this, arguments);
-                  if ((!list || list.length === 0) && typeof className === 'string' && EXT_QUERY_RE.test(className)) {
-                    return [createSafeStub('div')];
+                var origDocQuerySelectorAll = Document.prototype.querySelectorAll;
+                Document.prototype.querySelectorAll = function(sel) {
+                  var list = origDocQuerySelectorAll.apply(this, arguments);
+                  if ((!list || list.length === 0) && isExtensionCaller(sel)) {
+                    return [createSafeStub('div', sel)];
                   }
                   return list;
                 };
 
+                var origDocGetElementsByClassName = Document.prototype.getElementsByClassName;
+                Document.prototype.getElementsByClassName = function(className) {
+                  var list = origDocGetElementsByClassName.apply(this, arguments);
+                  if ((!list || list.length === 0) && isExtensionCaller(className)) {
+                    return [createSafeStub('div', className)];
+                  }
+                  return list;
+                };
+
+                // Patch Element prototype methods (crucial: extensions query child elements)
+                if (typeof Element !== 'undefined' && Element.prototype) {
+                  var origElemQuerySelector = Element.prototype.querySelector;
+                  Element.prototype.querySelector = function(sel) {
+                    var el = origElemQuerySelector.apply(this, arguments);
+                    if (!el && isExtensionCaller(sel)) {
+                      return createSafeStub('div', sel);
+                    }
+                    return el;
+                  };
+
+                  var origElemQuerySelectorAll = Element.prototype.querySelectorAll;
+                  Element.prototype.querySelectorAll = function(sel) {
+                    var list = origElemQuerySelectorAll.apply(this, arguments);
+                    if ((!list || list.length === 0) && isExtensionCaller(sel)) {
+                      return [createSafeStub('div', sel)];
+                    }
+                    return list;
+                  };
+
+                  var origElemGetElementsByClassName = Element.prototype.getElementsByClassName;
+                  Element.prototype.getElementsByClassName = function(className) {
+                    var list = origElemGetElementsByClassName.apply(this, arguments);
+                    if ((!list || list.length === 0) && isExtensionCaller(className)) {
+                      return [createSafeStub('div', className)];
+                    }
+                    return list;
+                  };
+                }
+
                 // 3. Resolve CSS preload consumption warning
+                function satisfyPreload(linkEl) {
+                  try {
+                    var href = linkEl && linkEl.getAttribute('href');
+                    if (!href) return;
+                    var cleanHref = href.split('?')[0];
+                    var exists = document.querySelector('link[rel="stylesheet"][href*="' + cleanHref + '"]');
+                    if (!exists) {
+                      var link = document.createElement('link');
+                      link.rel = 'stylesheet';
+                      link.href = href;
+                      document.head.appendChild(link);
+                    }
+                  } catch (e) {}
+                }
+
                 function satisfyPreloadStylesheets() {
                   try {
                     var preloads = document.querySelectorAll('link[rel="preload"][as="style"]');
-                    preloads.forEach(function(p) {
-                      var href = p.getAttribute('href');
-                      if (href && !document.querySelector('link[rel="stylesheet"][href="' + href + '"]')) {
-                        var link = document.createElement('link');
-                        link.rel = 'stylesheet';
-                        link.href = href;
-                        document.head.appendChild(link);
+                    for (var i = 0; i < preloads.length; i++) {
+                      satisfyPreload(preloads[i]);
+                    }
+                  } catch (e) {}
+                }
+
+                // Run immediately and observe additions
+                satisfyPreloadStylesheets();
+
+                if (typeof MutationObserver !== 'undefined' && document.head) {
+                  try {
+                    var observer = new MutationObserver(function(mutations) {
+                      for (var i = 0; i < mutations.length; i++) {
+                        var added = mutations[i].addedNodes;
+                        for (var j = 0; j < added.length; j++) {
+                          var node = added[j];
+                          if (node && node.nodeType === 1 && node.tagName === 'LINK' && node.getAttribute('rel') === 'preload' && node.getAttribute('as') === 'style') {
+                            satisfyPreload(node);
+                          }
+                        }
                       }
                     });
+                    observer.observe(document.head, { childList: true });
                   } catch (e) {}
                 }
 
                 if (document.readyState === 'complete') {
                   satisfyPreloadStylesheets();
                 } else {
+                  window.addEventListener('DOMContentLoaded', satisfyPreloadStylesheets);
                   window.addEventListener('load', satisfyPreloadStylesheets);
                 }
               })();
@@ -201,6 +288,14 @@ export default function RootLayout({
             <button id="close-share-modal" className="close-share-modal" type="button" tabIndex={-1}></button>
             <button id="modal-close" className="modal-close" type="button" tabIndex={-1}></button>
             <button id="share-modal-trigger" className="share-modal-trigger" type="button" tabIndex={-1}></button>
+            <button id="copy-btn" className="copy-btn copy-button" type="button" tabIndex={-1}></button>
+            <button id="copy-button" className="copy-button" type="button" tabIndex={-1}></button>
+            <button id="copyBtn" className="copyBtn" type="button" tabIndex={-1}></button>
+            <button id="copy" className="copy" type="button" tabIndex={-1}></button>
+            <button id="copyLink" className="copyLink" type="button" tabIndex={-1}></button>
+            <button id="copy-link" className="copy-link" type="button" tabIndex={-1}></button>
+            <button id="copyUrl" className="copyUrl" type="button" tabIndex={-1}></button>
+            <button id="copy-url" className="copy-url" type="button" tabIndex={-1}></button>
             <div id="share-modal-content" className="share-modal-content"></div>
             <div id="shareModalContent" className="shareModalContent"></div>
             <div id="share-dialog" className="share-dialog"></div>
@@ -208,6 +303,9 @@ export default function RootLayout({
             <div id="share-overlay" className="share-overlay"></div>
             <input id="share-link" className="share-link" type="hidden" tabIndex={-1} readOnly defaultValue="" />
             <input id="share-input" className="share-input" type="hidden" tabIndex={-1} readOnly defaultValue="" />
+            <input id="share-url" className="share-url" type="hidden" tabIndex={-1} readOnly defaultValue="" />
+            <input id="shareUrl" className="shareUrl" type="hidden" tabIndex={-1} readOnly defaultValue="" />
+            <input id="copy-input" className="copy-input" type="hidden" tabIndex={-1} readOnly defaultValue="" />
           </div>
         </div>
         {children}

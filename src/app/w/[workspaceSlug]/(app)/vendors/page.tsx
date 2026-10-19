@@ -226,11 +226,14 @@ export default function VendorManagementPage() {
     }
   };
 
-  // Initial load
+  // Initial load and filter synchronization
   useEffect(() => {
-    fetchVendors();
-    fetchSyncStatus();
-  }, [workspaceSlug, industryFilter, statusFilter]);
+    const timer = setTimeout(() => {
+      fetchVendors();
+      fetchSyncStatus();
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [workspaceSlug, industryFilter, statusFilter, searchQuery]);
 
   // Real-time dynamic updates: visible polling + tab focus revalidation + cross-tab live events
   useRealtimeSubscription(
@@ -399,15 +402,25 @@ export default function VendorManagementPage() {
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && fetchVendors()}
               placeholder="Search vendor, materials, notes..."
-              className="w-full pl-9 pr-3 py-2 sm:py-1.5 text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:outline-none focus:border-[#5A81FA] text-[#1F1F1F]"
+              className="w-full pl-9 pr-8 py-2 sm:py-1.5 text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:outline-none focus:border-[#5A81FA] text-[#1F1F1F]"
             />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#696E82] hover:text-[#1F1F1F] p-0.5 cursor-pointer"
+                title="Clear search"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
 
           {/* Mobile Filter Button */}
           <button
             type="button"
             onClick={() => setIsMobileFilterOpen(true)}
-            className="sm:hidden relative flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-[#E2E6F0] bg-white text-xs font-semibold text-[#1F1F1F] active:scale-95 transition-all shrink-0"
+            className="sm:hidden relative flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-[#E2E6F0] bg-white text-xs font-semibold text-[#1F1F1F] active:scale-95 transition-all shrink-0 cursor-pointer"
             aria-label="Open filter sidebar"
           >
             <Filter className="w-3.5 h-3.5 text-[#5A81FA]" />
@@ -424,7 +437,8 @@ export default function VendorManagementPage() {
             <select
               value={industryFilter}
               onChange={(e) => setIndustryFilter(e.target.value)}
-              className="px-2.5 py-1.5 text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] focus:outline-none focus:border-[#5A81FA]"
+              aria-label="Filter by industry category"
+              className="px-2.5 py-1.5 text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] focus:outline-none focus:border-[#5A81FA] cursor-pointer"
             >
               <option value="">All Categories</option>
               <option value="Marble & Granite">Marble & Granite</option>
@@ -438,7 +452,8 @@ export default function VendorManagementPage() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-2.5 py-1.5 text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] focus:outline-none focus:border-[#5A81FA]"
+              aria-label="Filter by relationship status"
+              className="px-2.5 py-1.5 text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] focus:outline-none focus:border-[#5A81FA] cursor-pointer"
             >
               <option value="">All Statuses</option>
               <option value="ACTIVE">Active</option>
@@ -446,6 +461,21 @@ export default function VendorManagementPage() {
               <option value="FOLLOW_UP">Follow Up</option>
               <option value="INACTIVE">Inactive</option>
             </select>
+
+            {(industryFilter || statusFilter || searchQuery) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setIndustryFilter("");
+                  setStatusFilter("");
+                  setSearchQuery("");
+                }}
+                className="text-xs font-semibold text-rose-600 hover:text-rose-800 hover:underline px-1 cursor-pointer"
+                title="Reset all filters"
+              >
+                Reset
+              </button>
+            )}
           </div>
         </div>
 
@@ -1075,6 +1105,59 @@ export default function VendorManagementPage() {
           </div>
         </div>
       )}
+
+      {/* Mobile Filter Drawer */}
+      <MobileFilterDrawer
+        isOpen={isMobileFilterOpen}
+        onClose={() => setIsMobileFilterOpen(false)}
+        title="Filter Vendors & Visitors"
+        activeCount={mobileActiveFilterCount}
+        onReset={() => {
+          setIndustryFilter("");
+          setStatusFilter("");
+        }}
+        resultCount={vendors.length}
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">
+              Category / Industry
+            </label>
+            <select
+              value={industryFilter}
+              onChange={(e) => setIndustryFilter(e.target.value)}
+              aria-label="Filter by industry category"
+              className="w-full p-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#5A81FA] cursor-pointer"
+            >
+              <option value="">All Categories</option>
+              <option value="Marble & Granite">Marble & Granite</option>
+              <option value="Carpentry & Veneers">Carpentry & Veneers</option>
+              <option value="Glass & Aluminium">Glass & Aluminium</option>
+              <option value="Architectural Lighting">Lighting</option>
+              <option value="HVAC & Automation">HVAC & Automation</option>
+              <option value="Sanitaryware & Tiles">Sanitaryware</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">
+              Relationship Status
+            </label>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              aria-label="Filter by relationship status"
+              className="w-full p-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#5A81FA] cursor-pointer"
+            >
+              <option value="">All Statuses</option>
+              <option value="ACTIVE">Active</option>
+              <option value="PARTNERED">Partnered</option>
+              <option value="FOLLOW_UP">Follow Up</option>
+              <option value="INACTIVE">Inactive</option>
+            </select>
+          </div>
+        </div>
+      </MobileFilterDrawer>
     </div>
   );
 }

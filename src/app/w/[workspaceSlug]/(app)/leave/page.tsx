@@ -50,6 +50,7 @@ export default function LeaveManagementPage() {
   // Filters
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [leaveTypeFilter, setLeaveTypeFilter] = useState<string>("");
+  const [dateFilter, setDateFilter] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [sortOrder, setSortOrder] = useState<string>("RECENT");
   const [viewMode, setViewMode] = useState<"table" | "grid">("table");
@@ -390,7 +391,7 @@ export default function LeaveManagementPage() {
 
   // Filtering & Pagination
   const filteredRecords = useMemo(() => {
-    return records.filter((rec) => {
+    const list = records.filter((rec) => {
       const q = searchQuery.toLowerCase().trim();
       const empName = (rec.employeeNameRaw || rec.employee?.membership?.user?.fullName || "").toLowerCase();
       const empId = (rec.employee?.employeeId || "").toLowerCase();
@@ -400,9 +401,53 @@ export default function LeaveManagementPage() {
       const matchesStatus = !statusFilter || rec.status === statusFilter;
       const matchesType = !leaveTypeFilter || rec.leaveType === leaveTypeFilter;
 
-      return matchesSearch && matchesStatus && matchesType;
+      if (!matchesSearch || !matchesStatus || !matchesType) return false;
+
+      if (dateFilter && dateFilter !== "ALL" && rec.startDate) {
+        const start = new Date(rec.startDate);
+        const now = new Date();
+        if (dateFilter === "THIS_MONTH") {
+          if (start.getFullYear() !== now.getFullYear() || start.getMonth() !== now.getMonth()) {
+            return false;
+          }
+        } else if (dateFilter === "NEXT_MONTH") {
+          const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+          if (start.getFullYear() !== nextMonth.getFullYear() || start.getMonth() !== nextMonth.getMonth()) {
+            return false;
+          }
+        } else if (dateFilter === "LAST_30_DAYS") {
+          const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+          if (start < thirtyDaysAgo || start > now) {
+            return false;
+          }
+        } else if (dateFilter === "THIS_YEAR") {
+          if (start.getFullYear() !== now.getFullYear()) {
+            return false;
+          }
+        }
+      }
+
+      return true;
     });
-  }, [records, searchQuery, statusFilter, leaveTypeFilter]);
+
+    list.sort((a, b) => {
+      if (sortOrder === "OLDEST") {
+        return new Date(a.startDate || 0).getTime() - new Date(b.startDate || 0).getTime();
+      }
+      if (sortOrder === "DURATION") {
+        return (Number(b.days) || 0) - (Number(a.days) || 0);
+      }
+      if (sortOrder === "NAME_ASC") {
+        const nameA = a.employeeNameRaw || a.employee?.membership?.user?.fullName || "";
+        const nameB = b.employeeNameRaw || b.employee?.membership?.user?.fullName || "";
+        return nameA.localeCompare(nameB);
+      }
+      // Default: RECENT (newest start date first)
+      return new Date(b.startDate || 0).getTime() - new Date(a.startDate || 0).getTime();
+    });
+
+    return list;
+  }, [records, searchQuery, statusFilter, leaveTypeFilter, dateFilter, sortOrder]);
 
   const totalPages = Math.max(1, Math.ceil(filteredRecords.length / pageSize));
   const paginatedRecords = useMemo(() => {
@@ -658,17 +703,6 @@ export default function LeaveManagementPage() {
             Rejected ({totalRejected})
           </button>
         </div>
-
-        {/* Scope Dropdown on right */}
-        <select
-          value={sortOrder}
-          onChange={(e) => setSortOrder(e.target.value)}
-          className="text-xs bg-white border border-[#E2E6F0] rounded-xl px-3 py-1.5 text-[#1F1F1F] font-medium focus:outline-none focus:border-[#1456F0] self-start sm:self-auto"
-        >
-          <option value="RECENT">All records ⇅</option>
-          <option value="OLDEST">Oldest first</option>
-          <option value="DURATION">Duration (High to Low)</option>
-        </select>
       </div>
 
       {/* 3. Secondary Filter Strip matching Reference Image */}
@@ -705,15 +739,60 @@ export default function LeaveManagementPage() {
             <option value="LOSS_OF_PAY">Loss of Pay</option>
           </select>
 
-          {/* Date Selector Placeholder */}
-          <div className="text-xs bg-white border border-[#E2E6F0] rounded-xl px-3 py-1.5 text-[#696E82] font-medium flex items-center gap-1.5">
-            <Calendar className="w-3.5 h-3.5 text-[#696E82]" />
-            <span>Select dates ⇅</span>
+          {/* Date Selector */}
+          <div className="relative">
+            <select
+              value={dateFilter}
+              onChange={(e) => {
+                setDateFilter(e.target.value);
+                setPage(1);
+              }}
+              aria-label="Filter by date range"
+              className="text-xs bg-white border border-[#E2E6F0] rounded-xl pl-8 pr-3 py-1.5 text-[#1F1F1F] font-medium focus:outline-none focus:border-[#1456F0] cursor-pointer"
+            >
+              <option value="ALL">All dates ⇅</option>
+              <option value="THIS_MONTH">This month</option>
+              <option value="NEXT_MONTH">Next month</option>
+              <option value="LAST_30_DAYS">Past 30 days</option>
+              <option value="THIS_YEAR">This year</option>
+            </select>
+            <Calendar className="w-3.5 h-3.5 text-[#696E82] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
 
-          <div className="text-xs bg-white border border-[#E2E6F0] rounded-xl px-3 py-1.5 text-[#1F1F1F] font-medium">
-            <span>Sort: Recent requests ⇅</span>
-          </div>
+          {/* Sort Selector */}
+          <select
+            value={sortOrder}
+            onChange={(e) => {
+              setSortOrder(e.target.value);
+              setPage(1);
+            }}
+            aria-label="Sort leave requests"
+            className="text-xs bg-white border border-[#E2E6F0] rounded-xl px-3 py-1.5 text-[#1F1F1F] font-medium focus:outline-none focus:border-[#1456F0] cursor-pointer"
+          >
+            <option value="RECENT">Sort: Recent requests ⇅</option>
+            <option value="OLDEST">Sort: Oldest first ⇅</option>
+            <option value="DURATION">Sort: Duration (High to Low) ⇅</option>
+            <option value="NAME_ASC">Sort: Staff Name (A → Z) ⇅</option>
+          </select>
+
+          {/* Reset Filters Button */}
+          {(statusFilter || leaveTypeFilter || dateFilter !== "ALL" || searchQuery || sortOrder !== "RECENT") && (
+            <button
+              type="button"
+              onClick={() => {
+                setStatusFilter("");
+                setLeaveTypeFilter("");
+                setDateFilter("ALL");
+                setSearchQuery("");
+                setSortOrder("RECENT");
+                setPage(1);
+              }}
+              className="text-xs font-semibold text-rose-600 hover:text-rose-800 hover:underline px-1 cursor-pointer"
+              title="Reset all filters"
+            >
+              Reset
+            </button>
+          )}
         </div>
 
         {/* View Toggle */}

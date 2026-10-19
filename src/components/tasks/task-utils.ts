@@ -119,3 +119,126 @@ export function sanitizeTaskDescription(desc: string | null | undefined): string
   return cleaned;
 }
 
+/**
+ * Workflow Priority Ranking for Studio Tasks:
+ * 1. CHECKING (Top priority: awaiting partner/admin review or submitted deliverables)
+ * 2. ONGOING (Active in-progress deliverables)
+ * 3. OTHERS (Todo, Started, Changes requested, Blocked, etc.)
+ * 4. COMPLETED (Finished deliverables - automatically positioned at the down/bottom)
+ * 5. CANCELLED (Terminal cancelled tasks)
+ */
+export function getTaskWorkflowRank(
+  taskOrStatus:
+    | string
+    | null
+    | undefined
+    | {
+        status?: string | null;
+        submissions?: Array<{ status?: string | null }> | null;
+        checklistItems?: Array<{ status?: string | null }> | null;
+      }
+): number {
+  if (!taskOrStatus) return 3;
+
+  const status = (
+    typeof taskOrStatus === "string" ? taskOrStatus : taskOrStatus.status || ""
+  ).toUpperCase();
+
+  // 1. Completed deliverables go to the bottom (rank 4)
+  if (status === "COMPLETED") {
+    return 4;
+  }
+  // 2. Cancelled deliverables also go to the bottom (rank 5)
+  if (status === "CANCELLED") {
+    return 5;
+  }
+
+  // 3. Checking / In Review deliverables go to the top (rank 1)
+  const isObj = typeof taskOrStatus === "object" && taskOrStatus !== null;
+  const hasPendingSubmission =
+    isObj &&
+    Array.isArray(taskOrStatus.submissions) &&
+    taskOrStatus.submissions.some((s) => s?.status === "PENDING");
+  const hasItemInReview =
+    isObj &&
+    Array.isArray(taskOrStatus.checklistItems) &&
+    taskOrStatus.checklistItems.some(
+      (ci) => ci?.status === "IN_REVIEW" || ci?.status === "CHECKING"
+    );
+
+  if (
+    status === "CHECKING" ||
+    status === "IN_REVIEW" ||
+    hasPendingSubmission ||
+    hasItemInReview
+  ) {
+    return 1;
+  }
+
+  // 4. Ongoing / In Progress deliverables (rank 2)
+  if (status === "ONGOING" || status === "IN_PROGRESS") {
+    return 2;
+  }
+
+  // 5. All others (TODO, NOT_STARTED, STARTED, CHANGES_REQUESTED, REVISION, BLOCKED, etc.) (rank 3)
+  return 3;
+}
+
+/**
+ * Compare two tasks according to studio workflow hierarchy:
+ * Checking (top) > Ongoing > Others > Completed (down/bottom)
+ * Within each status tier, sorts by the chosen secondary sort.
+ */
+export function compareTasksByWorkflow(
+  a: any,
+  b: any,
+  secondarySort: string = "DUE_DATE_ASC"
+): number {
+  const rankA = getTaskWorkflowRank(a);
+  const rankB = getTaskWorkflowRank(b);
+
+  if (rankA !== rankB) {
+    return rankA - rankB;
+  }
+
+  // If both tasks are completed, prioritize most recently completed first
+  if (rankA === 4) {
+    if (a.completionDate && b.completionDate) {
+      const compDiff =
+        new Date(b.completionDate).getTime() - new Date(a.completionDate).getTime();
+      if (compDiff !== 0) return compDiff;
+    }
+  }
+
+  switch (secondarySort) {
+    case "DUE_DATE_ASC": {
+      if (!a.dueDate && !b.dueDate) return 0;
+      if (!a.dueDate) return 1;
+      if (!b.dueDate) return -1;
+      return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+    }
+    case "DUE_DATE_DESC": {
+      if (!a.dueDate && !b.dueDate) return 0;
+      if (!a.dueDate) return 1;
+      if (!b.dueDate) return -1;
+      return new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime();
+    }
+    case "CREATED_DESC":
+      return (
+        new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+      );
+    case "CREATED_ASC":
+      return (
+        new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime()
+      );
+    case "ALPHA_ASC":
+      return (a.title || "").localeCompare(b.title || "");
+    case "ALPHA_DESC":
+      return (b.title || "").localeCompare(a.title || "");
+    case "PROJ_ALPHA_ASC":
+      return (a.project?.code || "").localeCompare(b.project?.code || "");
+    default:
+      return 0;
+  }
+}
+

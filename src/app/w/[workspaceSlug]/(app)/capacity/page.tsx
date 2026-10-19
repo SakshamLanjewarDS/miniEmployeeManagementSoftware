@@ -236,24 +236,40 @@ export default function WorkloadCapacityPage() {
     }
   };
 
-  // Unique departments for filter dropdown
-  const departments = useMemo(() => {
-    if (!data?.employees) return [];
-    const depts = new Set<string>();
-    data.employees.forEach((e) => {
-      if (e.department) depts.add(e.department);
-    });
-    return Array.from(depts);
+  const STANDARD_DEPARTMENTS = [
+    "Architecture",
+    "Interior Design",
+    "Structural",
+    "Landscape",
+    "MEP",
+    "3D Visualisation",
+    "Admin / Finance",
+    "Project Management",
+  ];
+
+  const [allDepartments, setAllDepartments] = useState<string[]>(STANDARD_DEPARTMENTS);
+
+  useEffect(() => {
+    if (data?.employees) {
+      setAllDepartments((prev) => {
+        const set = new Set(prev);
+        data.employees.forEach((e) => {
+          if (e.department) set.add(e.department);
+        });
+        return Array.from(set).sort();
+      });
+    }
   }, [data]);
 
   // Filtered employees
   const filteredEmployees = useMemo(() => {
     if (!data?.employees) return [];
     return data.employees.filter((e) => {
+      if (departmentFilter && e.department !== departmentFilter) return false;
       if (selectedStatusFilter === "ALL") return true;
       return e.allocationStatus === selectedStatusFilter;
     });
-  }, [data, selectedStatusFilter]);
+  }, [data, selectedStatusFilter, departmentFilter]);
 
   const getStatusBadge = (status: EmployeeSummary["allocationStatus"], utilization: number) => {
     switch (status) {
@@ -418,38 +434,53 @@ export default function WorkloadCapacityPage() {
             />
           </div>
 
-          {departments.length > 0 && (
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-medium text-slate-500">Dept:</span>
-              <select
-                value={departmentFilter}
-                onChange={(e) => setDepartmentFilter(e.target.value)}
-                className="text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#5A81FA]"
-              >
-                <option value="">All Departments</option>
-                {departments.map((d) => (
-                  <option key={d} value={d}>
-                    {d}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-medium text-slate-500">Dept:</span>
+            <select
+              value={departmentFilter}
+              onChange={(e) => setDepartmentFilter(e.target.value)}
+              aria-label="Filter by department"
+              className="text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#5A81FA] bg-white cursor-pointer"
+            >
+              <option value="">All Departments</option>
+              {allDepartments.map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-slate-500">Status:</span>
-          <select
-            value={selectedStatusFilter}
-            onChange={(e) => setSelectedStatusFilter(e.target.value)}
-            className="text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#5A81FA]"
-          >
-            <option value="ALL">All Statuses</option>
-            <option value="OVERALLOCATED">Overallocated (&gt;100%)</option>
-            <option value="BALANCED">Balanced (70-100%)</option>
-            <option value="UNDERALLOCATED">Underallocated (&lt;70%)</option>
-            <option value="ESTIMATES_INCOMPLETE">Estimates Incomplete</option>
-          </select>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-medium text-slate-500">Status:</span>
+            <select
+              value={selectedStatusFilter}
+              onChange={(e) => setSelectedStatusFilter(e.target.value)}
+              aria-label="Filter by allocation status"
+              className="text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#5A81FA] bg-white cursor-pointer"
+            >
+              <option value="ALL">All Statuses</option>
+              <option value="OVERALLOCATED">Overallocated (&gt;100%)</option>
+              <option value="BALANCED">Balanced (70-100%)</option>
+              <option value="UNDERALLOCATED">Underallocated (&lt;70%)</option>
+              <option value="ESTIMATES_INCOMPLETE">Estimates Incomplete</option>
+            </select>
+          </div>
+
+          {(departmentFilter || selectedStatusFilter !== "ALL") && (
+            <button
+              type="button"
+              onClick={() => {
+                setDepartmentFilter("");
+                setSelectedStatusFilter("ALL");
+              }}
+              className="text-xs font-semibold text-rose-600 hover:text-rose-800 hover:underline cursor-pointer"
+            >
+              Reset Filters
+            </button>
+          )}
         </div>
       </div>
 

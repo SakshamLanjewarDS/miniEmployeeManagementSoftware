@@ -595,19 +595,41 @@ ${m.actionItems?.map((a, i) => `${i + 1}. [${a.status}] ${a.description} ${a.ass
     return meetings
       .filter((m) => {
         const mDate = new Date(m.meetingDate).toISOString().split("T")[0];
-        return mDate >= todayStr && m.status !== "COMPLETED" && m.status !== "CANCELLED";
+        if (mDate < todayStr || m.status === "COMPLETED" || m.status === "CANCELLED") return false;
+        if (selectedProjectType !== "ALL" && m.projectId !== selectedProjectType) return false;
+        if (selectedMeetingType !== "ALL" && m.meetingType !== selectedMeetingType) return false;
+        if (searchQuery.trim()) {
+          const q = searchQuery.toLowerCase();
+          const matchTitle = m.title.toLowerCase().includes(q);
+          const matchAgenda = (m.agenda || "").toLowerCase().includes(q);
+          const matchNotes = (m.notes || "").toLowerCase().includes(q);
+          const matchProject = (m.project?.name || "").toLowerCase().includes(q) || (m.project?.code || "").toLowerCase().includes(q);
+          if (!matchTitle && !matchAgenda && !matchNotes && !matchProject) return false;
+        }
+        return true;
       })
       .sort((a, b) => new Date(a.meetingDate).getTime() - new Date(b.meetingDate).getTime());
-  }, [meetings, todayStr]);
+  }, [meetings, todayStr, selectedProjectType, selectedMeetingType, searchQuery]);
 
   const needsStatusUpdateMeetings = useMemo(() => {
     return meetings
       .filter((m) => {
         const mDate = new Date(m.meetingDate).toISOString().split("T")[0];
-        return mDate < todayStr && (m.status === "SCHEDULED" || m.status === "IN_PROGRESS");
+        if (mDate >= todayStr || (m.status !== "SCHEDULED" && m.status !== "IN_PROGRESS")) return false;
+        if (selectedProjectType !== "ALL" && m.projectId !== selectedProjectType) return false;
+        if (selectedMeetingType !== "ALL" && m.meetingType !== selectedMeetingType) return false;
+        if (searchQuery.trim()) {
+          const q = searchQuery.toLowerCase();
+          const matchTitle = m.title.toLowerCase().includes(q);
+          const matchAgenda = (m.agenda || "").toLowerCase().includes(q);
+          const matchNotes = (m.notes || "").toLowerCase().includes(q);
+          const matchProject = (m.project?.name || "").toLowerCase().includes(q) || (m.project?.code || "").toLowerCase().includes(q);
+          if (!matchTitle && !matchAgenda && !matchNotes && !matchProject) return false;
+        }
+        return true;
       })
       .sort((a, b) => new Date(b.meetingDate).getTime() - new Date(a.meetingDate).getTime());
-  }, [meetings, todayStr]);
+  }, [meetings, todayStr, selectedProjectType, selectedMeetingType, searchQuery]);
 
   const activeMeetingForOverview = selectedMeeting || needsStatusUpdateMeetings[0] || upcomingMeetings[0] || meetings[0] || null;
 
@@ -885,8 +907,18 @@ ${m.actionItems?.map((a, i) => `${i + 1}. [${a.status}] ${a.description} ${a.ass
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search meetings or minutes..."
-            className="w-full pl-9 pr-3 py-2 bg-white border border-[#E2E6F0] rounded-xl text-[#0B122B] text-xs focus:outline-none focus:border-[#3562E8] shadow-2xs"
+            className="w-full pl-9 pr-8 py-2 bg-white border border-[#E2E6F0] rounded-xl text-[#0B122B] text-xs focus:outline-none focus:border-[#3562E8] shadow-2xs"
           />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery("")}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#696E82] hover:text-[#0B122B] p-0.5 cursor-pointer"
+              title="Clear search"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -896,6 +928,7 @@ ${m.actionItems?.map((a, i) => `${i + 1}. [${a.status}] ${a.description} ${a.ass
           <select
             value={selectedProjectType}
             onChange={(e) => setSelectedProjectType(e.target.value)}
+            aria-label="Filter meetings by project"
             className="px-3 py-1.5 bg-[#F8F9FE] border border-[#E2E6F0] rounded-xl text-[#0B122B] font-medium text-xs focus:outline-none focus:border-[#3562E8] cursor-pointer"
           >
             <option value="ALL">All projects</option>
@@ -909,6 +942,7 @@ ${m.actionItems?.map((a, i) => `${i + 1}. [${a.status}] ${a.description} ${a.ass
           <select
             value={selectedMeetingType}
             onChange={(e) => setSelectedMeetingType(e.target.value)}
+            aria-label="Filter by meeting type"
             className="px-3 py-1.5 bg-[#F8F9FE] border border-[#E2E6F0] rounded-xl text-[#0B122B] font-medium text-xs focus:outline-none focus:border-[#3562E8] cursor-pointer"
           >
             <option value="ALL">All meeting types</option>
@@ -918,6 +952,21 @@ ${m.actionItems?.map((a, i) => `${i + 1}. [${a.status}] ${a.description} ${a.ass
             <option value="Partner Strategy">Partner Strategy</option>
             <option value="Budget & Financials">Budget & Financials</option>
           </select>
+
+          {(selectedProjectType !== "ALL" || selectedMeetingType !== "ALL" || searchQuery) && (
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedProjectType("ALL");
+                setSelectedMeetingType("ALL");
+                setSearchQuery("");
+              }}
+              className="text-xs font-semibold text-rose-600 hover:text-rose-800 hover:underline px-1 cursor-pointer"
+              title="Reset all meeting filters"
+            >
+              Reset Filters
+            </button>
+          )}
         </div>
 
         <div className="flex items-center gap-2">

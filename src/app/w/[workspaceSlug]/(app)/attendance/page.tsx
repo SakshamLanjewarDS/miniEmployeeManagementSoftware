@@ -25,6 +25,7 @@ export default function AttendanceManagementPage() {
   const todayStr = new Date().toISOString().split("T")[0];
   const [selectedDate, setSelectedDate] = useState<string>(todayStr);
   const [statusFilter, setStatusFilter] = useState<string>("");
+  const [searchQuery, setSearchQuery] = useState<string>("");
   const [records, setRecords] = useState<any[]>([]);
   const [summary, setSummary] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
@@ -47,6 +48,7 @@ export default function AttendanceManagementPage() {
     try {
       const q = new URLSearchParams({
         workspaceSlug,
+        pageSize: "100",
         ...(selectedDate ? { date: selectedDate } : {}),
         ...(statusFilter ? { status: statusFilter } : {}),
       });
@@ -63,6 +65,16 @@ export default function AttendanceManagementPage() {
       if (!silent) setLoading(false);
     }
   };
+
+  const filteredRecords = React.useMemo(() => {
+    if (!searchQuery.trim()) return records;
+    const q = searchQuery.toLowerCase().trim();
+    return records.filter((rec) => {
+      const empName = (rec.employee?.membership?.user?.fullName || "").toLowerCase();
+      const empId = (rec.employee?.employeeId || "").toLowerCase();
+      return empName.includes(q) || empId.includes(q);
+    });
+  }, [records, searchQuery]);
 
   useEffect(() => {
     fetchAttendance();
@@ -190,34 +202,73 @@ export default function AttendanceManagementPage() {
         </div>
       )}
 
-      {/* Filter Selector */}
-      <div className="p-3 bg-white rounded-2xl border border-[#E2E6F0] shadow-2xs flex items-center justify-between gap-3">
-        <span className="text-xs font-semibold text-[#1F1F1F]">Attendance Status:</span>
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-3 py-1.5 text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] focus:outline-none focus:border-[#5A81FA]"
-        >
-          <option value="">All Statuses</option>
-          <option value="PRESENT">Present</option>
-          <option value="HALF_DAY">Half Day</option>
-          <option value="ON_LEAVE">On Leave</option>
-          <option value="ABSENT">Absent</option>
-          <option value="MISSING_PUNCH">Missing Punch</option>
-        </select>
+      {/* Filter Selector Bar */}
+      <div className="p-3 bg-white rounded-2xl border border-[#E2E6F0] shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="w-3.5 h-3.5 text-[#696E82] absolute left-3 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search employee by name or ID..."
+            className="w-full pl-8 pr-7 py-1.5 text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] focus:outline-none focus:border-[#5A81FA]"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery("")}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-[#696E82] hover:text-[#1F1F1F] p-0.5 cursor-pointer"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold text-[#1F1F1F] whitespace-nowrap">Status:</span>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            aria-label="Filter attendance by status"
+            className="px-3 py-1.5 text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] focus:outline-none focus:border-[#5A81FA] cursor-pointer"
+          >
+            <option value="">All Statuses</option>
+            <option value="PRESENT">Present</option>
+            <option value="HALF_DAY">Half Day</option>
+            <option value="ON_LEAVE">On Leave</option>
+            <option value="ABSENT">Absent</option>
+            <option value="MISSING_PUNCH">Missing Punch</option>
+          </select>
+
+          {(statusFilter || searchQuery) && (
+            <button
+              type="button"
+              onClick={() => {
+                setStatusFilter("");
+                setSearchQuery("");
+              }}
+              className="text-xs font-semibold text-rose-600 hover:text-rose-800 hover:underline px-1 cursor-pointer"
+              title="Reset all filters"
+            >
+              Reset
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Records Table */}
       <div className="bg-white rounded-3xl border border-[#E2E6F0] shadow-2xs overflow-hidden">
         {loading ? (
           <div className="p-12 text-center text-xs text-[#696E82]">Loading attendance logs...</div>
-        ) : records.length === 0 ? (
+        ) : filteredRecords.length === 0 ? (
           <div className="p-12 text-center text-xs text-[#696E82]">
-            No attendance records recorded for {selectedDate}.
+            {records.length > 0
+              ? "No attendance records match your filter criteria."
+              : `No attendance records recorded for ${selectedDate}.`}
           </div>
         ) : (
           <div className="divide-y divide-[#E2E6F0]">
-            {records.map((rec) => {
+            {filteredRecords.map((rec) => {
               const empName = rec.employee?.membership?.user?.fullName || "Staff Member";
               const empId = rec.employee?.employeeId || "EMP";
               const pInStr = rec.punchIn
