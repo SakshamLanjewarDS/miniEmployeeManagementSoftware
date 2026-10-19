@@ -456,7 +456,7 @@ export default function DailyEmployeeWorkDashboard() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="text-xs font-medium text-[#696E82]">{formattedDate}</div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-[#0B122B] tracking-tight mt-0.5">My work today</h1>
+          <h1 className="type-page-title text-[#0B122B] mt-0.5">My work today</h1>
           <p className="text-xs sm:text-sm text-[#696E82] mt-0.5">
             A clear view of your tasks, schedule and notes.
           </p>
@@ -725,7 +725,7 @@ export default function DailyEmployeeWorkDashboard() {
                 <div className="w-14 h-14 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mb-4">
                   <Check className="w-7 h-7 stroke-[2.5]" />
                 </div>
-                <h3 className="text-base font-bold text-[#0B122B]">No tasks need your action</h3>
+                <h3 className="type-card-title text-[#0B122B]">No tasks need your action</h3>
                 <p className="text-xs text-[#696E82] mt-1 max-w-sm">
                   Your personal queue is clear. You have {metrics?.totalDelegated ?? 0} delegated items to follow.
                 </p>
@@ -948,7 +948,7 @@ export default function DailyEmployeeWorkDashboard() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Calendar className="w-5 h-5 text-[#3562E8]" />
-                <h2 className="text-base font-bold text-[#0B122B]">Today's schedule</h2>
+                <h2 className="type-section-title text-[#0B122B]">Today's schedule</h2>
                 <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-[#F8F9FE] text-[#5A81FA] border border-[#CEDEFF]">
                   {timelineEvents.length} events
                 </span>
@@ -1012,7 +1012,7 @@ export default function DailyEmployeeWorkDashboard() {
             </div>
 
             <div className="flex items-center gap-4 self-end sm:self-auto">
-              <div className="text-2xl sm:text-3xl font-extrabold text-[#0B122B] font-mono tracking-tight">
+              <div className="type-kpi-value text-[#0B122B] font-mono">
                 {formatTimer(pomodoroSecondsLeft)}
               </div>
 
@@ -1120,7 +1120,7 @@ export default function DailyEmployeeWorkDashboard() {
           >
             <div className="flex items-center justify-between p-4 sm:p-5 border-b border-[#E2E6F0]">
               <div>
-                <h3 id="delegate-modal-title" className="text-base font-bold text-[#0B122B] flex items-center gap-2">
+                <h3 id="delegate-modal-title" className="type-card-title text-[#0B122B] flex items-center gap-2">
                   <UserPlus className="w-5 h-5 text-[#3562E8]" />
                   <span>Delegate deliverable</span>
                 </h3>
@@ -1200,7 +1200,7 @@ export default function DailyEmployeeWorkDashboard() {
           >
             <div className="flex items-center justify-between p-4 sm:p-5 border-b border-[#E2E6F0]">
               <div>
-                <h3 id="extension-modal-title" className="text-base font-bold text-[#0B122B] flex items-center gap-2">
+                <h3 id="extension-modal-title" className="type-card-title text-[#0B122B] flex items-center gap-2">
                   <Clock className="w-5 h-5 text-amber-500" />
                   <span>Request deadline extension</span>
                 </h3>
@@ -1284,7 +1284,7 @@ export default function DailyEmployeeWorkDashboard() {
           >
             <div className="flex items-center justify-between p-4 sm:p-5 border-b border-[#E2E6F0]">
               <div>
-                <h3 id="blocker-modal-title" className="text-base font-bold text-rose-700 flex items-center gap-2">
+                <h3 id="blocker-modal-title" className="type-card-title text-rose-700 flex items-center gap-2">
                   <ShieldAlert className="w-5 h-5 text-rose-600" />
                   <span>Escalate task blocker</span>
                 </h3>

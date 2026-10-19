@@ -136,7 +136,7 @@ export default function OwnerDashboardView({
     month: "long",
     day: "numeric",
     year: "numeric",
-  }).toUpperCase();
+  });
 
   const userInitials = userFullName
     .split(" ")
@@ -152,17 +152,17 @@ export default function OwnerDashboardView({
       <MorningBriefingModal workspaceSlug={workspaceSlug} role={userRole} />
 
       {/* ============================================================== */}
-      {/* 1. TOP GREETING & PRIMARY ACTION (Reference: 4ac8f30e)         */}
+      {/* 1. TOP GREETING & PRIMARY ACTION                               */}
       {/* ============================================================== */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="text-xs font-semibold text-slate-500 mb-1">
+          <div className="type-metadata text-slate-500 mb-1">
             {todayDateString}
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+          <h1 className="type-page-title text-slate-900">
             Good morning, {userFullName.split(" ")[0]}
           </h1>
-          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+          <p className="type-body-compact text-slate-500 mt-1">
             Your studio at a glance.
           </p>
         </div>
@@ -175,7 +175,7 @@ export default function OwnerDashboardView({
           />
           <Link
             href={`/w/${workspaceSlug}/tasks`}
-            className="hidden sm:inline-flex items-center gap-2 px-4 py-2.5 bg-[#2563EB] hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors"
+            className="hidden sm:inline-flex items-center gap-2 px-4 py-2.5 bg-[#2563EB] hover:bg-blue-700 text-white type-button-label rounded-xl shadow-xs transition-colors"
           >
             <Plus className="w-4 h-4" />
             <span>Assign deliverable</span>
@@ -184,13 +184,13 @@ export default function OwnerDashboardView({
       </div>
 
       {/* Attention Action Banner */}
-      <div className="bg-[#EFF6FF] border border-[#BFDBFE] rounded-2xl p-3.5 sm:p-4 flex items-center justify-between gap-3 text-xs">
+      <div className="bg-[#EFF6FF] border border-[#BFDBFE] rounded-2xl p-3.5 sm:p-4 flex items-center justify-between gap-3 type-body-compact">
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="w-7 h-7 rounded-full bg-blue-600 text-white flex items-center justify-center shrink-0">
             <AlertCircle className="w-4 h-4" />
           </div>
           <div className="min-w-0">
-            <span className="font-bold text-blue-950 mr-2">
+            <span className="font-semibold text-blue-950 mr-2">
               {pendingDecisionsCount} {pendingDecisionsCount === 1 ? "action needs" : "actions need"} your attention
             </span>
             <span className="text-blue-700 hidden sm:inline">
@@ -200,7 +200,7 @@ export default function OwnerDashboardView({
         </div>
         <Link
           href={`/w/${workspaceSlug}/inbox`}
-          className="text-xs font-bold text-[#2563EB] hover:text-blue-800 flex items-center gap-1 shrink-0 whitespace-nowrap"
+          className="type-button-label text-[#2563EB] hover:text-blue-800 flex items-center gap-1 shrink-0 whitespace-nowrap"
         >
           <span>Open decision inbox</span>
           <ChevronRight className="w-4 h-4" />
@@ -208,10 +208,7 @@ export default function OwnerDashboardView({
       </div>
 
       {/* ============================================================== */}
-      {/* 3. FOUR KPI CARDS (Image A)                                     */}
-      {/* ============================================================== */}
-      {/* ============================================================== */}
-      {/* 2. FOUR KPI CARDS (Reference: 4ac8f30e)                        */}
+      {/* 2. FOUR KPI CARDS                                              */}
       {/* ============================================================== */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {/* KPI 1: Active Projects */}
@@ -220,13 +217,13 @@ export default function OwnerDashboardView({
           className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-2xs hover:border-[#2563EB] transition-all group"
         >
           <div className="flex items-center justify-between mb-1.5">
-            <span className="text-xs text-slate-500 font-medium">Active projects</span>
+            <span className="type-kpi-label text-slate-500">Active projects</span>
             <span className="w-2 h-2 rounded-full bg-blue-500" />
           </div>
-          <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 group-hover:text-[#2563EB] transition-colors">
+          <div className="type-kpi-value text-slate-900 group-hover:text-[#2563EB] transition-colors">
             {data.studioSummary.activeProjectsCount}
           </div>
-          <span className="text-[11px] text-slate-400 mt-1 block">Live commissions</span>
+          <span className="type-helper text-slate-500 mt-1 block">Live commissions</span>
         </Link>
 
         {/* KPI 2: Pending Reviews */}
@@ -235,13 +232,13 @@ export default function OwnerDashboardView({
           className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-2xs hover:border-amber-400 transition-all group"
         >
           <div className="flex items-center justify-between mb-1.5">
-            <span className="text-xs text-slate-500 font-medium">Pending reviews</span>
+            <span className="type-kpi-label text-slate-500">Pending reviews</span>
             <span className="w-2 h-2 rounded-full bg-amber-500" />
           </div>
-          <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 group-hover:text-amber-600 transition-colors">
+          <div className="type-kpi-value text-slate-900 group-hover:text-amber-600 transition-colors">
             {data.studioSummary.pendingReviewsCount}
           </div>
-          <span className="text-[11px] text-slate-400 mt-1 block">Awaiting leadership sign-off</span>
+          <span className="type-helper text-slate-500 mt-1 block">Awaiting leadership sign-off</span>
         </Link>
 
         {/* KPI 3: Overdue Tasks */}
@@ -250,15 +247,15 @@ export default function OwnerDashboardView({
           className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-2xs hover:border-emerald-400 transition-all group"
         >
           <div className="flex items-center justify-between mb-1.5">
-            <span className="text-xs text-slate-500 font-medium">Overdue tasks</span>
+            <span className="type-kpi-label text-slate-500">Overdue tasks</span>
             <span className={`w-2 h-2 rounded-full ${data.studioSummary.overdueDeliverablesCount > 0 ? "bg-rose-500" : "bg-emerald-500"}`} />
           </div>
-          <div className={`text-2xl sm:text-3xl font-extrabold transition-colors ${
+          <div className={`type-kpi-value transition-colors ${
             data.studioSummary.overdueDeliverablesCount > 0 ? "text-rose-600" : "text-slate-900"
           }`}>
             {data.studioSummary.overdueDeliverablesCount}
           </div>
-          <span className="text-[11px] text-slate-400 mt-1 block">
+          <span className="type-helper text-slate-500 mt-1 block">
             {data.studioSummary.overdueDeliverablesCount === 0 ? "Everything on track" : "Requires attention"}
           </span>
         </Link>
@@ -269,13 +266,13 @@ export default function OwnerDashboardView({
           className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-2xs hover:border-slate-400 transition-all group"
         >
           <div className="flex items-center justify-between mb-1.5">
-            <span className="text-xs text-slate-500 font-medium">Recorded collections</span>
+            <span className="type-kpi-label text-slate-500">Recorded collections</span>
             <span className="w-2 h-2 rounded-full bg-slate-400" />
           </div>
-          <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 truncate mt-0.5">
+          <div className="type-kpi-value text-slate-900 truncate mt-0.5">
             {formatCurrency(data.studioSummary.totalCollections)}
           </div>
-          <span className="text-[11px] text-slate-400 mt-1 block">
+          <span className="type-helper text-slate-500 mt-1 block">
             {data.studioSummary.totalCollections === 0 ? "No collections recorded" : "Incurred revenue"}
           </span>
         </Link>
@@ -285,7 +282,7 @@ export default function OwnerDashboardView({
       <div className="sm:hidden">
         <Link
           href={`/w/${workspaceSlug}/tasks`}
-          className="w-full py-3 bg-[#2563EB] hover:bg-blue-700 text-white text-xs font-bold rounded-2xl shadow-xs transition-colors flex items-center justify-center gap-2"
+          className="w-full py-3 bg-[#2563EB] hover:bg-blue-700 text-white type-button-label rounded-2xl shadow-xs transition-colors flex items-center justify-center gap-2"
         >
           <Plus className="w-4 h-4" />
           <span>Assign deliverable</span>
@@ -293,7 +290,7 @@ export default function OwnerDashboardView({
       </div>
 
       {/* ============================================================== */}
-      {/* 3. BALANCED TWO-COLUMN GRID (Reference: 4ac8f30e)              */}
+      {/* 3. BALANCED TWO-COLUMN GRID                                    */}
       {/* ============================================================== */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* LEFT / MAIN COLUMN (~65%) */}
@@ -302,15 +299,15 @@ export default function OwnerDashboardView({
           <div className="bg-white rounded-3xl border border-slate-200/90 p-5 sm:p-6 shadow-2xs space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <h2 className="type-card-title text-slate-900 flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-sm bg-amber-500 inline-block" />
                   <span>Ready for your review ({data.approvalInbox.length})</span>
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">Keep project delivery moving.</p>
+                </h2>
+                <p className="type-helper text-slate-500 mt-0.5">Keep project delivery moving.</p>
               </div>
               <Link
                 href={`/w/${workspaceSlug}/inbox`}
-                className="text-xs font-bold text-[#2563EB] hover:text-blue-800 flex items-center gap-1"
+                className="type-button-label text-[#2563EB] hover:text-blue-800 flex items-center gap-1"
               >
                 <span>Open decision inbox</span>
                 <ChevronRight className="w-3.5 h-3.5" />
@@ -320,25 +317,25 @@ export default function OwnerDashboardView({
             {data.approvalInbox.length === 0 ? (
               <div className="p-8 text-center bg-slate-50/70 rounded-2xl border border-dashed border-slate-200 space-y-1">
                 <CheckCircle2 className="w-6 h-6 text-emerald-600 mx-auto" />
-                <p className="text-xs font-semibold text-slate-800">Review queue is clear</p>
-                <p className="text-[11px] text-slate-400">All submissions have been reviewed.</p>
+                <p className="type-minor-heading text-slate-800">Review queue is clear</p>
+                <p className="type-helper text-slate-500">All submissions have been reviewed.</p>
               </div>
             ) : (
               <div className="space-y-3">
                 {data.approvalInbox.slice(0, 4).map((item) => (
                   <div
                     key={item.id}
-                    className="p-3.5 rounded-2xl border border-slate-200/80 bg-slate-50/40 hover:bg-white transition-all flex items-center justify-between gap-3 text-xs group"
+                    className="p-3.5 rounded-2xl border border-slate-200/80 bg-slate-50/40 hover:bg-white transition-all flex items-center justify-between gap-3 type-body-compact group"
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="w-9 h-9 rounded-xl bg-blue-50 text-[#2563EB] flex items-center justify-center shrink-0 border border-blue-100">
                         <FileText className="w-4 h-4" />
                       </div>
                       <div className="min-w-0">
-                        <div className="font-bold text-slate-900 truncate text-xs group-hover:text-[#2563EB] transition-colors">
+                        <div className="type-minor-heading text-slate-900 truncate group-hover:text-[#2563EB] transition-colors">
                           {item.title}
                         </div>
-                        <div className="text-[11px] text-slate-500 truncate mt-0.5">
+                        <div className="type-metadata text-slate-500 truncate mt-0.5">
                           {item.requesterName} • <span className="font-mono text-slate-600">{item.projectCode}</span>
                         </div>
                       </div>
@@ -347,7 +344,7 @@ export default function OwnerDashboardView({
                     <button
                       type="button"
                       onClick={() => setReviewingItem(item)}
-                      className="px-3.5 py-1.5 bg-[#2563EB] hover:bg-blue-700 text-white text-xs font-semibold rounded-xl shadow-2xs transition-all cursor-pointer shrink-0"
+                      className="px-3.5 py-1.5 bg-[#2563EB] hover:bg-blue-700 text-white type-button-label rounded-xl shadow-2xs transition-all cursor-pointer shrink-0"
                     >
                       Review
                     </button>
@@ -365,11 +362,11 @@ export default function OwnerDashboardView({
                   <FolderKanban className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-slate-900">Project delivery</h3>
+                  <h2 className="type-card-title text-slate-900">Project delivery</h2>
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full type-badge bg-emerald-50 text-emerald-700 border border-emerald-200">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                   <span>On schedule</span>
                 </span>
@@ -377,11 +374,11 @@ export default function OwnerDashboardView({
             </div>
 
             <div className="space-y-2 pt-1">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-bold text-slate-800">
+              <div className="flex items-center justify-between type-body-compact">
+                <span className="font-medium text-slate-800">
                   {data.studioSummary.activeProjectsCount} active projects
                 </span>
-                <span className="font-bold text-slate-800">
+                <span className="font-medium text-slate-800 tabular-nums">
                   {data.studioSummary.activeProjectsCount > 0
                     ? Math.round(((data.studioSummary.activeProjectsCount - data.studioSummary.overdueDeliverablesCount) / data.studioSummary.activeProjectsCount) * 100)
                     : 100}% on time
@@ -407,11 +404,11 @@ export default function OwnerDashboardView({
                 <div className="w-8 h-8 rounded-xl bg-blue-50 text-[#2563EB] flex items-center justify-center border border-blue-100">
                   <Users className="w-4 h-4" />
                 </div>
-                <h3 className="text-sm font-bold text-slate-900">Studio team workload</h3>
+                <h2 className="type-card-title text-slate-900">Studio team workload</h2>
               </div>
               <Link
                 href={`/w/${workspaceSlug}/team`}
-                className="text-xs font-bold text-[#2563EB] hover:text-blue-800 flex items-center gap-1"
+                className="type-button-label text-[#2563EB] hover:text-blue-800 flex items-center gap-1"
               >
                 <span>View all {data.teamWorkload.length}</span>
                 <ChevronRight className="w-3.5 h-3.5" />
@@ -419,13 +416,13 @@ export default function OwnerDashboardView({
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
+              <table className="w-full text-left type-table-cell">
                 <thead>
-                  <tr className="border-b border-slate-100 text-[10px] text-slate-400 uppercase font-bold tracking-wider">
-                    <th className="pb-3 font-semibold">TEAM MEMBER</th>
-                    <th className="pb-3 font-semibold">ROLE</th>
-                    <th className="pb-3 text-center font-semibold">ACTIVE TASKS</th>
-                    <th className="pb-3 font-semibold text-right sm:text-left sm:pl-6">WORKLOAD</th>
+                  <tr className="border-b border-slate-100 text-slate-500 type-form-label">
+                    <th className="pb-3 font-medium">Team member</th>
+                    <th className="pb-3 font-medium">Role</th>
+                    <th className="pb-3 text-center font-medium">Active tasks</th>
+                    <th className="pb-3 font-medium text-right sm:text-left sm:pl-6">Workload</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -437,18 +434,18 @@ export default function OwnerDashboardView({
                       <tr key={m.memberId} className="hover:bg-slate-50/70 transition-colors">
                         <td className="py-3">
                           <div className="flex items-center gap-2.5">
-                            <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-800 text-[10px] font-bold flex items-center justify-center shrink-0">
+                            <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-800 type-badge font-bold flex items-center justify-center shrink-0">
                               {initials}
                             </div>
-                            <span className="font-bold text-slate-900 truncate max-w-[140px] sm:max-w-none">
+                            <span className="font-medium text-slate-900 truncate max-w-[140px] sm:max-w-none">
                               {m.fullName}
                             </span>
                           </div>
                         </td>
-                        <td className="py-3 text-slate-500 font-medium">
+                        <td className="py-3 text-slate-500 font-normal">
                           {m.designation || "Studio Specialist"}
                         </td>
-                        <td className="py-3 text-center font-bold text-slate-800">
+                        <td className="py-3 text-center font-medium text-slate-800 tabular-nums">
                           {m.activeTasksCount}
                         </td>
                         <td className="py-3 sm:pl-6">
@@ -459,7 +456,7 @@ export default function OwnerDashboardView({
                                 style={{ width: `${Math.max(5, workloadPct)}%` }}
                               />
                             </div>
-                            <span className="font-mono text-slate-600 text-xs w-8 text-right">
+                            <span className="font-mono text-slate-600 type-body-compact w-8 text-right tabular-nums">
                               {workloadPct}%
                             </span>
                           </div>
@@ -482,9 +479,9 @@ export default function OwnerDashboardView({
                 <div className="w-8 h-8 rounded-xl bg-blue-50 text-[#2563EB] flex items-center justify-center border border-blue-100">
                   <Activity className="w-4 h-4" />
                 </div>
-                <h3 className="text-sm font-bold text-slate-900">Studio health</h3>
+                <h2 className="type-card-title text-slate-900">Studio health</h2>
               </div>
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full type-badge bg-emerald-50 text-emerald-700 border border-emerald-200">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                 <span>Healthy</span>
               </span>
@@ -508,30 +505,30 @@ export default function OwnerDashboardView({
                   />
                 </svg>
                 <div className="absolute text-center">
-                  <span className="text-xs font-black font-mono text-slate-900">
+                  <span className="type-kpi-value font-mono text-slate-900 leading-none">
                     {data.studioHealthIndex?.score ?? 79}
                   </span>
-                  <span className="text-[8px] text-slate-400 block font-mono -mt-1">/100</span>
+                  <span className="type-metadata text-slate-400 block font-mono -mt-1">/100</span>
                 </div>
               </div>
 
               <div className="space-y-1">
-                <div className="text-xs text-slate-500 flex items-center gap-1">
-                  <span className="text-rose-500 font-bold">↘ -1.6%</span>
+                <div className="type-helper text-slate-500 flex items-center gap-1">
+                  <span className="text-rose-500 font-medium">↘ -1.6%</span>
                   <span>vs last week</span>
                 </div>
-                <p className="text-[11px] text-slate-400 leading-tight">
+                <p className="type-helper text-slate-500 leading-tight">
                   Composite rating of delivery, reviews, and capacity.
                 </p>
               </div>
             </div>
 
             {/* 4 Health Dimension Progress Bars */}
-            <div className="space-y-2.5 pt-2 border-t border-slate-100 text-xs">
+            <div className="space-y-2.5 pt-2 border-t border-slate-100 type-body-compact">
               <div className="space-y-1">
-                <div className="flex justify-between text-slate-600 text-[11px]">
+                <div className="flex justify-between text-slate-600 type-helper">
                   <span>Deliverables</span>
-                  <span className="font-bold text-slate-800">100%</span>
+                  <span className="font-medium text-slate-800 tabular-nums">100%</span>
                 </div>
                 <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
                   <div className="bg-blue-600 h-full rounded-full" style={{ width: "100%" }} />
@@ -539,9 +536,9 @@ export default function OwnerDashboardView({
               </div>
 
               <div className="space-y-1">
-                <div className="flex justify-between text-slate-600 text-[11px]">
+                <div className="flex justify-between text-slate-600 type-helper">
                   <span>Review latency</span>
-                  <span className="font-bold text-slate-800">25%</span>
+                  <span className="font-medium text-slate-800 tabular-nums">25%</span>
                 </div>
                 <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
                   <div className="bg-emerald-500 h-full rounded-full" style={{ width: "25%" }} />
@@ -549,9 +546,9 @@ export default function OwnerDashboardView({
               </div>
 
               <div className="space-y-1">
-                <div className="flex justify-between text-slate-600 text-[11px]">
+                <div className="flex justify-between text-slate-600 type-helper">
                   <span>Team balance</span>
-                  <span className="font-bold text-slate-800">100%</span>
+                  <span className="font-medium text-slate-800 tabular-nums">100%</span>
                 </div>
                 <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
                   <div className="bg-purple-600 h-full rounded-full" style={{ width: "100%" }} />
@@ -559,9 +556,9 @@ export default function OwnerDashboardView({
               </div>
 
               <div className="space-y-1">
-                <div className="flex justify-between text-slate-600 text-[11px]">
+                <div className="flex justify-between text-slate-600 type-helper">
                   <span>Cash velocity</span>
-                  <span className="font-bold text-slate-800">90%</span>
+                  <span className="font-medium text-slate-800 tabular-nums">90%</span>
                 </div>
                 <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
                   <div className="bg-amber-500 h-full rounded-full" style={{ width: "90%" }} />
@@ -572,7 +569,7 @@ export default function OwnerDashboardView({
             <div className="pt-2 text-right">
               <Link
                 href={`/w/${workspaceSlug}/capacity`}
-                className="text-xs font-bold text-[#2563EB] hover:text-blue-800 inline-flex items-center gap-1"
+                className="type-button-label text-[#2563EB] hover:text-blue-800 inline-flex items-center gap-1"
               >
                 <span>View health details</span>
                 <ChevronRight className="w-3.5 h-3.5" />
@@ -582,24 +579,24 @@ export default function OwnerDashboardView({
 
           {/* Card 2: Next actions */}
           <div className="bg-white border border-slate-200/90 rounded-3xl p-5 sm:p-6 shadow-2xs space-y-3">
-            <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+            <h2 className="type-card-title text-slate-900 flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-sm bg-blue-600 inline-block" />
               <span>Next actions</span>
-            </h3>
+            </h2>
 
-            <div className="space-y-2 text-xs">
+            <div className="space-y-2 type-body-compact">
               <Link
                 href={`/w/${workspaceSlug}/inbox`}
                 className="p-3 rounded-2xl bg-slate-50 hover:bg-slate-100/80 border-l-4 border-l-rose-500 border border-slate-200/60 flex items-center justify-between group transition-colors"
               >
                 <div>
-                  <div className="font-bold text-slate-900 text-xs">Review task submissions</div>
-                  <div className="text-[11px] text-slate-500">
+                  <div className="type-minor-heading text-slate-900">Review task submissions</div>
+                  <div className="type-helper text-slate-500">
                     {data.approvalInbox.length || 2} deliverables pending
                   </div>
                 </div>
-                <span className="text-[10px] font-bold bg-rose-100 text-rose-700 px-2 py-0.5 rounded-md">
-                  HIGH
+                <span className="type-badge bg-rose-100 text-rose-700 px-2 py-0.5 rounded-md">
+                  High
                 </span>
               </Link>
 
@@ -608,11 +605,11 @@ export default function OwnerDashboardView({
                 className="p-3 rounded-2xl bg-slate-50 hover:bg-slate-100/80 border-l-4 border-l-amber-500 border border-slate-200/60 flex items-center justify-between group transition-colors"
               >
                 <div>
-                  <div className="font-bold text-slate-900 text-xs">Verify studio capacity</div>
-                  <div className="text-[11px] text-slate-500">Check team workload matrix</div>
+                  <div className="type-minor-heading text-slate-900">Verify studio capacity</div>
+                  <div className="type-helper text-slate-500">Check team workload matrix</div>
                 </div>
-                <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-md">
-                  MED
+                <span className="type-badge bg-amber-100 text-amber-700 px-2 py-0.5 rounded-md">
+                  Med
                 </span>
               </Link>
 
@@ -621,11 +618,11 @@ export default function OwnerDashboardView({
                 className="p-3 rounded-2xl bg-slate-50 hover:bg-slate-100/80 border-l-4 border-l-blue-500 border border-slate-200/60 flex items-center justify-between group transition-colors"
               >
                 <div>
-                  <div className="font-bold text-slate-900 text-xs">Audit incurred expenses</div>
-                  <div className="text-[11px] text-slate-500">Review project contractor costs</div>
+                  <div className="type-minor-heading text-slate-900">Audit incurred expenses</div>
+                  <div className="type-helper text-slate-500">Review project contractor costs</div>
                 </div>
-                <span className="text-[10px] font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-md">
-                  LOW
+                <span className="type-badge bg-blue-100 text-blue-700 px-2 py-0.5 rounded-md">
+                  Low
                 </span>
               </Link>
             </div>
@@ -634,13 +631,13 @@ export default function OwnerDashboardView({
           {/* Card 3: Upcoming site visits */}
           <div className="bg-white border border-slate-200/90 rounded-3xl p-5 sm:p-6 shadow-2xs space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <h2 className="type-card-title text-slate-900 flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-[#2563EB]" />
                 <span>Upcoming site visits</span>
-              </h3>
+              </h2>
               <Link
                 href={`/w/${workspaceSlug}/visits`}
-                className="text-xs font-bold text-[#2563EB] hover:text-blue-800 flex items-center gap-1"
+                className="type-button-label text-[#2563EB] hover:text-blue-800 flex items-center gap-1"
               >
                 <span>View calendar</span>
                 <ChevronRight className="w-3.5 h-3.5" />
@@ -650,18 +647,18 @@ export default function OwnerDashboardView({
             {data.upcomingSiteVisits.length === 0 ? (
               <div className="p-8 text-center bg-slate-50/70 rounded-2xl border border-dashed border-slate-200 space-y-1">
                 <Calendar className="w-6 h-6 text-slate-300 mx-auto" />
-                <p className="text-xs text-slate-500 font-medium">No visits scheduled this week.</p>
+                <p className="type-body-compact text-slate-500 font-medium">No visits scheduled this week.</p>
               </div>
             ) : (
               <div className="space-y-2.5">
                 {data.upcomingSiteVisits.slice(0, 3).map((v) => (
-                  <div key={v.id} className="p-3 bg-slate-50 rounded-2xl border border-slate-100 space-y-1 text-xs">
-                    <div className="flex items-center justify-between text-[10px] text-slate-400 font-mono">
-                      <span className="font-bold text-[#2563EB]">{v.projectCode} • {v.siteName}</span>
+                  <div key={v.id} className="p-3 bg-slate-50 rounded-2xl border border-slate-100 space-y-1 type-body-compact">
+                    <div className="flex items-center justify-between type-metadata text-slate-400 font-mono">
+                      <span className="font-semibold text-[#2563EB]">{v.projectCode} • {v.siteName}</span>
                       <span>{new Date(v.scheduledTime).toLocaleDateString()}</span>
                     </div>
-                    <p className="font-bold text-slate-800 truncate">{v.purpose}</p>
-                    <span className="text-[11px] text-slate-500 block">
+                    <p className="type-minor-heading text-slate-800 truncate">{v.purpose}</p>
+                    <span className="type-helper text-slate-500 block">
                       Inspector: {v.inspectorName}
                     </span>
                   </div>
@@ -674,7 +671,7 @@ export default function OwnerDashboardView({
 
       {/* Toast Notification */}
       {airlockToast && (
-        <div className="fixed bottom-6 right-6 z-50 px-4 py-3 bg-slate-900 text-white text-xs font-semibold rounded-2xl shadow-2xl border border-slate-800 flex items-center gap-2 animate-in fade-in slide-in-from-bottom-3 duration-200">
+        <div className="fixed bottom-6 right-6 z-50 px-4 py-3 bg-slate-900 text-white type-body-compact font-medium rounded-2xl shadow-2xl border border-slate-800 flex items-center gap-2 animate-in fade-in slide-in-from-bottom-3 duration-200">
           <CheckCircle2 className="w-4 h-4 text-emerald-400" />
           <span>{airlockToast}</span>
         </div>

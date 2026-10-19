@@ -865,7 +865,7 @@ export default function TeamClientView({
         {/* Title & Actions Row */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#1F1F1F]">
+            <h1 className="type-page-title text-[#1F1F1F]">
               Studio team
             </h1>
             <p className="text-xs sm:text-sm text-[#696E82] mt-0.5">
@@ -1360,7 +1360,7 @@ export default function TeamClientView({
                         {initials}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <h3 className="font-bold text-sm text-[#1F1F1F] truncate" title={emp.fullName}>
+                        <h3 className="type-card-title text-[#1F1F1F] truncate" title={emp.fullName}>
                           {emp.fullName}
                         </h3>
                         <p className="text-xs text-[#696E82] truncate mt-0.5">
@@ -1772,7 +1772,7 @@ export default function TeamClientView({
                     .substring(0, 2)
                     .toUpperCase()}
                 </div>
-                <h2 className="text-lg font-bold text-[#1F1F1F] mt-3">
+                <h2 className="type-section-title text-[#1F1F1F] mt-3">
                   {selectedProfileEmployee.fullName}
                 </h2>
                 <div className="mt-1.5 flex items-center justify-center gap-2">
@@ -2080,7 +2080,7 @@ export default function TeamClientView({
                   <UserPlus className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-[#1F1F1F]">Add New Studio Employee</h3>
+                  <h3 className="type-card-title text-[#1F1F1F]">Add New Studio Employee</h3>
                   <p className="text-xs text-[#696E82]">Create staff identity, role, credentials, and project assignments</p>
                 </div>
               </div>
@@ -2404,7 +2404,7 @@ export default function TeamClientView({
                   <Edit className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-[#1F1F1F]">Edit Studio Employee</h3>
+                  <h3 className="type-card-title text-[#1F1F1F]">Edit Studio Employee</h3>
                   <p className="text-xs text-[#696E82]">
                     Editing details for <span className="font-semibold text-[#5A81FA]">{editingEmployee.employeeId}</span>
                   </p>
@@ -2594,7 +2594,7 @@ export default function TeamClientView({
                   <KeyRound className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-[#1F1F1F]">Manage Employee Credentials</h3>
+                  <h3 className="type-card-title text-[#1F1F1F]">Manage Employee Credentials</h3>
                   <p className="text-xs text-[#696E82]">
                     Update password and revoke active sessions for this user
                   </p>

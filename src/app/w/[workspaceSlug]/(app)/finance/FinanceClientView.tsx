@@ -486,7 +486,7 @@ export default function FinanceClientView({
               </div>
             </div>
 
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#0F172A] leading-snug">
+            <h1 className="type-page-title text-[#0F172A] leading-snug">
               Project Finance
             </h1>
             <p className="text-xs text-slate-500 leading-relaxed">

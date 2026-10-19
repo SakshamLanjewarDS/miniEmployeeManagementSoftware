@@ -15,7 +15,7 @@ export function TaskPriorityBadge({
   className = "",
 }: TaskPriorityBadgeProps) {
   const norm = (priority || "").toUpperCase();
-  const sizeClasses = size === "sm" ? "text-[11px] px-2 py-0.5 gap-1" : "text-[12px] px-2.5 py-0.5 gap-1";
+  const sizeClasses = size === "sm" ? "type-badge px-2 py-0.5 gap-1" : "type-badge px-2.5 py-0.5 gap-1";
 
   switch (norm) {
     case "URGENT":

@@ -126,7 +126,7 @@ export default function AttendanceManagementPage() {
             <span>/</span>
             <span className="font-semibold text-[#1F1F1F]">Staff Attendance</span>
           </div>
-          <h1 className="text-xl sm:text-2xl font-bold text-[#1F1F1F] tracking-tight">Studio Attendance & Punch Logs</h1>
+          <h1 className="type-page-title text-[#1F1F1F]">Studio Attendance & Punch Logs</h1>
           <p className="text-xs text-[#696E82] mt-0.5">
             Owner/Admin restricted • Incomplete punch reporting • Audited time corrections
           </p>
@@ -371,7 +371,7 @@ export default function AttendanceManagementPage() {
           >
             <div className="flex items-center justify-between border-b border-[#E2E6F0] pb-3">
               <div>
-                <h3 className="text-base font-bold text-[#1F1F1F]">Audited Punch Correction</h3>
+                <h3 className="type-card-title text-[#1F1F1F]">Audited Punch Correction</h3>
                 <p className="text-xs text-[#696E82]">
                   {correctingRecord.employee?.membership?.user?.fullName} ({selectedDate})
                 </p>

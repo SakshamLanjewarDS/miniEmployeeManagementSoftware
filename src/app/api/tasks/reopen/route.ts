@@ -13,7 +13,9 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { taskId, itemId, reason } = body;
+    const taskId = body.taskId;
+    const itemId = body.itemId || body.checklistItemId;
+    const reason = body.reason;
 
     if (!taskId || !itemId || !reason || !reason.trim()) {
       return NextResponse.json(

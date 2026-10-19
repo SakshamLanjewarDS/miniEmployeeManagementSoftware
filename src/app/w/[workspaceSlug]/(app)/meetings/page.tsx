@@ -755,7 +755,7 @@ ${m.actionItems?.map((a, i) => `${i + 1}. [${a.status}] ${a.description} ${a.ass
             <span>/</span>
             <span className="font-semibold text-[#0B122B]">Studio meetings</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-[#0B122B] tracking-tight">Studio meetings</h1>
+          <h1 className="type-page-title text-[#0B122B]">Studio meetings</h1>
           <p className="text-xs sm:text-sm text-[#696E82] mt-0.5">
             Plan discussions. Capture decisions. Track follow-through.
           </p>
@@ -1261,7 +1261,7 @@ ${m.actionItems?.map((a, i) => `${i + 1}. [${a.status}] ${a.description} ${a.ass
         <div className="bg-white rounded-3xl border border-[#E2E6F0] p-5 shadow-xs space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-slate-100">
             <div className="flex items-center gap-3">
-              <h2 className="text-base font-bold text-slate-900">
+              <h2 className="type-section-title text-slate-900">
                 {calendarMonth.toLocaleString("default", { month: "long", year: "numeric" })}
               </h2>
               <span className="text-xs text-slate-500 font-medium">
@@ -1412,7 +1412,7 @@ ${m.actionItems?.map((a, i) => `${i + 1}. [${a.status}] ${a.description} ${a.ass
                   <div className="flex flex-col md:flex-row md:items-start justify-between gap-3 border-b border-[#E2E6F0] pb-4">
                     <div className="space-y-1.5">
                       <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="text-base font-bold text-slate-900">{m.title}</h3>
+                        <h3 className="type-card-title text-slate-900">{m.title}</h3>
                         <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#CEDEFF] text-[#2C308D]">
                           {m.meetingType}
                         </span>
@@ -1936,7 +1936,7 @@ ${m.actionItems?.map((a, i) => `${i + 1}. [${a.status}] ${a.description} ${a.ass
                     <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
                       Day Schedule Inspection
                     </span>
-                    <h2 className="text-base font-bold text-slate-900">
+                    <h2 className="type-section-title text-slate-900">
                       {new Date(selectedDateForDrawer).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
                     </h2>
                   </div>

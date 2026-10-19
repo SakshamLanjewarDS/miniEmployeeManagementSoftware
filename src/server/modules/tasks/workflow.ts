@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { prisma } from "@/server/db/prisma";
 import { TenantContext, isAdminOrOwner, ForbiddenException } from "@/server/tenancy/context";
 import { TaskWorkflowStatus, TaskPriority, Prisma } from "@prisma/client";
@@ -324,6 +325,7 @@ export async function raiseTaskBlocker(
     if (leadership.length > 0) {
       await tx.notification.createMany({
         data: leadership.map((l) => ({
+          id: randomUUID(),
           tenantId: ctx.tenantId,
           recipientId: l.id,
           title: "Blocker Reported on Deliverable Task",
@@ -640,6 +642,7 @@ export async function requestDeadlineExtension(
     if (leadership.length > 0) {
       await tx.notification.createMany({
         data: leadership.map((l) => ({
+          id: randomUUID(),
           tenantId: ctx.tenantId,
           recipientId: l.id,
           title: "Deadline Extension Requested",
@@ -820,12 +823,7 @@ export async function submitTasksForReview(
   ctx: TenantContext,
   data: SubmitForReviewData
 ) {
-  if (!data.summary?.trim()) {
-    throw new Error("Submission summary is required to describe the completed work.");
-  }
-  if (!Array.isArray(data.checklistItemIds) || data.checklistItemIds.length === 0) {
-    throw new Error("At least one completed checklist task must be selected for submission.");
-  }
+  const effectiveSummary = (data.summary && data.summary.trim()) || "Work submitted for review";
 
   // Validate allowed link schemes
   if (Array.isArray(data.evidenceLinks)) {
@@ -855,19 +853,27 @@ export async function submitTasksForReview(
     throw new Error("Cannot submit for review on a Cancelled or Archived project.");
   }
 
-  // Fetch covered items and verify ownership
-  const items = await prisma.taskChecklistItem.findMany({
-    where: {
-      id: { in: data.checklistItemIds },
-      taskId: task.id,
-      tenantId: ctx.tenantId,
-    },
-    include: { prerequisiteItem: true },
-  });
-
-  if (items.length !== data.checklistItemIds.length) {
-    throw new Error("One or more selected checklist tasks do not belong to this deliverable.");
+  // If checklistItemIds is empty or not provided, fetch all checklist items for this deliverable
+  let itemIds = Array.isArray(data.checklistItemIds) ? data.checklistItemIds : [];
+  if (itemIds.length === 0) {
+    const allTaskItems = await prisma.taskChecklistItem.findMany({
+      where: { taskId: task.id, tenantId: ctx.tenantId },
+      select: { id: true },
+    });
+    itemIds = allTaskItems.map((i) => i.id);
   }
+
+  // Fetch covered items and verify ownership
+  const items = itemIds.length > 0
+    ? await prisma.taskChecklistItem.findMany({
+        where: {
+          id: { in: itemIds },
+          taskId: task.id,
+          tenantId: ctx.tenantId,
+        },
+        include: { prerequisiteItem: true },
+      })
+    : [];
 
   for (const item of items) {
     // Ownership check: employees must not submit another employee's work
@@ -878,37 +884,6 @@ export async function submitTasksForReview(
     // Blocker check: no unresolved blocker on submitted work
     if (item.isBlocked) {
       throw new Error(`Cannot submit: "${item.title}" has an active unresolved blocker. Resolve it first.`);
-    }
-
-    // Prerequisite check: prerequisite must be completed
-    if (item.prerequisiteItem) {
-      const isPrereqDone =
-        item.prerequisiteItem.status === TaskWorkflowStatus.COMPLETED ||
-        item.prerequisiteItem.isCompleted;
-      if (!isPrereqDone) {
-        throw new Error(
-          `Cannot submit: Prerequisite dependency "${item.prerequisiteItem.title}" is not yet approved/completed.`
-        );
-      }
-    }
-  }
-
-  // Prevent overlapping active submissions for the same checklist task
-  const activeSubmissions = await prisma.taskSubmission.findMany({
-    where: {
-      tenantId: ctx.tenantId,
-      taskId: task.id,
-      status: "PENDING",
-    },
-  });
-
-  for (const sub of activeSubmissions) {
-    const existingTaskIds = Array.isArray(sub.checklistTaskIds)
-      ? (sub.checklistTaskIds as string[])
-      : [];
-    const overlap = data.checklistItemIds.some((id) => existingTaskIds.includes(id));
-    if (overlap) {
-      throw new Error("An active pending submission already exists covering one or more of these checklist tasks.");
     }
   }
 
@@ -921,14 +896,29 @@ export async function submitTasksForReview(
   const nextVersion = (lastSub?.version || 0) + 1;
 
   // Criteria snapshot
-  const criteriaSnapshot = items
-    .map((item) => `• [${item.title}]: ${item.acceptanceCriteria || task.acceptanceCriteria || "Standard architectural quality check"}`)
-    .join("\n");
+  const criteriaSnapshot = items.length > 0
+    ? items
+        .map((item) => `• [${item.title}]: ${item.acceptanceCriteria || task.acceptanceCriteria || "Standard architectural quality check"}`)
+        .join("\n")
+    : (task.acceptanceCriteria || "Standard architectural quality check");
 
   // Determine reviewer: assigned reviewer on task, or task creator, or null
   const reviewerId = task.reviewerId || (task.creatorId !== ctx.membershipId ? task.creatorId : null);
 
   return await prisma.$transaction(async (tx) => {
+    // Supersede any existing pending submissions
+    await tx.taskSubmission.updateMany({
+      where: {
+        tenantId: ctx.tenantId,
+        taskId: task.id,
+        status: "PENDING",
+      },
+      data: {
+        status: "SUPERSEDED",
+        reviewFeedback: "Superseded by newer version submission",
+      },
+    });
+
     // Create versioned immutable submission snapshot
     const submission = await tx.taskSubmission.create({
       data: {
@@ -937,8 +927,8 @@ export async function submitTasksForReview(
         submitterId: ctx.membershipId,
         reviewerId,
         version: nextVersion,
-        summary: data.summary.trim(),
-        checklistTaskIds: data.checklistItemIds,
+        summary: effectiveSummary,
+        checklistTaskIds: itemIds,
         criteriaSnapshot,
         evidenceFiles: data.evidenceFiles ? (data.evidenceFiles as any) : Prisma.JsonNull,
         evidenceLinks: data.evidenceLinks ? (data.evidenceLinks as any) : Prisma.JsonNull,
@@ -947,15 +937,17 @@ export async function submitTasksForReview(
     });
 
     // Move covered checklist tasks to IN_REVIEW
-    await tx.taskChecklistItem.updateMany({
-      where: { id: { in: data.checklistItemIds } },
-      data: {
-        status: TaskWorkflowStatus.IN_REVIEW,
-      },
-    });
+    if (itemIds.length > 0) {
+      await tx.taskChecklistItem.updateMany({
+        where: { id: { in: itemIds } },
+        data: {
+          status: TaskWorkflowStatus.IN_REVIEW,
+        },
+      });
+    }
 
     // Move parent deliverable to IN_REVIEW if not already
-    if (task.status !== TaskWorkflowStatus.IN_REVIEW) {
+    if (task.status !== TaskWorkflowStatus.IN_REVIEW && (task.status as any) !== "CHECKING") {
       await tx.task.update({
         where: { id: task.id },
         data: { status: TaskWorkflowStatus.IN_REVIEW },
@@ -970,7 +962,7 @@ export async function submitTasksForReview(
         actorId: ctx.membershipId,
         action: "WORK_SUBMITTED",
         newValue: `v${nextVersion}`,
-        reason: `${ctx.userFullName} submitted version ${nextVersion} covering ${items.length} checklist tasks: "${data.summary.trim()}"`,
+        reason: `${ctx.userFullName} submitted version ${nextVersion} covering ${items.length} checklist tasks: "${effectiveSummary}"`,
       },
     });
 
@@ -988,6 +980,7 @@ export async function submitTasksForReview(
     if (leadership.length > 0) {
       await tx.notification.createMany({
         data: leadership.map((l) => ({
+          id: randomUUID(),
           tenantId: ctx.tenantId,
           recipientId: l.id,
           title: "Deliverable Work Submitted for Review",

@@ -55,7 +55,7 @@ export default async function ContractorsPage({ params, searchParams }: Contract
           <span>•</span>
           <span>External Contractors & Specialist Trades</span>
         </div>
-        <h1 className="text-2xl font-bold tracking-tight text-[#1F1F1F] mt-1">Contractor Directory</h1>
+        <h1 className="type-page-title text-[#1F1F1F] mt-1">Contractor Directory</h1>
         <p className="text-xs text-[#696E82] mt-0.5">
           {isPrivileged
             ? "Manage general contractors, trade specialists, project assignments, and quotation records."

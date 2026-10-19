@@ -198,7 +198,7 @@ export default function ExecutiveTasksPage() {
             <span>/</span>
             <span className="font-semibold text-[#1F1F1F]">Partner Deliverables</span>
           </div>
-          <h1 className="text-2xl font-bold text-[#1F1F1F] tracking-tight">Executive Task Board</h1>
+          <h1 className="type-page-title text-[#1F1F1F]">Executive Task Board</h1>
           <p className="text-xs text-[#696E82] mt-0.5">
             Single & Joint leadership assignments • 8 KPI slots • Isolated from employee tasks
           </p>
@@ -577,7 +577,7 @@ export default function ExecutiveTasksPage() {
               </div>
 
               <div>
-                <h2 className="text-lg font-bold text-[#1F1F1F]">{selectedTask.title}</h2>
+                <h2 className="type-section-title text-[#1F1F1F]">{selectedTask.title}</h2>
                 <div className="flex items-center gap-2 mt-1">
                   <span className="text-xs text-[#5A81FA] font-semibold">{selectedTask.category}</span>
                   {selectedTask.project && (
@@ -674,7 +674,7 @@ export default function ExecutiveTasksPage() {
           >
             <div className="flex items-center justify-between border-b border-[#E2E6F0] pb-3">
               <div>
-                <h3 id="create-deliv-title" className="text-base font-bold text-[#1F1F1F]">Create Executive Deliverable</h3>
+                <h3 id="create-deliv-title" className="type-card-title text-[#1F1F1F]">Create Executive Deliverable</h3>
                 <p className="text-xs text-[#696E82]">Leadership deliverable tracking</p>
               </div>
               <button

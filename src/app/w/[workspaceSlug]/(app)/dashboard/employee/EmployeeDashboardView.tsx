@@ -645,19 +645,19 @@ export default function EmployeeDashboardView({
   return (
     <div className="space-y-6 pb-12 max-w-7xl mx-auto">
       {/* ============================================================== */}
-      {/* 1. TOP GREETING PANEL (Image A)                                 */}
+      {/* 1. TOP GREETING PANEL                                          */}
       {/* ============================================================== */}
       <div className="bg-white border border-slate-200/80 rounded-3xl p-4 sm:p-6 lg:p-8 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="space-y-1 min-w-0">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 font-mono">
+          <div className="type-metadata text-slate-500 mb-1">
             {todayDateString}
           </div>
-          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-slate-900 tracking-tight">
-            Good Morning, {userFullName.split(" ")[0]}
+          <h1 className="type-page-title text-slate-900">
+            Good morning, {userFullName.split(" ")[0]}
           </h1>
-          <p className="text-xs sm:text-sm text-slate-500">
+          <p className="type-body-compact text-slate-500">
             Architect & Designer Workspace. You have{" "}
-            <span className="font-bold text-[#3562E8] bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100">
+            <span className="font-semibold text-[#3562E8] bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100">
               {pendingPersonalActions} pending action{pendingPersonalActions !== 1 ? "s" : ""}
             </span>{" "}
             requiring your focus today.
@@ -676,14 +676,14 @@ export default function EmployeeDashboardView({
           <button
             type="button"
             onClick={() => setIsFocusMode(!isFocusMode)}
-            className={`px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-2xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
+            className={`px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-2xl type-button-label transition-all flex items-center gap-1.5 cursor-pointer border ${
               isFocusMode
                 ? "bg-slate-900 text-white border-slate-900 shadow-sm"
                 : "bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200/80"
             }`}
           >
             <Target className={`w-3.5 h-3.5 ${isFocusMode ? "text-amber-400" : "text-[#3562E8]"}`} />
-            <span>{isFocusMode ? "Exit Focus" : "Focus Mode"}</span>
+            <span>{isFocusMode ? "Exit focus" : "Focus mode"}</span>
           </button>
 
           <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-amber-50 text-amber-500 border border-amber-200/60 flex items-center justify-center shadow-xs">
@@ -704,7 +704,7 @@ export default function EmployeeDashboardView({
 
       {/* Action Notification Banner */}
       {actionMessage && (
-        <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs text-emerald-800 flex items-center justify-between shadow-xs">
+        <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl type-body-compact text-emerald-800 flex items-center justify-between shadow-xs">
           <div className="flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
             <span className="font-semibold">{actionMessage}</span>
@@ -719,22 +719,22 @@ export default function EmployeeDashboardView({
       )}
 
       {/* ============================================================== */}
-      {/* 2. SECTION NAVIGATION PILLS ROW (Image A)                       */}
+      {/* 2. SECTION NAVIGATION PILLS ROW                                 */}
       {/* ============================================================== */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 touch-scroll-x no-scrollbar text-xs">
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 touch-scroll-x no-scrollbar">
         {[
           { key: "MY_DAY", label: "My Day" },
-          { key: "QUEUE", label: `Work Queue (${data.workQueue.length})` },
-          { key: "DRAWINGS", label: `GFC Drawings (${data.latestApprovedDrawings?.length || 0})` },
-          { key: "VISITS", label: `Site Visits (${data.mySiteVisits.length})` },
-          { key: "SCRATCHPAD", label: `Field Memos (${savedMemos.length})` },
+          { key: "QUEUE", label: `Work queue (${data.workQueue.length})` },
+          { key: "DRAWINGS", label: `GFC drawings (${data.latestApprovedDrawings?.length || 0})` },
+          { key: "VISITS", label: `Site visits (${data.mySiteVisits.length})` },
+          { key: "SCRATCHPAD", label: `Field memos (${savedMemos.length})` },
         ].map((tab) => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key as any)}
-            className={`px-4 py-2 rounded-xl font-bold transition-all cursor-pointer whitespace-nowrap ${
+            className={`px-4 py-2 rounded-xl type-nav-label transition-all cursor-pointer whitespace-nowrap ${
               activeTab === tab.key
-                ? "bg-[#3562E8] text-white shadow-xs"
+                ? "bg-[#3562E8] text-white shadow-xs font-semibold"
                 : "bg-white text-slate-600 border border-slate-200/80 hover:bg-slate-50"
             }`}
           >
@@ -744,7 +744,7 @@ export default function EmployeeDashboardView({
       </div>
 
       {/* ============================================================== */}
-      {/* 3. FOUR KPI CARDS (Image A)                                     */}
+      {/* 3. FOUR KPI CARDS                                              */}
       {/* ============================================================== */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {/* KPI 1: In Progress */}
@@ -757,14 +757,14 @@ export default function EmployeeDashboardView({
               : "bg-white border-slate-200/80 hover:border-[#3562E8]"
           }`}
         >
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-xs text-slate-400 font-medium">In Progress</span>
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="type-kpi-label text-slate-500 font-medium">In progress</span>
             <span className="w-2 h-2 rounded-full bg-blue-500" />
           </div>
-          <div className="text-2xl sm:text-3xl font-bold text-slate-900">
+          <div className="type-kpi-value text-slate-900">
             {data.mySummary.pendingTasksCount}
           </div>
-          <span className="text-[10px] text-slate-400 mt-1 block">Active deliverables</span>
+          <span className="type-helper text-slate-500 mt-1 block">Active deliverables</span>
         </button>
 
         {/* KPI 2: Due Today */}
@@ -777,14 +777,14 @@ export default function EmployeeDashboardView({
               : "bg-white border-slate-200/80 hover:border-[#3562E8]"
           }`}
         >
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-xs text-slate-400 font-medium">Due Today</span>
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="type-kpi-label text-slate-500 font-medium">Due today</span>
             <span className="w-2 h-2 rounded-full bg-[#3562E8]" />
           </div>
-          <div className="text-2xl sm:text-3xl font-bold text-[#3562E8]">
+          <div className="type-kpi-value text-[#3562E8]">
             {data.mySummary.dueTodayCount}
           </div>
-          <span className="text-[10px] text-[#3562E8] font-medium mt-1 block">Scheduled for delivery</span>
+          <span className="type-helper text-[#3562E8] font-medium mt-1 block">Scheduled for delivery</span>
         </button>
 
         {/* KPI 3: Overdue */}
@@ -797,18 +797,18 @@ export default function EmployeeDashboardView({
               : "bg-white border-slate-200/80 hover:border-rose-300"
           }`}
         >
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-xs text-slate-400 font-medium">Overdue</span>
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="type-kpi-label text-slate-500 font-medium">Overdue</span>
             <span className="w-2 h-2 rounded-full bg-rose-500" />
           </div>
           <div
-            className={`text-2xl sm:text-3xl font-bold transition-colors ${
+            className={`type-kpi-value transition-colors ${
               data.mySummary.overdueCount > 0 ? "text-rose-600" : "text-slate-900"
             }`}
           >
             {data.mySummary.overdueCount}
           </div>
-          <span className="text-[10px] text-rose-500 font-medium mt-1 block">Past target deadline</span>
+          <span className="type-helper text-rose-600 font-medium mt-1 block">Past target deadline</span>
         </button>
 
         {/* KPI 4: In Review */}
@@ -821,38 +821,38 @@ export default function EmployeeDashboardView({
               : "bg-white border-slate-200/80 hover:border-amber-300"
           }`}
         >
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-xs text-slate-400 font-medium">Under Review</span>
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="type-kpi-label text-slate-500 font-medium">Under review</span>
             <span className="w-2 h-2 rounded-full bg-amber-500" />
           </div>
-          <div className="text-2xl sm:text-3xl font-bold text-amber-600">
+          <div className="type-kpi-value text-amber-600">
             {data.mySummary.inReviewCount}
           </div>
-          <span className="text-[10px] text-slate-400 mt-1 block">Awaiting lead sign-off</span>
+          <span className="type-helper text-slate-500 mt-1 block">Awaiting lead sign-off</span>
         </button>
       </div>
 
       {/* ============================================================== */}
-      {/* 4. PRIMARY HERO CARD: ACTIVE SESSION (Exact Match to Image A!)  */}
+      {/* 4. PRIMARY HERO CARD: ACTIVE SESSION                           */}
       {/* ============================================================== */}
       <div className="bg-white border border-slate-200/80 rounded-3xl p-6 sm:p-7 shadow-xs space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-[#3562E8] uppercase tracking-wider font-mono border border-blue-100">
-              ACTIVE SESSION
+            <span className="px-2.5 py-0.5 rounded-full type-badge bg-blue-50 text-[#3562E8] font-mono border border-blue-100">
+              Active session
             </span>
-            <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
+            <span className={`px-2 py-0.5 rounded-full type-badge ${
               isTimerRunning ? "bg-emerald-100 text-emerald-800 animate-pulse" : "bg-slate-100 text-slate-500"
             }`}>
-              {isTimerRunning ? "RECORDING" : "IDLE"}
+              {isTimerRunning ? "Recording" : "Idle"}
             </span>
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-400 font-medium">Time Elapsed</span>
-            <div className="flex items-center gap-1.5 font-mono text-xl sm:text-2xl font-bold text-slate-900 bg-slate-50 px-3 py-1 rounded-xl border border-slate-200/60">
+            <span className="type-kpi-label text-slate-500 font-medium">Time elapsed</span>
+            <div className="flex items-center gap-1.5 font-mono type-kpi-value text-slate-900 bg-slate-50 px-3 py-1 rounded-xl border border-slate-200/60">
               <Clock className={`w-4 h-4 text-[#3562E8] ${isTimerRunning ? "animate-spin" : ""}`} />
-              <span>{formatTime(timerSeconds)}</span>
+              <span className="tabular-nums">{formatTime(timerSeconds)}</span>
             </div>
           </div>
         </div>

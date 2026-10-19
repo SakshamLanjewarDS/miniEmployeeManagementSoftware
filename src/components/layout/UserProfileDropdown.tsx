@@ -108,13 +108,13 @@ export function UserProfileDropdown({ context }: UserProfileDropdownProps) {
 
         {/* User Info (Hidden on very small screens) */}
         <div className="text-left hidden sm:block">
-          <div className="text-xs font-bold text-[#1F1F1F] leading-tight truncate max-w-[130px]">
+          <div className="type-button-label text-[#1F1F1F] leading-tight truncate max-w-[130px]">
             {context.userFullName}
           </div>
-          <div className="text-[10px] text-[#696E82] flex items-center gap-1 font-medium">
+          <div className="type-metadata text-[#4B5565] flex items-center gap-1 font-medium">
             <span>{context.employeeId || "OWNER"}</span>
             <span>•</span>
-            <span className="text-[#5A81FA] font-semibold">{context.role}</span>
+            <span className="text-[#3562E8] font-semibold">{context.role}</span>
           </div>
         </div>
 
@@ -148,9 +148,9 @@ export function UserProfileDropdown({ context }: UserProfileDropdownProps) {
 
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="text-sm font-bold text-[#1F1F1F] truncate">{context.userFullName}</h3>
+                  <h3 className="type-card-title text-[#1F1F1F] truncate">{context.userFullName}</h3>
                   <span
-                    className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${getRoleBadgeStyle(
+                    className={`type-badge font-bold px-2 py-0.5 rounded-md border ${getRoleBadgeStyle(
                       context.role
                     )}`}
                   >
@@ -167,31 +167,31 @@ export function UserProfileDropdown({ context }: UserProfileDropdownProps) {
                       : "Project Architect")}
                 </div>
 
-                <div className="text-[11px] text-[#696E82] truncate mt-0.5 flex items-center gap-1">
-                  <Mail className="w-3 h-3 shrink-0" />
+                <div className="type-metadata text-[#4B5565] truncate mt-0.5 flex items-center gap-1">
+                  <Mail className="w-3.5 h-3.5 shrink-0 text-[#696E82]" />
                   <span className="truncate">{context.userEmail}</span>
                 </div>
               </div>
             </div>
 
             {/* Badges strip */}
-            <div className="grid grid-cols-2 gap-2 mt-4 pt-3 border-t border-[#E2E6F0] text-[11px]">
-              <div className="p-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl space-y-0.5">
-                <span className="text-[10px] text-[#696E82] uppercase font-semibold flex items-center gap-1">
-                  <IdCard className="w-3 h-3 text-[#5A81FA]" />
+            <div className="grid grid-cols-2 gap-2 mt-4 pt-3 border-t border-[#E2E6F0]">
+              <div className="p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl space-y-0.5">
+                <span className="type-badge text-[#4B5565] font-semibold flex items-center gap-1.5">
+                  <IdCard className="w-3.5 h-3.5 text-[#3562E8]" />
                   <span>Employee ID</span>
                 </span>
-                <span className="font-mono font-bold text-[#1F1F1F]">
+                <span className="type-tabular font-mono font-semibold text-[#1F1F1F] block">
                   {context.employeeId || "OWNER-01"}
                 </span>
               </div>
 
-              <div className="p-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl space-y-0.5">
-                <span className="text-[10px] text-[#696E82] uppercase font-semibold flex items-center gap-1">
-                  <Building className="w-3 h-3 text-[#5A81FA]" />
+              <div className="p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl space-y-0.5">
+                <span className="type-badge text-[#4B5565] font-semibold flex items-center gap-1.5">
+                  <Building className="w-3.5 h-3.5 text-[#3562E8]" />
                   <span>Department</span>
                 </span>
-                <span className="font-semibold text-[#1F1F1F] truncate block">
+                <span className="type-body-compact font-semibold text-[#1F1F1F] truncate block">
                   {context.department || (context.role === "OWNER" ? "Leadership" : "Architecture")}
                 </span>
               </div>
@@ -199,19 +199,19 @@ export function UserProfileDropdown({ context }: UserProfileDropdownProps) {
           </div>
 
           {/* Studio Workspace Context */}
-          <div className="p-3.5 bg-[#F8F9FD] border-b border-[#E2E6F0] text-xs space-y-1.5">
-            <div className="flex items-center justify-between text-[#696E82]">
-              <span className="text-[10px] text-[#696E82] uppercase font-semibold">Active Practice</span>
-              <span className="font-semibold text-[#1F1F1F]">{context.tenantName}</span>
+          <div className="p-3.5 bg-[#F8F9FD] border-b border-[#E2E6F0] space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="type-badge text-[#4B5565] font-medium">Active Practice</span>
+              <span className="type-body-compact font-semibold text-[#1F1F1F]">{context.tenantName}</span>
             </div>
-            <div className="flex items-center justify-between text-[#696E82]">
-              <span className="text-[10px] text-[#696E82] uppercase font-semibold">Workspace Slug</span>
-              <span className="font-mono text-[#5A81FA] font-semibold">{context.tenantSlug}</span>
+            <div className="flex items-center justify-between">
+              <span className="type-badge text-[#4B5565] font-medium">Workspace Slug</span>
+              <span className="font-mono type-tabular text-[#3562E8] font-semibold">{context.tenantSlug}</span>
             </div>
-            <div className="flex items-center justify-between text-[#696E82]">
-              <span className="text-[10px] text-[#696E82] uppercase font-semibold">Session Status</span>
-              <span className="inline-flex items-center gap-1 text-[11px] text-emerald-700 font-medium">
-                <Shield className="w-3 h-3 text-emerald-600" />
+            <div className="flex items-center justify-between">
+              <span className="type-badge text-[#4B5565] font-medium">Session Status</span>
+              <span className="inline-flex items-center gap-1.5 type-badge text-emerald-800 font-medium">
+                <Shield className="w-3.5 h-3.5 text-emerald-600" />
                 <span>Encrypted • Asia/Kolkata</span>
               </span>
             </div>

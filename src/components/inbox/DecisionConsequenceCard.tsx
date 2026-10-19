@@ -80,7 +80,7 @@ export function DecisionConsequenceCard({
       case "DELIVERABLE_SUBMISSION":
         return {
           financialImpact: "Unlocks Phase Milestone Billing (Estimated ₹1,20,000)",
-          financialDelta: "+0%",
+          financialDelta: "+0?",
           scheduleImpact: "On Schedule • Zero Delay to GFC Milestone",
           downstreamTrades: ["Civil Masonry", "Plumbing Riser Piping", "Electrical Conduits"],
           slaRisk: item.ageHours > 48 ? "HIGH (Contractor SLA Breached)" : "NORMAL",
@@ -90,7 +90,7 @@ export function DecisionConsequenceCard({
         const days = item.details?.scheduleImpactDays || 7;
         return {
           financialImpact: `Fee Variation of +₹${Number(fee).toLocaleString("en-IN")}`,
-          financialDelta: `+${((fee / 1500000) * 100).toFixed(1)}% Contingency Buffer`,
+          financialDelta: `+${((fee / 1500000) * 100).toFixed(1)}? Contingency Buffer`,
           scheduleImpact: `Schedule extended by +${days} calendar days`,
           downstreamTrades: [item.details?.affectedScope || "All Architectural Disciplines"],
           slaRisk: "Awaiting Client Signed Addendum",
@@ -126,7 +126,7 @@ export function DecisionConsequenceCard({
       default:
         return {
           financialImpact: "Standard Operational Decision",
-          financialDelta: "0%",
+          financialDelta: "0?",
           scheduleImpact: "Aligned with project targets",
           downstreamTrades: ["Architectural Team"],
           slaRisk: "NORMAL",
@@ -138,7 +138,7 @@ export function DecisionConsequenceCard({
 
   // WhatsApp & Email Transmittal Formatter
   const handleCopyTransmittal = () => {
-    const text = `*100% DESIGN STUDIO | EXECUTIVE DECISION TRANSMITTAL*
+    const text = `*100? DESIGN STUDIO | EXECUTIVE DECISION TRANSMITTAL*
 ----------------------------------------
 *Project:* ${item.projectCode || "STUDIO"} — ${item.projectName || "Workspace"}
 *Item:* ${item.title}
@@ -159,17 +159,17 @@ _Cryptographically stamped by Studio Executive Leadership._`;
       {/* 1. GOVERNANCE & AUDIT HEADER */}
       <div className="p-4 border-b border-slate-100 bg-slate-50/70 space-y-2 shrink-0">
         <div className="flex items-center justify-between">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 font-mono">
-            CONSEQUENCE &amp; GOVERNANCE COCKPIT
+          <span className="type-kpi-label text-slate-500 font-medium">
+            Consequence &amp; governance cockpit
           </span>
-          <span className="text-[10px] font-mono text-slate-400">
+          <span className="type-helper text-slate-500 font-mono">
             Aging: {item.ageHours}h ({item.ageDays}d)
           </span>
         </div>
 
         {/* Four-Eyes Verification Status */}
         <div
-          className={`p-2.5 rounded-xl border text-xs flex items-center gap-2.5 ${
+          className={`p-2.5 rounded-xl border type-body-compact flex items-center gap-2.5 ${
             item.canApprove
               ? "bg-emerald-50/80 text-emerald-800 border-emerald-200"
               : "bg-amber-50 text-amber-800 border-amber-200"
@@ -179,8 +179,8 @@ _Cryptographically stamped by Studio Executive Leadership._`;
             <>
               <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
               <div className="min-w-0">
-                <span className="font-bold block">Four-Eyes Compliant</span>
-                <span className="text-[10px] text-emerald-700/80 truncate block">
+                <span className="type-minor-heading block">Four-Eyes Compliant</span>
+                <span className="type-helper text-emerald-700/80 truncate block">
                   Author ({item.requesterName}) ≠ Reviewer (You)
                 </span>
               </div>
@@ -189,8 +189,8 @@ _Cryptographically stamped by Studio Executive Leadership._`;
             <>
               <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0" />
               <div className="min-w-0">
-                <span className="font-bold block">Segregation of Duties Enforced</span>
-                <span className="text-[10px] text-amber-700/80 truncate block">
+                <span className="type-minor-heading block">Segregation of Duties Enforced</span>
+                <span className="type-helper text-amber-700/80 truncate block">
                   {item.cannotApproveReason || "Independent partner sign-off required"}
                 </span>
               </div>
@@ -200,19 +200,19 @@ _Cryptographically stamped by Studio Executive Leadership._`;
       </div>
 
       {/* 2. CONSEQUENCE ENGINE BODY (Scrollable) */}
-      <div className="p-4 flex-1 overflow-y-auto space-y-4 text-xs">
+      <div className="p-4 flex-1 overflow-y-auto space-y-4 type-body-compact">
         {/* Financial Consequence Tile */}
         <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 space-y-1.5">
           <div className="flex items-center justify-between text-slate-500">
-            <span className="font-semibold flex items-center gap-1.5">
+            <span className="type-form-label font-medium flex items-center gap-1.5 text-slate-600">
               <TrendingUp className="w-3.5 h-3.5 text-blue-600" />
-              <span>Financial Consequence</span>
+              <span>Financial consequence</span>
             </span>
-            <span className="font-mono font-bold text-slate-800 text-[11px]">
+            <span className="font-mono type-badge font-semibold text-slate-800 tabular-nums">
               {impact.financialDelta}
             </span>
           </div>
-          <p className="text-slate-800 font-medium text-xs leading-relaxed">
+          <p className="text-slate-800 font-medium type-body-compact leading-relaxed">
             {impact.financialImpact}
           </p>
         </div>
@@ -220,28 +220,28 @@ _Cryptographically stamped by Studio Executive Leadership._`;
         {/* Schedule & Handover Consequence Tile */}
         <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 space-y-1.5">
           <div className="flex items-center justify-between text-slate-500">
-            <span className="font-semibold flex items-center gap-1.5">
+            <span className="type-form-label font-medium flex items-center gap-1.5 text-slate-600">
               <Calendar className="w-3.5 h-3.5 text-purple-600" />
-              <span>Schedule Impact</span>
+              <span>Schedule impact</span>
             </span>
-            <span className="font-mono text-[10px] text-slate-500">Milestone Delta</span>
+            <span className="type-helper text-slate-500">Milestone delta</span>
           </div>
-          <p className="text-slate-800 font-medium text-xs leading-relaxed">
+          <p className="text-slate-800 font-medium type-body-compact leading-relaxed">
             {impact.scheduleImpact}
           </p>
         </div>
 
         {/* Downstream Affected Trades / Disciplines */}
         <div className="space-y-1.5">
-          <span className="text-[11px] font-bold text-slate-600 flex items-center gap-1.5">
+          <span className="type-form-label font-medium text-slate-700 flex items-center gap-1.5">
             <Layers className="w-3.5 h-3.5 text-slate-400" />
-            <span>Downstream Affected Disciplines &amp; Trades</span>
+            <span>Downstream affected disciplines &amp; trades</span>
           </span>
           <div className="flex flex-wrap gap-1.5">
             {impact.downstreamTrades.map((trade, idx) => (
               <span
                 key={idx}
-                className="px-2.5 py-1 bg-slate-100 text-slate-700 font-medium text-[11px] rounded-lg border border-slate-200"
+                className="px-2.5 py-1 bg-slate-100 text-slate-700 type-badge rounded-lg border border-slate-200"
               >
                 {trade}
               </span>
@@ -252,11 +252,11 @@ _Cryptographically stamped by Studio Executive Leadership._`;
         {/* Directive Feedback Notes */}
         <div className="space-y-2 pt-1">
           <div className="flex items-center justify-between">
-            <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+            <label className="type-form-label font-semibold text-slate-800 flex items-center gap-1.5">
               <MessageSquare className="w-3.5 h-3.5 text-blue-600" />
-              <span>Executive Directives &amp; Redline Notes</span>
+              <span>Executive directives &amp; redline notes</span>
             </label>
-            <span className="text-[10px] text-slate-400 font-mono">Transmitted to Author</span>
+            <span className="type-helper text-slate-400 font-mono">Transmitted to author</span>
           </div>
 
           {/* Quick Preset Pills */}
@@ -266,7 +266,7 @@ _Cryptographically stamped by Studio Executive Leadership._`;
                 key={idx}
                 type="button"
                 onClick={() => onFeedbackChange(preset)}
-                className="px-2 py-0.5 bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-600 text-[10px] rounded-md border border-slate-200 transition-colors cursor-pointer text-left"
+                className="px-2 py-0.5 bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-600 type-badge rounded-md border border-slate-200 transition-colors cursor-pointer text-left"
               >
                 + {preset.length > 32 ? preset.slice(0, 32) + "..." : preset}
               </button>
@@ -278,7 +278,7 @@ _Cryptographically stamped by Studio Executive Leadership._`;
             value={feedback}
             onChange={(e) => onFeedbackChange(e.target.value)}
             placeholder="Type executive directives, specific corrections, or structural caveats..."
-            className="w-full p-2.5 text-xs text-slate-900 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 leading-relaxed font-sans"
+            className="w-full p-2.5 type-input-value text-slate-900 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 leading-relaxed font-sans"
           />
         </div>
       </div>
@@ -291,10 +291,10 @@ _Cryptographically stamped by Studio Executive Leadership._`;
               type="button"
               onClick={() => onExecute("RESOLVE_BLOCKER")}
               disabled={isSubmitting}
-              className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white type-button-label rounded-xl shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
               <CheckCircle2 className="w-4 h-4" />
-              <span>Unblock Deliverable Now</span>
+              <span>Unblock deliverable now</span>
             </button>
           ) : (
             <>
@@ -310,27 +310,27 @@ _Cryptographically stamped by Studio Executive Leadership._`;
                   )
                 }
                 disabled={isSubmitting}
-                className="flex-1 py-2.5 px-3 bg-white hover:bg-rose-50 text-rose-700 border border-rose-200 font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer text-center"
+                className="flex-1 py-2.5 px-3 bg-white hover:bg-rose-50 text-rose-700 border border-rose-200 type-button-label rounded-xl shadow-xs transition-colors cursor-pointer text-center"
               >
                 {item.type === "DEADLINE_EXTENSION" ||
                 item.type === "LEAVE_APPLICATION" ||
                 item.type === "LEAVE_CANCELLATION"
-                  ? "Reject Request"
-                  : "Request Changes"}
+                  ? "Reject request"
+                  : "Request changes"}
               </button>
 
               <button
                 type="button"
                 onClick={() => onExecute("APPROVE")}
                 disabled={isSubmitting || !item.canApprove}
-                className={`flex-1 py-2.5 px-4 font-bold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-1.5 ${
+                className={`flex-1 py-2.5 px-4 type-button-label rounded-xl shadow-md transition-all flex items-center justify-center gap-1.5 ${
                   item.canApprove
                     ? "bg-[#3562E8] hover:bg-blue-600 text-white cursor-pointer shadow-blue-500/20"
                     : "bg-slate-200 text-slate-400 cursor-not-allowed shadow-none"
                 }`}
               >
                 <CheckCircle2 className="w-4 h-4" />
-                <span>Confirm &amp; Stamp</span>
+                <span>Confirm &amp; stamp</span>
               </button>
             </>
           )}
@@ -340,18 +340,18 @@ _Cryptographically stamped by Studio Executive Leadership._`;
         <button
           type="button"
           onClick={handleCopyTransmittal}
-          className="w-full py-1.5 px-3 bg-slate-100 hover:bg-slate-200 text-slate-600 text-[11px] font-semibold rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+          className="w-full py-1.5 px-3 bg-slate-100 hover:bg-slate-200 text-slate-600 type-button-label rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
           title="Copy formatted notice for contractor or client WhatsApp group"
         >
           {copiedTransmittal ? (
             <>
               <Check className="w-3.5 h-3.5 text-emerald-600" />
-              <span className="text-emerald-700 font-bold">Transmittal Copied to Clipboard!</span>
+              <span className="text-emerald-700 font-semibold">Transmittal copied to clipboard!</span>
             </>
           ) : (
             <>
               <Copy className="w-3.5 h-3.5 text-slate-500" />
-              <span>Copy WhatsApp Transmittal Notice</span>
+              <span>Copy WhatsApp transmittal notice</span>
             </>
           )}
         </button>

@@ -37,15 +37,15 @@ export function AppTopbar({ context }: AppTopbarProps) {
           <Menu className="w-5 h-5" />
         </button>
 
-        <div className="flex items-center gap-1.5 sm:gap-2 text-xs font-semibold text-slate-900 min-w-0">
+        <div className="flex items-center gap-1.5 sm:gap-2 text-sm font-semibold text-slate-900 min-w-0">
           <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 border border-slate-200/60 min-w-0">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
-            <span className="font-bold tracking-tight truncate max-w-[140px] sm:max-w-[240px] text-slate-800 text-[11px] sm:text-xs">
+            <span className="font-semibold truncate max-w-[140px] sm:max-w-[240px] text-slate-800 type-badge">
               {context.tenantName}
             </span>
           </div>
           <span className="text-slate-300 hidden md:inline">/</span>
-          <span className="text-slate-500 font-normal hidden md:inline">Studio OS</span>
+          <span className="text-slate-500 font-normal hidden md:inline type-helper">Studio OS</span>
         </div>
       </div>
 
@@ -57,8 +57,8 @@ export function AppTopbar({ context }: AppTopbarProps) {
         title="Open Command Palette (⌘K)"
       >
         <Search className="w-3.5 h-3.5 text-slate-400 group-hover:text-[#3562E8] transition-colors" />
-        <span className="font-medium text-slate-600 hidden md:inline">Quick find or jump...</span>
-        <kbd className="text-[10px] font-mono font-bold bg-white px-1.5 py-0.5 rounded-md border border-slate-200/80 text-slate-500 shadow-2xs">
+        <span className="font-medium text-slate-600 hidden md:inline text-xs sm:text-sm">Quick find or jump...</span>
+        <kbd className="type-badge font-mono font-medium bg-white px-1.5 py-0.5 rounded-md border border-slate-200/80 text-slate-500 shadow-2xs">
           ⌘K
         </kbd>
       </button>

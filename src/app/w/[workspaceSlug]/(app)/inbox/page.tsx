@@ -477,7 +477,7 @@ export default function OwnerDecisionInboxPage() {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+              <h1 className="type-page-title text-slate-900">
                 Executive Decision Airlock
               </h1>
               <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
@@ -561,7 +561,7 @@ export default function OwnerDecisionInboxPage() {
         <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-2xs">
           <div className="text-xs font-medium text-slate-500 uppercase tracking-wider">Queue Volume</div>
           <div className="mt-1 flex items-baseline justify-between">
-            <span className="text-2xl sm:text-3xl font-extrabold text-slate-900">{data?.counts.total ?? 0}</span>
+            <span className="type-kpi-value text-slate-900 tabular-nums">{data?.counts.total ?? 0}</span>
             <span className="text-xs text-slate-400 font-mono">Pending authorization</span>
           </div>
         </div>
@@ -569,7 +569,7 @@ export default function OwnerDecisionInboxPage() {
         <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-2xs">
           <div className="text-xs font-medium text-[#3562E8] uppercase tracking-wider">Four-Eyes Actionable</div>
           <div className="mt-1 flex items-baseline justify-between">
-            <span className="text-2xl sm:text-3xl font-extrabold text-[#3562E8]">{data?.counts.myDecisions ?? 0}</span>
+            <span className="type-kpi-value text-[#3562E8] tabular-nums">{data?.counts.myDecisions ?? 0}</span>
             <span className="text-xs text-blue-600 font-medium">Clear to decide</span>
           </div>
         </div>
@@ -587,7 +587,7 @@ export default function OwnerDecisionInboxPage() {
         <div className="p-4 bg-white rounded-2xl border border-rose-200 bg-rose-50/20 shadow-2xs">
           <div className="text-xs font-medium text-rose-700 uppercase tracking-wider">Critical Blockers</div>
           <div className="mt-1 flex items-baseline justify-between">
-            <span className="text-2xl sm:text-3xl font-extrabold text-rose-700">{data?.counts.blockers ?? 0}</span>
+            <span className="type-kpi-value text-rose-700 tabular-nums">{data?.counts.blockers ?? 0}</span>
             <span className="text-xs text-rose-600 font-medium">Site work stoppage</span>
           </div>
         </div>
@@ -879,7 +879,7 @@ export default function OwnerDecisionInboxPage() {
           <div className="w-14 h-14 rounded-3xl bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center mx-auto shadow-inner">
             <CheckCircle2 className="w-8 h-8" />
           </div>
-          <h3 className="text-lg font-bold text-slate-900">Decision Inbox is Clear</h3>
+          <h3 className="type-card-title text-slate-900">Decision Inbox is Clear</h3>
           <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto">
             Zero pending deliverables, drawing revisions, or site blockers require review under this filter.
           </p>
@@ -976,7 +976,7 @@ export default function OwnerDecisionInboxPage() {
 
                 {/* Title */}
                 <div>
-                  <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">
+                  <h2 className="type-section-title text-slate-900">
                     {selectedItem.title}
                   </h2>
                 </div>

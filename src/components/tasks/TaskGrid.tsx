@@ -95,15 +95,15 @@ export function TaskGrid({
           <div className="w-12 h-12 rounded-full bg-[#F3F5FF] border border-[#DFE5F2] flex items-center justify-center mx-auto text-[#5878FF]">
             <RotateCcw className="w-6 h-6 text-[#5878FF]" />
           </div>
-          <h3 className="text-base font-bold text-[#111B35]">No deliverables match your filters</h3>
-          <p className="text-xs text-[#52617C] max-w-sm mx-auto">
+          <h3 className="type-small-heading text-[#111B35]">No deliverables match your filters</h3>
+          <p className="type-helper text-[#52617C] max-w-sm mx-auto">
             Try adjusting your search criteria, clearing the status, or resetting the architectural typology.
           </p>
           {onClearFilters && (
             <button
               type="button"
               onClick={onClearFilters}
-              className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 bg-[#5878FF] hover:bg-[#4665E8] text-white text-xs font-semibold rounded-xl shadow-2xs transition-colors cursor-pointer"
+              className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 bg-[#5878FF] hover:bg-[#4665E8] text-white type-button-label rounded-xl shadow-2xs transition-colors cursor-pointer"
             >
               <RotateCcw className="w-3.5 h-3.5" />
               <span>Clear filters</span>
@@ -118,15 +118,15 @@ export function TaskGrid({
         <div className="w-12 h-12 rounded-full bg-[#F3F5FF] border border-[#DFE5F2] flex items-center justify-center mx-auto text-[#5878FF]">
           <FolderGit2 className="w-6 h-6 text-[#5878FF]" />
         </div>
-        <h3 className="text-base font-bold text-[#111B35]">No deliverables yet</h3>
-        <p className="text-xs text-[#52617C] max-w-sm mx-auto">
+        <h3 className="type-small-heading text-[#111B35]">No deliverables yet</h3>
+        <p className="type-helper text-[#52617C] max-w-sm mx-auto">
           Start by assigning architectural deliverables, drafting tasks, or site survey milestones to your studio team.
         </p>
         {canAssignDeliverable && onOpenCreateTask && (
           <button
             type="button"
             onClick={onOpenCreateTask}
-            className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 bg-[#5878FF] hover:bg-[#4665E8] text-white text-xs font-semibold rounded-xl shadow-2xs transition-colors cursor-pointer"
+            className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 bg-[#5878FF] hover:bg-[#4665E8] text-white type-button-label rounded-xl shadow-2xs transition-colors cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>Assign Deliverable</span>

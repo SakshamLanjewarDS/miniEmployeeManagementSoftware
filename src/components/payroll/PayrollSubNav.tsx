@@ -40,7 +40,7 @@ export function PayrollSubNav({ workspaceSlug, activeTab }: PayrollSubNavProps) 
             href={tab.href}
             prefetch={false}
             aria-current={isActive ? "page" : undefined}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg type-nav-label font-semibold transition-all ${
               isActive
                 ? "bg-[#1456F0] text-white shadow-2xs"
                 : "text-[#696E82] hover:text-[#1F1F1F] hover:bg-white/60"

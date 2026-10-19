@@ -141,10 +141,10 @@ export default function WorkspaceLoginPage() {
 
             {/* Greeting & Headline */}
             <div className="mb-6 sm:mb-7">
-              <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#1F1F1F]">
+              <h2 className="type-page-title text-[#1F1F1F]">
                 Log in
               </h2>
-              <p className="text-xs sm:text-sm text-[#4B5565] mt-1.5 font-medium leading-relaxed">
+              <p className="type-intro text-[#4B5565] mt-1.5 leading-relaxed">
                 Enter your assigned Employee ID or registered email to access your workspace.
               </p>
             </div>
@@ -167,7 +167,7 @@ export default function WorkspaceLoginPage() {
               <div className="space-y-1.5">
                 <label
                   htmlFor="login-identifier"
-                  className="block text-[11px] font-bold uppercase tracking-wider text-[#4B5565] pl-1"
+                  className="block type-form-label text-[#4B5565] pl-1"
                 >
                   Employee ID or Email
                 </label>
@@ -186,7 +186,7 @@ export default function WorkspaceLoginPage() {
                     value={identifier}
                     onChange={(e) => setIdentifier(e.target.value)}
                     placeholder="e.g. EMP-001 or designsaksham1@gmail.com"
-                    className="w-full pl-11 pr-4 py-3 sm:py-3.5 text-sm sm:text-base bg-white/80 hover:bg-white focus:bg-white border border-[#E2E6F0] focus:border-[#3562E8] rounded-full text-[#1F1F1F] placeholder:text-[#A8B1CE] focus:outline-none focus:ring-4 focus:ring-[#3562E8]/10 shadow-[inset_0_1px_2px_rgba(0,0,0,0.02)] transition-all"
+                    className="w-full pl-11 pr-4 py-3 sm:py-3.5 type-input-value bg-white/80 hover:bg-white focus:bg-white border border-[#E2E6F0] focus:border-[#3562E8] rounded-full text-[#1F1F1F] placeholder:text-[#A8B1CE] focus:outline-none focus:ring-4 focus:ring-[#3562E8]/10 shadow-[inset_0_1px_2px_rgba(0,0,0,0.02)] transition-all"
                   />
                 </div>
               </div>
@@ -196,7 +196,7 @@ export default function WorkspaceLoginPage() {
                 <div className="flex items-center justify-between pl-1">
                   <label
                     htmlFor="login-password"
-                    className="block text-[11px] font-bold uppercase tracking-wider text-[#4B5565]"
+                    className="block type-form-label text-[#4B5565]"
                   >
                     Password
                   </label>
@@ -218,7 +218,7 @@ export default function WorkspaceLoginPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••••••"
-                    className="w-full pl-11 pr-12 py-3 sm:py-3.5 text-sm sm:text-base bg-white/80 hover:bg-white focus:bg-white border border-[#E2E6F0] focus:border-[#3562E8] rounded-full text-[#1F1F1F] placeholder:text-[#A8B1CE] focus:outline-none focus:ring-4 focus:ring-[#3562E8]/10 shadow-[inset_0_1px_2px_rgba(0,0,0,0.02)] transition-all"
+                    className="w-full pl-11 pr-12 py-3 sm:py-3.5 type-input-value bg-white/80 hover:bg-white focus:bg-white border border-[#E2E6F0] focus:border-[#3562E8] rounded-full text-[#1F1F1F] placeholder:text-[#A8B1CE] focus:outline-none focus:ring-4 focus:ring-[#3562E8]/10 shadow-[inset_0_1px_2px_rgba(0,0,0,0.02)] transition-all"
                   />
                   <button
                     type="button"
@@ -241,7 +241,7 @@ export default function WorkspaceLoginPage() {
                   type="submit"
                   disabled={loading}
                   suppressHydrationWarning
-                  className="w-full h-[52px] sm:h-[54px] px-6 rounded-full bg-gradient-to-r from-[#3562E8] via-[#416DE8] to-[#5A81FA] hover:from-[#264FCB] hover:to-[#426EE8] active:scale-[0.99] text-white font-semibold text-sm sm:text-base shadow-[0_12px_28px_-6px_rgba(53,98,232,0.38)] hover:shadow-[0_16px_32px_-6px_rgba(53,98,232,0.48)] border border-white/20 transition-all flex items-center justify-between cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed disabled:scale-100"
+                  className="w-full h-[52px] sm:h-[54px] px-6 rounded-full bg-gradient-to-r from-[#3562E8] via-[#416DE8] to-[#5A81FA] hover:from-[#264FCB] hover:to-[#426EE8] active:scale-[0.99] text-white type-button-label shadow-[0_12px_28px_-6px_rgba(53,98,232,0.38)] hover:shadow-[0_16px_32px_-6px_rgba(53,98,232,0.48)] border border-white/20 transition-all flex items-center justify-between cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed disabled:scale-100"
                 >
                   <span className="font-semibold tracking-wide pl-2">
                     {loading ? "Authenticating..." : "Sign In to Studio OS"}

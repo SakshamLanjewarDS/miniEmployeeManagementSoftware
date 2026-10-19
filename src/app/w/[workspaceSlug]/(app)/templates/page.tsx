@@ -209,7 +209,7 @@ export default function TemplatesPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-[#0B122B] tracking-tight">
+          <h1 className="type-page-title text-[#0B122B]">
             Project & Checklist Templates
           </h1>
           <p className="text-sm text-slate-500 mt-1">
@@ -295,7 +295,7 @@ export default function TemplatesPage() {
                     </span>
                   </div>
 
-                  <h3 className="text-base font-bold text-[#0B122B] group-hover:text-[#5A81FA] transition">
+                  <h3 className="type-card-title text-[#0B122B] group-hover:text-[#5A81FA] transition">
                     {t.name}
                   </h3>
 

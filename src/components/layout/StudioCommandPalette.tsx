@@ -350,7 +350,7 @@ export function StudioCommandPalette({ context }: StudioCommandPaletteProps) {
               setSelectedIndex(0);
             }}
             placeholder="Search commands, projects, deliverables, team... (↑↓ to navigate)"
-            className="w-full bg-transparent text-sm sm:text-base font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none"
+            className="w-full bg-transparent type-input-value font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none"
           />
           {query && (
             <button
@@ -361,7 +361,7 @@ export function StudioCommandPalette({ context }: StudioCommandPaletteProps) {
               <X className="w-4 h-4" />
             </button>
           )}
-          <kbd className="hidden sm:inline-flex items-center gap-1 px-2 py-1 text-[11px] font-mono font-semibold text-slate-500 bg-slate-100 border border-slate-200 rounded-lg shrink-0">
+          <kbd className="hidden sm:inline-flex items-center gap-1 px-2 py-1 type-badge font-mono font-semibold text-slate-500 bg-slate-100 border border-slate-200 rounded-lg shrink-0">
             ESC
           </kbd>
         </div>
@@ -371,8 +371,8 @@ export function StudioCommandPalette({ context }: StudioCommandPaletteProps) {
           {filteredCommands.length === 0 ? (
             <div className="py-12 text-center text-slate-400 space-y-2">
               <Search className="w-8 h-8 mx-auto opacity-40" />
-              <p className="text-xs sm:text-sm font-medium">No results found for &ldquo;{query}&rdquo;</p>
-              <p className="text-[11px] text-slate-400">Try searching for &quot;Projects&quot;, &quot;Tasks&quot;, or &quot;Leaves&quot;</p>
+              <p className="type-body-compact font-medium">No results found for &ldquo;{query}&rdquo;</p>
+              <p className="type-helper text-slate-400">Try searching for &quot;Projects&quot;, &quot;Tasks&quot;, or &quot;Leaves&quot;</p>
             </div>
           ) : (
             filteredCommands.map((cmd, idx) => {
@@ -399,11 +399,11 @@ export function StudioCommandPalette({ context }: StudioCommandPaletteProps) {
                       <Icon className="w-4 h-4" />
                     </div>
                     <div className="min-w-0">
-                      <div className="text-xs sm:text-sm font-semibold truncate leading-tight">
+                      <div className="type-minor-heading truncate leading-tight">
                         {cmd.title}
                       </div>
                       <div
-                        className={`text-[10px] uppercase font-bold tracking-wider mt-0.5 ${
+                        className={`type-badge font-medium mt-0.5 ${
                           isSelected ? "text-blue-100" : "text-slate-400"
                         }`}
                       >
@@ -415,7 +415,7 @@ export function StudioCommandPalette({ context }: StudioCommandPaletteProps) {
                   <div className="flex items-center gap-2 shrink-0">
                     {cmd.shortcut && (
                       <span
-                        className={`text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded-md ${
+                        className={`type-badge font-mono font-semibold px-1.5 py-0.5 rounded-md ${
                           isSelected ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"
                         }`}
                       >
@@ -431,7 +431,7 @@ export function StudioCommandPalette({ context }: StudioCommandPaletteProps) {
         </div>
 
         {/* Footer / Helper Bar */}
-        <div className="px-4 py-2.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 shrink-0">
+        <div className="px-4 py-2.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between type-helper text-slate-500 shrink-0">
           <div className="flex items-center gap-3">
             <span className="flex items-center gap-1 font-mono">
               <kbd className="px-1.5 py-0.5 bg-white border border-slate-200 rounded text-[10px]">↑</kbd>

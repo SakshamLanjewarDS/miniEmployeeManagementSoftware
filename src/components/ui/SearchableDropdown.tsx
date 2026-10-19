@@ -127,6 +127,8 @@ export interface SearchableDropdownProps {
   minWidth?: number | string;
   maxWidth?: number | string;
   align?: "left" | "right";
+  direction?: "up" | "down" | "auto";
+  placement?: "top" | "bottom" | "auto";
   renderOption?: (option: DropdownOption, isSelected: boolean) => React.ReactNode;
   renderTriggerValue?: (selected: DropdownOption | DropdownOption[] | null) => React.ReactNode;
   formId?: string;
@@ -237,11 +239,14 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
   minWidth,
   maxWidth,
   align = "left",
+  direction = "auto",
+  placement,
   renderOption,
   renderTriggerValue,
   formId,
   fieldKey,
 }) => {
+  const effectiveDirection = placement === "top" ? "up" : placement === "bottom" ? "down" : direction;
   const { getFieldConfig, isFieldHidden } = useFormFieldAdmin();
   const effectiveFormId = formId || "GLOBAL_FORM";
   const effectiveFieldKey = fieldKey || id || (label ? label.toLowerCase().replace(/[^a-z0-9]/g, "") : "");
@@ -253,6 +258,7 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
 
   const isMulti = Boolean(multiple ?? multiSelect);
   const [isOpen, setIsOpen] = useState(false);
+  const [openUpward, setOpenUpward] = useState(effectiveDirection === "up");
   const [searchQuery, setSearchQuery] = useState("");
   const [highlightedIndex, setHighlightedIndex] = useState<number>(-1);
   const [internalOtherValue, setInternalOtherValue] = useState("");
@@ -260,6 +266,22 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+
+  const handleToggle = () => {
+    if (disabled) return;
+    if (!isOpen && containerRef.current) {
+      if (effectiveDirection === "up") {
+        setOpenUpward(true);
+      } else if (effectiveDirection === "down") {
+        setOpenUpward(false);
+      } else {
+        const rect = containerRef.current.getBoundingClientRect();
+        const spaceBelow = window.innerHeight - rect.bottom;
+        setOpenUpward(spaceBelow < 280);
+      }
+    }
+    setIsOpen((prev) => !prev);
+  };
 
   // If this dropdown field has been hidden by an Admin, don't render it
   if (effectiveFieldKey && isFieldHidden(effectiveFormId, effectiveFieldKey)) {
@@ -583,11 +605,11 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
             <HardHat className="w-3.5 h-3.5" />
           </div>
           <div className="min-w-0 flex flex-col">
-            <span className="font-semibold text-[#111B35] text-xs truncate">
+            <span className="font-medium text-[#111B35] text-sm truncate">
               {opt.label}
             </span>
             {opt.subLabel && (
-              <span className="text-[11px] text-[#7A869E] truncate leading-tight">
+              <span className="type-helper text-[#7A869E] truncate leading-tight">
                 {opt.subLabel}
               </span>
             )}
@@ -604,11 +626,11 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
             <Compass className="w-3.5 h-3.5" />
           </div>
           <div className="min-w-0 flex flex-col">
-            <span className="font-semibold text-[#111B35] text-xs truncate">
+            <span className="font-medium text-[#111B35] text-sm truncate">
               {opt.label}
             </span>
             {opt.subLabel && (
-              <span className="text-[11px] text-[#7A869E] truncate leading-tight">
+              <span className="type-helper text-[#7A869E] truncate leading-tight">
                 {opt.subLabel}
               </span>
             )}
@@ -622,7 +644,7 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
       return (
         <div className="flex items-center gap-2 min-w-0">
           <Briefcase className="w-3.5 h-3.5 text-[#5878FF] shrink-0" />
-          <span className="font-semibold text-[#111B35] text-xs truncate">
+          <span className="font-medium text-[#111B35] text-sm truncate">
             {opt.label}
           </span>
         </div>
@@ -634,11 +656,11 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
       return (
         <div className="flex items-center gap-2 min-w-0">
           <Layers className="w-3.5 h-3.5 text-[#5878FF] shrink-0" />
-          <span className="font-semibold text-[#111B35] text-xs truncate">
+          <span className="font-medium text-[#111B35] text-sm truncate">
             {opt.label}
           </span>
           {opt.subLabel && (
-            <span className="text-[11px] text-[#7A869E] truncate">({opt.subLabel})</span>
+            <span className="type-helper text-[#7A869E] truncate">({opt.subLabel})</span>
           )}
         </div>
       );
@@ -649,7 +671,7 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
       return (
         <div className="flex items-center gap-2 min-w-0">
           <MapPin className="w-3.5 h-3.5 text-rose-500 shrink-0" />
-          <span className="font-semibold text-[#111B35] text-xs truncate">
+          <span className="font-medium text-[#111B35] text-sm truncate">
             {opt.label}
           </span>
         </div>
@@ -661,11 +683,11 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
       <div className="flex items-center gap-2 min-w-0">
         {opt.icon}
         <div className="min-w-0 flex flex-col">
-          <span className="font-semibold text-[#111B35] text-xs truncate">
+          <span className="font-medium text-[#111B35] text-sm truncate">
             {opt.label}
           </span>
           {opt.subLabel && (
-            <span className="text-[11px] text-[#7A869E] truncate leading-tight">
+            <span className="type-helper text-[#7A869E] truncate leading-tight">
               {opt.subLabel}
             </span>
           )}
@@ -677,8 +699,8 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
   // Size styling classes for the trigger
   const triggerSizeClasses = {
     sm: "py-1.5 px-2.5 text-xs rounded-lg min-h-[34px]",
-    md: "py-2.5 px-3 text-xs rounded-xl min-h-[42px]",
-    lg: "py-3 px-3.5 text-sm rounded-xl min-h-[48px]",
+    md: "py-2.5 px-3 type-input-value rounded-xl min-h-[42px]",
+    lg: "py-3 px-3.5 type-input-value rounded-xl min-h-[48px]",
   }[size];
 
   return (
@@ -691,7 +713,7 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
       {effectiveLabel && (
         <div className="flex items-center justify-between">
           <div className="flex items-center">
-            <label htmlFor={id} className="block font-semibold text-[#111B35] text-xs">
+            <label htmlFor={id} className="block type-form-label text-[#111B35]">
               {effectiveLabel} {effectiveRequired && <span className="text-rose-600">*</span>}
             </label>
             {effectiveFieldKey && (
@@ -705,12 +727,12 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
             )}
           </div>
           {isOtherSelected && !isMulti && (
-            <span className="text-[10px] font-semibold text-[#5878FF] bg-[#F1F4FF] px-2 py-0.5 rounded-md border border-[#CEDEFF]">
+            <span className="type-badge font-medium text-[#5878FF] bg-[#F1F4FF] px-2 py-0.5 rounded-md border border-[#CEDEFF]">
               Custom Value Active
             </span>
           )}
           {isMulti && values.length > 0 && (
-            <span className="text-[10px] font-semibold text-[#5878FF] bg-[#F1F4FF] px-2 py-0.5 rounded-md border border-[#CEDEFF]">
+            <span className="type-badge font-medium text-[#5878FF] bg-[#F1F4FF] px-2 py-0.5 rounded-md border border-[#CEDEFF]">
               {values.length} Selected
             </span>
           )}
@@ -724,7 +746,7 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
           id={id}
           name={name}
           disabled={disabled}
-          onClick={() => !disabled && setIsOpen(!isOpen)}
+          onClick={handleToggle}
           aria-haspopup="listbox"
           aria-expanded={isOpen}
           aria-disabled={disabled}
@@ -745,7 +767,7 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
                   {selectedOptions.slice(0, 2).map((opt) => (
                     <span
                       key={opt.value}
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#F1F4FF] text-[#5878FF] font-semibold text-[11px] border border-[#CEDEFF] max-w-[130px] truncate"
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#F1F4FF] text-[#5878FF] type-badge border border-[#CEDEFF] max-w-[130px] truncate"
                     >
                       <span className="truncate">{opt.label}</span>
                       <span
@@ -762,7 +784,7 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
                     </span>
                   ))}
                   {selectedOptions.length > 2 && (
-                    <span className="text-[11px] font-semibold text-[#52617C] bg-[#EEF2EA] px-1.5 py-0.5 rounded-md">
+                    <span className="type-badge text-[#52617C] bg-[#EEF2EA] px-1.5 py-0.5 rounded-md">
                       +{selectedOptions.length - 2} more
                     </span>
                   )}
@@ -831,7 +853,11 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
           <div
             className={`absolute ${
               align === "right" ? "right-0" : "left-0"
-            } top-full mt-1.5 w-full max-w-[calc(100vw-1.5rem)] bg-white border border-[#DFE5F2] rounded-2xl shadow-[0_12px_32px_-4px_rgba(17,27,53,0.12),0_4px_12px_-2px_rgba(17,27,53,0.06)] z-50 overflow-hidden text-xs animate-in fade-in-50 zoom-in-95 duration-150 p-2 ${popoverClassName}`}
+            } ${
+              (effectiveDirection === "up" || (effectiveDirection !== "down" && openUpward))
+                ? "bottom-full mb-1.5 shadow-[0_-12px_36px_-4px_rgba(17,27,53,0.18),0_-4px_14px_-2px_rgba(17,27,53,0.1)]"
+                : "top-full mt-1.5 shadow-[0_12px_32px_-4px_rgba(17,27,53,0.12),0_4px_12px_-2px_rgba(17,27,53,0.06)]"
+            } w-full max-w-[calc(100vw-1.5rem)] bg-white border border-[#DFE5F2] rounded-2xl z-50 overflow-hidden text-xs animate-in fade-in-50 zoom-in-95 duration-150 p-2 ${popoverClassName}`}
             style={{
               minWidth: minWidth ?? "min(260px, calc(100vw - 1.5rem))",
               maxWidth: maxWidth || "calc(100vw - 1.5rem)",
@@ -848,7 +874,7 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder={effectiveSearchPlaceholder}
-                  className="w-full pl-8 pr-7 py-2 bg-[#F7F8FD] border border-[#DFE5F2] focus:border-[#5878FF] focus:bg-white rounded-full text-xs text-[#111B35] placeholder-[#7A869E] focus:outline-none transition-all shadow-2xs"
+                  className="w-full pl-8 pr-7 py-2 bg-[#F7F8FD] border border-[#DFE5F2] focus:border-[#5878FF] focus:bg-white rounded-full type-input-value text-base sm:text-xs text-[#111B35] placeholder:text-[#7A869E] focus:outline-none transition-all shadow-2xs"
                   onClick={(e) => e.stopPropagation()}
                 />
                 {searchQuery && (

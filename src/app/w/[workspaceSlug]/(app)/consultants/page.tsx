@@ -55,7 +55,7 @@ export default async function ConsultantsPage({ params, searchParams }: Consulta
           <span>•</span>
           <span>Professional Consultant Directory</span>
         </div>
-        <h1 className="text-2xl font-bold tracking-tight text-[#1F1F1F] mt-1">Consultant Directory</h1>
+        <h1 className="type-page-title text-[#1F1F1F] mt-1">Consultant Directory</h1>
         <p className="text-xs text-[#696E82] mt-0.5">
           {isPrivileged
             ? "Manage engineering, structural, MEP, landscape, and specialist consultants across studio projects."

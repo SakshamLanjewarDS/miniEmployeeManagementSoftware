@@ -143,7 +143,13 @@ export default async function TasksPage({ params, searchParams }: TasksPageProps
       checklistTaskIds: Array.isArray(s.checklistTaskIds) ? s.checklistTaskIds : [],
       criteriaSnapshot: s.criteriaSnapshot,
       evidenceFiles: s.evidenceFiles,
-      evidenceLinks: s.evidenceLinks,
+      evidenceLinks: Array.isArray(s.evidenceLinks)
+        ? s.evidenceLinks.map((el: any) =>
+            typeof el === "string"
+              ? { url: el, title: el }
+              : { url: el?.url || "", title: el?.title || el?.url || "" }
+          )
+        : [],
       status: s.status,
       reviewFeedback: s.reviewFeedback,
       decidedAt: s.decidedAt ? s.decidedAt.toISOString() : null,
@@ -240,20 +246,20 @@ export default async function TasksPage({ params, searchParams }: TasksPageProps
         <div className="bg-[#F2F4FF] border border-[#CEDEFF] rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
           <div className="flex items-start gap-3">
             <div className="p-2.5 bg-[#5A81FA] text-white rounded-xl shrink-0 mt-0.5">
-              <span className="font-bold text-xs uppercase tracking-wider">VISIT</span>
+              <span className="type-badge font-bold">Visit</span>
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-[#5A81FA] uppercase tracking-wider">
-                  {upcomingVisit.operationalState === "ACTIVE" ? "🟢 Currently Active Visit" : "⏰ Upcoming Scheduled Visit"}
+                <span className="type-metadata font-semibold text-[#5A81FA]">
+                  {upcomingVisit.operationalState === "ACTIVE" ? "🟢 Currently active visit" : "⏰ Upcoming scheduled visit"}
                 </span>
-                <span className="text-xs text-[#696E82]">•</span>
-                <span className="text-xs font-semibold text-[#1F1F1F]">{upcomingVisit.project.code}</span>
+                <span className="type-helper text-[#696E82]">•</span>
+                <span className="type-metadata font-semibold text-[#1F1F1F] font-mono">{upcomingVisit.project.code}</span>
               </div>
-              <h3 className="text-sm font-bold text-[#1F1F1F] mt-0.5">
+              <h2 className="type-card-title text-[#1F1F1F] mt-0.5">
                 {upcomingVisit.purpose}
-              </h3>
-              <p className="text-xs text-[#696E82] mt-0.5">
+              </h2>
+              <p className="type-body-compact text-[#696E82] mt-0.5">
                 Site: {upcomingVisit.site.name} — {upcomingVisit.site.address}
               </p>
             </div>
@@ -261,9 +267,9 @@ export default async function TasksPage({ params, searchParams }: TasksPageProps
 
           <a
             href={`/w/${ctx.tenantSlug}/visits`}
-            className="px-4 py-2 bg-[#5A81FA] hover:bg-[#426EE8] text-white text-xs font-semibold rounded-xl shadow-xs transition-all text-center shrink-0"
+            className="px-4 py-2 bg-[#5A81FA] hover:bg-[#426EE8] text-white type-button-label rounded-xl shadow-xs transition-all text-center shrink-0"
           >
-            {upcomingVisit.operationalState === "ACTIVE" ? "Go to Active Visit (Check Out) →" : "Check In at Site →"}
+            {upcomingVisit.operationalState === "ACTIVE" ? "Go to active visit (check out) →" : "Check in at site →"}
           </a>
         </div>
       )}

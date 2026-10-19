@@ -146,7 +146,7 @@ export function MobileBottomNav({ context }: MobileBottomNavProps) {
                   }`}
                 />
               </div>
-              <span className="text-[10px] sm:text-[11px] tracking-tight mt-0.5 truncate max-w-full text-center leading-none">
+              <span className="type-badge font-medium tracking-normal mt-0.5 truncate max-w-full text-center leading-tight">
                 {item.name}
               </span>
             </Link>
@@ -163,12 +163,12 @@ export function MobileBottomNav({ context }: MobileBottomNavProps) {
           <div className="relative">
             <MoreHorizontal className="w-5 h-5 shrink-0 stroke-[1.8]" />
             {decisionCount !== null && decisionCount > 0 && (
-              <span className="absolute -top-1 -right-1.5 min-w-[14px] h-3.5 px-0.5 rounded-full bg-rose-500 text-white text-[9px] font-bold flex items-center justify-center border-2 border-white shadow-xs">
+              <span className="absolute -top-1 -right-1.5 min-w-[16px] h-4 px-1 rounded-full bg-rose-500 text-white type-badge font-semibold flex items-center justify-center border-2 border-white shadow-xs">
                 {decisionCount > 99 ? "99+" : decisionCount}
               </span>
             )}
           </div>
-          <span className="text-[10px] sm:text-[11px] tracking-tight mt-0.5 truncate max-w-full text-center leading-none">
+          <span className="type-badge font-medium tracking-normal mt-0.5 truncate max-w-full text-center leading-tight">
             More
           </span>
         </button>

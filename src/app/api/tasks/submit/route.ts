@@ -13,23 +13,15 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { taskId, checklistItemIds, summary, evidenceFiles, evidenceLinks } = body;
+    const { taskId, evidenceFiles, evidenceLinks } = body;
 
     if (!taskId) {
       return NextResponse.json({ error: "Task ID is required." }, { status: 400 });
     }
-    if (!summary || !summary.trim()) {
-      return NextResponse.json(
-        { error: "Submission summary is required to describe the completed work." },
-        { status: 400 }
-      );
-    }
-    if (!Array.isArray(checklistItemIds) || checklistItemIds.length === 0) {
-      return NextResponse.json(
-        { error: "At least one completed checklist task must be selected for submission." },
-        { status: 400 }
-      );
-    }
+
+    const rawItems = body.checklistItemIds || body.checklistTaskIds;
+    const checklistItemIds = Array.isArray(rawItems) ? rawItems : [];
+    const summary = (body.summary && body.summary.trim()) || (body.submissionNotes && body.submissionNotes.trim()) || "Work submitted for review";
 
     const submission = await submitTasksForReview(ctx, {
       taskId,

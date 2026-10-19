@@ -670,13 +670,13 @@ export default function EmployeeMyLeavePage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 text-xs text-[#696E82] mb-1">
+          <div className="flex items-center gap-2 type-helper text-[#4B5565] mb-1">
             <span>Staff Portal</span>
             <span>/</span>
             <span className="font-semibold text-[#1F1F1F]">My Leave Records</span>
           </div>
-          <h1 className="text-2xl font-bold text-[#1F1F1F] tracking-tight">My Leave & Quota Summary</h1>
-          <p className="text-xs text-[#696E82] mt-0.5">
+          <h1 className="type-page-title text-[#1F1F1F]">My Leave & Quota Summary</h1>
+          <p className="type-helper text-[#4B5565] mt-0.5">
             Self-service leave applications, pending edits, whole-request cancellation, and live quota tracking
           </p>
         </div>
@@ -795,9 +795,9 @@ export default function EmployeeMyLeavePage() {
               </div>
               <div className="text-2xl font-extrabold text-[#1F1F1F] mt-2 font-mono flex items-baseline gap-1.5">
                 <span className="text-[#5A81FA]">{analytics.ytdPaidDays}d</span>
-                <span className="text-xs text-[#696E82]">paid /</span>
+                <span className="type-helper text-[#4B5565]">paid /</span>
                 <span className="text-rose-600">{analytics.ytdUnpaidLopDays}d</span>
-                <span className="text-xs text-[#696E82]">LOP</span>
+                <span className="type-helper text-[#4B5565]">LOP</span>
               </div>
               {/* Mini visual bar */}
               <div className="w-full bg-[#E2E6F0] h-1.5 rounded-full overflow-hidden mt-2 flex">
@@ -860,11 +860,11 @@ export default function EmployeeMyLeavePage() {
           <div className="bg-white rounded-3xl border border-[#E2E6F0] p-6 shadow-2xs space-y-5">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#E2E6F0] pb-4">
               <div>
-                <h3 className="text-sm font-bold text-[#1F1F1F] flex items-center gap-2">
+                <h3 className="type-card-title text-[#1F1F1F] flex items-center gap-2">
                   <TrendingUp className="w-4 h-4 text-[#5A81FA]" />
                   <span>Month-Wise Leave Trajectory ({currentYear})</span>
                 </h3>
-                <p className="text-xs text-[#696E82] mt-0.5">
+                <p className="type-helper text-[#4B5565] mt-0.5">
                   Click any month bar to inspect or change the active calendar month. Stacked comparison of Paid Quota vs Loss of Pay (LOP).
                 </p>
               </div>
@@ -956,7 +956,7 @@ export default function EmployeeMyLeavePage() {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 text-xs">
                 <div className="p-3 rounded-2xl bg-[#F8F9FE] border border-[#E2E6F0]">
                   <div className="text-[11px] text-[#696E82] font-medium">Annual Quota Progress</div>
-                  <div className="text-base font-bold text-[#1F1F1F] mt-1 font-mono">
+                  <div className="type-card-title text-[#1F1F1F] mt-1 font-mono">
                     {analytics.ytdPaidDays} / {analytics.annualQuotaTotal} Paid Days ({Math.round((analytics.ytdPaidDays / (analytics.annualQuotaTotal || 1)) * 100)}%)
                   </div>
                   <div className="text-[10px] text-[#696E82] mt-0.5">
@@ -966,7 +966,7 @@ export default function EmployeeMyLeavePage() {
 
                 <div className="p-3 rounded-2xl bg-[#F8F9FE] border border-[#E2E6F0]">
                   <div className="text-[11px] text-[#696E82] font-medium">Average Monthly Leaves</div>
-                  <div className="text-base font-bold text-[#1F1F1F] mt-1 font-mono">
+                  <div className="type-card-title text-[#1F1F1F] mt-1 font-mono">
                     {(analytics.ytdTotalDays / Math.max(1, currentMonth)).toFixed(2)} Days / Month
                   </div>
                   <div className="text-[10px] text-[#696E82] mt-0.5">
@@ -992,7 +992,7 @@ export default function EmployeeMyLeavePage() {
             {/* Category / Typology Breakdown Card */}
             <div className="bg-white rounded-3xl border border-[#E2E6F0] p-6 shadow-2xs space-y-4">
               <div className="flex items-center justify-between border-b border-[#E2E6F0] pb-3">
-                <h3 className="text-sm font-bold text-[#1F1F1F] flex items-center gap-2">
+                <h3 className="type-card-title text-[#1F1F1F] flex items-center gap-2">
                   <PieChart className="w-4 h-4 text-[#5A81FA]" />
                   <span>Leave Typology & Category Share ({currentYear})</span>
                 </h3>
@@ -1113,7 +1113,7 @@ export default function EmployeeMyLeavePage() {
             {/* Pattern & Compliance Insights Card */}
             <div className="bg-white rounded-3xl border border-[#E2E6F0] p-6 shadow-2xs space-y-4">
               <div className="flex items-center justify-between border-b border-[#E2E6F0] pb-3">
-                <h3 className="text-sm font-bold text-[#1F1F1F] flex items-center gap-2">
+                <h3 className="type-card-title text-[#1F1F1F] flex items-center gap-2">
                   <Activity className="w-4 h-4 text-purple-600" />
                   <span>Work Habits & Pattern Analysis</span>
                 </h3>
@@ -1193,7 +1193,7 @@ export default function EmployeeMyLeavePage() {
                 </div>
 
                 {analytics.upcomingLeaves.length === 0 ? (
-                  <div className="p-3 rounded-2xl bg-[#F8F9FE] text-center text-xs text-[#696E82]">
+                  <div className="p-3 rounded-2xl bg-[#F8F9FE] text-center type-helper text-[#4B5565]">
                     No future absences scheduled. You are all set!
                   </div>
                 ) : (
@@ -1277,22 +1277,22 @@ export default function EmployeeMyLeavePage() {
           <div className="bg-white rounded-3xl border border-[#E2E6F0] p-5 shadow-2xs space-y-4">
             <div className="flex items-center justify-between border-b border-[#E2E6F0] pb-3">
               <div>
-                <h3 className="text-sm font-bold text-[#1F1F1F] flex items-center gap-2">
+                <h3 className="type-card-title text-[#1F1F1F] flex items-center gap-2">
                   <span>Pending Leave Requests</span>
                   <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
                     {pendingRequests.length}
                   </span>
                 </h3>
-                <p className="text-xs text-[#696E82]">
+                <p className="type-helper text-[#4B5565]">
                   Requests awaiting studio leadership review. You may edit or withdraw your pending submissions.
                 </p>
               </div>
             </div>
 
             {loading ? (
-              <div className="p-8 text-center text-xs text-[#696E82]">Loading pending requests...</div>
+              <div className="p-8 text-center type-helper text-[#4B5565]">Loading pending requests...</div>
             ) : pendingRequests.length === 0 ? (
-              <div className="p-6 text-center text-xs text-[#696E82] bg-[#F8F9FD] rounded-2xl border border-[#E2E6F0]">
+              <div className="p-6 text-center type-helper text-[#4B5565] bg-[#F8F9FD] rounded-2xl border border-[#E2E6F0]">
                 No pending leave requests. All prior submissions have been reviewed.
               </div>
             ) : (
@@ -1364,22 +1364,22 @@ export default function EmployeeMyLeavePage() {
           <div className="bg-white rounded-3xl border border-[#E2E6F0] p-5 shadow-2xs space-y-4">
             <div className="flex items-center justify-between border-b border-[#E2E6F0] pb-3">
               <div>
-                <h3 className="text-sm font-bold text-[#1F1F1F] flex items-center gap-2">
+                <h3 className="type-card-title text-[#1F1F1F] flex items-center gap-2">
                   <span>Approved Leave Consumption</span>
                   <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
                     {approvedRequests.length}
                   </span>
                 </h3>
-                <p className="text-xs text-[#696E82]">
+                <p className="type-helper text-[#4B5565]">
                   Active approved leave affecting current monthly quota. You may request cancellation if plans change.
                 </p>
               </div>
             </div>
 
             {loading ? (
-              <div className="p-8 text-center text-xs text-[#696E82]">Loading approved records...</div>
+              <div className="p-8 text-center type-helper text-[#4B5565]">Loading approved records...</div>
             ) : approvedRequests.length === 0 ? (
-              <div className="p-6 text-center text-xs text-[#696E82] bg-[#F8F9FD] rounded-2xl border border-[#E2E6F0]">
+              <div className="p-6 text-center type-helper text-[#4B5565] bg-[#F8F9FD] rounded-2xl border border-[#E2E6F0]">
                 No approved leave records currently consuming quota.
               </div>
             ) : (
@@ -1446,8 +1446,8 @@ export default function EmployeeMyLeavePage() {
           <div className="bg-white rounded-3xl border border-[#E2E6F0] p-5 shadow-2xs space-y-4">
             <div className="flex items-center justify-between border-b border-[#E2E6F0] pb-3">
               <div>
-                <h3 className="text-sm font-bold text-[#1F1F1F]">Personal Leave Calendar</h3>
-                <p className="text-xs text-[#696E82]">
+                <h3 className="type-card-title text-[#1F1F1F]">Personal Leave Calendar</h3>
+                <p className="type-helper text-[#4B5565]">
                   {monthNames[currentMonth - 1]} {currentYear}
                 </p>
               </div>
@@ -1543,10 +1543,10 @@ export default function EmployeeMyLeavePage() {
       <div className="bg-white rounded-3xl border border-[#E2E6F0] p-5 shadow-2xs space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#E2E6F0] pb-3">
           <div>
-            <h3 className="text-sm font-bold text-[#1F1F1F]">
+            <h3 className="type-card-title text-[#1F1F1F]">
               All-Time Leave History ({filteredHistory.length} records)
             </h3>
-            <p className="text-xs text-[#696E82]">
+            <p className="type-helper text-[#4B5565]">
               Search and filter your complete personal leave history
             </p>
           </div>
@@ -1616,7 +1616,7 @@ export default function EmployeeMyLeavePage() {
         </div>
 
         {paginatedHistory.length === 0 ? (
-          <div className="p-8 text-center text-xs text-[#696E82] bg-[#F8F9FD] rounded-2xl">
+          <div className="p-8 text-center type-helper text-[#4B5565] bg-[#F8F9FD] rounded-2xl">
             No matching leave records found.
           </div>
         ) : (
@@ -1662,7 +1662,7 @@ export default function EmployeeMyLeavePage() {
 
         {/* Pagination Controls */}
         {totalHistoryPages > 1 && (
-          <div className="flex items-center justify-between pt-2 border-t border-[#E2E6F0] text-xs text-[#696E82]">
+          <div className="flex items-center justify-between pt-2 border-t border-[#E2E6F0] type-helper text-[#4B5565]">
             <span>
               Page {historyPage} of {totalHistoryPages}
             </span>
@@ -1692,8 +1692,8 @@ export default function EmployeeMyLeavePage() {
           <div className="bg-white rounded-3xl border border-[#E2E6F0] shadow-xl w-full max-w-xl overflow-hidden my-8">
             <div className="flex items-center justify-between p-5 border-b border-[#E2E6F0]">
               <div>
-                <h3 className="text-base font-bold text-[#1F1F1F]">Apply For Studio Leave</h3>
-                <p className="text-xs text-[#696E82]">
+                <h3 className="type-card-title text-[#1F1F1F]">Apply For Studio Leave</h3>
+                <p className="type-helper text-[#4B5565]">
                   Dynamic preview with 24-hour notice validation and provisional quota split
                 </p>
               </div>
@@ -1963,8 +1963,8 @@ export default function EmployeeMyLeavePage() {
           <div className="bg-white rounded-3xl border border-[#E2E6F0] shadow-xl w-full max-w-xl overflow-hidden my-8">
             <div className="flex items-center justify-between p-5 border-b border-[#E2E6F0]">
               <div>
-                <h3 className="text-base font-bold text-[#1F1F1F]">Edit Pending Application</h3>
-                <p className="text-xs text-[#696E82]">
+                <h3 className="type-card-title text-[#1F1F1F]">Edit Pending Application</h3>
+                <p className="type-helper text-[#4B5565]">
                   Modifying a pending request revalidates policy and increments request version
                 </p>
               </div>
@@ -2077,8 +2077,8 @@ export default function EmployeeMyLeavePage() {
           <div className="bg-white rounded-3xl border border-[#E2E6F0] shadow-xl w-full max-w-lg overflow-hidden my-8">
             <div className="flex items-center justify-between p-5 border-b border-[#E2E6F0]">
               <div>
-                <h3 className="text-base font-bold text-[#1F1F1F]">Request Leave Cancellation</h3>
-                <p className="text-xs text-[#696E82]">
+                <h3 className="type-card-title text-[#1F1F1F]">Request Leave Cancellation</h3>
+                <p className="type-helper text-[#4B5565]">
                   Approved leave remains active and consumes quota until leadership approves
                 </p>
               </div>
@@ -2142,8 +2142,8 @@ export default function EmployeeMyLeavePage() {
           <div className="bg-white w-full max-w-md h-full shadow-2xl p-6 overflow-y-auto space-y-5 animate-in slide-in-from-right duration-200">
             <div className="flex items-center justify-between border-b border-[#E2E6F0] pb-4">
               <div>
-                <h3 className="text-base font-bold text-[#1F1F1F]">Leave Record Details</h3>
-                <p className="text-xs text-[#696E82]">Record ID: {selectedRecord.id}</p>
+                <h3 className="type-card-title text-[#1F1F1F]">Leave Record Details</h3>
+                <p className="type-helper text-[#4B5565]">Record ID: {selectedRecord.id}</p>
               </div>
               <button
                 onClick={() => setIsDetailDrawerOpen(false)}

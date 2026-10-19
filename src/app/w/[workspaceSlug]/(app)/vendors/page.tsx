@@ -300,7 +300,7 @@ export default function VendorManagementPage() {
             <span>/</span>
             <span className="font-semibold text-[#1F1F1F]">Vendors & Visitors</span>
           </div>
-          <h1 className="text-xl sm:text-2xl font-bold text-[#1F1F1F] tracking-tight">Vendor & Visitor CRM</h1>
+          <h1 className="type-page-title text-[#1F1F1F]">Vendor & Visitor CRM</h1>
           <p className="text-xs text-[#696E82] mt-0.5">
             Architectural procurement • Visitor tracking • Confidential notes & quality ratings
           </p>
@@ -573,7 +573,7 @@ export default function VendorManagementPage() {
               <div className="space-y-2">
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <h3 className="font-bold text-[#1F1F1F] text-sm">{v.companyName || v.name}</h3>
+                    <h3 className="type-card-title text-[#1F1F1F]">{v.companyName || v.name}</h3>
                     <div className="text-[11px] text-[#696E82] flex items-center gap-1.5 mt-0.5">
                       <span className="font-medium text-[#1F1F1F]">{v.name}</span>
                       {v.designation && <span>({v.designation})</span>}
@@ -687,7 +687,7 @@ export default function VendorManagementPage() {
           >
             <div className="flex items-center justify-between border-b border-[#E2E6F0] pb-3">
               <div>
-                <h3 className="text-base font-bold text-[#1F1F1F]">Add Vendor / Visitor Record</h3>
+                <h3 className="type-card-title text-[#1F1F1F]">Add Vendor / Visitor Record</h3>
                 <p className="text-xs text-[#696E82]">Studio architectural CRM onboarding</p>
               </div>
               <button
@@ -820,7 +820,7 @@ export default function VendorManagementPage() {
           >
             <div className="flex items-center justify-between border-b border-[#E2E6F0] pb-3">
               <div>
-                <h3 className="text-base font-bold text-[#1F1F1F]">Edit Vendor Record</h3>
+                <h3 className="type-card-title text-[#1F1F1F]">Edit Vendor Record</h3>
                 <p className="text-xs text-[#696E82]">Update contact details, category, or notes</p>
               </div>
               <button

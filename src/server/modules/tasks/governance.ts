@@ -53,16 +53,27 @@ export function evaluateTaskCompletionGovernance(
   },
   targetStatus: TaskWorkflowStatus
 ): GovernanceEvaluationResult {
+  const policy = getTaskGovernancePolicy(task);
+
   // Non-completion transitions follow standard workflow permissions
   if (targetStatus !== TaskWorkflowStatus.COMPLETED) {
     return {
       allowed: true,
       requiresReview: false,
-      policy: getTaskGovernancePolicy(task),
+      policy,
     };
   }
 
-  const policy = getTaskGovernancePolicy(task);
+  const isPrivileged = ctx.role === "OWNER" || ctx.role === "ADMIN";
+
+  // Studio Leadership (Owner and Admin) has sovereign administrative authority to complete any task
+  if (isPrivileged) {
+    return {
+      allowed: true,
+      requiresReview: false,
+      policy,
+    };
+  }
 
   // 1. Operational tasks with SELF_COMPLETION_ALLOWED
   if (policy === "SELF_COMPLETION_ALLOWED") {
@@ -87,23 +98,20 @@ export function evaluateTaskCompletionGovernance(
       (s) => s.submitterId === ctx.membershipId && s.status === "PENDING"
     ) || false;
 
-  // FOUR-EYES RULE: Submitter or assignee CANNOT self-approve governed work!
-  // Sovereign Owner status DOES NOT bypass this fundamental architectural governance rule!
+  // FOUR-EYES RULE: For non-leadership employees, submitter or assignee cannot self-approve governed work
   if (isAssignee || isSubmitter) {
     return {
       allowed: false,
       requiresReview: true,
       policy: "REVIEW_REQUIRED",
       reason:
-        "Four-Eyes Principle: Deliverable assignees or submitters cannot approve their own governed deliverable. Independent review is mandatory.",
+        "Four-Eyes Principle: Deliverable assignees or submitters cannot approve their own governed deliverable. Independent review by Studio Leadership is required.",
     };
   }
 
-  // Actor must have leadership or designated reviewer authority
-  const isPrivileged = ctx.role === "OWNER" || ctx.role === "ADMIN";
   const isDesignatedReviewer = task.reviewerId === ctx.membershipId;
 
-  if (!isPrivileged && !isDesignatedReviewer) {
+  if (!isDesignatedReviewer) {
     return {
       allowed: false,
       requiresReview: true,

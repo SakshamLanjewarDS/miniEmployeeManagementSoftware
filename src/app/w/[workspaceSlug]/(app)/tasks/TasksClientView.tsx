@@ -1149,6 +1149,14 @@ export default function TasksClientView({
           ? {
               ...t,
               status: newStatus as any,
+              checklistItems:
+                newStatus === "CHECKING" || newStatus === "IN_REVIEW"
+                  ? (t.checklistItems || []).map((ci: any) =>
+                      ci.isCompleted || ci.status === "COMPLETED"
+                        ? ci
+                        : { ...ci, status: "IN_REVIEW" }
+                    )
+                  : t.checklistItems,
               completionDate:
                 newStatus === "COMPLETED"
                   ? new Date().toISOString()
@@ -1163,6 +1171,14 @@ export default function TasksClientView({
           ? {
               ...prev,
               status: newStatus as any,
+              checklistItems:
+                newStatus === "CHECKING" || newStatus === "IN_REVIEW"
+                  ? (prev.checklistItems || []).map((ci: any) =>
+                      ci.isCompleted || ci.status === "COMPLETED"
+                        ? ci
+                        : { ...ci, status: "IN_REVIEW" }
+                    )
+                  : prev.checklistItems,
               completionDate:
                 newStatus === "COMPLETED"
                   ? new Date().toISOString()
@@ -1176,14 +1192,17 @@ export default function TasksClientView({
     setChangeComment("");
     setOverrideReason("");
     setErrorMessage(null);
-    if (newStatus === "COMPLETED") {
-      setSuccessMessage(`Deliverable "${previousTask.title}" marked as completed and moved down.`);
-    } else if (newStatus === "CHECKING") {
-      setSuccessMessage(`Deliverable "${previousTask.title}" moved to Checking.`);
-    }
 
     // 2. BACKGROUND SERVER SYNC
     try {
+      const isLeadership = userRole === "OWNER" || userRole === "ADMIN";
+      const effectiveAuditReason =
+        options.auditReason ||
+        options.comment ||
+        (newStatus === "COMPLETED" && isLeadership
+          ? `Marked as completed by Studio Leadership`
+          : undefined);
+
       const res = await fetch(`/api/tasks/status?workspaceSlug=${workspaceSlug}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1191,7 +1210,7 @@ export default function TasksClientView({
           taskId,
           status: newStatus,
           comment: options.comment,
-          auditReason: options.auditReason,
+          auditReason: effectiveAuditReason,
         }),
       });
 
@@ -1204,10 +1223,19 @@ export default function TasksClientView({
         if (drawerTask && drawerTask.id === taskId) {
           setDrawerTask((prev) => (prev ? { ...prev, status: previousStatus } : null));
         }
+        setSuccessMessage(null);
         setErrorMessage(data.error || "Failed to update task status");
       } else {
+        if (newStatus === "COMPLETED") {
+          setSuccessMessage(`Deliverable "${previousTask.title}" marked as completed and moved down.`);
+        } else if (newStatus === "CHECKING") {
+          setSuccessMessage(`Deliverable "${previousTask.title}" moved to Checking.`);
+        } else {
+          setSuccessMessage(`Deliverable "${previousTask.title}" status updated to ${newStatus}.`);
+        }
         broadcastRealtimeEvent("TASK_UPDATED", { taskId, status: newStatus });
         broadcastRealtimeEvent("NOTIFICATION_UPDATED");
+        router.refresh();
       }
     } catch {
       // Rollback on network error
@@ -1217,6 +1245,7 @@ export default function TasksClientView({
       if (drawerTask && drawerTask.id === taskId) {
         setDrawerTask((prev) => (prev ? { ...prev, status: previousStatus } : null));
       }
+      setSuccessMessage(null);
       setErrorMessage("Network error updating status. Reverted.");
     }
   };
@@ -2313,13 +2342,13 @@ export default function TasksClientView({
 
   return (
     <div className="space-y-6" suppressHydrationWarning>
-      {/* 1. STUDIO DELIVERABLES HEADER (Reference: abf0b1db) */}
+      {/* 1. STUDIO DELIVERABLES HEADER */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#0B122B]">
+          <h1 className="type-page-title text-[#0B122B]">
             Studio deliverables
           </h1>
-          <p className="text-xs sm:text-sm text-[#696E82] mt-0.5">
+          <p className="type-body-compact text-[#696E82] mt-1">
             Track work, review submissions and keep delivery moving.
           </p>
         </div>
@@ -2331,7 +2360,7 @@ export default function TasksClientView({
               type="button"
               suppressHydrationWarning
               onClick={() => setCustomFieldsModalOpen(true)}
-              className="px-3.5 py-2 bg-white border border-[#E2E6F0] hover:bg-[#F8F9FD] text-[#0B122B] text-xs font-semibold rounded-xl shadow-2xs transition-colors flex items-center gap-1.5 cursor-pointer"
+              className="px-3.5 py-2 bg-white border border-[#E2E6F0] hover:bg-[#F8F9FD] text-[#0B122B] type-button-label rounded-xl shadow-2xs transition-colors flex items-center gap-1.5 cursor-pointer"
             >
               <SlidersHorizontal className="w-3.5 h-3.5 text-[#3562E8]" />
               <span>Form fields</span>
@@ -2345,7 +2374,7 @@ export default function TasksClientView({
               setCustomFieldValues({});
               setIsCreateTaskModalOpen(true);
             }}
-            className="px-4 py-2 bg-[#3562E8] hover:bg-[#284ebd] text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+            className="px-4 py-2 bg-[#3562E8] hover:bg-[#284ebd] text-white type-button-label rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
           >
             <Plus className="w-4 h-4 stroke-[2.5]" />
             <span>Assign deliverable</span>
@@ -2357,9 +2386,9 @@ export default function TasksClientView({
                 type="button"
                 suppressHydrationWarning
                 onClick={() => handleScopeChange("all")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                className={`px-3 py-1.5 rounded-lg type-nav-label transition-all cursor-pointer ${
                   currentScope === "all"
-                    ? "bg-[#3562E8] text-white shadow-2xs"
+                    ? "bg-[#3562E8] text-white shadow-2xs font-semibold"
                     : "text-[#696E82] hover:text-[#0B122B]"
                 }`}
               >
@@ -2369,9 +2398,9 @@ export default function TasksClientView({
                 type="button"
                 suppressHydrationWarning
                 onClick={() => handleScopeChange("assigned_by_me")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                className={`px-3 py-1.5 rounded-lg type-nav-label transition-all cursor-pointer ${
                   currentScope === "assigned_by_me"
-                    ? "bg-[#3562E8] text-white shadow-2xs"
+                    ? "bg-[#3562E8] text-white shadow-2xs font-semibold"
                     : "text-[#696E82] hover:text-[#0B122B]"
                 }`}
               >
@@ -2381,9 +2410,9 @@ export default function TasksClientView({
                 type="button"
                 suppressHydrationWarning
                 onClick={() => handleScopeChange("my")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                className={`px-3 py-1.5 rounded-lg type-nav-label transition-all cursor-pointer ${
                   currentScope === "my"
-                    ? "bg-[#3562E8] text-white shadow-2xs"
+                    ? "bg-[#3562E8] text-white shadow-2xs font-semibold"
                     : "text-[#696E82] hover:text-[#0B122B]"
                 }`}
               >
@@ -2394,7 +2423,7 @@ export default function TasksClientView({
         </div>
       </div>
 
-      {/* 2. SUMMARY METRIC CARDS (5 Interactive Cards - Reference: abf0b1db) */}
+      {/* 2. SUMMARY METRIC CARDS */}
       {metrics && (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
           {/* Card 1: Due Today */}
@@ -2408,14 +2437,14 @@ export default function TasksClientView({
                 : "bg-white border-[#E2E6F0] hover:border-[#CEDEFF]"
             }`}
           >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-[#0B122B]">Due today</span>
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="type-kpi-label text-[#0B122B] font-medium">Due today</span>
               <Calendar className="w-4 h-4 text-[#3562E8]" />
             </div>
-            <div className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#0B122B] mt-2 font-sans">
+            <div className="type-kpi-value text-[#0B122B] mt-1 tabular-nums">
               {metrics.dueToday}
             </div>
-            <p className="text-[11px] text-[#696E82] mt-1">Pending today</p>
+            <p className="type-helper text-[#696E82] mt-1">Pending today</p>
           </button>
 
           {/* Card 2: Overdue */}
@@ -2429,14 +2458,14 @@ export default function TasksClientView({
                 : "bg-white border-[#E2E6F0] hover:border-rose-200"
             }`}
           >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-rose-600">Overdue</span>
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="type-kpi-label text-rose-600 font-medium">Overdue</span>
               <AlertTriangle className="w-4 h-4 text-rose-500" />
             </div>
-            <div className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#0B122B] mt-2 font-sans">
+            <div className="type-kpi-value text-[#0B122B] mt-1 tabular-nums">
               {metrics.overdue}
             </div>
-            <p className="text-[11px] text-rose-600/80 mt-1">Requires immediate attention</p>
+            <p className="type-helper text-rose-600/80 mt-1">Requires immediate attention</p>
           </button>
 
           {/* Card 3: In Progress */}
@@ -2450,14 +2479,14 @@ export default function TasksClientView({
                 : "bg-white border-[#E2E6F0] hover:border-[#CEDEFF]"
             }`}
           >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-[#3562E8]">In progress</span>
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="type-kpi-label text-[#3562E8] font-medium">In progress</span>
               <Play className="w-4 h-4 text-[#3562E8] fill-current" />
             </div>
-            <div className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#0B122B] mt-2 font-sans">
+            <div className="type-kpi-value text-[#0B122B] mt-1 tabular-nums">
               {metrics.inProgress}
             </div>
-            <p className="text-[11px] text-[#696E82] mt-1">Active studio drafting</p>
+            <p className="type-helper text-[#696E82] mt-1">Active studio drafting</p>
           </button>
 
           {/* Card 4: Waiting for Review */}
@@ -2471,14 +2500,14 @@ export default function TasksClientView({
                 : "bg-white border-[#E2E6F0] hover:border-purple-200"
             }`}
           >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-purple-700">Waiting review</span>
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="type-kpi-label text-purple-700 font-medium">Waiting review</span>
               <Clock className="w-4 h-4 text-purple-600" />
             </div>
-            <div className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#0B122B] mt-2 font-sans">
+            <div className="type-kpi-value text-[#0B122B] mt-1 tabular-nums">
               {metrics.waitingReview}
             </div>
-            <p className="text-[11px] text-[#696E82] mt-1">Submitted for approval</p>
+            <p className="type-helper text-[#696E82] mt-1">Submitted for approval</p>
           </button>
 
           {/* Card 5: Completed */}
@@ -2492,14 +2521,14 @@ export default function TasksClientView({
                 : "bg-white border-[#E2E6F0] hover:border-emerald-200"
             }`}
           >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-emerald-700">Completed</span>
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="type-kpi-label text-emerald-700 font-medium">Completed</span>
               <CheckCircle2 className="w-4 h-4 text-emerald-600" />
             </div>
-            <div className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#0B122B] mt-2 font-sans">
+            <div className="type-kpi-value text-[#0B122B] mt-1 tabular-nums">
               {metrics.completed}
             </div>
-            <p className="text-[11px] text-emerald-700/80 mt-1">Approved deliverables</p>
+            <p className="type-helper text-emerald-700/80 mt-1">Approved deliverables</p>
           </button>
         </div>
       )}
@@ -3374,6 +3403,7 @@ export default function TasksClientView({
                           <SearchableDropdown
                             size="sm"
                             optionType="status"
+                            direction="up"
                             disabled={loadingTaskId === task.id}
                             value={
                               task.status === "NOT_STARTED" ? "TODO" :
@@ -4326,17 +4356,21 @@ export default function TasksClientView({
                           {sub.evidenceLinks && Array.isArray(sub.evidenceLinks) && sub.evidenceLinks.length > 0 && (
                             <div className="text-[11px] space-y-0.5">
                               <span className="font-bold text-[#696E82] block">Attached Deliverable Files / Evidence:</span>
-                              {sub.evidenceLinks.map((link: string, idx: number) => (
-                                <a
-                                  key={idx}
-                                  href={link}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-[#5A81FA] hover:underline block truncate"
-                                >
-                                  🔗 {link}
-                                </a>
-                              ))}
+                              {sub.evidenceLinks.map((link: any, idx: number) => {
+                                const url = typeof link === "string" ? link : link?.url || "#";
+                                const displayText = typeof link === "string" ? link : link?.title || link?.url || "Attached Link";
+                                return (
+                                  <a
+                                    key={idx}
+                                    href={url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-[#5A81FA] hover:underline block truncate"
+                                  >
+                                    🔗 {displayText}
+                                  </a>
+                                );
+                              })}
                             </div>
                           )}
 
@@ -4693,6 +4727,7 @@ export default function TasksClientView({
                   <SearchableDropdown
                     size="sm"
                     optionType="status"
+                    direction="up"
                     searchable={false}
                     clearable={false}
                     disabled={loadingTaskId === drawerTask.id}

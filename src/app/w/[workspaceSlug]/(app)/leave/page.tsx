@@ -35,6 +35,7 @@ import {
   MoreVertical,
   Info,
   Edit3,
+  BarChart3,
 } from "lucide-react";
 import { broadcastRealtimeEvent, useRealtimeSubscription } from "@/lib/realtime";
 
@@ -50,6 +51,15 @@ export default function LeaveManagementPage() {
   // Filters
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [leaveTypeFilter, setLeaveTypeFilter] = useState<string>("");
+  const [employeeFilter, setEmployeeFilter] = useState<string>("ALL");
+  const [selectedStatsEmployee, setSelectedStatsEmployee] = useState<{
+    id: string;
+    employeeId: string;
+    name: string;
+    role: string;
+    department?: string;
+    email?: string;
+  } | null>(null);
   const [dateFilter, setDateFilter] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [sortOrder, setSortOrder] = useState<string>("RECENT");
@@ -380,7 +390,168 @@ export default function LeaveManagementPage() {
     }
   };
 
-  // Metrics computation
+  // Unique employees for selection & stats lookup
+  const uniqueEmployees = useMemo(() => {
+    const map = new Map<string, { id: string; employeeId: string; name: string; role: string; department?: string; email?: string }>();
+
+    // Seed from employees
+    employees.forEach((emp) => {
+      const id = emp.id;
+      const name = emp.name || emp.user?.fullName || emp.membership?.user?.fullName || "Staff Member";
+      const employeeId = emp.employeeId || "EMP";
+      const role = emp.designation || emp.department || "Staff";
+      const email = emp.email || emp.user?.email || emp.membership?.user?.email || "";
+      map.set(id, { id, employeeId, name, role, department: emp.department, email });
+    });
+
+    // Seed from records
+    records.forEach((rec) => {
+      const id = rec.employeeId || rec.employee?.id || rec.employeeNameRaw;
+      if (!id) return;
+      if (!map.has(id)) {
+        const name = rec.employeeNameRaw || rec.employee?.membership?.user?.fullName || "Staff Member";
+        const employeeId = rec.employee?.employeeId || rec.employeeId || "EMP";
+        const role = rec.employee?.designation || rec.employee?.department || "Architect";
+        const email = rec.employee?.membership?.user?.email || "";
+        map.set(id, { id, employeeId, name, role, department: rec.employee?.department, email });
+      }
+    });
+
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [records, employees]);
+
+  // Helper to compute deep leave stats for any given employee
+  const getEmployeeLeaveStats = (empIdentifier: any) => {
+    if (!empIdentifier) return null;
+
+    let targetId = "";
+    let targetCode = "";
+    let targetName = "";
+
+    if (typeof empIdentifier === "object") {
+      targetId = empIdentifier.id || empIdentifier.employee?.id || "";
+      targetCode = empIdentifier.employeeId || empIdentifier.employee?.employeeId || "";
+      targetName = empIdentifier.name || empIdentifier.fullName || empIdentifier.employeeNameRaw || "";
+    } else {
+      targetId = String(empIdentifier);
+      targetCode = String(empIdentifier);
+      targetName = String(empIdentifier);
+    }
+
+    const empRecords = records.filter((r) => {
+      const rId = r.employeeId || r.employee?.id || "";
+      const rCode = r.employee?.employeeId || r.employeeId || "";
+      const rName = r.employeeNameRaw || r.employee?.membership?.user?.fullName || "";
+
+      if (targetId && (rId === targetId || r.employeeId === targetId)) return true;
+      if (targetCode && (rCode === targetCode || r.employee?.employeeId === targetCode)) return true;
+      if (
+        targetName &&
+        (rName.toLowerCase() === targetName.toLowerCase() ||
+          (r.employeeNameRaw && r.employeeNameRaw.toLowerCase() === targetName.toLowerCase()))
+      ) {
+        return true;
+      }
+      return false;
+    });
+
+    const pending = empRecords.filter((r) => r.status === "PENDING").length;
+    const approved = empRecords.filter((r) => r.status === "APPROVED").length;
+    const rejected = empRecords.filter((r) => r.status === "REJECTED").length;
+
+    const approvedDays = empRecords
+      .filter((r) => r.status === "APPROVED")
+      .reduce((sum, r) => sum + (Number(r.days) || 0), 0);
+
+    const pendingDays = empRecords
+      .filter((r) => r.status === "PENDING")
+      .reduce((sum, r) => sum + (Number(r.days) || 0), 0);
+
+    const currentYear = new Date().getFullYear();
+    const currentMonth = new Date().getMonth();
+
+    const thisYearApprovedDays = empRecords
+      .filter((r) => {
+        if (r.status !== "APPROVED" || !r.startDate) return false;
+        return new Date(r.startDate).getFullYear() === currentYear;
+      })
+      .reduce((sum, r) => sum + (Number(r.days) || 0), 0);
+
+    const thisMonthApprovedDays = empRecords
+      .filter((r) => {
+        if (r.status !== "APPROVED" || !r.startDate) return false;
+        const d = new Date(r.startDate);
+        return d.getFullYear() === currentYear && d.getMonth() === currentMonth;
+      })
+      .reduce((sum, r) => sum + (Number(r.days) || 0), 0);
+
+    const monthlyAllowance = 2.0;
+    const annualAllowance = 24.0;
+
+    const lopDays = empRecords
+      .filter((r) => r.status === "APPROVED" && (r.leaveType === "LOSS_OF_PAY" || r.isPaidEligible === false))
+      .reduce((sum, r) => sum + (Number(r.days) || 0), 0);
+    const paidDays = Math.max(0, approvedDays - lopDays);
+
+    const remainingMonthly = Math.max(0, monthlyAllowance - thisMonthApprovedDays);
+    const remainingAnnual = Math.max(0, annualAllowance - thisYearApprovedDays);
+
+    const casualDays = empRecords
+      .filter((r) => r.status === "APPROVED" && r.leaveType === "CASUAL")
+      .reduce((sum, r) => sum + (Number(r.days) || 0), 0);
+    const sickDays = empRecords
+      .filter((r) => r.status === "APPROVED" && r.leaveType === "SICK")
+      .reduce((sum, r) => sum + (Number(r.days) || 0), 0);
+    const annualDays = empRecords
+      .filter((r) => r.status === "APPROVED" && r.leaveType === "ANNUAL")
+      .reduce((sum, r) => sum + (Number(r.days) || 0), 0);
+
+    return {
+      totalRecords: empRecords.length,
+      pending,
+      approved,
+      rejected,
+      approvedDays,
+      pendingDays,
+      thisYearApprovedDays,
+      thisMonthApprovedDays,
+      monthlyAllowance,
+      annualAllowance,
+      paidDays,
+      lopDays,
+      remainingMonthly,
+      remainingAnnual,
+      casualDays,
+      sickDays,
+      annualDays,
+      history: empRecords,
+    };
+  };
+
+  const isEmployeeFiltered = employeeFilter !== "ALL";
+  const activeEmployee = useMemo(() => {
+    if (!isEmployeeFiltered) return null;
+    return uniqueEmployees.find((e) => e.id === employeeFilter || e.employeeId === employeeFilter || e.name === employeeFilter) || null;
+  }, [isEmployeeFiltered, employeeFilter, uniqueEmployees]);
+
+  const activeEmployeeStats = useMemo(() => {
+    if (!activeEmployee) return null;
+    return getEmployeeLeaveStats(activeEmployee);
+  }, [activeEmployee, records]);
+
+  // Real-time leave stats for the active stats modal
+  const currentModalStats = useMemo(() => {
+    if (!selectedStatsEmployee) return null;
+    return getEmployeeLeaveStats(selectedStatsEmployee);
+  }, [selectedStatsEmployee, records]);
+
+  // Real-time leave stats for the employee being reviewed in the drawer
+  const reviewEmpStats = useMemo(() => {
+    if (!selectedLeave) return null;
+    return getEmployeeLeaveStats(selectedLeave.employee || selectedLeave.employeeId || selectedLeave.employeeNameRaw);
+  }, [selectedLeave, records]);
+
+  // Studio-wide metrics computation
   const totalPending = useMemo(() => records.filter((r) => r.status === "PENDING").length, [records]);
   const totalApproved = useMemo(() => records.filter((r) => r.status === "APPROVED").length, [records]);
   const totalRejected = useMemo(() => records.filter((r) => r.status === "REJECTED").length, [records]);
@@ -388,6 +559,12 @@ export default function LeaveManagementPage() {
     () => records.filter((r) => r.status === "APPROVED").reduce((sum, r) => sum + (Number(r.days) || 0), 0),
     [records]
   );
+
+  // Dynamic metrics shown on KPI cards
+  const displayedPending = isEmployeeFiltered && activeEmployeeStats ? activeEmployeeStats.pending : totalPending;
+  const displayedApproved = isEmployeeFiltered && activeEmployeeStats ? activeEmployeeStats.approved : totalApproved;
+  const displayedRejected = isEmployeeFiltered && activeEmployeeStats ? activeEmployeeStats.rejected : totalRejected;
+  const displayedDaysApproved = isEmployeeFiltered && activeEmployeeStats ? activeEmployeeStats.approvedDays : totalDaysApproved;
 
   // Filtering & Pagination
   const filteredRecords = useMemo(() => {
@@ -400,8 +577,14 @@ export default function LeaveManagementPage() {
       const matchesSearch = !q || empName.includes(q) || empId.includes(q) || reason.includes(q);
       const matchesStatus = !statusFilter || rec.status === statusFilter;
       const matchesType = !leaveTypeFilter || rec.leaveType === leaveTypeFilter;
+      const matchesEmployee =
+        employeeFilter === "ALL" ||
+        rec.employeeId === employeeFilter ||
+        rec.employee?.id === employeeFilter ||
+        rec.employee?.employeeId === employeeFilter ||
+        rec.employeeNameRaw === employeeFilter;
 
-      if (!matchesSearch || !matchesStatus || !matchesType) return false;
+      if (!matchesSearch || !matchesStatus || !matchesType || !matchesEmployee) return false;
 
       if (dateFilter && dateFilter !== "ALL" && rec.startDate) {
         const start = new Date(rec.startDate);
@@ -447,7 +630,7 @@ export default function LeaveManagementPage() {
     });
 
     return list;
-  }, [records, searchQuery, statusFilter, leaveTypeFilter, dateFilter, sortOrder]);
+  }, [records, searchQuery, statusFilter, leaveTypeFilter, employeeFilter, dateFilter, sortOrder]);
 
   const totalPages = Math.max(1, Math.ceil(filteredRecords.length / pageSize));
   const paginatedRecords = useMemo(() => {
@@ -475,7 +658,7 @@ export default function LeaveManagementPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl md:text-[28px] font-bold text-[#1F1F1F] tracking-tight">
+            <h1 className="type-page-title text-[#1F1F1F]">
               Staff leave
             </h1>
           </div>
@@ -561,6 +744,55 @@ export default function LeaveManagementPage() {
         </div>
       )}
 
+      {/* Active Employee Stats Banner */}
+      {isEmployeeFiltered && activeEmployee && (
+        <div className="p-3.5 bg-[#F0F4FF] border border-[#CEDEFF] rounded-2xl flex flex-wrap items-center justify-between gap-3 text-xs shadow-2xs animate-in fade-in">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-[#1456F0] text-white font-bold text-xs flex items-center justify-center shadow-xs">
+              {getInitials(activeEmployee.name)}
+            </div>
+            <div>
+              <div className="font-bold text-[#1F1F1F] flex items-center gap-2">
+                <span>Employee Leave Profile: {activeEmployee.name}</span>
+                <span className="text-[10px] font-semibold text-[#1456F0] bg-white px-2 py-0.5 rounded-full border border-[#CEDEFF]">
+                  {activeEmployee.employeeId}
+                </span>
+              </div>
+              <div className="text-[11px] text-[#696E82] mt-0.5">
+                <span>{activeEmployee.role}</span>
+                {activeEmployee.department && <span> • {activeEmployee.department}</span>}
+                {activeEmployeeStats && (
+                  <span className="font-semibold text-emerald-700 ml-2">
+                    • {activeEmployeeStats.remainingAnnual.toFixed(1)} days balance left
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setSelectedStatsEmployee(activeEmployee)}
+              className="px-3 py-1.5 bg-white border border-[#CEDEFF] hover:bg-[#1456F0] hover:text-white text-[#1456F0] font-semibold rounded-xl text-xs transition-colors shadow-2xs cursor-pointer flex items-center gap-1.5"
+            >
+              <Info className="w-3.5 h-3.5" />
+              <span>Full Leave Stats &amp; Breakdown</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setEmployeeFilter("ALL");
+                setPage(1);
+              }}
+              className="px-3 py-1.5 bg-white border border-[#E2E6F0] hover:bg-[#F8F9FE] text-[#696E82] hover:text-[#1F1F1F] font-medium rounded-xl text-xs transition-colors cursor-pointer"
+            >
+              Clear Filter ✕
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* 1. Four KPI Summary Cards matching Reference Image */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
         {/* Card 1: Pending review */}
@@ -572,12 +804,12 @@ export default function LeaveManagementPage() {
             <div>
               <div className="text-xs text-[#696E82] font-medium">Pending review</div>
               <div className="text-xl md:text-2xl font-bold text-[#1F1F1F] tracking-tight mt-0.5">
-                {totalPending}
+                {displayedPending}
               </div>
             </div>
           </div>
           <div className="text-[11px] text-[#696E82] mt-3 pt-2.5 border-t border-[#F2F4F8]">
-            Awaiting leadership action
+            {isEmployeeFiltered && activeEmployee ? `${activeEmployee.name}'s pending requests` : "Awaiting leadership action"}
           </div>
         </div>
 
@@ -590,12 +822,12 @@ export default function LeaveManagementPage() {
             <div>
               <div className="text-xs text-[#696E82] font-medium">Approved requests</div>
               <div className="text-xl md:text-2xl font-bold text-[#1F1F1F] tracking-tight mt-0.5">
-                {totalApproved}
+                {displayedApproved}
               </div>
             </div>
           </div>
           <div className="text-[11px] text-[#696E82] mt-3 pt-2.5 border-t border-[#F2F4F8]">
-            Total approved requests
+            {isEmployeeFiltered && activeEmployee ? `${activeEmployee.name}'s approved requests` : "Total approved requests"}
           </div>
         </div>
 
@@ -611,30 +843,34 @@ export default function LeaveManagementPage() {
                 <Info className="w-3 h-3 text-[#696E82]" />
               </div>
               <div className="text-xl md:text-2xl font-bold text-[#1F1F1F] tracking-tight mt-0.5">
-                {totalDaysApproved.toFixed(2)}
+                {displayedDaysApproved.toFixed(2)}
               </div>
             </div>
           </div>
           <div className="text-[11px] text-[#696E82] mt-3 pt-2.5 border-t border-[#F2F4F8]">
-            As reported by leave tracker
+            {isEmployeeFiltered && activeEmployee ? `${activeEmployee.name}'s total days taken` : "As reported by leave tracker"}
           </div>
         </div>
 
-        {/* Card 4: Monthly allowance */}
+        {/* Card 4: Monthly allowance / Remaining balance */}
         <div className="p-4 md:p-5 bg-white rounded-2xl border border-[#E2E6F0] shadow-2xs hover:border-[#CEDEFF] transition-all">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-[#F4F6FB] text-[#1F1F1F] flex items-center justify-center shrink-0">
               <FileText className="w-5 h-5" />
             </div>
             <div>
-              <div className="text-xs text-[#696E82] font-medium">Monthly allowance</div>
+              <div className="text-xs text-[#696E82] font-medium">
+                {isEmployeeFiltered ? "Remaining leave balance" : "Monthly allowance"}
+              </div>
               <div className="text-xl md:text-2xl font-bold text-[#1F1F1F] tracking-tight mt-0.5">
-                2 days
+                {isEmployeeFiltered && activeEmployeeStats ? `${activeEmployeeStats.remainingAnnual.toFixed(1)} days` : "2 days"}
               </div>
             </div>
           </div>
           <div className="text-[11px] text-[#696E82] mt-3 pt-2.5 border-t border-[#F2F4F8]">
-            Per employee • Not remaining balance
+            {isEmployeeFiltered && activeEmployeeStats
+              ? `Annual balance • ${activeEmployeeStats.remainingMonthly.toFixed(1)} days left this month`
+              : "Per employee • Not remaining balance"}
           </div>
         </div>
       </div>
@@ -723,6 +959,28 @@ export default function LeaveManagementPage() {
             />
           </div>
 
+          {/* Employee / Staff Filter Dropdown */}
+          <select
+            value={employeeFilter}
+            onChange={(e) => {
+              setEmployeeFilter(e.target.value);
+              setPage(1);
+            }}
+            aria-label="Filter by staff employee"
+            className={`text-xs border rounded-xl px-3 py-1.5 font-medium focus:outline-none focus:border-[#1456F0] cursor-pointer transition-colors ${
+              employeeFilter !== "ALL"
+                ? "bg-[#EBF1FF] border-[#CEDEFF] text-[#1456F0] font-bold shadow-2xs"
+                : "bg-white border-[#E2E6F0] text-[#1F1F1F]"
+            }`}
+          >
+            <option value="ALL">All staff members ▾</option>
+            {uniqueEmployees.map((e) => (
+              <option key={e.id} value={e.id}>
+                {e.name} ({e.employeeId})
+              </option>
+            ))}
+          </select>
+
           {/* Leave Type Dropdown */}
           <select
             value={leaveTypeFilter}
@@ -776,12 +1034,13 @@ export default function LeaveManagementPage() {
           </select>
 
           {/* Reset Filters Button */}
-          {(statusFilter || leaveTypeFilter || dateFilter !== "ALL" || searchQuery || sortOrder !== "RECENT") && (
+          {(statusFilter || leaveTypeFilter || employeeFilter !== "ALL" || dateFilter !== "ALL" || searchQuery || sortOrder !== "RECENT") && (
             <button
               type="button"
               onClick={() => {
                 setStatusFilter("");
                 setLeaveTypeFilter("");
+                setEmployeeFilter("ALL");
                 setDateFilter("ALL");
                 setSearchQuery("");
                 setSortOrder("RECENT");
@@ -843,137 +1102,278 @@ export default function LeaveManagementPage() {
           </div>
         ) : (
           <>
-            {/* Desktop Table View matching Reference Image */}
-            <div className="hidden md:block overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-[#E2E6F0] text-[#696E82] font-semibold bg-[#FAFBFF]">
-                    <th className="py-3.5 px-5">Employee</th>
-                    <th className="py-3.5 px-4">Dates</th>
-                    <th className="py-3.5 px-4">Duration &amp; type</th>
-                    <th className="py-3.5 px-4">Status</th>
-                    <th className="py-3.5 px-4 text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#F0F2F7]">
-                  {paginatedRecords.map((rec) => {
-                    const empName = rec.employeeNameRaw || rec.employee?.membership?.user?.fullName || "Staff Member";
-                    const empId = rec.employee?.employeeId || "EMP-001";
-                    const role = rec.employee?.designation || rec.employee?.department || "Architect";
-                    const datesStr = formatDisplayDates(rec.startDate, rec.endDate);
-                    const durationStr = formatDuration(rec);
+            {/* Desktop View: Table or Grid */}
+            {viewMode === "table" ? (
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full text-left type-table-cell">
+                  <thead>
+                    <tr className="border-b border-[#E2E6F0] text-[#696E82] font-semibold bg-[#FAFBFF]">
+                      <th className="py-3.5 px-5">Employee</th>
+                      <th className="py-3.5 px-4">Dates</th>
+                      <th className="py-3.5 px-4">Duration &amp; type</th>
+                      <th className="py-3.5 px-4">Status</th>
+                      <th className="py-3.5 px-4 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#F0F2F7]">
+                    {paginatedRecords.map((rec) => {
+                      const empName = rec.employeeNameRaw || rec.employee?.membership?.user?.fullName || "Staff Member";
+                      const empId = rec.employee?.employeeId || "EMP-001";
+                      const role = rec.employee?.designation || rec.employee?.department || "Architect";
+                      const datesStr = formatDisplayDates(rec.startDate, rec.endDate);
+                      const durationStr = formatDuration(rec);
+                      const empData = {
+                        id: rec.employee?.id || rec.employeeId || rec.id,
+                        employeeId: empId,
+                        name: empName,
+                        role: role,
+                        department: rec.employee?.department,
+                        email: rec.employee?.membership?.user?.email || rec.employee?.email,
+                      };
 
-                    return (
-                      <tr key={rec.id} className="hover:bg-[#F8F9FE] transition-colors group">
-                        {/* Employee */}
-                        <td className="py-3.5 px-5">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-[#EBF1FF] text-[#1456F0] font-bold text-xs flex items-center justify-center shrink-0">
+                      return (
+                        <tr key={rec.id} className="hover:bg-[#F8F9FE] transition-colors group">
+                          {/* Employee - Clickable to open Employee Leave Stats Modal */}
+                          <td
+                            className="py-3.5 px-5 cursor-pointer group/emp hover:bg-[#F0F4FF] transition-colors"
+                            onClick={() => setSelectedStatsEmployee(empData)}
+                            title={`Click to view leave statistics for ${empName}`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-full bg-[#EBF1FF] text-[#1456F0] group-hover/emp:bg-[#1456F0] group-hover/emp:text-white font-bold text-xs flex items-center justify-center shrink-0 transition-all shadow-2xs">
+                                {getInitials(empName)}
+                              </div>
+                              <div>
+                                <div className="font-semibold text-[#1F1F1F] group-hover/emp:text-[#1456F0] flex items-center gap-1.5 transition-colors">
+                                  <span>{empName}</span>
+                                  <span className="text-[10px] font-medium text-[#1456F0] bg-[#EBF1FF] px-1.5 py-0.2 rounded-md opacity-0 group-hover/emp:opacity-100 transition-opacity">
+                                    Stats ↗
+                                  </span>
+                                </div>
+                                <div className="text-[11px] text-[#696E82] mt-0.5">
+                                  <span>{empId}</span>
+                                  <span className="mx-1">•</span>
+                                  <span>{role}</span>
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Dates */}
+                          <td className="py-3.5 px-4 font-medium text-[#1F1F1F]">
+                            {datesStr}
+                          </td>
+
+                          {/* Duration & type */}
+                          <td className="py-3.5 px-4">
+                            <div className="font-bold text-[#1F1F1F]">{durationStr}</div>
+                            <div className="text-[11px] text-[#696E82] capitalize">
+                              {rec.leaveType?.toLowerCase().replace(/_/g, " ")}
+                            </div>
+                          </td>
+
+                          {/* Status Badge matching Reference */}
+                          <td className="py-3.5 px-4">
+                            {rec.status === "PENDING" && (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-900 border border-amber-200">
+                                <Clock className="w-3 h-3 text-amber-600" />
+                                <span>Pending</span>
+                              </span>
+                            )}
+                            {rec.status === "APPROVED" && (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                <span>Approved</span>
+                              </span>
+                            )}
+                            {rec.status === "REJECTED" && (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-800 border border-rose-200">
+                                <X className="w-3 h-3 text-rose-600" />
+                                <span>Rejected</span>
+                              </span>
+                            )}
+                            {rec.status === "CANCELLED" && (
+                              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold bg-gray-100 text-gray-700">
+                                Cancelled
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Actions */}
+                          <td className="py-3.5 px-4 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                onClick={() => {
+                                  setSelectedLeave(rec);
+                                  setIsReviewOpen(true);
+                                }}
+                                className="text-xs font-semibold text-[#1456F0] hover:text-[#0F47D1] transition-colors"
+                              >
+                                {rec.status === "PENDING" ? "Review" : "View details"}
+                              </button>
+
+                              <div className="relative">
+                                <button
+                                  onClick={() => setActiveMenuRecordId(activeMenuRecordId === rec.id ? null : rec.id)}
+                                  className="p-1 rounded-lg text-[#696E82] hover:text-[#1F1F1F] hover:bg-[#F8F9FE]"
+                                >
+                                  <MoreVertical className="w-3.5 h-3.5" />
+                                </button>
+
+                                {activeMenuRecordId === rec.id && (
+                                  <div className="absolute right-0 top-full mt-1 w-36 bg-white rounded-xl border border-[#E2E6F0] shadow-lg z-30 p-1 text-left">
+                                    <button
+                                      onClick={() => {
+                                        setSelectedLeave(rec);
+                                        setIsReviewOpen(true);
+                                        setActiveMenuRecordId(null);
+                                      }}
+                                      className="w-full text-left px-2.5 py-1.5 text-xs text-[#1F1F1F] hover:bg-[#F8F9FE] rounded-lg"
+                                    >
+                                      Review details
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        setSelectedStatsEmployee(empData);
+                                        setActiveMenuRecordId(null);
+                                      }}
+                                      className="w-full text-left px-2.5 py-1.5 text-xs text-[#1456F0] hover:bg-[#EBF1FF] rounded-lg font-medium"
+                                    >
+                                      Employee stats
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteLeave(rec.id, empName)}
+                                      className="w-full text-left px-2.5 py-1.5 text-xs text-rose-600 hover:bg-rose-50 rounded-lg"
+                                    >
+                                      Delete / Tombstone
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              /* Desktop Grid View */
+              <div className="hidden md:grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-5">
+                {paginatedRecords.map((rec) => {
+                  const empName = rec.employeeNameRaw || rec.employee?.membership?.user?.fullName || "Staff Member";
+                  const empId = rec.employee?.employeeId || "EMP-001";
+                  const role = rec.employee?.designation || rec.employee?.department || "Architect";
+                  const datesStr = formatDisplayDates(rec.startDate, rec.endDate);
+                  const durationStr = formatDuration(rec);
+                  const empData = {
+                    id: rec.employee?.id || rec.employeeId || rec.id,
+                    employeeId: empId,
+                    name: empName,
+                    role: role,
+                    department: rec.employee?.department,
+                    email: rec.employee?.membership?.user?.email || rec.employee?.email,
+                  };
+
+                  return (
+                    <div
+                      key={rec.id}
+                      className="p-4 bg-white border border-[#E2E6F0] hover:border-[#CEDEFF] rounded-2xl shadow-2xs hover:shadow-xs transition-all space-y-3 flex flex-col justify-between"
+                    >
+                      <div className="space-y-3">
+                        {/* Employee Header - Clickable for stats */}
+                        <div
+                          className="flex items-center justify-between cursor-pointer group/card p-1 -m-1 rounded-xl hover:bg-[#F0F4FF] transition-colors"
+                          onClick={() => setSelectedStatsEmployee(empData)}
+                          title={`Click to view leave stats for ${empName}`}
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-9 h-9 rounded-full bg-[#EBF1FF] text-[#1456F0] group-hover/card:bg-[#1456F0] group-hover/card:text-white font-bold text-xs flex items-center justify-center shrink-0 transition-all shadow-2xs">
                               {getInitials(empName)}
                             </div>
                             <div>
-                              <div className="font-semibold text-[#1F1F1F]">
-                                {empName}
+                              <div className="font-bold text-xs text-[#1F1F1F] group-hover/card:text-[#1456F0] flex items-center gap-1 transition-colors">
+                                <span>{empName}</span>
+                                <span className="text-[9px] font-semibold text-[#1456F0] bg-[#EBF1FF] px-1.5 py-0.2 rounded-md opacity-0 group-hover/card:opacity-100 transition-opacity">
+                                  Stats ↗
+                                </span>
                               </div>
-                              <div className="text-[11px] text-[#696E82] mt-0.5">
-                                <span>{empId}</span>
-                                <span className="mx-1">•</span>
-                                <span>{role}</span>
+                              <div className="text-[11px] text-[#696E82]">
+                                <span>{empId}</span> • <span>{role}</span>
                               </div>
                             </div>
                           </div>
-                        </td>
 
-                        {/* Dates */}
-                        <td className="py-3.5 px-4 font-medium text-[#1F1F1F]">
-                          {datesStr}
-                        </td>
-
-                        {/* Duration & type */}
-                        <td className="py-3.5 px-4">
-                          <div className="font-bold text-[#1F1F1F]">{durationStr}</div>
-                          <div className="text-[11px] text-[#696E82] capitalize">
-                            {rec.leaveType?.toLowerCase().replace(/_/g, " ")}
-                          </div>
-                        </td>
-
-                        {/* Status Badge matching Reference */}
-                        <td className="py-3.5 px-4">
                           {rec.status === "PENDING" && (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-900 border border-amber-200">
-                              <Clock className="w-3 h-3 text-amber-600" />
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-900 border border-amber-200">
+                              <Clock className="w-2.5 h-2.5 text-amber-600" />
                               <span>Pending</span>
                             </span>
                           )}
                           {rec.status === "APPROVED" && (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                              <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" />
                               <span>Approved</span>
                             </span>
                           )}
                           {rec.status === "REJECTED" && (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-800 border border-rose-200">
-                              <X className="w-3 h-3 text-rose-600" />
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-50 text-rose-800 border border-rose-200">
+                              <X className="w-2.5 h-2.5 text-rose-600" />
                               <span>Rejected</span>
                             </span>
                           )}
                           {rec.status === "CANCELLED" && (
-                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold bg-gray-100 text-gray-700">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-100 text-gray-700">
                               Cancelled
                             </span>
                           )}
-                        </td>
+                        </div>
 
-                        {/* Actions */}
-                        <td className="py-3.5 px-4 text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <button
-                              onClick={() => {
-                                setSelectedLeave(rec);
-                                setIsReviewOpen(true);
-                              }}
-                              className="text-xs font-semibold text-[#1456F0] hover:text-[#0F47D1] transition-colors"
-                            >
-                              {rec.status === "PENDING" ? "Review" : "View details"}
-                            </button>
-
-                            <div className="relative">
-                              <button
-                                onClick={() => setActiveMenuRecordId(activeMenuRecordId === rec.id ? null : rec.id)}
-                                className="p-1 rounded-lg text-[#696E82] hover:text-[#1F1F1F] hover:bg-[#F8F9FE]"
-                              >
-                                <MoreVertical className="w-3.5 h-3.5" />
-                              </button>
-
-                              {activeMenuRecordId === rec.id && (
-                                <div className="absolute right-0 top-full mt-1 w-36 bg-white rounded-xl border border-[#E2E6F0] shadow-lg z-30 p-1 text-left">
-                                  <button
-                                    onClick={() => {
-                                      setSelectedLeave(rec);
-                                      setIsReviewOpen(true);
-                                      setActiveMenuRecordId(null);
-                                    }}
-                                    className="w-full text-left px-2.5 py-1.5 text-xs text-[#1F1F1F] hover:bg-[#F8F9FE] rounded-lg"
-                                  >
-                                    Review details
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeleteLeave(rec.id, empName)}
-                                    className="w-full text-left px-2.5 py-1.5 text-xs text-rose-600 hover:bg-rose-50 rounded-lg"
-                                  >
-                                    Delete / Tombstone
-                                  </button>
-                                </div>
-                              )}
-                            </div>
+                        {/* Dates & Duration */}
+                        <div className="p-2.5 bg-[#F8F9FE] rounded-xl space-y-1.5 text-xs">
+                          <div className="flex items-center gap-2 text-[#1F1F1F] font-semibold">
+                            <Calendar className="w-3.5 h-3.5 text-[#1456F0]" />
+                            <span>{datesStr}</span>
                           </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                          <div className="flex items-center justify-between text-[11px] text-[#696E82]">
+                            <span className="font-bold text-[#1F1F1F]">{durationStr}</span>
+                            <span className="capitalize">{rec.leaveType?.toLowerCase().replace(/_/g, " ")}</span>
+                          </div>
+                        </div>
+
+                        {rec.reason && (
+                          <p className="text-[11px] text-[#696E82] line-clamp-2 italic pl-1">
+                            "{rec.reason}"
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Card Actions */}
+                      <div className="pt-2 border-t border-[#F0F2F7] flex items-center justify-between gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedStatsEmployee(empData)}
+                          className="text-[11px] font-semibold text-[#1456F0] hover:underline cursor-pointer"
+                        >
+                          Leave stats ↗
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedLeave(rec);
+                            setIsReviewOpen(true);
+                          }}
+                          className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-[#F8F9FE] hover:bg-[#1456F0] hover:text-white border border-[#E2E6F0] text-[#1F1F1F] transition-all cursor-pointer"
+                        >
+                          {rec.status === "PENDING" ? "Review" : "Details"}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
 
             {/* Mobile Stack Cards matching Reference Image */}
             <div className="md:hidden divide-y divide-[#E2E6F0]">
@@ -983,16 +1383,34 @@ export default function LeaveManagementPage() {
                 const role = rec.employee?.designation || rec.employee?.department || "Architect";
                 const datesStr = formatDisplayDates(rec.startDate, rec.endDate);
                 const durationStr = formatDuration(rec);
+                const empData = {
+                  id: rec.employee?.id || rec.employeeId || rec.id,
+                  employeeId: empId,
+                  name: empName,
+                  role: role,
+                  department: rec.employee?.department,
+                  email: rec.employee?.membership?.user?.email || rec.employee?.email,
+                };
 
                 return (
                   <div key={rec.id} className="p-4 space-y-3">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-[#EBF1FF] text-[#1456F0] font-bold text-xs flex items-center justify-center shrink-0">
+                      {/* Clickable Employee for Stats on Mobile */}
+                      <div
+                        className="flex items-center gap-3 cursor-pointer group/mob p-1 -m-1 rounded-xl hover:bg-[#F0F4FF] transition-colors"
+                        onClick={() => setSelectedStatsEmployee(empData)}
+                        title={`Click to view leave statistics for ${empName}`}
+                      >
+                        <div className="w-9 h-9 rounded-full bg-[#EBF1FF] text-[#1456F0] group-hover/mob:bg-[#1456F0] group-hover/mob:text-white font-bold text-xs flex items-center justify-center shrink-0 transition-colors">
                           {getInitials(empName)}
                         </div>
                         <div>
-                          <div className="font-bold text-sm text-[#1F1F1F]">{empName}</div>
+                          <div className="font-bold text-sm text-[#1F1F1F] group-hover/mob:text-[#1456F0] flex items-center gap-1.5 transition-colors">
+                            <span>{empName}</span>
+                            <span className="text-[10px] font-medium text-[#1456F0] bg-[#EBF1FF] px-1.5 py-0.2 rounded-md">
+                              Stats ↗
+                            </span>
+                          </div>
                           <div className="text-xs text-[#696E82]">
                             <span>{empId}</span>
                             <span className="mx-1">•</span>
@@ -1125,13 +1543,29 @@ export default function LeaveManagementPage() {
 
             {/* Employee Header */}
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-[#EBF1FF] text-[#1456F0] font-bold text-sm flex items-center justify-center">
+              <div
+                className="flex items-center gap-3 cursor-pointer group/revEmp p-1 -m-1 rounded-xl hover:bg-[#F0F4FF] transition-colors"
+                onClick={() => {
+                  setSelectedStatsEmployee({
+                    id: selectedLeave.employee?.id || selectedLeave.employeeId,
+                    employeeId: selectedLeave.employee?.employeeId || selectedLeave.employeeId || "EMP-001",
+                    name: selectedLeave.employeeNameRaw || selectedLeave.employee?.membership?.user?.fullName || "Staff Member",
+                    role: selectedLeave.employee?.designation || selectedLeave.employee?.department || "Architect",
+                    department: selectedLeave.employee?.department,
+                    email: selectedLeave.employee?.membership?.user?.email,
+                  });
+                }}
+                title="Click to view full employee leave statistics"
+              >
+                <div className="w-10 h-10 rounded-full bg-[#EBF1FF] text-[#1456F0] group-hover/revEmp:bg-[#1456F0] group-hover/revEmp:text-white font-bold text-sm flex items-center justify-center transition-all shadow-2xs">
                   {getInitials(selectedLeave.employeeNameRaw || selectedLeave.employee?.membership?.user?.fullName || "Staff")}
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-[#1F1F1F]">
-                    {selectedLeave.employeeNameRaw || selectedLeave.employee?.membership?.user?.fullName || "Staff Member"}
+                  <h3 className="type-card-title text-[#1F1F1F] group-hover/revEmp:text-[#1456F0] flex items-center gap-1.5 transition-colors">
+                    <span>{selectedLeave.employeeNameRaw || selectedLeave.employee?.membership?.user?.fullName || "Staff Member"}</span>
+                    <span className="text-[10px] font-medium text-[#1456F0] bg-[#EBF1FF] px-1.5 py-0.2 rounded-md">
+                      Stats ↗
+                    </span>
                   </h3>
                   <p className="text-xs text-[#696E82]">
                     {selectedLeave.employee?.employeeId || "EMP-001"} • {selectedLeave.employee?.designation || selectedLeave.employee?.department || "Architect"}
@@ -1187,45 +1621,92 @@ export default function LeaveManagementPage() {
               </p>
             </div>
 
-            {/* Allowance & Allocation Card matching Reference */}
+            {/* Allowance & Allocation Card with Real Employee Stats */}
             <div className="p-4 bg-white border border-[#E2E6F0] rounded-2xl space-y-2.5 text-xs">
-              <div className="font-bold text-[#1F1F1F] flex items-center gap-1.5">
-                <FileText className="w-3.5 h-3.5 text-[#1456F0]" />
-                <span>Allowance &amp; allocation</span>
+              <div className="flex items-center justify-between">
+                <div className="font-bold text-[#1F1F1F] flex items-center gap-1.5">
+                  <FileText className="w-3.5 h-3.5 text-[#1456F0]" />
+                  <span>Allowance &amp; allocation</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedStatsEmployee({
+                      id: selectedLeave.employee?.id || selectedLeave.employeeId,
+                      employeeId: selectedLeave.employee?.employeeId || selectedLeave.employeeId || "EMP-001",
+                      name: selectedLeave.employeeNameRaw || selectedLeave.employee?.membership?.user?.fullName || "Staff Member",
+                      role: selectedLeave.employee?.designation || selectedLeave.employee?.department || "Architect",
+                      department: selectedLeave.employee?.department,
+                      email: selectedLeave.employee?.membership?.user?.email,
+                    });
+                  }}
+                  className="text-[11px] font-semibold text-[#1456F0] hover:underline cursor-pointer flex items-center gap-1"
+                >
+                  <BarChart3 className="w-3 h-3" />
+                  <span>View stats ↗</span>
+                </button>
               </div>
 
               <div className="space-y-2 divide-y divide-[#F2F4F8] pt-1">
                 <div className="flex justify-between items-center pt-1">
                   <span className="text-[#696E82]">Monthly policy</span>
                   <div className="text-right">
-                    <span className="font-bold text-[#1F1F1F]">2 paid days</span>
-                    <span className="text-[11px] text-[#696E82] block">Per employee</span>
+                    <span className="font-bold text-[#1F1F1F]">2.0 paid days</span>
+                    <span className="text-[11px] text-[#696E82] block">
+                      {reviewEmpStats ? `${reviewEmpStats.remainingMonthly.toFixed(1)} days left this month` : "Per employee"}
+                    </span>
                   </div>
                 </div>
 
                 <div className="flex justify-between items-center pt-2">
                   <span className="text-[#696E82]">Remaining balance</span>
                   <div className="text-right">
-                    <span className="font-medium text-[#1F1F1F]">Not available in this view</span>
-                    <span className="text-[11px] text-[#696E82] block">Prior usage unknown</span>
+                    <span className="font-bold text-emerald-700">
+                      {reviewEmpStats ? `${reviewEmpStats.remainingAnnual.toFixed(1)} annual days left` : "24.0 days/year"}
+                    </span>
+                    <span className="text-[11px] text-[#696E82] block">
+                      {reviewEmpStats ? `${reviewEmpStats.thisYearApprovedDays.toFixed(1)} used of 24.0 this year` : "Annual quota"}
+                    </span>
                   </div>
                 </div>
 
                 <div className="flex justify-between items-center pt-2">
                   <span className="text-[#696E82]">Paid / unpaid split</span>
                   <div className="text-right">
-                    <span className="font-medium text-amber-700">Verify before approval</span>
-                    <span className="text-[11px] text-[#696E82] block">Not specified</span>
+                    <span className="font-semibold text-[#1F1F1F]">
+                      {reviewEmpStats ? `${reviewEmpStats.paidDays.toFixed(1)} paid days taken` : "Calculated on approval"}
+                    </span>
+                    <span className="text-[11px] text-rose-600 block">
+                      {reviewEmpStats && reviewEmpStats.lopDays > 0 ? `${reviewEmpStats.lopDays.toFixed(1)} Loss of Pay (LOP)` : "0 Loss of Pay"}
+                    </span>
                   </div>
                 </div>
               </div>
 
-              <div className="pt-2 border-t border-[#F2F4F8]">
-                <Link
-                  href={`/w/${workspaceSlug}/leave/dossier/${selectedLeave.employeeId}`}
-                  className="text-xs font-semibold text-[#1456F0] hover:underline inline-flex items-center gap-1"
+              <div className="pt-2 border-t border-[#F2F4F8] flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedStatsEmployee({
+                      id: selectedLeave.employee?.id || selectedLeave.employeeId,
+                      employeeId: selectedLeave.employee?.employeeId || selectedLeave.employeeId || "EMP-001",
+                      name: selectedLeave.employeeNameRaw || selectedLeave.employee?.membership?.user?.fullName || "Staff Member",
+                      role: selectedLeave.employee?.designation || selectedLeave.employee?.department || "Architect",
+                      department: selectedLeave.employee?.department,
+                      email: selectedLeave.employee?.membership?.user?.email,
+                    });
+                  }}
+                  className="text-xs font-semibold text-[#1456F0] hover:underline inline-flex items-center gap-1 cursor-pointer"
                 >
-                  <span>View leave history</span>
+                  <BarChart3 className="w-3.5 h-3.5" />
+                  <span>Complete leave stats</span>
+                </button>
+
+                <Link
+                  href={`/w/${workspaceSlug}/leave/dossier/${selectedLeave.employeeId || selectedLeave.employee?.id}`}
+                  className="text-xs font-semibold text-[#696E82] hover:text-[#1F1F1F] inline-flex items-center gap-1"
+                >
+                  <span>Dossier</span>
                   <ArrowRight className="w-3 h-3" />
                 </Link>
               </div>
@@ -1297,7 +1778,7 @@ export default function LeaveManagementPage() {
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-[#E2E6F0] space-y-4 animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between border-b border-[#F0F2F7] pb-3">
-              <h3 className="text-base font-bold text-[#1F1F1F]">Apply Leave on Behalf</h3>
+              <h3 className="type-card-title text-[#1F1F1F]">Apply Leave on Behalf</h3>
               <button
                 type="button"
                 onClick={() => setIsCreateOpen(false)}
@@ -1414,7 +1895,7 @@ export default function LeaveManagementPage() {
             <div className="flex items-center justify-between border-b border-[#F0F2F7] pb-3">
               <div className="flex items-center gap-2">
                 <FileSpreadsheet className="w-5 h-5 text-emerald-600" />
-                <h3 className="text-base font-bold text-[#1F1F1F]">Google Sheets Integration</h3>
+                <h3 className="type-card-title text-[#1F1F1F]">Google Sheets Integration</h3>
               </div>
               <button
                 type="button"
@@ -1461,6 +1942,262 @@ export default function LeaveManagementPage() {
               >
                 Close
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Employee Leave Statistics Modal */}
+      {selectedStatsEmployee && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-5 sm:p-7 shadow-2xl border border-[#E2E6F0] space-y-5 max-h-[92vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-150 text-[#1F1F1F]">
+            {/* Modal Header */}
+            <div className="flex items-start justify-between border-b border-[#F0F2F7] pb-4">
+              <div className="flex items-center gap-3.5">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#1456F0] to-[#3B82F6] text-white font-bold text-base flex items-center justify-center shadow-md shadow-blue-500/20 shrink-0">
+                  {getInitials(selectedStatsEmployee.name)}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-lg font-bold text-[#1F1F1F] tracking-tight">
+                      {selectedStatsEmployee.name}
+                    </h3>
+                    <span className="text-[11px] font-semibold text-[#1456F0] bg-[#EBF1FF] px-2.5 py-0.5 rounded-full border border-[#CEDEFF]">
+                      {selectedStatsEmployee.employeeId}
+                    </span>
+                  </div>
+                  <p className="text-xs text-[#696E82] mt-0.5">
+                    <span>{selectedStatsEmployee.role}</span>
+                    {selectedStatsEmployee.department && <span> • {selectedStatsEmployee.department}</span>}
+                    {selectedStatsEmployee.email && <span> • {selectedStatsEmployee.email}</span>}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setSelectedStatsEmployee(null)}
+                className="w-8 h-8 rounded-xl flex items-center justify-center text-[#696E82] hover:text-[#1F1F1F] hover:bg-[#F8F9FE] transition-colors"
+                title="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Allowance & Balance Card */}
+            {currentModalStats && (
+              <div className="p-4 bg-gradient-to-br from-[#FAFBFF] to-[#F0F4FF] border border-[#CEDEFF] rounded-2xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <BarChart3 className="w-4 h-4 text-[#1456F0]" />
+                    <span className="font-bold text-xs text-[#1F1F1F]">Annual Leave Balance &amp; Quota</span>
+                  </div>
+                  <span className="text-xs font-semibold text-[#1456F0] bg-white px-2.5 py-1 rounded-full border border-[#CEDEFF] shadow-2xs">
+                    {currentModalStats.remainingAnnual.toFixed(1)} days balance left
+                  </span>
+                </div>
+
+                {/* Progress bar */}
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-[11px] text-[#696E82]">
+                    <span>{currentModalStats.thisYearApprovedDays.toFixed(1)} days used this year</span>
+                    <span>Quota: {currentModalStats.annualAllowance.toFixed(1)} days/year</span>
+                  </div>
+                  <div className="w-full bg-[#E2E6F0] h-2.5 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-300 ${
+                        currentModalStats.thisYearApprovedDays > currentModalStats.annualAllowance
+                          ? "bg-rose-500"
+                          : currentModalStats.thisYearApprovedDays / currentModalStats.annualAllowance > 0.8
+                          ? "bg-amber-500"
+                          : "bg-[#1456F0]"
+                      }`}
+                      style={{
+                        width: `${Math.min(
+                          100,
+                          (currentModalStats.thisYearApprovedDays / (currentModalStats.annualAllowance || 24)) * 100
+                        )}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-2 border-t border-[#CEDEFF]/50 text-xs">
+                  <div>
+                    <span className="text-[#696E82] text-[11px] block">Monthly Policy</span>
+                    <span className="font-semibold text-[#1F1F1F]">{currentModalStats.monthlyAllowance.toFixed(1)} days/mo</span>
+                  </div>
+                  <div>
+                    <span className="text-[#696E82] text-[11px] block">Used This Month</span>
+                    <span className="font-semibold text-[#1F1F1F]">{currentModalStats.thisMonthApprovedDays.toFixed(1)} days</span>
+                  </div>
+                  <div>
+                    <span className="text-[#696E82] text-[11px] block">This Month Balance</span>
+                    <span className="font-semibold text-emerald-700">{currentModalStats.remainingMonthly.toFixed(1)} days left</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 4 Key Stat Cards */}
+            {currentModalStats && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                <div className="p-3.5 bg-white border border-[#E2E6F0] rounded-2xl shadow-2xs">
+                  <span className="text-[11px] font-medium text-[#696E82] block">Approved Days</span>
+                  <div className="text-xl font-bold text-emerald-700 mt-0.5">
+                    {currentModalStats.approvedDays.toFixed(1)}
+                  </div>
+                  <span className="text-[10px] text-[#696E82] mt-0.5 block">
+                    {currentModalStats.approved} {currentModalStats.approved === 1 ? "request" : "requests"}
+                  </span>
+                </div>
+
+                <div className="p-3.5 bg-white border border-[#E2E6F0] rounded-2xl shadow-2xs">
+                  <span className="text-[11px] font-medium text-[#696E82] block">Pending Days</span>
+                  <div className="text-xl font-bold text-amber-600 mt-0.5">
+                    {currentModalStats.pendingDays.toFixed(1)}
+                  </div>
+                  <span className="text-[10px] text-[#696E82] mt-0.5 block">
+                    {currentModalStats.pending} awaiting review
+                  </span>
+                </div>
+
+                <div className="p-3.5 bg-white border border-[#E2E6F0] rounded-2xl shadow-2xs">
+                  <span className="text-[11px] font-medium text-[#696E82] block">Paid Leave</span>
+                  <div className="text-xl font-bold text-[#1456F0] mt-0.5">
+                    {currentModalStats.paidDays.toFixed(1)}
+                  </div>
+                  <span className="text-[10px] text-[#696E82] mt-0.5 block">Eligible days</span>
+                </div>
+
+                <div className="p-3.5 bg-white border border-[#E2E6F0] rounded-2xl shadow-2xs">
+                  <span className="text-[11px] font-medium text-[#696E82] block">Loss of Pay (LOP)</span>
+                  <div className="text-xl font-bold text-rose-600 mt-0.5">
+                    {currentModalStats.lopDays.toFixed(1)}
+                  </div>
+                  <span className="text-[10px] text-[#696E82] mt-0.5 block">Unpaid / exceeded</span>
+                </div>
+              </div>
+            )}
+
+            {/* Leave Type Breakdown Pills */}
+            {currentModalStats && (
+              <div className="space-y-2">
+                <span className="text-xs font-bold text-[#1F1F1F]">Approved Breakdown by Type</span>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                  <div className="p-2.5 bg-[#F8F9FE] border border-[#E2E6F0] rounded-xl flex items-center justify-between">
+                    <span className="text-[#696E82]">Casual</span>
+                    <span className="font-bold text-[#1F1F1F]">{currentModalStats.casualDays.toFixed(1)} d</span>
+                  </div>
+                  <div className="p-2.5 bg-[#F8F9FE] border border-[#E2E6F0] rounded-xl flex items-center justify-between">
+                    <span className="text-[#696E82]">Sick</span>
+                    <span className="font-bold text-[#1F1F1F]">{currentModalStats.sickDays.toFixed(1)} d</span>
+                  </div>
+                  <div className="p-2.5 bg-[#F8F9FE] border border-[#E2E6F0] rounded-xl flex items-center justify-between">
+                    <span className="text-[#696E82]">Annual</span>
+                    <span className="font-bold text-[#1F1F1F]">{currentModalStats.annualDays.toFixed(1)} d</span>
+                  </div>
+                  <div className="p-2.5 bg-[#F8F9FE] border border-[#E2E6F0] rounded-xl flex items-center justify-between">
+                    <span className="text-[#696E82]">Loss of Pay</span>
+                    <span className="font-bold text-rose-600">{currentModalStats.lopDays.toFixed(1)} d</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Leave Applications History for this employee */}
+            <div className="space-y-2 pt-2 border-t border-[#F0F2F7]">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-[#1F1F1F]">
+                  Leave History ({currentModalStats?.history?.length || 0})
+                </span>
+                <span className="text-[11px] text-[#696E82]">
+                  {currentModalStats?.history?.length === 0 ? "No records" : "All logged requests"}
+                </span>
+              </div>
+
+              <div className="max-h-60 overflow-y-auto space-y-2 pr-1">
+                {!currentModalStats || currentModalStats.history.length === 0 ? (
+                  <div className="p-6 text-center text-xs text-[#696E82] bg-[#F8F9FE] rounded-2xl border border-dashed border-[#E2E6F0]">
+                    No leave requests found on file for this staff member.
+                  </div>
+                ) : (
+                  currentModalStats.history.map((rec: any) => (
+                    <div
+                      key={rec.id}
+                      className="p-3 bg-[#FAFBFF] border border-[#E2E6F0] hover:border-[#CEDEFF] rounded-xl flex items-center justify-between gap-3 text-xs transition-colors"
+                    >
+                      <div className="space-y-0.5">
+                        <div className="font-semibold text-[#1F1F1F] flex items-center gap-2">
+                          <span className="capitalize">{rec.leaveType?.toLowerCase().replace(/_/g, " ")} leave</span>
+                          <span className="text-[11px] text-[#696E82]">• {formatDuration(rec)}</span>
+                        </div>
+                        <div className="text-[11px] text-[#696E82]">
+                          <span>{formatDisplayDates(rec.startDate, rec.endDate)}</span>
+                          {rec.reason && <span className="italic ml-2">"{rec.reason}"</span>}
+                        </div>
+                      </div>
+
+                      <div className="shrink-0 flex items-center gap-2">
+                        {rec.status === "PENDING" && (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-900 border border-amber-200">
+                            Pending
+                          </span>
+                        )}
+                        {rec.status === "APPROVED" && (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                            Approved
+                          </span>
+                        )}
+                        {rec.status === "REJECTED" && (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-50 text-rose-800 border border-rose-200">
+                            Rejected
+                          </span>
+                        )}
+                        {rec.status === "CANCELLED" && (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-100 text-gray-700">
+                            Cancelled
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 pt-3 border-t border-[#F0F2F7]">
+              <button
+                type="button"
+                onClick={() => {
+                  setEmployeeFilter(selectedStatsEmployee.id || selectedStatsEmployee.name);
+                  setSelectedStatsEmployee(null);
+                  setPage(1);
+                }}
+                className="w-full sm:w-auto px-4 py-2 bg-[#EBF1FF] hover:bg-[#1456F0] text-[#1456F0] hover:text-white font-semibold rounded-xl text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <Filter className="w-3.5 h-3.5" />
+                <span>Filter Table by {selectedStatsEmployee.name.split(" ")[0]}</span>
+              </button>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                <Link
+                  href={`/w/${workspaceSlug}/leave/dossier/${selectedStatsEmployee.id || selectedStatsEmployee.employeeId}`}
+                  className="w-full sm:w-auto px-3.5 py-2 border border-[#E2E6F0] hover:bg-[#F8F9FE] text-[#1F1F1F] font-semibold rounded-xl text-xs inline-flex items-center justify-center gap-1 transition-colors"
+                >
+                  <span>Full Dossier</span>
+                  <ExternalLink className="w-3.5 h-3.5 text-[#696E82]" />
+                </Link>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedStatsEmployee(null)}
+                  className="w-full sm:w-auto px-5 py-2 bg-[#1456F0] hover:bg-[#0F47D1] text-white font-bold rounded-xl text-xs shadow-xs transition-colors cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>

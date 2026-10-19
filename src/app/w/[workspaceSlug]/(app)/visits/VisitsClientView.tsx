@@ -1478,7 +1478,7 @@ export default function VisitsClientView({
         {/* Title & Actions Row */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#1F1F1F]">
+            <h1 className="type-page-title text-[#1F1F1F]">
               Site visits & issues
             </h1>
             <p className="text-xs sm:text-sm text-[#696E82] mt-0.5">
@@ -1558,7 +1558,7 @@ export default function VisitsClientView({
               </div>
               <div>
                 <div className="text-[11px] sm:text-xs text-[#696E82] font-medium">Assigned to me</div>
-                <div className="text-xl sm:text-2xl font-bold text-[#1F1F1F] font-mono leading-none mt-1">
+                <div className="type-kpi-value text-[#1F1F1F] tabular-nums mt-1">
                   {scheduledVisits.length}
                 </div>
               </div>
@@ -1570,7 +1570,7 @@ export default function VisitsClientView({
               </div>
               <div>
                 <div className="text-[11px] sm:text-xs text-[#696E82] font-medium">Pending check-in</div>
-                <div className="text-xl sm:text-2xl font-bold text-[#1F1F1F] font-mono leading-none mt-1">
+                <div className="type-kpi-value text-[#1F1F1F] tabular-nums mt-1">
                   {scheduledVisits.filter((s) => s.operationalState === "SCHEDULED").length}
                 </div>
               </div>
@@ -1582,7 +1582,7 @@ export default function VisitsClientView({
               </div>
               <div>
                 <div className="text-[11px] sm:text-xs text-[#696E82] font-medium">Recorded visits</div>
-                <div className="text-xl sm:text-2xl font-bold text-[#1F1F1F] font-mono leading-none mt-1">
+                <div className="type-kpi-value text-[#1F1F1F] tabular-nums mt-1">
                   {allVisits.filter((v) => v.operationalState === "CHECKED_OUT" || v.checkOutTime).length}
                 </div>
               </div>
@@ -1641,7 +1641,7 @@ export default function VisitsClientView({
                   Active On-Site Inspection
                 </span>
               </div>
-              <h2 className="text-lg sm:text-xl font-bold text-[#1F1F1F]">{activeVisit.purpose}</h2>
+              <h2 className="type-section-title text-[#1F1F1F]">{activeVisit.purpose}</h2>
               <div className="text-xs text-[#696E82] flex items-center gap-1.5 flex-wrap">
                 <MapPin className="w-3.5 h-3.5 text-[#5A81FA]" />
                 <span className="font-medium text-[#1F1F1F]">{activeVisit.site.name}</span>
@@ -2585,7 +2585,7 @@ export default function VisitsClientView({
               <Calendar className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-[#1F1F1F]">My assigned visits</h3>
+              <h3 className="type-subsection-title text-[#1F1F1F]">My assigned visits</h3>
               <p className="text-[11px] text-[#696E82]">
                 Visits assigned to you for field check-in.
               </p>

@@ -252,7 +252,7 @@ export function ProfileClientView({ context, initialData }: ProfileClientViewPro
       {/* Main Header Row */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl md:text-[28px] font-bold text-[#1F1F1F] tracking-tight">
+          <h1 className="type-page-title text-[#1F1F1F]">
             My profile
           </h1>
           <p className="text-xs md:text-sm text-[#696E82] mt-0.5">
@@ -339,7 +339,7 @@ export function ProfileClientView({ context, initialData }: ProfileClientViewPro
         {/* Identity Details */}
         <div className="flex-1 space-y-3 text-center md:text-left">
           <div>
-            <h2 className="text-2xl font-bold text-[#1F1F1F] tracking-tight">
+            <h2 className="type-section-title text-[#1F1F1F]">
               {initialData.myProfile?.fullName || context.userFullName}
             </h2>
             <p className="text-xs md:text-sm text-[#696E82] font-medium mt-0.5">
@@ -488,7 +488,7 @@ export function ProfileClientView({ context, initialData }: ProfileClientViewPro
             {/* Left Column: Personal details form */}
             <div className="lg:col-span-7 bg-white rounded-3xl border border-[#E2E6F0] p-6 shadow-2xs space-y-5">
               <div>
-                <h3 className="text-base font-bold text-[#1F1F1F] flex items-center gap-2">
+                <h3 className="type-card-title text-[#1F1F1F] flex items-center gap-2">
                   <User className="w-4 h-4 text-[#1456F0]" />
                   <span>Personal details</span>
                 </h3>
@@ -593,7 +593,7 @@ export function ProfileClientView({ context, initialData }: ProfileClientViewPro
               <div className="bg-white rounded-3xl border border-[#E2E6F0] p-6 shadow-2xs space-y-4">
                 <div className="flex items-center gap-2">
                   <FileText className="w-4 h-4 text-[#1456F0]" />
-                  <h3 className="text-base font-bold text-[#1F1F1F]">Official studio record</h3>
+                  <h3 className="type-card-title text-[#1F1F1F]">Official studio record</h3>
                 </div>
 
                 <div className="space-y-3 text-xs divide-y divide-[#F2F4F8]">
@@ -767,7 +767,7 @@ export function ProfileClientView({ context, initialData }: ProfileClientViewPro
       {activeTab === "hr-record" && (
         <div className="space-y-5">
           <div className="bg-white rounded-3xl border border-[#E2E6F0] p-6 shadow-2xs space-y-4">
-            <h3 className="text-base font-bold text-[#1F1F1F] flex items-center gap-2">
+            <h3 className="type-card-title text-[#1F1F1F] flex items-center gap-2">
               <Shield className="w-4 h-4 text-[#1456F0]" />
               <span>Official Employment &amp; HR Records</span>
             </h3>

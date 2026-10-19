@@ -52,6 +52,7 @@ export function TaskCardActions({
           <SearchableDropdown
             size="sm"
             optionType="status"
+            direction="up"
             searchable={false}
             clearable={false}
             loading={isLoadingStatus}

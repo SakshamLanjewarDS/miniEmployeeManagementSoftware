@@ -866,12 +866,12 @@ export function AppSidebar({ context }: AppSidebarProps) {
             />
           </div>
           <div className="min-w-0">
-            <h2 className="text-sm font-bold text-[#0B122B] truncate tracking-tight">
+            <h2 className="type-card-title text-[#0B122B] truncate">
               {context.tenantName}
             </h2>
             <div className="flex items-center gap-1.5 mt-0.5">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-[11px] text-slate-500 font-mono uppercase tracking-wider truncate">
+              <span className="type-helper text-slate-500 font-mono truncate">
                 {context.tenantSlug}
               </span>
             </div>
@@ -895,7 +895,7 @@ export function AppSidebar({ context }: AppSidebarProps) {
 
       {/* 2. SCROLLABLE NAVIGATION BODY (Flexible Middle Area) */}
       <nav
-        className="flex-1 overflow-y-auto px-3.5 py-4 space-y-4 text-xs no-scrollbar"
+        className="flex-1 overflow-y-auto px-3.5 py-4 space-y-4 no-scrollbar"
         aria-label="Studio Main Navigation"
       >
         {/* THREE DIRECT NAVIGATION LINKS */}
@@ -910,10 +910,10 @@ export function AppSidebar({ context }: AppSidebarProps) {
                 href={item.href}
                 prefetch={false}
                 aria-current={isActive ? "page" : undefined}
-                className={`flex items-center justify-between px-3.5 py-2.5 rounded-2xl font-medium transition-all duration-150 group press-feedback ${
+                className={`flex items-center justify-between px-3.5 py-2.5 rounded-2xl type-nav-label transition-all duration-150 group press-feedback ${
                   isActive
                     ? "bg-[#3562E8] text-white font-semibold shadow-sm shadow-[#3562E8]/20"
-                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 hover:translate-x-0.5"
+                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 hover:translate-x-0.5 font-medium"
                 }`}
                 onClick={() => {
                   if (isMobileOpen) setIsMobileOpen(false);
@@ -930,7 +930,7 @@ export function AppSidebar({ context }: AppSidebarProps) {
 
                 {item.badge && (
                   <span
-                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                    className={`type-badge font-medium px-2 py-0.5 rounded-full ${
                       isActive ? "bg-white/20 text-white" : "bg-rose-100 text-rose-700"
                     }`}
                   >
@@ -961,10 +961,10 @@ export function AppSidebar({ context }: AppSidebarProps) {
                   aria-expanded={isExpanded}
                   aria-controls={`group-panel-${group.id}`}
                   onClick={() => handleToggleGroup(group.id)}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm transition-all cursor-pointer ${
                     isGroupActive
-                      ? "text-[#3562E8] bg-blue-50/70 font-bold"
-                      : "text-slate-500 hover:text-slate-900 hover:bg-slate-100/60"
+                      ? "text-[#3562E8] bg-blue-50/70 font-semibold"
+                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/60 font-medium"
                   }`}
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
@@ -973,7 +973,7 @@ export function AppSidebar({ context }: AppSidebarProps) {
                         isGroupActive ? "text-[#3562E8]" : "text-slate-400"
                       }`}
                     />
-                    <span className="truncate tracking-tight">{group.title}</span>
+                    <span className="truncate">{group.title}</span>
                   </div>
                   <ChevronDown
                     className={`w-3.5 h-3.5 shrink-0 transition-transform duration-200 ${
@@ -1005,10 +1005,10 @@ export function AppSidebar({ context }: AppSidebarProps) {
                               prefetch={false}
                               tabIndex={isExpanded ? 0 : -1}
                               aria-current={isActive ? "page" : undefined}
-                              className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all duration-150 group press-feedback ${
+                              className={`flex items-center justify-between px-3 py-2 rounded-xl type-nav-label transition-all duration-150 group press-feedback ${
                                 isActive
                                   ? "bg-[#3562E8] text-white font-semibold shadow-xs"
-                                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 hover:translate-x-0.5"
+                                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 hover:translate-x-0.5 font-medium"
                               }`}
                               onClick={() => {
                                 if (isMobileOpen) setIsMobileOpen(false);
@@ -1027,7 +1027,7 @@ export function AppSidebar({ context }: AppSidebarProps) {
 
                               {item.badge && (
                                 <span
-                                  className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                                  className={`type-badge font-medium px-1.5 py-0.5 rounded-full ${
                                     isActive
                                       ? "bg-white/20 text-white"
                                       : "bg-slate-100 text-slate-700"
@@ -1059,10 +1059,10 @@ export function AppSidebar({ context }: AppSidebarProps) {
             onClick={() => {
               if (isMobileOpen) setIsMobileOpen(false);
             }}
-            className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all group ${
+            className={`flex items-center justify-between px-3 py-2 rounded-xl type-nav-label transition-all group ${
               isIntegrationsActive
                 ? "bg-[#3562E8] text-white font-semibold shadow-xs"
-                : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/70"
+                : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 font-medium"
             }`}
           >
             <div className="flex items-center gap-2.5 min-w-0">
@@ -1077,7 +1077,7 @@ export function AppSidebar({ context }: AppSidebarProps) {
             {healthAttention && (
               <span
                 title="Action required on integration health"
-                className="flex items-center gap-1 text-[10px] font-semibold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-200"
+                className="flex items-center gap-1 type-badge font-medium text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-200"
               >
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
                 <span>Attention</span>
@@ -1096,20 +1096,20 @@ export function AppSidebar({ context }: AppSidebarProps) {
               aria-haspopup="menu"
               className="flex items-center gap-2.5 min-w-0 text-left cursor-pointer flex-1"
             >
-              <div className="w-9 h-9 rounded-2xl bg-[#CEDEFF] text-[#2C308D] font-bold text-xs flex items-center justify-center shrink-0 shadow-2xs">
+              <div className="w-9 h-9 rounded-2xl bg-[#CEDEFF] text-[#2C308D] font-semibold text-xs flex items-center justify-center shrink-0 shadow-2xs">
                 {userInitials}
               </div>
               <div className="min-w-0 flex-1">
-                <div className="text-xs font-bold text-slate-900 truncate">
+                <div className="text-sm font-semibold text-slate-900 truncate">
                   {context.userFullName}
                 </div>
-                <div className="text-[10px] text-slate-500 truncate">
+                <div className="type-helper text-slate-500 truncate">
                   {context.designation || context.role}
                 </div>
-                <div className="text-[10px] text-slate-400 font-mono mt-0.5 flex items-center gap-1">
+                <div className="type-helper text-slate-400 font-mono mt-0.5 flex items-center gap-1">
                   <span>{context.employeeId || "OWNER"}</span>
                   <span>•</span>
-                  <span className="font-semibold text-[#3562E8]">{context.role}</span>
+                  <span className="font-medium text-[#3562E8]">{context.role}</span>
                 </div>
               </div>
               <MoreVertical className="w-4 h-4 text-slate-400 shrink-0 ml-1" />

@@ -969,7 +969,7 @@ export function ProjectDetailClientView({
             <div className="flex items-center gap-3">
               <ProjectProfileCircle typology={project.projectType} name={project.name} size="lg" />
               <div>
-                <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#1F1F1F]">{project.name}</h1>
+                <h1 className="type-page-title text-[#1F1F1F]">{project.name}</h1>
                 <p className="text-xs text-[#696E82] line-clamp-1">
                   {project.brief || project.description || "Architectural project commission."}
                 </p>
@@ -2003,7 +2003,7 @@ export function ProjectDetailClientView({
                 <HardHat className="w-5 h-5" />
               </div>
               <div>
-                <h2 className="text-base font-bold text-[#1F1F1F]">Commissioned Contractors & Specialists</h2>
+                <h2 className="type-section-title text-[#1F1F1F]">Commissioned Contractors & Specialists</h2>
                 <p className="text-xs text-[#696E82] mt-0.5">
                   Civil contractors, specialized trade partners, and site teams commissioned for execution of {project.name}.
                 </p>

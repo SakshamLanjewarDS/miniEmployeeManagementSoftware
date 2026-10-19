@@ -58,14 +58,14 @@ export const FormModal: React.FC<FormModalProps> = ({
               </div>
             )}
             <div>
-              <h3 className="text-base font-bold text-[#1F1F1F] leading-snug">{title}</h3>
-              {subtitle && <p className="text-xs text-[#696E82] mt-0.5">{subtitle}</p>}
+              <h3 className="type-card-title text-[#1F1F1F] leading-snug">{title}</h3>
+              {subtitle && <p className="type-helper text-[#696E82] mt-0.5">{subtitle}</p>}
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="text-[#696E82] hover:text-[#1F1F1F] p-1 rounded-lg hover:bg-[#F2F4FF] cursor-pointer transition-colors"
+            className="text-[#696E82] hover:text-[#1F1F1F] p-1.5 rounded-lg hover:bg-[#F2F4FF] cursor-pointer transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -127,11 +127,11 @@ export const FormField: React.FC<FormFieldProps> = ({
   const effectiveRequired = customConfig?.required !== undefined ? customConfig.required : required;
 
   return (
-    <div className={`space-y-1 ${className}`}>
+    <div className={`space-y-1.5 ${className}`}>
       {effectiveLabel && (
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2">
           <div className="flex items-center">
-            <label htmlFor={htmlFor} className="block font-semibold text-[#1F1F1F] text-xs">
+            <label htmlFor={htmlFor} className="block type-form-label text-[#1F1F1F]">
               {effectiveLabel} {effectiveRequired && <span className="text-red-600">*</span>}
             </label>
             {effectiveFieldKey && (
@@ -145,16 +145,16 @@ export const FormField: React.FC<FormFieldProps> = ({
               />
             )}
           </div>
-          {action && <div className="text-[11px]">{action}</div>}
+          {action && <div className="type-helper text-slate-500">{action}</div>}
         </div>
       )}
       {children}
       {effectiveHelper && !error && (
-        <p className="text-[10px] text-[#696E82] pl-0.5 leading-tight">{effectiveHelper}</p>
+        <p className="type-helper text-[#696E82] pl-0.5 mt-1 leading-normal">{effectiveHelper}</p>
       )}
       {error && (
-        <div className="flex items-center gap-1 text-[11px] text-red-600 pl-0.5">
-          <AlertCircle className="w-3 h-3 shrink-0" />
+        <div className="flex items-center gap-1.5 type-helper text-red-600 pl-0.5 mt-1">
+          <AlertCircle className="w-3.5 h-3.5 shrink-0 text-red-600" />
           <span>{error}</span>
         </div>
       )}
@@ -179,7 +179,7 @@ export const FormInput = React.forwardRef<HTMLInputElement, FormInputProps>(
         type={type}
         className={`w-full p-2.5 bg-[#F8F9FD] border ${
           error ? "border-red-500 ring-1 ring-red-500" : "border-[#E2E6F0]"
-        } rounded-xl text-[#1F1F1F] text-xs focus:outline-none focus:ring-2 focus:ring-[#5A81FA] placeholder-[#696E82] transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
+        } rounded-xl text-[#1F1F1F] type-input-value focus:outline-none focus:ring-2 focus:ring-[#5A81FA] placeholder:text-[#696E82] transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
         {...props}
       />
     );
@@ -202,7 +202,7 @@ export const FormTextarea = React.forwardRef<HTMLTextAreaElement, FormTextareaPr
         rows={rows}
         className={`w-full p-2.5 bg-[#F8F9FD] border ${
           error ? "border-red-500 ring-1 ring-red-500" : "border-[#E2E6F0]"
-        } rounded-xl text-[#1F1F1F] text-xs focus:outline-none focus:ring-2 focus:ring-[#5A81FA] placeholder-[#696E82] transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
+        } rounded-xl text-[#1F1F1F] type-input-value focus:outline-none focus:ring-2 focus:ring-[#5A81FA] placeholder:text-[#696E82] transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
         {...props}
       />
     );
@@ -233,18 +233,18 @@ export const FormActions: React.FC<FormActionsProps> = ({
   className = "",
 }) => {
   return (
-    <div className={`flex justify-end gap-2 pt-4 border-t border-[#E2E6F0] ${className}`}>
+    <div className={`flex justify-end items-center gap-2.5 pt-4 border-t border-[#E2E6F0] ${className}`}>
       <button
         type="button"
         onClick={onCancel}
-        className="px-4 py-2 bg-[#F2F4FF] hover:bg-[#E5EAFF] text-[#696E82] hover:text-[#1F1F1F] font-semibold rounded-xl text-xs cursor-pointer transition-colors"
+        className="px-4 py-2 bg-[#F2F4FF] hover:bg-[#E5EAFF] text-[#696E82] hover:text-[#1F1F1F] type-button-label rounded-xl cursor-pointer transition-colors"
       >
         Cancel
       </button>
       <button
         type="submit"
         disabled={isSubmitting || disabled}
-        className="px-5 py-2 bg-[#5A81FA] hover:bg-[#426EE8] text-white font-semibold rounded-xl text-xs shadow-xs cursor-pointer disabled:opacity-50 flex items-center gap-1.5 transition-colors"
+        className="px-5 py-2 bg-[#5A81FA] hover:bg-[#426EE8] text-white type-button-label rounded-xl shadow-xs cursor-pointer disabled:opacity-50 flex items-center gap-1.5 transition-colors"
       >
         {isSubmitting ? (
           <span>{submittingLabel}</span>

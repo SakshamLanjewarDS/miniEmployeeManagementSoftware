@@ -75,29 +75,63 @@ The color system uses CSS custom properties configured in [`src/app/globals.css`
 
 ---
 
-## 3. Typography System
+## 3. Typography System — DM Sans Architectural Standard
 
-The primary typeface is **Inter** (`var(--font-sans)`), supported by system font fallbacks (`-apple-system`, `BlinkMacSystemFont`, `"Segoe UI"`, `Roboto`). 
+The typography system for **100% DESIGN Studio OS** is anchored on **DM Sans** as the single authority typeface for all application UI, geometric forms, schedules, and dashboards, paired with **Noto Sans Devanagari** for seamless bilingual studio communications, and clean system UI fallbacks.
 
 ```css
---font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+--font-sans: var(--font-dm-sans), "DM Sans", "Noto Sans Devanagari", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 ```
 
-### 3.1 Type Scale & Application Hierarchy
+### 3.1 Font Weights & Loading Architecture
+- **Font Family:** `DM Sans` (Google Fonts variable font with local WOFF2 font-display: swap zero-FOUT strategy).
+- **Approved Weight Scale:**
+  - `400` — Regular: Default body, compact text, form input values, helper metadata.
+  - `500` — Medium: Form labels, navigation tabs, KPI labels, badge status indicators.
+  - `600` — SemiBold: Page titles, section headers, card headings, button labels, KPI values.
+  - `700` — Bold: High-emphasis callouts, primary brand headers, decisive financial totals.
+- **Fallbacks:** `"Noto Sans Devanagari"`, `system-ui`, `-apple-system`, `BlinkMacSystemFont`, `"Segoe UI"`, `Roboto`, `sans-serif`.
+- **Root Unit:** Standard 16px root ($1\text{rem} = 16\text{px}$). All type tokens are defined strictly in `rem` units with proportional `rem` line heights to preserve browser accessibility and user zoom preferences.
 
-| Scale Level | Size | Weight | Line Height | Usage |
-|---|---|---|---|---|
-| **Display Heading** | `28px` / `1.75rem` | Bold (`700`) | `1.2` | Workspace Welcome, Major Section Overviews |
-| **Page Heading (`h1`)** | `22px` / `1.375rem` | Semibold (`600`) | `1.25` | Project Title, Dashboard Header, Inspection Title |
-| **Section Heading (`h2`)** | `18px` / `1.125rem` | Semibold (`600`) | `1.3` | Card Section Header, Tab Category, Dossier Heading |
-| **Subheading (`h3`)** | `15px` / `0.9375rem` | Medium (`500`) | `1.4` | Modal Titles, Deliverable Titles, Grouping Labels |
-| **Body Regular** | `14px` / `0.875rem` | Normal (`400`) | `1.5` | Standard descriptions, minutes, checklist text |
-| **Body Medium** | `14px` / `0.875rem` | Medium (`500`) | `1.5` | Form input values, table cells, assignee names |
-| **Caption / Meta** | `12px` / `0.75rem` | Normal (`400`) | `1.4` | Timestamps, coordinates, badge labels, helper hints |
-| **Micro Badge** | `11px` / `0.6875rem` | Semibold (`600`) | `1.0` | Status pills, drawing revision stamps ($R_0, R_1$), counters |
+---
 
-### 3.2 Tabular Numerals for Architectural Measurements
-All financial sums, GPS latitude/longitude coordinates, square-meter areas, and CAD revision numbers use tabular figures (`font-variant-numeric: tabular-nums` or Tailwind `tabular-nums`) to maintain vertical column alignment in tables and financial ledgers.
+### 3.2 The 17-Role Typography Token Scale
+
+Every piece of text across the application maps directly to one of the 17 standardized semantic roles:
+
+| Role Token Class | Desktop Size (rem / px) | Desktop Line-Height | Mobile Size (rem / px) | Mobile Line-Height | Weight | Tracking | Primary Usage & Context |
+|---|---|---|---|---|---|---|---|
+| `.type-page-title` | `1.875rem` (30px) | `2.375rem` (38px) | `1.5rem` (24px) | `2.0rem` (32px) | SemiBold (600) | `-0.02em` | Level 1 page headers, primary workspace views |
+| `.type-section-title` | `1.5rem` (24px) | `2.0rem` (32px) | `1.25rem` (20px) | `1.75rem` (28px) | SemiBold (600) | `normal` | Major content sections, dashboard widget zones |
+| `.type-subsection-title` | `1.25rem` (20px) | `1.75rem` (28px) | `1.125rem` (18px) | `1.625rem` (26px) | SemiBold (600) | `normal` | Sub-sections, modal headers, drawer view titles |
+| `.type-card-title` | `1.125rem` (18px) | `1.625rem` (26px) | `1.0rem` (16px) | `1.5rem` (24px) | SemiBold (600) | `normal` | Deliverable card titles, kanban task names |
+| `.type-small-heading` | `1.0rem` (16px) | `1.5rem` (24px) | `1.0rem` (16px) | `1.5rem` (24px) | SemiBold (600) | `normal` | Grouping sub-headers, table header titles |
+| `.type-minor-heading` | `0.875rem` (14px) | `1.25rem` (20px) | `0.875rem` (14px) | `1.25rem` (20px) | SemiBold (600) | `normal` | Checkpoint group titles, tray section headers |
+| `.type-intro` | `1.125rem` (18px) | `1.75rem` (28px) | `1.0rem` (16px) | `1.625rem` (26px) | Regular (400) | `normal` | Lead-in paragraphs, onboarding hero sub-copy |
+| `.type-body` | `1.0rem` (16px) | `1.625rem` (26px) | `1.0rem` (16px) | `1.625rem` (26px) | Regular (400) | `normal` | Default body copy, narrative descriptions |
+| `.type-body-compact` / `.type-table-cell` | `0.875rem` (14px) | `1.375rem` (22px) | `0.875rem` (14px) | `1.375rem` (22px) | Regular (400) | `normal` | Table rows, checklist items, dense lists |
+| `.type-form-label` | `0.875rem` (14px) | `1.25rem` (20px) | `0.875rem` (14px) | `1.25rem` (20px) | Medium (500) | `normal` | Form input labels, field descriptors |
+| `.type-input-value` | `1.0rem` (16px) | `1.5rem` (24px) | `1.0rem` (16px) | `1.5rem` (24px) | Regular (400) | `normal` | Form text fields, selects, textarea inputs |
+| `.type-button-label` | `0.875rem` (14px) | `1.25rem` (20px) | `0.875rem` (14px) | `1.25rem` (20px) | SemiBold (600) | `normal` | Button text, action links, interactive triggers |
+| `.type-nav-label` | `0.875rem` (14px) | `1.25rem` (20px) | `0.875rem` (14px) | `1.25rem` (20px) | Medium (500) | `normal` | Sidebar navigation items, segmented tab labels |
+| `.type-helper` / `.type-metadata` | `0.8125rem` (13px) | `1.25rem` (20px) | `0.8125rem` (13px) | `1.25rem` (20px) | Regular (400) | `normal` | Input hints, validation hints, timestamps |
+| `.type-badge` | `0.75rem` (12px) | `1.125rem` (18px) | `0.75rem` (12px) | `1.125rem` (18px) | Medium (500) | `normal` | Status pills, scope tags, four-eyes badges |
+| `.type-kpi-value` | `2.0rem` (32px) | `2.5rem` (40px) | `1.75rem` (28px) | `2.25rem` (36px) | SemiBold (600) | `-0.01em` | Metrics values, financial totals, counts |
+| `.type-kpi-label` | `0.8125rem` (13px) | `1.25rem` (20px) | `0.8125rem` (13px) | `1.25rem` (20px) | Medium (500) | `normal` | Metric labels, stat subtitles, KPI descriptors |
+
+---
+
+### 3.3 Tabular Numerals for Numerical & Financial Data
+To prevent horizontal layout jitter during real-time updates and guarantee crisp vertical column alignment across drawing schedules, payroll registers, billable hour timers, and site coordinates:
+- All financial sums, billable durations, percentages, and milestone metrics apply `.type-tabular` (`font-variant-numeric: tabular-nums`).
+- `.type-kpi-value` includes `tabular-nums` by default.
+
+### 3.4 Strict Typographic Rules & Anti-Patterns
+1. **No Micro-Text:** Text smaller than `0.75rem` (12px) is strictly prohibited. The minimum permissible text size anywhere in the application is `12px` (`.type-badge`).
+2. **No All-Caps Paragraphs or Extended Tracking:** All headings and buttons use natural sentence case or title case. Wide letter-spacing (`tracking-widest` or `tracking-[0.2em]`) and aggressive uppercase styling are eliminated in favor of clean font weights.
+3. **Form Input Zoom Immunity:** Form inputs and select dropdowns use `1rem` (16px) on mobile viewports to prevent iOS Safari auto-zooming and unexpected layout shifts.
+4. **Single H1 Rule:** Only one semantic `<h1>` is permitted per page (the `.type-page-title`). Card headers and modular panel titles use `<h2>` or `<h3>` with corresponding semantic tokens.
+5. **Prose Measure:** Unconstrained multi-line paragraphs and notes apply `.prose-measure` (`max-width: 72ch`) to ensure comfortable reading cadence.
 
 ---
 
@@ -269,7 +303,7 @@ All views implement dedicated `@media print` rules:
 | **Secondary Hue** | Studio Navy (`#2C308D`) |
 | **Surface Hue** | Crisp White (`#FFFFFF`) / Ice Tint (`#F8F9FD`) |
 | **Border Tone** | Geometric Slate (`#E2E6F0`) |
-| **Base Font** | Inter (Variable / Regular, Medium, Semibold, Bold) |
+| **Base Font** | DM Sans (Variable WOFF2 / Regular 400, Medium 500, SemiBold 600, Bold 700) with Noto Sans Devanagari fallback |
 | **Numeric Font** | Inter Tabular Numbers (`tabular-nums`) |
 | **Grid Engine** | CSS Container Queries (`@container`) + CSS Grid |
 | **Touch Optimization** | `touch-action: manipulation` (0ms delay) |

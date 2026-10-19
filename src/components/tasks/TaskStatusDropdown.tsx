@@ -115,6 +115,7 @@ export interface TaskStatusDropdownProps {
   className?: string;
   variant?: "badge" | "select";
   fullWidth?: boolean;
+  direction?: "up" | "down" | "auto";
 }
 
 export function TaskStatusDropdown({
@@ -124,9 +125,10 @@ export function TaskStatusDropdown({
   className = "",
   variant = "select",
   fullWidth = true,
+  direction = "up",
 }: TaskStatusDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [openUpward, setOpenUpward] = useState(true);
+  const [openUpward, setOpenUpward] = useState(direction === "up" ? true : true);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const triggerBtnRef = useRef<HTMLButtonElement>(null);
 
@@ -137,11 +139,15 @@ export function TaskStatusDropdown({
     e.stopPropagation();
     if (isLoading) return;
     if (!isOpen && triggerBtnRef.current) {
-      const rect = triggerBtnRef.current.getBoundingClientRect();
-      const spaceBelow = window.innerHeight - rect.bottom;
-      const spaceAbove = rect.top;
-      // Prefer upward if space below is limited
-      setOpenUpward(spaceBelow < 310 && spaceAbove > 260);
+      if (direction === "up") {
+        setOpenUpward(true);
+      } else if (direction === "down") {
+        setOpenUpward(false);
+      } else {
+        const rect = triggerBtnRef.current.getBoundingClientRect();
+        const spaceBelow = window.innerHeight - rect.bottom;
+        setOpenUpward(spaceBelow < 310 || rect.top > 200);
+      }
     }
     setIsOpen((prev) => !prev);
   };
@@ -182,7 +188,7 @@ export function TaskStatusDropdown({
           type="button"
           disabled={isLoading}
           onClick={handleToggle}
-          className="w-full flex items-center justify-between px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold border transition-all cursor-pointer shadow-2xs hover:bg-slate-50 border-slate-200/90 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-100"
+          className="w-full flex items-center justify-between px-3.5 py-2 rounded-xl type-button-label border transition-all cursor-pointer shadow-2xs hover:bg-slate-50 border-slate-200/90 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-100"
           title={`Status: ${activeOption.label}`}
           aria-label={`Status: ${activeOption.label}`}
           aria-haspopup="listbox"
@@ -204,7 +210,7 @@ export function TaskStatusDropdown({
           type="button"
           disabled={isLoading}
           onClick={handleToggle}
-          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-semibold border transition-all cursor-pointer shadow-2xs hover:shadow-xs hover:brightness-98 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-blue-100 ${activeOption.badgeBg} ${activeOption.badgeText} ${activeOption.badgeBorder}`}
+          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl type-badge font-semibold border transition-all cursor-pointer shadow-2xs hover:shadow-xs hover:brightness-98 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-blue-100 ${activeOption.badgeBg} ${activeOption.badgeText} ${activeOption.badgeBorder}`}
           title={`Status: ${activeOption.label}`}
           aria-label={`Status: ${activeOption.label}`}
           aria-haspopup="listbox"
@@ -251,11 +257,11 @@ export function TaskStatusDropdown({
                       <span className="text-[14px] leading-none shrink-0 select-none">
                         {opt.icon}
                       </span>
-                      <span className="text-[13px] font-bold text-slate-900 leading-tight">
+                      <span className="type-minor-heading text-slate-900 leading-tight">
                         {opt.label}
                       </span>
                     </div>
-                    <div className="text-[11px] text-slate-500 font-normal leading-tight mt-0.5">
+                    <div className="type-badge text-slate-500 font-normal leading-tight mt-0.5">
                       {opt.subLabel}
                     </div>
                   </div>

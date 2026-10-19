@@ -930,7 +930,7 @@ export function ProjectsClientView({
               </span>
             )}
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-[#1F1F1F] mt-1">
+          <h1 className="type-page-title text-[#1F1F1F] mt-1">
             Studio Projects & Phases
           </h1>
           <p className="text-xs text-[#696E82] mt-0.5">
@@ -1875,7 +1875,7 @@ export function ProjectsClientView({
       {filteredProjects.length === 0 ? (
         <div className="bg-white border border-[#E2E6F0] rounded-2xl p-12 text-center space-y-3 shadow-2xs">
           <FolderKanban className="w-10 h-10 text-[#A8B1CE] mx-auto" />
-          <h3 className="text-base font-bold text-[#1F1F1F]">No projects found</h3>
+          <h3 className="type-small-heading text-[#1F1F1F]">No projects found</h3>
           <p className="text-xs text-[#696E82] max-w-sm mx-auto">
             {searchQuery || activeFiltersCount > 0
               ? "Try adjusting your search query or filter selection."
@@ -1986,7 +1986,7 @@ export function ProjectsClientView({
                   <div>
                     <div className="flex items-center gap-2.5">
                       <ProjectProfileCircle typology={p.projectType} name={p.name} size="md" />
-                      <h3 className="text-lg font-bold text-[#1F1F1F] tracking-tight group-hover:text-[#5A81FA] transition-colors">
+                      <h3 className="type-card-title text-[#1F1F1F] group-hover:text-[#5A81FA] transition-colors">
                         {p.name}
                       </h3>
                     </div>
@@ -2268,7 +2268,7 @@ export function ProjectsClientView({
                   <Plus className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-[#1F1F1F]">
+                  <h3 className="type-card-title text-[#1F1F1F]">
                     Commission New Architectural Project
                   </h3>
                   <p className="text-xs text-[#696E82]">
@@ -2660,7 +2660,7 @@ export function ProjectsClientView({
                   <Pencil className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-[#1F1F1F]">
+                  <h3 className="type-card-title text-[#1F1F1F]">
                     Modify Project: {editingProject.name}
                   </h3>
                   <p className="text-xs text-[#696E82]">
@@ -3084,7 +3084,7 @@ export function ProjectsClientView({
             </div>
 
             <div>
-              <h3 className="text-sm font-bold text-[#1F1F1F]">Delete Project?</h3>
+              <h3 className="type-card-title text-[#1F1F1F]">Delete Project?</h3>
               <p className="text-xs text-[#696E82] mt-1 leading-relaxed">
                 Are you sure you want to delete{" "}
                 <strong className="text-[#1F1F1F]">
@@ -3127,7 +3127,7 @@ export function ProjectsClientView({
             </div>
 
             <div>
-              <h3 className="text-base font-bold text-[#1F1F1F]">
+              <h3 className="type-card-title text-[#1F1F1F]">
                 Delete {selectedProjectIds.length} Selected Project(s)?
               </h3>
               <p className="text-xs text-[#696E82] mt-1.5 leading-relaxed">
@@ -3197,7 +3197,7 @@ export function ProjectsClientView({
                   <TrendingUp className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-[#1F1F1F]">
+                  <h3 className="type-card-title text-[#1F1F1F]">
                     Manipulate Project Progress: {progressProject.name}
                   </h3>
                   <p className="text-xs text-[#696E82]">

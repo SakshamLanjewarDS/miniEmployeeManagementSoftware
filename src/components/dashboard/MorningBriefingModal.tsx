@@ -68,8 +68,8 @@ export function MorningBriefingModal({ workspaceSlug, role }: MorningBriefingMod
               <Sun className="w-5 h-5 text-amber-500" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-[#1F1F1F]">Morning Executive Briefing</h3>
-              <p className="text-[11px] text-[#696E82]">100% DESIGN Studio • {data.date}</p>
+              <h3 className="type-card-title text-[#1F1F1F]">Morning Executive Briefing</h3>
+              <p className="type-helper text-[#4B5565]">100% DESIGN Studio • {data.date}</p>
             </div>
           </div>
           <button onClick={() => setIsOpen(false)} className="p-1 rounded-lg hover:bg-gray-100 text-[#696E82]">
@@ -87,7 +87,7 @@ export function MorningBriefingModal({ workspaceSlug, role }: MorningBriefingMod
             <Link
               href={`/w/${workspaceSlug}/leave/calendar`}
               onClick={() => setIsOpen(false)}
-              className="text-[#5A81FA] text-[11px] hover:underline"
+              className="text-[#5A81FA] type-helper text-[#5A81FA] hover:underline"
             >
               View Calendar →
             </Link>
@@ -121,7 +121,7 @@ export function MorningBriefingModal({ workspaceSlug, role }: MorningBriefingMod
             <Link
               href={`/w/${workspaceSlug}/leave`}
               onClick={() => setIsOpen(false)}
-              className="text-xs font-bold text-amber-900 underline"
+              className="type-button-label text-amber-900 underline"
             >
               Review Now
             </Link>

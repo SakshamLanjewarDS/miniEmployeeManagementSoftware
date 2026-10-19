@@ -305,7 +305,7 @@ export default function WorkloadCapacityPage() {
       {/* Top Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-[#0B122B] tracking-tight">
+          <h1 className="type-page-title text-[#0B122B]">
             Workload & Capacity Planning
           </h1>
           <p className="text-sm text-slate-500 mt-1">
@@ -487,7 +487,7 @@ export default function WorkloadCapacityPage() {
       {/* Main Employee Capacity Grid */}
       <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-[#0B122B] flex items-center gap-2">
+          <h2 className="type-section-title text-[#0B122B] flex items-center gap-2">
             <Users className="w-4 h-4 text-[#5A81FA]" />
             Employee Workload Matrix
           </h2>
@@ -636,7 +636,7 @@ export default function WorkloadCapacityPage() {
             {/* Drawer Header */}
             <div className="px-4 sm:px-6 py-4 sm:py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
               <div>
-                <h3 id="emp-drawer-title" className="text-base font-bold text-[#0B122B]">
+                <h3 id="emp-drawer-title" className="type-card-title text-[#0B122B]">
                   {selectedEmployee.fullName}
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
@@ -773,7 +773,7 @@ export default function WorkloadCapacityPage() {
             className="bg-white rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-slate-100 space-y-4 max-h-[92vh] overflow-y-auto"
           >
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 id="adjust-workload-title" className="text-base font-bold text-[#0B122B]">
+              <h3 id="adjust-workload-title" className="type-card-title text-[#0B122B]">
                 Adjust Workload: {adjustTask.title}
               </h3>
               <button

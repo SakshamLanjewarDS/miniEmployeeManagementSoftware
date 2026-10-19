@@ -482,13 +482,13 @@ export function NotificationDropdown({ context }: NotificationDropdownProps) {
             </button>
 
             {/* Title */}
-            <h3 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
+            <h3 className="type-card-title text-slate-900">
               Notification
             </h3>
 
             {/* Blue Pill Badge matching Image A */}
             <div className="flex items-center">
-              <span className="bg-[#0066FF] text-white text-xs font-bold px-3 py-1 rounded-full shadow-2xs">
+              <span className="bg-[#0066FF] text-white type-badge font-semibold px-3 py-1 rounded-full shadow-2xs">
                 {activeUnreadCount} NEW
               </span>
             </div>
@@ -562,13 +562,13 @@ export function NotificationDropdown({ context }: NotificationDropdownProps) {
               <section className="py-1">
                 {/* Section Header */}
                 <div className="px-5 py-3 flex items-center justify-between">
-                  <span className="text-xs font-bold tracking-wider text-slate-400 uppercase">
+                  <span className="type-badge font-semibold tracking-wider text-slate-400 uppercase">
                     TODAY
                   </span>
                   <button
                     type="button"
                     onClick={markAllAsRead}
-                    className="text-xs font-semibold text-[#0066FF] hover:underline cursor-pointer"
+                    className="type-helper font-semibold text-[#0066FF] hover:underline cursor-pointer"
                   >
                     Mark all as read
                   </button>
@@ -606,15 +606,15 @@ export function NotificationDropdown({ context }: NotificationDropdownProps) {
                         {/* Title, timestamp & message */}
                         <div className="flex-1 min-w-0 pr-1">
                           <div className="flex items-start justify-between gap-2">
-                            <h4 className="text-sm font-bold text-slate-900 group-hover:text-blue-600 transition-colors leading-snug">
+                            <h4 className="type-minor-heading text-slate-900 group-hover:text-blue-600 transition-colors">
                               {item.title}
                             </h4>
-                            <span className="text-xs text-slate-400 font-medium shrink-0 pt-0.5">
+                            <span className="type-metadata text-slate-400 shrink-0 tabular-nums">
                               {formatShortTime(item.createdAt)}
                             </span>
                           </div>
 
-                          <p className="text-xs text-slate-500 leading-relaxed mt-1 line-clamp-2">
+                          <p className="type-body-compact text-slate-600 mt-1 line-clamp-2">
                             {item.message}
                           </p>
                         </div>
@@ -630,13 +630,13 @@ export function NotificationDropdown({ context }: NotificationDropdownProps) {
               <section className="py-1">
                 {/* Section Header */}
                 <div className="px-5 py-3 flex items-center justify-between">
-                  <span className="text-xs font-bold tracking-wider text-slate-400 uppercase">
+                  <span className="type-badge font-semibold tracking-wider text-slate-400 uppercase">
                     YESTERDAY
                   </span>
                   <button
                     type="button"
                     onClick={markAllAsRead}
-                    className="text-xs font-semibold text-[#0066FF] hover:underline cursor-pointer"
+                    className="type-helper font-semibold text-[#0066FF] hover:underline cursor-pointer"
                   >
                     Mark all as read
                   </button>
@@ -674,15 +674,15 @@ export function NotificationDropdown({ context }: NotificationDropdownProps) {
                         {/* Title, timestamp & message */}
                         <div className="flex-1 min-w-0 pr-1">
                           <div className="flex items-start justify-between gap-2">
-                            <h4 className="text-sm font-bold text-slate-900 group-hover:text-blue-600 transition-colors leading-snug">
+                            <h4 className="type-minor-heading text-slate-900 group-hover:text-blue-600 transition-colors">
                               {item.title}
                             </h4>
-                            <span className="text-xs text-slate-400 font-medium shrink-0 pt-0.5">
+                            <span className="type-metadata text-slate-400 shrink-0 tabular-nums">
                               {formatShortTime(item.createdAt)}
                             </span>
                           </div>
 
-                          <p className="text-xs text-slate-500 leading-relaxed mt-1 line-clamp-2">
+                          <p className="type-body-compact text-slate-600 mt-1 line-clamp-2">
                             {item.message}
                           </p>
                         </div>
@@ -697,13 +697,13 @@ export function NotificationDropdown({ context }: NotificationDropdownProps) {
             {groupedNotifications.earlier.length > 0 && (
               <section className="py-1">
                 <div className="px-5 py-3 flex items-center justify-between">
-                  <span className="text-xs font-bold tracking-wider text-slate-400 uppercase">
+                  <span className="type-badge font-semibold tracking-wider text-slate-400 uppercase">
                     EARLIER
                   </span>
                   <button
                     type="button"
                     onClick={markAllAsRead}
-                    className="text-xs font-semibold text-[#0066FF] hover:underline cursor-pointer"
+                    className="type-helper font-semibold text-[#0066FF] hover:underline cursor-pointer"
                   >
                     Mark all as read
                   </button>
@@ -738,15 +738,15 @@ export function NotificationDropdown({ context }: NotificationDropdownProps) {
 
                         <div className="flex-1 min-w-0 pr-1">
                           <div className="flex items-start justify-between gap-2">
-                            <h4 className="text-sm font-bold text-slate-900 group-hover:text-blue-600 transition-colors leading-snug">
+                            <h4 className="type-minor-heading text-slate-900 group-hover:text-blue-600 transition-colors">
                               {item.title}
                             </h4>
-                            <span className="text-xs text-slate-400 font-medium shrink-0 pt-0.5">
+                            <span className="type-metadata text-slate-400 shrink-0 tabular-nums">
                               {formatShortTime(item.createdAt)}
                             </span>
                           </div>
 
-                          <p className="text-xs text-slate-500 leading-relaxed mt-1 line-clamp-2">
+                          <p className="type-body-compact text-slate-600 mt-1 line-clamp-2">
                             {item.message}
                           </p>
                         </div>

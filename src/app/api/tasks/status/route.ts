@@ -13,11 +13,23 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { taskId, status, comment, auditReason } = body;
+    const { taskId, status, comment, auditReason } = body || {};
+
+    if (!taskId || !status) {
+      return NextResponse.json({ error: "taskId and status are required" }, { status: 400 });
+    }
+
+    const isPrivileged = ctx.role === "OWNER" || ctx.role === "ADMIN";
+    const effectiveAuditReason =
+      auditReason ||
+      comment ||
+      (status === "COMPLETED" && isPrivileged
+        ? `Completed and approved by Studio Leadership (${ctx.userFullName})`
+        : undefined);
 
     const updated = await transitionTaskStatus(ctx, taskId, status, {
       comment,
-      auditReason,
+      auditReason: effectiveAuditReason,
     });
 
     return NextResponse.json({ success: true, task: updated });
@@ -29,3 +41,9 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+export async function GET(req: NextRequest) {
+  return NextResponse.json({ ok: true, message: "Task status endpoint active" });
+}
+
+export const PATCH = POST;

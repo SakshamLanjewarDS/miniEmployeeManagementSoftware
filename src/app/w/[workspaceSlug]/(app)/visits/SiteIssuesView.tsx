@@ -270,7 +270,7 @@ export default function SiteIssuesView({
       {!hideHeader && (
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h2 className="text-xl font-bold text-[#1F1F1F] tracking-tight">Site Issues & Snag Tracking</h2>
+            <h1 className="type-page-title text-[#1F1F1F]">Site Issues & Snag Tracking</h1>
             <p className="text-xs text-[#696E82] mt-0.5">
               Field defects, contractor accountability, and resolution sign-off
             </p>
@@ -526,7 +526,7 @@ export default function SiteIssuesView({
       ) : issues.length === 0 ? (
         <div className="p-12 text-center bg-white rounded-2xl border border-[#E2E6F0] shadow-2xs">
           <ShieldAlert className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-          <h3 className="text-sm font-bold text-[#1F1F1F]">No site issues found</h3>
+          <h3 className="type-small-heading text-[#1F1F1F]">No site issues found</h3>
           <p className="text-xs text-[#696E82] mt-1">
             No snags matching your current filters. Click "Report Site Issue" to log defects discovered on site.
           </p>
@@ -564,7 +564,7 @@ export default function SiteIssuesView({
                     </span>
                   </div>
 
-                  <h3 className="font-bold text-sm text-[#1F1F1F] line-clamp-1">{issue.title}</h3>
+                  <h3 className="type-card-title text-[#1F1F1F] line-clamp-1">{issue.title}</h3>
                   <p className="text-xs text-[#696E82] mt-1 line-clamp-2">{issue.description}</p>
                 </div>
 
@@ -606,7 +606,7 @@ export default function SiteIssuesView({
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-[#E2E6F0] space-y-4 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between border-b border-[#E2E6F0] pb-3">
-              <h3 className="text-base font-bold text-[#1F1F1F]">Report Site Issue / Snag</h3>
+              <h3 className="type-card-title text-[#1F1F1F]">Report Site Issue / Snag</h3>
               <button
                 type="button"
                 onClick={() => setIsReportModalOpen(false)}

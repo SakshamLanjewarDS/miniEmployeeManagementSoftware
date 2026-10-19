@@ -87,16 +87,16 @@ export function StudioHealthIndexCard({ shi, className = "" }: StudioHealthIndex
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
+              <h2 className="type-card-title text-slate-900">
                 Studio Health Index (SHI)
               </h2>
               <span
-                className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${theme.badge}`}
+                className={`type-badge font-semibold px-2 py-0.5 rounded-full border ${theme.badge}`}
               >
                 {shi.grade}
               </span>
             </div>
-            <p className="text-xs text-slate-400">
+            <p className="type-helper text-slate-500">
               Composite telemetry: deliverables velocity, review latency, capacity, and cashflow
             </p>
           </div>
@@ -105,7 +105,7 @@ export function StudioHealthIndexCard({ shi, className = "" }: StudioHealthIndex
         {/* Score & Gauge Header Right */}
         <div className="flex items-center gap-4 self-end sm:self-auto">
           <div className="text-right">
-            <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+            <div className="type-kpi-value text-slate-900 tabular-nums">
               {shi.score}
               <span className="text-sm font-semibold text-slate-400">/100</span>
             </div>
@@ -173,7 +173,7 @@ export function StudioHealthIndexCard({ shi, className = "" }: StudioHealthIndex
               style={{ width: `${shi.subscores.overdueVelocity.score}%` }}
             />
           </div>
-          <div className="text-[10px] text-slate-400 truncate">
+          <div className="type-metadata text-slate-500 truncate">
             {shi.subscores.overdueVelocity.label}
           </div>
         </div>
@@ -195,7 +195,7 @@ export function StudioHealthIndexCard({ shi, className = "" }: StudioHealthIndex
               style={{ width: `${shi.subscores.reviewTurnaround.score}%` }}
             />
           </div>
-          <div className="text-[10px] text-slate-400 truncate">
+          <div className="type-metadata text-slate-500 truncate">
             {shi.subscores.reviewTurnaround.label}
           </div>
         </div>
@@ -217,7 +217,7 @@ export function StudioHealthIndexCard({ shi, className = "" }: StudioHealthIndex
               style={{ width: `${shi.subscores.teamCapacity.score}%` }}
             />
           </div>
-          <div className="text-[10px] text-slate-400 truncate">
+          <div className="type-metadata text-slate-500 truncate">
             {shi.subscores.teamCapacity.label}
           </div>
         </div>
@@ -239,7 +239,7 @@ export function StudioHealthIndexCard({ shi, className = "" }: StudioHealthIndex
               style={{ width: `${shi.subscores.cashflowMomentum.score}%` }}
             />
           </div>
-          <div className="text-[10px] text-slate-400 truncate">
+          <div className="type-metadata text-slate-500 truncate">
             {shi.subscores.cashflowMomentum.label}
           </div>
         </div>

@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { prisma } from "../../db/prisma";
 import { TenantContext, canApproveWork, isAdminOrOwner, ForbiddenException } from "../../tenancy/context";
 import { TaskPriority, TaskWorkflowStatus } from "@prisma/client";
@@ -947,60 +948,44 @@ export async function transitionTaskStatus(
     );
   }
 
-  // Four-eyes rule: Deliverable assignees CANNOT self-approve governed work to COMPLETED!
+  // Completion transition handling
   if (newStatus === TaskWorkflowStatus.COMPLETED) {
     const governance = evaluateTaskCompletionGovernance(ctx, task as any, newStatus);
-    if (!governance.allowed) {
+    if (!governance.allowed && !isPrivileged) {
       throw new ForbiddenException(
         governance.reason ||
           "Four-Eyes Principle: Deliverable assignees or submitters cannot approve their own governed deliverable."
       );
     }
 
-    if (governance.policy === "REVIEW_REQUIRED") {
-      // Direct completion override or completion gate checks
-      if (oldStatus !== TaskWorkflowStatus.IN_REVIEW) {
-        if (options.auditReason?.trim()) {
-          // With documented leadership override, mark remaining checklist items complete
-          if (task.checklistItems && task.checklistItems.length > 0) {
-            await prisma.taskChecklistItem.updateMany({
-              where: { taskId: task.id },
-              data: { isCompleted: true, status: TaskWorkflowStatus.COMPLETED },
-            });
-          }
-        } else {
-          // Without explicit auditReason, check if checklist items are incomplete
-          if (task.checklistItems && task.checklistItems.length > 0) {
-            const incompleteItems = task.checklistItems.filter(
-              (item) => item.status !== TaskWorkflowStatus.COMPLETED && !item.isCompleted
-            );
-            if (incompleteItems.length > 0) {
-              throw new Error(
-                `Cannot complete deliverable: All assigned employee checklist items must be completed and approved first (${incompleteItems.length} remaining). Direct completion override requires a documented audit reason.`
-              );
-            }
-          }
-          // If no checklist items or all checklist items already complete, verify a reason/comment was provided
-          const documentedReason = (options.auditReason || options.comment || "").trim();
-          if (!documentedReason) {
-            throw new Error("Direct completion override requires a documented audit reason.");
-          }
-        }
-      } else {
-        // Standard review completion: Check if checklist items exist. If so, all must be completed/approved!
-        if (task.checklistItems && task.checklistItems.length > 0) {
-          const incompleteItems = task.checklistItems.filter(
-            (item) => item.status !== TaskWorkflowStatus.COMPLETED && !item.isCompleted
+    if (isPrivileged) {
+      // Studio Leadership (Owner and Admin) has sovereign authority to mark any task as completed.
+      // Automatically complete all remaining incomplete checklist items.
+      if (task.checklistItems && task.checklistItems.length > 0) {
+        await prisma.taskChecklistItem.updateMany({
+          where: { taskId: task.id, isCompleted: false },
+          data: {
+            isCompleted: true,
+            status: TaskWorkflowStatus.COMPLETED,
+            completedAt: new Date(),
+            completedById: ctx.membershipId,
+          },
+        });
+      }
+    } else if (governance.policy === "REVIEW_REQUIRED" && !ALLOW_EMPLOYEE_SELF_COMPLETION) {
+      // Standard review completion: Check if checklist items exist. If so, all must be completed/approved!
+      if (task.checklistItems && task.checklistItems.length > 0) {
+        const incompleteItems = task.checklistItems.filter(
+          (item) => item.status !== TaskWorkflowStatus.COMPLETED && !item.isCompleted
+        );
+        if (incompleteItems.length > 0) {
+          throw new Error(
+            `Cannot complete deliverable: All assigned employee checklist items must be completed and approved first (${incompleteItems.length} remaining).`
           );
-          if (incompleteItems.length > 0) {
-            throw new Error(
-              `Cannot complete deliverable: All assigned employee checklist items must be completed and approved first (${incompleteItems.length} remaining).`
-            );
-          }
         }
       }
     } else {
-      // When SELF_COMPLETION_ALLOWED:
+      // When SELF_COMPLETION_ALLOWED or ALLOW_EMPLOYEE_SELF_COMPLETION is true:
       // Mark any remaining incomplete checklist items as completed
       if (task.checklistItems && task.checklistItems.length > 0) {
         await prisma.taskChecklistItem.updateMany({
@@ -1069,6 +1054,25 @@ export async function transitionTaskStatus(
         version: { increment: 1 },
       },
     });
+
+    const isCheckingOrReviewStatus =
+      effectiveNewStatus === TaskWorkflowStatus.IN_REVIEW ||
+      (effectiveNewStatus as any) === "CHECKING" ||
+      newStatus === TaskWorkflowStatus.IN_REVIEW ||
+      (newStatus as any) === "CHECKING";
+
+    if (isCheckingOrReviewStatus) {
+      // Transition incomplete checklist items to IN_REVIEW so employee responsibilities reflect review state
+      await tx.taskChecklistItem.updateMany({
+        where: {
+          taskId: task.id,
+          isCompleted: false,
+        },
+        data: {
+          status: TaskWorkflowStatus.IN_REVIEW,
+        },
+      });
+    }
 
     await tx.taskActivityHistory.create({
       data: {
@@ -1150,6 +1154,7 @@ export async function transitionTaskStatus(
         try {
           await tx.notification.createMany({
             data: Array.from(notifyRecipients).map((recipientId) => ({
+              id: randomUUID(),
               tenantId: ctx.tenantId,
               recipientId,
               title: "Task Completed",
@@ -1188,6 +1193,7 @@ export async function transitionTaskStatus(
         try {
           await tx.notification.createMany({
             data: Array.from(notifyRecipients).map((recipientId) => ({
+              id: randomUUID(),
               tenantId: ctx.tenantId,
               recipientId,
               title: "Task Revisions Requested",

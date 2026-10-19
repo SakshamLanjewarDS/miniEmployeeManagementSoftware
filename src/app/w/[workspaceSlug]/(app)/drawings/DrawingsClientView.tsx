@@ -583,7 +583,7 @@ export default function DrawingsClientView({
             <span>/</span>
             <span className="text-[#1F1F1F] font-semibold">Drawings</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#1F1F1F]">
+          <h1 className="type-page-title text-[#1F1F1F]">
             Drawings & approvals
           </h1>
           <p className="text-xs text-[#696E82] mt-0.5">
@@ -834,7 +834,7 @@ export default function DrawingsClientView({
 
           <div className="bg-white border border-[#E2E6F0] rounded-2xl p-5 shadow-2xs space-y-4">
             <div>
-              <h2 className="text-xl font-bold text-[#1F1F1F] tracking-tight">{mobileDetailDoc.title}</h2>
+              <h2 className="type-section-title text-[#1F1F1F]">{mobileDetailDoc.title}</h2>
               <p className="text-xs text-[#696E82] mt-0.5">
                 Project: {mobileDetailDoc.project.name} • {mobileDetailDoc.discipline} • {mobileDetailDoc.documentType}
               </p>
@@ -1151,7 +1151,7 @@ export default function DrawingsClientView({
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div>
-                        <h3 className="text-sm font-bold text-[#1F1F1F]">{doc.title}</h3>
+                        <h3 className="type-card-title text-[#1F1F1F]">{doc.title}</h3>
                         <p className="text-xs text-[#696E82]">
                           Project: {doc.project.name} • {doc.discipline}
                         </p>
@@ -1205,7 +1205,7 @@ export default function DrawingsClientView({
           {selectedDrawing && (
             <div className="hidden lg:block lg:col-span-5 bg-white border border-[#E2E6F0] rounded-2xl p-5 sm:p-6 shadow-2xs space-y-4">
               <div className="flex items-center justify-between border-b border-[#E2E6F0] pb-3">
-                <h3 className="text-sm font-bold text-[#1F1F1F]">Drawing details</h3>
+                <h3 className="type-subsection-title text-[#1F1F1F]">Drawing details</h3>
                 <button
                   type="button"
                   onClick={() => setSelectedDrawingId("")}
@@ -1217,7 +1217,7 @@ export default function DrawingsClientView({
               </div>
 
               <div>
-                <h2 className="text-lg font-bold text-[#1F1F1F] tracking-tight">{selectedDrawing.title}</h2>
+                <h2 className="type-card-title text-[#1F1F1F]">{selectedDrawing.title}</h2>
                 <p className="text-xs text-[#696E82] mt-0.5">
                   Project: {selectedDrawing.project.name} • {selectedDrawing.discipline} • {selectedDrawing.documentType}
                 </p>
@@ -1415,7 +1415,7 @@ export default function DrawingsClientView({
                   <FileCheck2 className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-[#1F1F1F]">Register Drawing Sheet</h3>
+                  <h3 className="type-card-title text-[#1F1F1F]">Register Drawing Sheet</h3>
                   <p className="text-xs text-[#696E82]">Upload initial revision (R0) to project archive</p>
                 </div>
               </div>
@@ -1572,7 +1572,7 @@ export default function DrawingsClientView({
                   <Upload className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-[#1F1F1F]">Upload New Revision</h3>
+                  <h3 className="type-card-title text-[#1F1F1F]">Upload New Revision</h3>
                   <p className="text-xs text-[#696E82] truncate">{uploadRevisionDoc.title}</p>
                 </div>
               </div>
@@ -1648,7 +1648,7 @@ export default function DrawingsClientView({
           <div className="bg-white border border-[#E2E6F0] rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4">
             <div className="flex items-center gap-2 text-amber-800">
               <RotateCcw className="w-5 h-5 text-amber-600" />
-              <h3 className="text-base font-bold text-[#1F1F1F]">Request Drawing Corrections</h3>
+              <h3 className="type-card-title text-[#1F1F1F]">Request Drawing Corrections</h3>
             </div>
             <p className="text-xs text-[#696E82]">
               Reverting revision <strong className="text-[#1F1F1F]">{changeRequestVersion.revision}</strong> back to{" "}
@@ -1699,7 +1699,7 @@ export default function DrawingsClientView({
           <div className="bg-white border border-[#E2E6F0] rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4">
             <div className="flex items-center gap-2 text-[#5A81FA]">
               <Award className="w-5 h-5 text-[#5A81FA]" />
-              <h3 className="text-base font-bold text-[#1F1F1F]">Record Client Approval Evidence</h3>
+              <h3 className="type-card-title text-[#1F1F1F]">Record Client Approval Evidence</h3>
             </div>
             <p className="text-xs text-[#696E82]">
               Recording formal client approval for exact revision{" "}

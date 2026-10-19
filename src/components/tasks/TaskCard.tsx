@@ -416,6 +416,8 @@ export function TaskCard({
 
       // Concept 2: Submitted / Awaiting review
       const isAwaitingReview = Boolean(
+        task.status === "CHECKING" ||
+        task.status === "IN_REVIEW" ||
         pendingSubmission !== undefined ||
         employeeChecklist.some((ci) => ci.status === "IN_REVIEW" || ci.status === "CHECKING")
       );
@@ -526,14 +528,14 @@ export function TaskCard({
       {/* ============================================================== */}
       <div className="flex items-center justify-between gap-2 min-w-0">
         <div className="flex items-center gap-2 min-w-0 flex-1">
-          <div className="w-6 h-6 rounded-full bg-[#a21caf] text-white flex items-center justify-center font-bold text-[10px] shrink-0 shadow-2xs">
+          <div className="w-6 h-6 rounded-full bg-[#a21caf] text-white flex items-center justify-center font-semibold type-badge shrink-0 shadow-2xs">
             {projectInitials}
           </div>
-          <span className="font-mono text-xs font-bold text-[#c026d3] bg-[#fdf2f8] border border-[#fbcfe8] px-2 py-0.5 rounded-md shrink-0">
+          <span className="font-mono type-badge font-medium text-[#c026d3] bg-[#fdf2f8] border border-[#fbcfe8] px-2 py-0.5 rounded-md shrink-0">
             {projectCode}
           </span>
           <span
-            className="font-bold text-sm sm:text-[15px] text-[#0f172a] truncate"
+            className="type-card-title text-[#0f172a] truncate"
             title={projectName}
           >
             {projectName}
@@ -542,16 +544,16 @@ export function TaskCard({
 
         <div className="flex items-center gap-1.5 shrink-0">
           {isParentOverdue && (
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200 shadow-2xs">
-              <AlertTriangle className="w-3 h-3 text-rose-600" />
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full type-badge font-medium bg-rose-50 text-rose-700 border border-rose-200 shadow-2xs">
+              <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
               <span>Overdue</span>
             </span>
           )}
 
           <span
-            className={`inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-semibold border shadow-2xs ${deliverableStatusBadgeConfig.classes}`}
+            className={`inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full type-badge font-medium border shadow-2xs ${deliverableStatusBadgeConfig.classes}`}
           >
-            <span className="font-bold">{deliverableStatusBadgeConfig.icon}</span>
+            <span className="font-semibold">{deliverableStatusBadgeConfig.icon}</span>
             <span>{deliverableStatusBadgeConfig.label}</span>
           </span>
         </div>
@@ -564,13 +566,13 @@ export function TaskCard({
         <div className="flex items-center justify-between gap-2 mb-1">
           <div className="flex items-center gap-1.5 text-blue-600">
             <Layers className="w-3.5 h-3.5" />
-            <span className="text-[10px] font-bold tracking-wider uppercase text-slate-500">
-              ARCHITECTURAL DELIVERABLE
+            <span className="type-badge font-medium text-slate-500">
+              Architectural Deliverable
             </span>
           </div>
 
           {task.phase?.phaseName && (
-            <span className="text-[10px] font-semibold text-slate-500 bg-white border border-slate-200 px-2 py-0.5 rounded">
+            <span className="type-badge font-medium text-slate-600 bg-white border border-slate-200 px-2 py-0.5 rounded-md">
               Phase: {task.phase.phaseName}
             </span>
           )}
@@ -581,12 +583,12 @@ export function TaskCard({
           onClick={() => onOpenDetails(task)}
           className="text-left w-full group/title cursor-pointer focus:outline-none"
         >
-          <h4 className="text-[14px] sm:text-[15px] font-bold text-slate-900 group-hover/title:text-blue-600 transition-colors line-clamp-1 leading-snug">
+          <h3 className="type-card-title text-slate-900 group-hover/title:text-blue-600 transition-colors line-clamp-1 leading-snug">
             {task.title || "Untitled Deliverable"}
-          </h4>
+          </h3>
         </button>
 
-        <p className="text-xs sm:text-[13px] text-slate-600 font-normal mt-1.5 line-clamp-2 leading-relaxed">
+        <p className="type-body-compact text-slate-600 font-normal mt-1.5 line-clamp-2 leading-relaxed">
           {cleanDescription || "No specific architectural instructions provided."}
         </p>
       </div>
@@ -595,10 +597,10 @@ export function TaskCard({
       {/* SECTION 5: ACCURATE PARENT PROGRESS & SUMMARY STRIP            */}
       {/* ============================================================== */}
       <div className="bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl p-3 space-y-2.5">
-        <div className="flex items-center justify-between gap-2 flex-wrap text-xs">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-1.5 flex-wrap">
             {/* Number of Assigned Employees */}
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-800 font-semibold text-xs shadow-2xs">
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-800 font-medium type-badge shadow-2xs">
               <Users className="w-3.5 h-3.5 text-[#5A81FA]" />
               <span>
                 {totalAssignedEmployees} {totalAssignedEmployees === 1 ? "Employee" : "Employees"}
@@ -606,7 +608,7 @@ export function TaskCard({
             </span>
 
             {/* Total Completed Checklist Items / Total Checklist Items */}
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-800 font-semibold text-xs shadow-2xs">
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-800 font-medium type-badge shadow-2xs">
               <CheckSquare className="w-3.5 h-3.5 text-emerald-600" />
               <span>
                 {totalChecklistItems > 0
@@ -616,7 +618,7 @@ export function TaskCard({
             </span>
 
             {/* Number of Approved Employee Assignments */}
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-800 font-semibold text-xs shadow-2xs">
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-800 font-medium type-badge shadow-2xs">
               <FileCheck2 className="w-3.5 h-3.5 text-emerald-600" />
               <span>
                 {approvedCount} of {totalAssignedEmployees} Approved
@@ -625,14 +627,14 @@ export function TaskCard({
 
             {/* Number of Employee Assignments Awaiting Review */}
             {awaitingReviewCount > 0 && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-purple-50 border border-purple-200 text-purple-800 font-bold text-xs shadow-2xs animate-pulse">
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-purple-50 border border-purple-200 text-purple-800 font-medium type-badge shadow-2xs animate-pulse">
                 <AlertCircle className="w-3.5 h-3.5 text-purple-600" />
                 <span>{awaitingReviewCount} Awaiting Review</span>
               </span>
             )}
           </div>
 
-          <div className="text-[11px] font-semibold text-slate-500 ml-auto">
+          <div className="type-helper font-medium text-slate-600 tabular-nums ml-auto">
             {parentChecklistProgressPct}% Completed
           </div>
         </div>
@@ -655,15 +657,15 @@ export function TaskCard({
       {/* ============================================================== */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-            <Users className="w-3 h-3 text-slate-400" />
-            <span>ASSIGNED RESPONSIBILITIES ({totalAssignedEmployees})</span>
+          <div className="type-kpi-label text-slate-500 flex items-center gap-1.5">
+            <Users className="w-3.5 h-3.5 text-slate-400" />
+            <span>Assigned responsibilities ({totalAssignedEmployees})</span>
           </div>
-          <span className="text-[10px] text-slate-400">Independent tracking</span>
+          <span className="type-helper text-slate-400">Independent tracking</span>
         </div>
 
         {employeeSections.length === 0 ? (
-          <div className="p-3 text-center border border-dashed border-slate-200 rounded-xl text-xs text-slate-400">
+          <div className="p-3 text-center border border-dashed border-slate-200 rounded-xl type-body-compact text-slate-400">
             No employees currently assigned.
           </div>
         ) : (
@@ -683,27 +685,27 @@ export function TaskCard({
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     {/* Left: Avatar + Name + ID */}
                     <div className="flex items-center gap-2 min-w-0">
-                      <div className="w-7 h-7 rounded-full bg-[#eff6ff] text-[#2563eb] border border-[#bfdbfe] font-bold text-xs flex items-center justify-center shrink-0 shadow-2xs">
+                      <div className="w-7 h-7 rounded-full bg-[#eff6ff] text-[#2563eb] border border-[#bfdbfe] font-bold type-badge flex items-center justify-center shrink-0 shadow-2xs">
                         {emp.initials}
                       </div>
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="text-xs sm:text-sm font-bold text-slate-900 truncate">
+                          <span className="type-minor-heading text-slate-900 truncate">
                             {emp.fullName}
                           </span>
                           {emp.employeeId && (
-                            <span className="font-mono text-[10px] text-indigo-600 bg-indigo-50 border border-indigo-100 px-1.5 py-0.2 rounded font-semibold shrink-0">
+                            <span className="font-mono type-badge text-indigo-600 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded font-semibold shrink-0">
                               {emp.employeeId}
                             </span>
                           )}
                           {emp.isCurrentUser && (
-                            <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-100 px-1 rounded shrink-0">
-                              YOU
+                            <span className="type-badge text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded-full shrink-0">
+                              You
                             </span>
                           )}
                         </div>
                         {emp.designation && (
-                          <span className="text-[10px] text-slate-400 block truncate">
+                          <span className="type-helper text-slate-500 block truncate">
                             {emp.designation}
                           </span>
                         )}
@@ -714,7 +716,7 @@ export function TaskCard({
                     <div className="flex items-center gap-1.5 flex-wrap shrink-0">
                       {/* Priority Badge */}
                       <span
-                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border shadow-2xs ${emp.priorityConfig.classes}`}
+                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full type-badge border shadow-2xs ${emp.priorityConfig.classes}`}
                         title={`Priority: ${emp.priorityConfig.label}`}
                       >
                         <span className="font-bold">{emp.priorityConfig.icon}</span>
@@ -723,7 +725,7 @@ export function TaskCard({
 
                       {/* Workflow Status Badge */}
                       <span
-                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border shadow-2xs ${emp.workflowStatus.classes}`}
+                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full type-badge border shadow-2xs ${emp.workflowStatus.classes}`}
                       >
                         <span className="font-bold">{emp.workflowStatus.icon}</span>
                         <span>{emp.workflowStatus.label}</span>
@@ -732,14 +734,14 @@ export function TaskCard({
                   </div>
 
                   {/* Middle Meta Strip: Deadline & Checklist Progress Bar */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-slate-100 text-xs">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-slate-100 type-body-compact">
                     {/* Deadline */}
                     <div className="flex items-center gap-1.5 text-slate-600">
                       <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                      <span className="font-semibold text-slate-700">Due:</span>
+                      <span className="font-medium text-slate-700">Due:</span>
                       <span className="font-medium text-slate-800">{emp.formattedDeadline}</span>
                       {emp.isOverdue && (
-                        <span className="px-1.5 py-0.2 rounded bg-rose-100 text-rose-800 text-[10px] font-bold border border-rose-200">
+                        <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 type-badge border border-rose-200">
                           Overdue
                         </span>
                       )}
@@ -748,7 +750,7 @@ export function TaskCard({
                     {/* Checklist Progress */}
                     <div className="flex items-center gap-2">
                       <CheckSquare className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                      <span className="font-semibold text-slate-800">
+                      <span className="type-body-compact font-medium text-slate-800 tabular-nums">
                         {emp.completedChecklistCount}/{emp.totalChecklistCount} completed
                       </span>
                       {emp.totalChecklistCount > 0 && (
@@ -776,7 +778,7 @@ export function TaskCard({
                           return (
                             <li
                               key={item.id || idx}
-                              className={`flex items-start justify-between gap-2 p-1.5 rounded-lg border text-xs transition-colors ${
+                              className={`flex items-start justify-between gap-2 p-1.5 rounded-lg border type-body-compact transition-colors ${
                                 isDone
                                   ? "bg-emerald-50/30 border-emerald-100 text-slate-500"
                                   : "bg-[#FAFAFD] border-slate-100 text-slate-800"
@@ -816,16 +818,16 @@ export function TaskCard({
                                 </span>
                               </div>
 
-                              <div className="flex items-center gap-1 shrink-0 text-[10px]">
+                              <div className="flex items-center gap-1 shrink-0 type-badge">
                                 {itemPriority && (
                                   <span
-                                    className={`px-1.5 py-0.2 rounded border font-semibold ${itemPriority.classes}`}
+                                    className={`px-1.5 py-0.5 rounded border font-medium ${itemPriority.classes}`}
                                   >
                                     {itemPriority.label}
                                   </span>
                                 )}
                                 {itemDue && (
-                                  <span className="text-slate-400 hidden sm:inline">
+                                  <span className="type-helper text-slate-500 hidden sm:inline">
                                     {itemDue}
                                   </span>
                                 )}
@@ -840,7 +842,7 @@ export function TaskCard({
                         <button
                           type="button"
                           onClick={() => toggleChecklistExpand(emp.memberId)}
-                          className="text-[11px] font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1 cursor-pointer pt-0.5 focus:outline-none"
+                          className="type-button-label text-blue-600 hover:text-blue-700 flex items-center gap-1 cursor-pointer pt-0.5 focus:outline-none"
                         >
                           <span>
                             {isChecklistExpanded
@@ -848,7 +850,7 @@ export function TaskCard({
                               : `Show all ${emp.totalChecklistCount} checklist items`}
                           </span>
                           <ChevronDown
-                            className={`w-3 h-3 transition-transform duration-200 ${
+                            className={`w-3.5 h-3.5 transition-transform duration-200 ${
                               isChecklistExpanded ? "rotate-180" : ""
                             }`}
                           />
@@ -859,7 +861,7 @@ export function TaskCard({
 
                   {/* Employee Action: Review or View Details */}
                   <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
-                    <span className="text-[10px] text-slate-400">
+                    <span className="type-helper text-slate-500">
                       Assignment ID: <span className="font-mono text-slate-600">{emp.assignmentId.slice(-6)}</span>
                     </span>
 
@@ -870,7 +872,7 @@ export function TaskCard({
                           e.stopPropagation();
                           onOpenDetails(task, emp.assignmentId);
                         }}
-                        className="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+                        className="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white type-button-label flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
                       >
                         <Eye className="w-3.5 h-3.5" />
                         <span>Review Submission</span>
@@ -882,7 +884,7 @@ export function TaskCard({
                           e.stopPropagation();
                           onOpenDetails(task, emp.assignmentId);
                         }}
-                        className="px-3 py-1.5 rounded-lg border border-blue-200 bg-white hover:bg-blue-50/50 text-blue-600 font-semibold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                        className="px-3 py-1.5 rounded-lg border border-blue-200 bg-white hover:bg-blue-50/50 text-blue-600 type-button-label flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
                       >
                         <Eye className="w-3.5 h-3.5" />
                         <span>View Assignment</span>
@@ -903,7 +905,7 @@ export function TaskCard({
         <button
           type="button"
           onClick={() => setIsDetailsTrayExpanded(!isDetailsTrayExpanded)}
-          className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1 cursor-pointer focus:outline-none"
+          className="type-button-label text-blue-600 hover:text-blue-700 flex items-center gap-1 cursor-pointer focus:outline-none"
         >
           <span>{isDetailsTrayExpanded ? "Less deliverable info" : "More deliverable info"}</span>
           <ChevronDown
@@ -914,29 +916,29 @@ export function TaskCard({
         </button>
 
         {isDetailsTrayExpanded && (
-          <div className="mt-2.5 p-3 rounded-xl bg-slate-50 border border-slate-100 text-xs text-slate-600 space-y-2 animate-in fade-in duration-150 text-left">
+          <div className="mt-2.5 p-3 rounded-xl bg-slate-50 border border-slate-100 type-body-compact text-slate-600 space-y-2 animate-in fade-in duration-150 text-left">
             {task.project?.projectType && (
               <div className="flex items-center gap-2">
-                <span className="text-[10px] font-bold text-slate-400 uppercase">Typology:</span>
-                <span className="font-semibold text-slate-700">{task.project.projectType}</span>
+                <span className="type-helper font-medium text-slate-500">Typology:</span>
+                <span className="type-body-compact font-medium text-slate-700">{task.project.projectType}</span>
               </div>
             )}
             {task.dueDate && (
               <div className="flex items-center gap-2">
-                <span className="text-[10px] font-bold text-slate-400 uppercase">Parent Deadline:</span>
-                <span className="font-semibold text-slate-700">
+                <span className="type-helper font-medium text-slate-500">Parent deadline:</span>
+                <span className="type-body-compact font-medium text-slate-700">
                   {formatDateTimeWithTimezone(task.dueDate, workspaceTimezone)}
                 </span>
               </div>
             )}
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold text-slate-400 uppercase">Created Date:</span>
-              <span className="font-medium text-slate-700">{formattedCreatedAt}</span>
+              <span className="type-helper font-medium text-slate-500">Created date:</span>
+              <span className="type-body-compact font-medium text-slate-700">{formattedCreatedAt}</span>
             </div>
             {task.creator?.user?.fullName && (
               <div className="flex items-center gap-2">
-                <span className="text-[10px] font-bold text-slate-400 uppercase">Assigned By:</span>
-                <span className="font-semibold text-slate-700">{task.creator.user.fullName}</span>
+                <span className="type-helper font-medium text-slate-500">Assigned by:</span>
+                <span className="type-body-compact font-medium text-slate-700">{task.creator.user.fullName}</span>
               </div>
             )}
           </div>
@@ -961,7 +963,7 @@ export function TaskCard({
             e.stopPropagation();
             onOpenDetails(task);
           }}
-          className="px-3.5 py-2 rounded-xl border border-blue-200 bg-white text-blue-600 font-semibold text-xs sm:text-sm flex items-center gap-1.5 hover:bg-blue-50/50 transition-colors cursor-pointer shadow-2xs shrink-0"
+          className="px-3.5 py-2 rounded-xl border border-blue-200 bg-white text-blue-600 type-button-label flex items-center gap-1.5 hover:bg-blue-50/50 transition-colors cursor-pointer shadow-2xs shrink-0"
         >
           <ExternalLink className="w-4 h-4 text-blue-600" />
           <span>Full Details</span>
@@ -979,7 +981,7 @@ export function TaskCard({
             e.stopPropagation();
             if (canEdit) onEdit(task);
           }}
-          className={`px-3 py-1.5 rounded-xl border border-slate-200/90 text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-2xs ${
+          className={`px-3 py-1.5 rounded-xl border border-slate-200/90 type-button-label flex items-center gap-1.5 transition-colors shadow-2xs ${
             canEdit
               ? "bg-white text-slate-700 hover:bg-slate-50 cursor-pointer"
               : "bg-slate-50 text-slate-400 opacity-60 cursor-not-allowed"
@@ -995,7 +997,7 @@ export function TaskCard({
             e.stopPropagation();
             onDelegate(task);
           }}
-          className="px-3 py-1.5 rounded-xl border border-slate-200/90 bg-white text-slate-700 font-semibold text-xs flex items-center gap-1.5 hover:bg-slate-50 transition-colors cursor-pointer shadow-2xs"
+          className="px-3 py-1.5 rounded-xl border border-slate-200/90 bg-white text-slate-700 type-button-label flex items-center gap-1.5 hover:bg-slate-50 transition-colors cursor-pointer shadow-2xs"
         >
           <ArrowRightLeft className="w-3.5 h-3.5 text-slate-500" />
           <span>Delegate</span>
