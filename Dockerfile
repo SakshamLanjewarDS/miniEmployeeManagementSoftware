@@ -43,12 +43,13 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 COPY --from=builder --chown=nextjs:nodejs /app/scripts ./scripts
 
-# Ensure full ownership of .next and storage for nextjs user
-RUN chown -R nextjs:nodejs /app/.next /app/storage && \
-    chmod -R 775 /app/.next /app/storage
+# Ensure full ownership of .next, storage, and scripts for nextjs user
+RUN chown -R nextjs:nodejs /app/.next /app/storage /app/scripts && \
+    chmod -R 775 /app/.next /app/storage /app/scripts && \
+    chmod +x /app/scripts/entrypoint.sh
 
 USER nextjs
 
 EXPOSE 3000
 
-CMD ["sh", "-c", "npx prisma db push --accept-data-loss && npm run start"]
+CMD ["sh", "/app/scripts/entrypoint.sh"]
