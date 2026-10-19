@@ -129,24 +129,35 @@ export function TaskStatusDropdown({
 }: TaskStatusDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [openUpward, setOpenUpward] = useState(direction === "up" ? true : true);
+  const [alignLeft, setAlignLeft] = useState(true);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const triggerBtnRef = useRef<HTMLButtonElement>(null);
 
   const activeOption = useMemo(() => normalizeStatusOption(currentStatus), [currentStatus]);
 
-  // Determine open direction based on viewport bounds
+  // Determine open direction and horizontal alignment based on viewport bounds
   const handleToggle = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (isLoading) return;
     if (!isOpen && triggerBtnRef.current) {
+      const rect = triggerBtnRef.current.getBoundingClientRect();
       if (direction === "up") {
         setOpenUpward(true);
       } else if (direction === "down") {
         setOpenUpward(false);
       } else {
-        const rect = triggerBtnRef.current.getBoundingClientRect();
         const spaceBelow = window.innerHeight - rect.bottom;
         setOpenUpward(spaceBelow < 310 || rect.top > 200);
+      }
+
+      // Check horizontal collision:
+      // Default to left-0 so the dropdown extends inwards across the card.
+      // Only flip to right-0 if aligning left would overflow the right edge of the viewport.
+      const spaceRight = window.innerWidth - rect.left;
+      if (spaceRight < 260 && rect.right > 260) {
+        setAlignLeft(false);
+      } else {
+        setAlignLeft(true);
       }
     }
     setIsOpen((prev) => !prev);
@@ -180,7 +191,7 @@ export function TaskStatusDropdown({
   };
 
   return (
-    <div className={`relative ${fullWidth ? "w-full flex-1 min-w-0" : "inline-block"} ${className}`} ref={dropdownRef}>
+    <div className={`relative ${fullWidth ? "w-full flex-1 min-w-0" : "inline-block"} ${isOpen ? "z-50" : "z-10"} ${className}`} ref={dropdownRef}>
       {/* TRIGGER BUTTON */}
       {variant === "select" ? (
         <button
@@ -226,12 +237,14 @@ export function TaskStatusDropdown({
         </button>
       )}
 
-      {/* FLOATING DROPDOWN POPUP (Matching exact screenshot with 2-line item layout and icons) */}
+      {/* FLOATING DROPDOWN POPUP */}
       {isOpen && (
         <div
           role="listbox"
           aria-label="Change status"
-          className={`absolute left-0 sm:left-auto sm:right-0 w-60 max-w-[calc(100vw-2rem)] bg-white rounded-2xl shadow-[0_12px_36px_rgba(15,23,42,0.14)] border border-slate-200/90 p-2 z-50 text-xs animate-in fade-in zoom-in-95 duration-100 ${
+          className={`absolute ${
+            alignLeft ? "left-0" : "right-0"
+          } w-60 max-w-[calc(100vw-2rem)] bg-white rounded-2xl shadow-[0_12px_36px_rgba(15,23,42,0.18)] border border-slate-200/90 p-2 z-50 text-xs animate-in fade-in zoom-in-95 duration-100 ${
             openUpward ? "bottom-full mb-1.5" : "top-full mt-1.5"
           }`}
           onClick={(e) => e.stopPropagation()}

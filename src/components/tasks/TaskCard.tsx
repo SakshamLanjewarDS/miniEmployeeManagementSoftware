@@ -18,6 +18,7 @@ import {
   FileCheck2,
   AlertCircle,
   ExternalLink,
+  ChevronRight,
 } from "lucide-react";
 import { TaskStatusDropdown } from "./TaskStatusDropdown";
 import { AssigneeInfo } from "./TaskAssignees";
@@ -519,128 +520,100 @@ export function TaskCard({
 
   return (
     <article
-      className="task-card rounded-2xl bg-white border border-[#e2e8f0] shadow-[0_1px_4px_rgba(15,23,42,0.04)] p-4 sm:p-5 flex flex-col justify-between hover:shadow-[0_8px_24px_rgba(15,23,42,0.08)] hover:border-slate-300 transition-all duration-150 group relative min-w-0 gap-4 virtual-render press-feedback"
+      className="task-card rounded-2xl bg-white border border-[#E2E6F0] hover:border-[#CBD5E1] p-3.5 sm:p-4 flex flex-col justify-between hover:shadow-[0_8px_20px_rgba(15,23,42,0.06)] transition-all duration-150 group relative min-w-0 gap-3 text-left virtual-render press-feedback"
       style={{ overflowWrap: "anywhere" }}
       aria-label={`Deliverable: ${task.title}`}
     >
       {/* ============================================================== */}
-      {/* HEADER: Project Code & Name (Left) + Overall Deliverable Status */}
+      {/* 1. HEADER: Project Badge & Discipline + Status Badges          */}
       {/* ============================================================== */}
       <div className="flex items-center justify-between gap-2 min-w-0">
-        <div className="flex items-center gap-2 min-w-0 flex-1">
-          <div className="w-6 h-6 rounded-full bg-[#a21caf] text-white flex items-center justify-center font-semibold type-badge shrink-0 shadow-2xs">
+        <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
+          <div className="w-5 h-5 rounded-full bg-[#a21caf] text-white flex items-center justify-center font-semibold text-[10px] shrink-0 shadow-2xs">
             {projectInitials}
           </div>
-          <span className="font-mono type-badge font-medium text-[#c026d3] bg-[#fdf2f8] border border-[#fbcfe8] px-2 py-0.5 rounded-md shrink-0">
+          <span className="font-mono type-badge font-semibold text-[#c026d3] bg-[#fdf2f8] border border-[#fbcfe8] px-1.5 py-0.2 rounded shrink-0">
             {projectCode}
           </span>
-          <span
-            className="type-card-title text-[#0f172a] truncate"
-            title={projectName}
-          >
-            {projectName}
-          </span>
+          <div className="flex items-center gap-1 text-slate-500 type-badge">
+            <Layers className="w-3 h-3 text-blue-600 shrink-0" />
+            <span className="truncate">Architectural Deliverable</span>
+          </div>
+          {task.phase?.phaseName && (
+            <span className="type-badge text-slate-600 bg-slate-50 border border-slate-200 px-1.5 py-0.2 rounded shrink-0">
+              {task.phase.phaseName}
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0">
           {isParentOverdue && (
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full type-badge font-medium bg-rose-50 text-rose-700 border border-rose-200 shadow-2xs">
-              <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full type-badge font-medium bg-rose-50 text-rose-700 border border-rose-200 shadow-2xs">
+              <AlertTriangle className="w-3 h-3 text-rose-600 shrink-0" />
               <span>Overdue</span>
             </span>
           )}
 
           <span
-            className={`inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full type-badge font-medium border shadow-2xs ${deliverableStatusBadgeConfig.classes}`}
+            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full type-badge font-medium border shadow-2xs ${deliverableStatusBadgeConfig.classes}`}
           >
-            <span className="font-semibold">{deliverableStatusBadgeConfig.icon}</span>
+            <span className="font-bold">{deliverableStatusBadgeConfig.icon}</span>
             <span>{deliverableStatusBadgeConfig.label}</span>
           </span>
         </div>
       </div>
 
       {/* ============================================================== */}
-      {/* INSET DELIVERABLE BRIEF (Title + Architectural Instructions)   */}
+      {/* 2. DELIVERABLE TITLE & PROJECT CONTEXT                         */}
       {/* ============================================================== */}
-      <div className="bg-[#f8faff] border border-[#e2e8f0] rounded-xl p-3.5 text-left">
-        <div className="flex items-center justify-between gap-2 mb-1">
-          <div className="flex items-center gap-1.5 text-blue-600">
-            <Layers className="w-3.5 h-3.5" />
-            <span className="type-badge font-medium text-slate-500">
-              Architectural Deliverable
-            </span>
-          </div>
-
-          {task.phase?.phaseName && (
-            <span className="type-badge font-medium text-slate-600 bg-white border border-slate-200 px-2 py-0.5 rounded-md">
-              Phase: {task.phase.phaseName}
-            </span>
-          )}
-        </div>
-
+      <div className="space-y-0.5">
         <button
           type="button"
           onClick={() => onOpenDetails(task)}
           className="text-left w-full group/title cursor-pointer focus:outline-none"
         >
-          <h3 className="type-card-title text-slate-900 group-hover/title:text-blue-600 transition-colors line-clamp-1 leading-snug">
+          <h3 className="type-card-title text-slate-900 group-hover/title:text-blue-600 transition-colors line-clamp-1 font-semibold leading-tight">
             {task.title || "Untitled Deliverable"}
           </h3>
         </button>
 
-        <p className="type-body-compact text-slate-600 font-normal mt-1.5 line-clamp-2 leading-relaxed">
-          {cleanDescription || "No specific architectural instructions provided."}
-        </p>
+        <div className="flex items-center gap-2 type-helper text-slate-500 flex-wrap">
+          <span>Project: <strong className="text-slate-700 font-semibold">{projectName}</strong></span>
+          {cleanDescription && (
+            <>
+              <span className="text-slate-300">•</span>
+              <span className="text-slate-500 truncate max-w-[200px] sm:max-w-[280px]">{cleanDescription}</span>
+            </>
+          )}
+        </div>
       </div>
 
       {/* ============================================================== */}
-      {/* SECTION 5: ACCURATE PARENT PROGRESS & SUMMARY STRIP            */}
+      {/* 3. CONSOLIDATED PROGRESS & STATS STRIP                         */}
       {/* ============================================================== */}
-      <div className="bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl p-3 space-y-2.5">
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {/* Number of Assigned Employees */}
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-800 font-medium type-badge shadow-2xs">
-              <Users className="w-3.5 h-3.5 text-[#5A81FA]" />
-              <span>
-                {totalAssignedEmployees} {totalAssignedEmployees === 1 ? "Employee" : "Employees"}
-              </span>
+      <div className="bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl p-2.5 space-y-1.5">
+        <div className="flex items-center justify-between text-xs gap-2">
+          <div className="flex items-center gap-1.5 font-medium text-slate-700">
+            <CheckSquare className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+            <span className="type-badge font-semibold">
+              Checklist {totalCompletedChecklistItems}/{totalChecklistItems} ({parentChecklistProgressPct}%)
             </span>
+          </div>
 
-            {/* Total Completed Checklist Items / Total Checklist Items */}
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-800 font-medium type-badge shadow-2xs">
-              <CheckSquare className="w-3.5 h-3.5 text-emerald-600" />
-              <span>
-                {totalChecklistItems > 0
-                  ? `${totalCompletedChecklistItems}/${totalChecklistItems} Checklist Items (${parentChecklistProgressPct}%)`
-                  : "0 Checklist Items"}
-              </span>
+          <div className="flex items-center gap-1.5 type-badge font-medium shrink-0">
+            <span className="text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
+              {approvedCount}/{totalAssignedEmployees} approved
             </span>
-
-            {/* Number of Approved Employee Assignments */}
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-800 font-medium type-badge shadow-2xs">
-              <FileCheck2 className="w-3.5 h-3.5 text-emerald-600" />
-              <span>
-                {approvedCount} of {totalAssignedEmployees} Approved
-              </span>
-            </span>
-
-            {/* Number of Employee Assignments Awaiting Review */}
             {awaitingReviewCount > 0 && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-purple-50 border border-purple-200 text-purple-800 font-medium type-badge shadow-2xs animate-pulse">
-                <AlertCircle className="w-3.5 h-3.5 text-purple-600" />
-                <span>{awaitingReviewCount} Awaiting Review</span>
+              <span className="text-purple-700 bg-purple-50 border border-purple-200 px-1.5 py-0.5 rounded font-semibold animate-pulse">
+                {awaitingReviewCount} in review
               </span>
             )}
           </div>
-
-          <div className="type-helper font-medium text-slate-600 tabular-nums ml-auto">
-            {parentChecklistProgressPct}% Completed
-          </div>
         </div>
 
-        {/* Visual Progress Bar */}
-        <div className="w-full bg-slate-200/80 rounded-full h-2 overflow-hidden">
+        {/* Progress Bar */}
+        <div className="w-full bg-slate-200/80 rounded-full h-1.5 overflow-hidden">
           <div
             className={`h-full rounded-full transition-all duration-300 ${
               parentChecklistProgressPct === 100
@@ -653,218 +626,58 @@ export function TaskCard({
       </div>
 
       {/* ============================================================== */}
-      {/* SECTION 4: REDESIGNED SEPARATED EMPLOYEE ASSIGNMENT SECTIONS  */}
+      {/* 4. ASSIGNED RESPONSIBILITIES: COMPACT, PROMINENT EMPLOYEE LIST */}
       {/* ============================================================== */}
-      <div className="space-y-3">
+      <div className="space-y-1.5">
         <div className="flex items-center justify-between">
-          <div className="type-kpi-label text-slate-500 flex items-center gap-1.5">
-            <Users className="w-3.5 h-3.5 text-slate-400" />
+          <span className="type-badge font-semibold text-slate-500 flex items-center gap-1">
+            <Users className="w-3.5 h-3.5 text-[#5A81FA]" />
             <span>Assigned responsibilities ({totalAssignedEmployees})</span>
-          </div>
-          <span className="type-helper text-slate-400">Independent tracking</span>
+          </span>
+          <span className="type-helper text-slate-400">Tracked individually</span>
         </div>
 
         {employeeSections.length === 0 ? (
-          <div className="p-3 text-center border border-dashed border-slate-200 rounded-xl type-body-compact text-slate-400">
+          <div className="py-2 px-3 text-center border border-dashed border-slate-200 rounded-xl type-helper text-slate-400">
             No employees currently assigned.
           </div>
         ) : (
-          <div className="space-y-2.5">
-            {employeeSections.map((emp) => {
-              const isChecklistExpanded = Boolean(expandedChecklists[emp.memberId]);
-              const visibleChecklistItems = isChecklistExpanded
-                ? emp.checklistItems
-                : emp.checklistItems.slice(0, 2);
-
-              return (
-                <div
-                  key={emp.memberId}
-                  className="rounded-xl border border-slate-200 bg-white hover:border-slate-300 transition-all p-3.5 space-y-3 shadow-2xs text-left"
-                >
-                  {/* Top: Employee Avatar, Name, Employee ID, Priority, and Workflow Status */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                    {/* Left: Avatar + Name + ID */}
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div className="w-7 h-7 rounded-full bg-[#eff6ff] text-[#2563eb] border border-[#bfdbfe] font-bold type-badge flex items-center justify-center shrink-0 shadow-2xs">
-                        {emp.initials}
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="type-minor-heading text-slate-900 truncate">
-                            {emp.fullName}
-                          </span>
-                          {emp.employeeId && (
-                            <span className="font-mono type-badge text-indigo-600 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded font-semibold shrink-0">
-                              {emp.employeeId}
-                            </span>
-                          )}
-                          {emp.isCurrentUser && (
-                            <span className="type-badge text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded-full shrink-0">
-                              You
-                            </span>
-                          )}
-                        </div>
-                        {emp.designation && (
-                          <span className="type-helper text-slate-500 block truncate">
-                            {emp.designation}
-                          </span>
-                        )}
-                      </div>
+          <div className="space-y-2">
+            {employeeSections.map((emp) => (
+              <div
+                key={emp.memberId}
+                className="p-2.5 rounded-xl bg-slate-50/80 border border-slate-200/80 hover:bg-white hover:border-slate-300 transition-all text-xs space-y-1.5"
+              >
+                {/* Row 1: Avatar + FULL NAME clearly visible & bold + Priority + Action */}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-700 border border-blue-200 font-bold text-[11px] flex items-center justify-center shrink-0 shadow-2xs">
+                      {emp.initials}
                     </div>
-
-                    {/* Right: Employee Priority Badge & Workflow Status Badge */}
-                    <div className="flex items-center gap-1.5 flex-wrap shrink-0">
-                      {/* Priority Badge */}
-                      <span
-                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full type-badge border shadow-2xs ${emp.priorityConfig.classes}`}
-                        title={`Priority: ${emp.priorityConfig.label}`}
-                      >
-                        <span className="font-bold">{emp.priorityConfig.icon}</span>
-                        <span>{emp.priorityConfig.label}</span>
+                    {/* EMPLOYEE FULL NAME: CLEARLY VISIBLE, PROMINENT & BOLD */}
+                    <span className="font-bold text-slate-900 text-xs sm:text-[13px] tracking-tight truncate">
+                      {emp.fullName}
+                    </span>
+                    {emp.isCurrentUser && (
+                      <span className="text-[10px] text-emerald-800 bg-emerald-100 px-1 rounded font-bold shrink-0">
+                        You
                       </span>
-
-                      {/* Workflow Status Badge */}
-                      <span
-                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full type-badge border shadow-2xs ${emp.workflowStatus.classes}`}
-                      >
-                        <span className="font-bold">{emp.workflowStatus.icon}</span>
-                        <span>{emp.workflowStatus.label}</span>
+                    )}
+                    {emp.employeeId && (
+                      <span className="font-mono text-[10px] text-indigo-600 bg-indigo-50 border border-indigo-100 px-1 rounded shrink-0 hidden sm:inline">
+                        {emp.employeeId}
                       </span>
-                    </div>
+                    )}
                   </div>
 
-                  {/* Middle Meta Strip: Deadline & Checklist Progress Bar */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-slate-100 type-body-compact">
-                    {/* Deadline */}
-                    <div className="flex items-center gap-1.5 text-slate-600">
-                      <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                      <span className="font-medium text-slate-700">Due:</span>
-                      <span className="font-medium text-slate-800">{emp.formattedDeadline}</span>
-                      {emp.isOverdue && (
-                        <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 type-badge border border-rose-200">
-                          Overdue
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Checklist Progress */}
-                    <div className="flex items-center gap-2">
-                      <CheckSquare className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                      <span className="type-body-compact font-medium text-slate-800 tabular-nums">
-                        {emp.completedChecklistCount}/{emp.totalChecklistCount} completed
-                      </span>
-                      {emp.totalChecklistCount > 0 && (
-                        <div className="w-16 bg-slate-200 rounded-full h-1.5 overflow-hidden">
-                          <div
-                            className="bg-emerald-500 h-full rounded-full transition-all duration-300"
-                            style={{ width: `${emp.checklistProgressPct}%` }}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Employee's Dedicated Checklist Items */}
-                  {emp.totalChecklistCount > 0 && (
-                    <div className="space-y-1.5 pt-1">
-                      <ul className="space-y-1">
-                        {visibleChecklistItems.map((item: any, idx: number) => {
-                          const isDone = item.isCompleted || item.status === "COMPLETED";
-                          const itemPriority = item.priority ? getPriorityBadgeConfig(item.priority) : null;
-                          const itemDue = item.dueDate
-                            ? formatDateTimeWithTimezone(item.dueDate, workspaceTimezone)
-                            : null;
-
-                          return (
-                            <li
-                              key={item.id || idx}
-                              className={`flex items-start justify-between gap-2 p-1.5 rounded-lg border type-body-compact transition-colors ${
-                                isDone
-                                  ? "bg-emerald-50/30 border-emerald-100 text-slate-500"
-                                  : "bg-[#FAFAFD] border-slate-100 text-slate-800"
-                              }`}
-                            >
-                              <div className="flex items-start gap-1.5 min-w-0 flex-1">
-                                <button
-                                  type="button"
-                                  disabled={!onToggleChecklist || (!isPrivileged && !emp.isCurrentUser)}
-                                  onClick={() =>
-                                    onToggleChecklist &&
-                                    onToggleChecklist(task.id, item.id, item.isCompleted)
-                                  }
-                                  className={`mt-0.5 shrink-0 ${
-                                    onToggleChecklist && (isPrivileged || emp.isCurrentUser)
-                                      ? "cursor-pointer"
-                                      : "cursor-default"
-                                  }`}
-                                  title={
-                                    onToggleChecklist && (isPrivileged || emp.isCurrentUser)
-                                      ? "Toggle item completion"
-                                      : "Designated employee or manager action"
-                                  }
-                                >
-                                  {isDone ? (
-                                    <CheckSquare className="w-3.5 h-3.5 text-emerald-600" />
-                                  ) : (
-                                    <Square className="w-3.5 h-3.5 text-slate-400" />
-                                  )}
-                                </button>
-                                <span
-                                  className={`break-words leading-relaxed ${
-                                    isDone ? "line-through text-slate-400" : "font-medium"
-                                  }`}
-                                >
-                                  {item.title}
-                                </span>
-                              </div>
-
-                              <div className="flex items-center gap-1 shrink-0 type-badge">
-                                {itemPriority && (
-                                  <span
-                                    className={`px-1.5 py-0.5 rounded border font-medium ${itemPriority.classes}`}
-                                  >
-                                    {itemPriority.label}
-                                  </span>
-                                )}
-                                {itemDue && (
-                                  <span className="type-helper text-slate-500 hidden sm:inline">
-                                    {itemDue}
-                                  </span>
-                                )}
-                              </div>
-                            </li>
-                          );
-                        })}
-                      </ul>
-
-                      {/* Expand / Collapse Button for Long Checklists */}
-                      {emp.totalChecklistCount > 2 && (
-                        <button
-                          type="button"
-                          onClick={() => toggleChecklistExpand(emp.memberId)}
-                          className="type-button-label text-blue-600 hover:text-blue-700 flex items-center gap-1 cursor-pointer pt-0.5 focus:outline-none"
-                        >
-                          <span>
-                            {isChecklistExpanded
-                              ? "Show fewer items"
-                              : `Show all ${emp.totalChecklistCount} checklist items`}
-                          </span>
-                          <ChevronDown
-                            className={`w-3.5 h-3.5 transition-transform duration-200 ${
-                              isChecklistExpanded ? "rotate-180" : ""
-                            }`}
-                          />
-                        </button>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Employee Action: Review or View Details */}
-                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
-                    <span className="type-helper text-slate-500">
-                      Assignment ID: <span className="font-mono text-slate-600">{emp.assignmentId.slice(-6)}</span>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {/* Priority Pill */}
+                    <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold border ${emp.priorityConfig.classes}`}>
+                      <span>{emp.priorityConfig.icon}</span>
+                      <span>{emp.priorityConfig.label}</span>
                     </span>
 
+                    {/* Review Submission button if awaiting review, otherwise details button */}
                     {emp.isAwaitingReview ? (
                       <button
                         type="button"
@@ -872,10 +685,11 @@ export function TaskCard({
                           e.stopPropagation();
                           onOpenDetails(task, emp.assignmentId);
                         }}
-                        className="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white type-button-label flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+                        className="px-2 py-0.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-[11px] font-bold flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
+                        title="Review Submission"
                       >
-                        <Eye className="w-3.5 h-3.5" />
-                        <span>Review Submission</span>
+                        <Eye className="w-3 h-3" />
+                        <span>Review</span>
                       </button>
                     ) : (
                       <button
@@ -884,150 +698,111 @@ export function TaskCard({
                           e.stopPropagation();
                           onOpenDetails(task, emp.assignmentId);
                         }}
-                        className="px-3 py-1.5 rounded-lg border border-blue-200 bg-white hover:bg-blue-50/50 text-blue-600 type-button-label flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                        className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                        title="View Checklist & Details"
                       >
-                        <Eye className="w-3.5 h-3.5" />
-                        <span>View Assignment</span>
+                        <ChevronRight className="w-4 h-4" />
                       </button>
                     )}
                   </div>
                 </div>
-              );
-            })}
+
+                {/* Row 2: Workflow Status Badge + Due Date + Checklist Counts */}
+                <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-200/50 text-[11px]">
+                  {/* Employee Workflow Status Badge */}
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border shadow-2xs ${emp.workflowStatus.classes} shrink-0`}>
+                    <span className="font-bold">{emp.workflowStatus.icon}</span>
+                    <span>{emp.workflowStatus.label}</span>
+                  </span>
+
+                  <div className="flex items-center gap-1.5 text-slate-500 truncate ml-auto text-[11px]">
+                    <span className="truncate">Due {emp.formattedDeadline}</span>
+                    {emp.isOverdue && (
+                      <span className="text-rose-600 font-bold text-[9px] bg-rose-50 px-1 rounded border border-rose-200 shrink-0">
+                        Overdue
+                      </span>
+                    )}
+                    {emp.totalChecklistCount > 0 && (
+                      <span className="text-slate-400 font-medium shrink-0">
+                        • {emp.completedChecklistCount}/{emp.totalChecklistCount} tasks
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>
 
       {/* ============================================================== */}
-      {/* MORE DETAILS TRAY TOGGLE                                       */}
+      {/* 5. FOOTER ACTIONS: STATUS DROPDOWN + DETAILS + EDIT/DELEGATE/DEL */}
       {/* ============================================================== */}
-      <div className="pt-1">
-        <button
-          type="button"
-          onClick={() => setIsDetailsTrayExpanded(!isDetailsTrayExpanded)}
-          className="type-button-label text-blue-600 hover:text-blue-700 flex items-center gap-1 cursor-pointer focus:outline-none"
-        >
-          <span>{isDetailsTrayExpanded ? "Less deliverable info" : "More deliverable info"}</span>
-          <ChevronDown
-            className={`w-3.5 h-3.5 transition-transform duration-200 ${
-              isDetailsTrayExpanded ? "rotate-180" : ""
-            }`}
+      <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex items-center gap-2 flex-1 min-w-[180px]">
+          <TaskStatusDropdown
+            currentStatus={task.status}
+            isLoading={isLoadingStatus}
+            onSelectStatus={(newStatus) => onUpdateStatus(task.id, newStatus)}
+            variant="select"
+            fullWidth
           />
-        </button>
 
-        {isDetailsTrayExpanded && (
-          <div className="mt-2.5 p-3 rounded-xl bg-slate-50 border border-slate-100 type-body-compact text-slate-600 space-y-2 animate-in fade-in duration-150 text-left">
-            {task.project?.projectType && (
-              <div className="flex items-center gap-2">
-                <span className="type-helper font-medium text-slate-500">Typology:</span>
-                <span className="type-body-compact font-medium text-slate-700">{task.project.projectType}</span>
-              </div>
-            )}
-            {task.dueDate && (
-              <div className="flex items-center gap-2">
-                <span className="type-helper font-medium text-slate-500">Parent deadline:</span>
-                <span className="type-body-compact font-medium text-slate-700">
-                  {formatDateTimeWithTimezone(task.dueDate, workspaceTimezone)}
-                </span>
-              </div>
-            )}
-            <div className="flex items-center gap-2">
-              <span className="type-helper font-medium text-slate-500">Created date:</span>
-              <span className="type-body-compact font-medium text-slate-700">{formattedCreatedAt}</span>
-            </div>
-            {task.creator?.user?.fullName && (
-              <div className="flex items-center gap-2">
-                <span className="type-helper font-medium text-slate-500">Assigned by:</span>
-                <span className="type-body-compact font-medium text-slate-700">{task.creator.user.fullName}</span>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* ============================================================== */}
-      {/* BOTTOM ACTIONS: Status Transition & Full Details               */}
-      {/* ============================================================== */}
-      <div className="pt-3 border-t border-slate-100 flex items-center gap-2">
-        <TaskStatusDropdown
-          currentStatus={task.status}
-          isLoading={isLoadingStatus}
-          onSelectStatus={(newStatus) => onUpdateStatus(task.id, newStatus)}
-          variant="select"
-          fullWidth
-        />
-
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onOpenDetails(task);
-          }}
-          className="px-3.5 py-2 rounded-xl border border-blue-200 bg-white text-blue-600 type-button-label flex items-center gap-1.5 hover:bg-blue-50/50 transition-colors cursor-pointer shadow-2xs shrink-0"
-        >
-          <ExternalLink className="w-4 h-4 text-blue-600" />
-          <span>Full Details</span>
-        </button>
-      </div>
-
-      {/* ============================================================== */}
-      {/* EDIT, DELEGATE, DELETE BUTTONS                                */}
-      {/* ============================================================== */}
-      <div className="flex items-center gap-2 pt-0.5">
-        <button
-          type="button"
-          disabled={!canEdit}
-          onClick={(e) => {
-            e.stopPropagation();
-            if (canEdit) onEdit(task);
-          }}
-          className={`px-3 py-1.5 rounded-xl border border-slate-200/90 type-button-label flex items-center gap-1.5 transition-colors shadow-2xs ${
-            canEdit
-              ? "bg-white text-slate-700 hover:bg-slate-50 cursor-pointer"
-              : "bg-slate-50 text-slate-400 opacity-60 cursor-not-allowed"
-          }`}
-        >
-          <Pencil className="w-3.5 h-3.5 text-slate-500" />
-          <span>Edit</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelegate(task);
-          }}
-          className="px-3 py-1.5 rounded-xl border border-slate-200/90 bg-white text-slate-700 type-button-label flex items-center gap-1.5 hover:bg-slate-50 transition-colors cursor-pointer shadow-2xs"
-        >
-          <ArrowRightLeft className="w-3.5 h-3.5 text-slate-500" />
-          <span>Delegate</span>
-        </button>
-
-        {/* Delete Icon Button */}
-        {canDelete || isPrivileged ? (
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
-              onDelete(task);
+              onOpenDetails(task);
             }}
-            className="ml-auto p-2 rounded-xl border border-slate-200/90 bg-white text-rose-600 hover:bg-rose-50 hover:border-rose-200 transition-all cursor-pointer shadow-2xs group/del"
-            title="Delete Task"
-            aria-label="Delete Task"
+            className="px-3 py-1.5 rounded-xl border border-blue-200 bg-white hover:bg-blue-50/70 text-blue-600 type-button-label flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs shrink-0 font-semibold"
           >
-            <Trash2 className="w-4 h-4 stroke-[2.2] text-rose-600 group-hover/del:text-rose-700 transition-colors" />
+            <ExternalLink className="w-3.5 h-3.5 text-blue-600" />
+            <span>Details</span>
           </button>
-        ) : (
+        </div>
+
+        <div className="flex items-center gap-1 shrink-0">
           <button
             type="button"
-            disabled
-            className="ml-auto p-2 rounded-xl border border-slate-200/60 bg-slate-50 text-slate-300 opacity-40 cursor-not-allowed"
-            title="Only task assigner or admin can delete this task"
-            aria-label="Delete Task (Disabled)"
+            disabled={!canEdit}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (canEdit) onEdit(task);
+            }}
+            className={`p-1.5 rounded-lg border border-slate-200/90 type-badge flex items-center transition-colors shadow-2xs ${
+              canEdit ? "bg-white text-slate-700 hover:bg-slate-50 cursor-pointer" : "bg-slate-50 text-slate-300 cursor-not-allowed"
+            }`}
+            title="Edit Task"
           >
-            <Trash2 className="w-4 h-4 text-slate-300" />
+            <Pencil className="w-3.5 h-3.5" />
           </button>
-        )}
+
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelegate(task);
+            }}
+            className="p-1.5 rounded-lg border border-slate-200/90 bg-white text-slate-700 hover:bg-slate-50 type-badge flex items-center transition-colors cursor-pointer shadow-2xs"
+            title="Delegate Responsibility"
+          >
+            <ArrowRightLeft className="w-3.5 h-3.5" />
+          </button>
+
+          {canDelete || isPrivileged ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(task);
+              }}
+              className="p-1.5 rounded-lg border border-slate-200/90 bg-white text-rose-600 hover:bg-rose-50 hover:border-rose-200 transition-colors cursor-pointer shadow-2xs"
+              title="Delete Task"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          ) : null}
+        </div>
       </div>
     </article>
   );

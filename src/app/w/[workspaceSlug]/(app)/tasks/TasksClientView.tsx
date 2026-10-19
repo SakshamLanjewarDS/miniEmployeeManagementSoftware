@@ -508,6 +508,7 @@ export default function TasksClientView({
   // Create Task Modal state
   const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false);
   const [creatingTask, setCreatingTask] = useState(false);
+  const [taskTitle, setTaskTitle] = useState("");
   const [selectedProjectId, setSelectedProjectId] = useState<string>(projects[0]?.id || "");
   const [selectedPhaseId, setSelectedPhaseId] = useState<string>("");
   const [taskDescription, setTaskDescription] = useState("");
@@ -942,6 +943,11 @@ export default function TasksClientView({
     e.preventDefault();
     const errors: Record<string, string> = {};
 
+    // 0. Deliverable Title Validation
+    if (!taskTitle.trim()) {
+      errors.title = "Deliverable Title is required.";
+    }
+
     // 1. Project Validation
     if (!selectedProjectId) {
       errors.project = "Please select an active architectural project.";
@@ -1046,6 +1052,7 @@ export default function TasksClientView({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          title: taskTitle.trim(),
           projectId: selectedProjectId,
           phaseId: selectedPhaseId || undefined,
           description: taskDescription.trim(),
@@ -1067,6 +1074,7 @@ export default function TasksClientView({
       // Add real task returned by server
       const createdTask: TaskItem = {
         ...data.task,
+        title: taskTitle.trim() || data.task.title,
         project: targetProj
           ? { id: targetProj.id, code: targetProj.code, name: targetProj.name, projectType: targetProj.projectType ?? null }
           : { id: selectedProjectId, code: "PROJ", name: "Project", projectType: null },
@@ -1119,6 +1127,7 @@ export default function TasksClientView({
       router.refresh();
 
       // Reset form
+      setTaskTitle("");
       setTaskDescription("");
       setTaskReviewerId("");
       setTaskEstimatedHours("");
@@ -3668,9 +3677,21 @@ export default function TasksClientView({
             {/* Header (Matching Image B) */}
             <div className="p-4 sm:p-7 pb-3 sm:pb-4 bg-white flex items-start justify-between gap-3 sm:gap-4 border-b border-slate-100/80">
               <div className="space-y-1.5 min-w-0 flex-1">
-                <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight leading-tight">
-                  {drawerTask.title}
-                </h2>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight leading-tight">
+                    {drawerTask.title}
+                  </h2>
+                  {(isPrivileged || isTaskAssignedToMe(drawerTask) || drawerTask.creatorId === currentMembershipId || drawerTask.creator?.id === currentMembershipId) && (
+                    <button
+                      type="button"
+                      onClick={() => openEditModal(drawerTask)}
+                      className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer shrink-0"
+                      title="Rename or Edit Deliverable"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
                 <div className="flex flex-wrap items-center gap-2 pt-0.5">
                   <div className="flex items-center gap-1.5">
                     <ProjectProfileCircle typology={drawerTask.project.projectType} name={drawerTask.project.name} size="xs" />
@@ -4103,204 +4124,435 @@ export default function TasksClientView({
                 </div>
               )}
 
-              {/* 5. CHECKLIST ITEMS & WORKFLOW ACTIONS */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h4 className="font-bold text-[#1F1F1F] text-xs uppercase tracking-wider flex items-center gap-1.5">
-                    <CheckSquare className="w-3.5 h-3.5 text-[#5A81FA]" />
-                    <span>Deliverable Checklist Tasks ({drawerTask.checklistItems.filter((i) => i.isCompleted).length} / {drawerTask.checklistItems.length})</span>
-                  </h4>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSubmissionSelectedItems(drawerTask.checklistItems.map((ci) => ci.id));
-                      setSubmissionModal({ task: drawerTask });
-                    }}
-                    className="px-2.5 py-1 bg-[#5A81FA] hover:bg-[#426EE8] text-white text-[11px] font-bold rounded-lg shadow-xs flex items-center gap-1 cursor-pointer transition-colors"
-                  >
-                    <Send className="w-3 h-3" />
-                    <span>Submit for Review</span>
-                  </button>
-                </div>
+              {/* 5. CHECKLIST ITEMS GROUPED BY ASSIGNED EMPLOYEE */}
+              {(() => {
+                const rawAssignments: any[] = Array.isArray(drawerTask.assignments) ? drawerTask.assignments : [];
+                const rawChecklist: any[] = Array.isArray(drawerTask.checklistItems) ? drawerTask.checklistItems : [];
 
-                {drawerTask.checklistItems.length === 0 ? (
-                  <p className="text-xs text-[#696E82] italic">No checklist items defined.</p>
-                ) : (
-                  <div className="space-y-2">
-                    {drawerTask.checklistItems.map((item) => (
-                      <div
-                        key={item.id}
-                        className={`p-3 rounded-xl border transition-all space-y-2 ${
-                          item.isBlocked
-                            ? "bg-red-50/60 border-red-300"
-                            : item.isCompleted
-                            ? "bg-emerald-50/40 border-emerald-200"
-                            : "bg-[#F8F9FD] hover:bg-white border-[#E2E6F0]"
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <button
-                            type="button"
-                            onClick={() => handleToggleChecklist(drawerTask.id, item.id, item.isCompleted)}
-                            className="flex items-start gap-2 text-left cursor-pointer flex-1 min-w-0"
-                          >
+                // Collect distinct assigned member IDs
+                const memberIdSet = new Set<string>();
+                rawAssignments.forEach((a) => {
+                  if (a.membershipId) memberIdSet.add(a.membershipId);
+                });
+                if (Array.isArray(drawerTask.assignedMemberIds)) {
+                  drawerTask.assignedMemberIds.forEach((id: string) => {
+                    if (id) memberIdSet.add(id);
+                  });
+                }
+                if (drawerTask.assigneeId) memberIdSet.add(drawerTask.assigneeId);
+                if (drawerTask.assignee?.id) memberIdSet.add(drawerTask.assignee.id);
+
+                // Include any members directly referenced in checklist items
+                rawChecklist.forEach((ci) => {
+                  if (ci.assignedMemberId) memberIdSet.add(ci.assignedMemberId);
+                });
+
+                const memberIds = Array.from(memberIdSet);
+
+                // Build detailed section for each assigned employee
+                const employeeSections = memberIds.map((mId) => {
+                  const memberOpt = members.find((m) => m.id === mId);
+                  const assignment = rawAssignments.find((a) => a.membershipId === mId);
+                  const taskAssignee =
+                    drawerTask.assignee && (drawerTask.assignee.id === mId || drawerTask.assigneeId === mId)
+                      ? drawerTask.assignee
+                      : null;
+
+                  const fullName =
+                    memberOpt?.user?.fullName ||
+                    assignment?.membership?.user?.fullName ||
+                    taskAssignee?.user?.fullName ||
+                    "Team Member";
+
+                  const employeeId =
+                    memberOpt?.employee?.employeeId ||
+                    assignment?.membership?.employee?.employeeId ||
+                    taskAssignee?.employee?.employeeId ||
+                    "";
+
+                  const designation =
+                    memberOpt?.employee?.designation ||
+                    assignment?.membership?.employee?.designation ||
+                    taskAssignee?.employee?.designation ||
+                    "";
+
+                  const initials = fullName
+                    .trim()
+                    .split(/\s+/)
+                    .filter(Boolean)
+                    .map((n: string) => n[0])
+                    .join("")
+                    .slice(0, 2)
+                    .toUpperCase() || "TM";
+
+                  const isCurrentUser = mId === currentMembershipId;
+
+                  // Specific items for this employee:
+                  // Match on assignedMemberId or fallback if this is the only assigned employee
+                  const items = rawChecklist.filter((ci) => {
+                    if (ci.assignedMemberId) return ci.assignedMemberId === mId;
+                    return memberIds.length === 1;
+                  });
+
+                  const completedCount = items.filter((i) => i.isCompleted || i.status === "COMPLETED").length;
+                  const totalCount = items.length;
+                  const progressPct = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+
+                  return {
+                    memberId: mId,
+                    fullName,
+                    employeeId,
+                    designation,
+                    initials,
+                    isCurrentUser,
+                    items,
+                    completedCount,
+                    totalCount,
+                    progressPct,
+                  };
+                });
+
+                // Check for unassigned / general checklist items
+                const assignedIds = new Set(memberIds);
+                const unassignedItems =
+                  memberIds.length > 1 || memberIds.length === 0
+                    ? rawChecklist.filter((ci) => !ci.assignedMemberId || !assignedIds.has(ci.assignedMemberId))
+                    : [];
+
+                const totalAllChecklist = rawChecklist.length;
+                const totalAllCompleted = rawChecklist.filter((i) => i.isCompleted || i.status === "COMPLETED").length;
+                const overallPct =
+                  totalAllChecklist > 0 ? Math.round((totalAllCompleted / totalAllChecklist) * 100) : 0;
+
+                const renderChecklistItem = (item: any) => {
+                  return (
+                    <div
+                      key={item.id}
+                      className={`p-3 rounded-xl border transition-all space-y-2 ${
+                        item.isBlocked
+                          ? "bg-rose-50/70 border-rose-200"
+                          : item.isCompleted
+                          ? "bg-emerald-50/50 border-emerald-200/80"
+                          : "bg-[#F8F9FD] hover:bg-white border-[#E2E6F0]"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleChecklist(drawerTask.id, item.id, item.isCompleted)}
+                          className="flex items-start gap-2.5 text-left cursor-pointer flex-1 min-w-0 group/chk"
+                        >
+                          <div className="mt-0.5 shrink-0">
                             {item.isCompleted ? (
-                              <CheckSquare className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                              <CheckSquare className="w-4 h-4 text-emerald-600 group-hover/chk:text-emerald-700 transition-colors" />
                             ) : (
-                              <Square className="w-4 h-4 text-[#696E82] shrink-0 mt-0.5" />
-                            )}
-                            <div className="min-w-0">
-                              <span
-                                className={`text-xs block ${
-                                  item.isCompleted ? "line-through text-[#696E82]" : "text-[#1F1F1F] font-semibold"
-                                }`}
-                              >
-                                {item.title}
-                              </span>
-                              {item.dueDate && (
-                                <span className="text-[10px] text-[#696E82] block">
-                                  Due: {new Date(item.dueDate).toLocaleDateString()}
-                                </span>
-                              )}
-                            </div>
-                          </button>
-
-                          {/* Status Badge */}
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            {item.isBlocked ? (
-                              <span className="px-2 py-0.5 bg-red-100 text-red-800 font-bold text-[10px] rounded border border-red-200">
-                                BLOCKED
-                              </span>
-                            ) : item.status === "IN_REVIEW" ? (
-                              <span className="px-2 py-0.5 bg-amber-100 text-amber-800 font-bold text-[10px] rounded border border-amber-200">
-                                IN REVIEW
-                              </span>
-                            ) : item.status === "IN_PROGRESS" ? (
-                              <span className="px-2 py-0.5 bg-blue-100 text-blue-800 font-bold text-[10px] rounded border border-blue-200">
-                                IN PROGRESS
-                              </span>
-                            ) : item.isCompleted ? (
-                              <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 font-bold text-[10px] rounded border border-emerald-200">
-                                DONE
-                              </span>
-                            ) : (
-                              <span className="px-2 py-0.5 bg-gray-100 text-gray-700 font-medium text-[10px] rounded border border-gray-200">
-                                NOT STARTED
-                              </span>
+                              <Square className="w-4 h-4 text-slate-400 group-hover/chk:text-slate-600 transition-colors" />
                             )}
                           </div>
-                        </div>
-
-                        {/* Prerequisite Indicator */}
-                        {item.prerequisiteItem && (
-                          <div className="text-[10px] text-[#696E82] bg-white p-1.5 rounded-lg border border-[#E2E6F0] flex items-center justify-between">
-                            <span>Prerequisite: <strong>{item.prerequisiteItem.title}</strong></span>
-                            <span className={item.prerequisiteItem.isCompleted ? "text-emerald-700 font-bold" : "text-amber-700 font-medium"}>
-                              {item.prerequisiteItem.isCompleted ? "✓ Completed" : "⏳ Pending completion"}
+                          <div className="min-w-0">
+                            <span
+                              className={`text-xs block leading-snug ${
+                                item.isCompleted
+                                  ? "line-through text-slate-400 font-normal"
+                                  : "text-slate-900 font-semibold group-hover/chk:text-blue-600 transition-colors"
+                              }`}
+                            >
+                              {item.title}
                             </span>
+                            {item.dueDate && (
+                              <span className="text-[10px] text-slate-500 flex items-center gap-1 mt-0.5">
+                                <Clock className="w-3 h-3 text-slate-400" />
+                                <span>Due: {new Date(item.dueDate).toLocaleDateString()}</span>
+                              </span>
+                            )}
                           </div>
-                        )}
+                        </button>
 
-                        {/* Blocker Alert Banner */}
-                        {item.isBlocked && (
-                          <div className="p-2 bg-red-100/70 border border-red-200 rounded-lg text-xs text-red-900 flex items-center justify-between gap-2">
-                            <div className="min-w-0">
-                              <span className="font-bold">⚠️ Blocked: </span>
-                              <span>{item.blockerReason || "Blocker logged"}</span>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setBlockerModal({
-                                  taskId: drawerTask.id,
-                                  checklistItemId: item.id,
-                                  title: item.title,
-                                  isResolving: true,
-                                  existingReason: item.blockerReason || undefined,
-                                })
-                              }
-                              className="px-2 py-1 bg-red-700 hover:bg-red-800 text-white text-[10px] font-bold rounded cursor-pointer shrink-0 transition-colors"
-                            >
-                              Resolve Blocker
-                            </button>
-                          </div>
-                        )}
-
-                        {/* Item Action Controls */}
-                        <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-[#E2E6F0]/60">
-                          {/* Start Work button */}
-                          {(!item.status || item.status === "NOT_STARTED") && !item.isCompleted && (
-                            <button
-                              type="button"
-                              onClick={() => handleStartChecklistItem(drawerTask.id, item.id)}
-                              className="px-2 py-1 bg-[#F2F4FF] hover:bg-[#5A81FA] text-[#5A81FA] hover:text-white rounded text-[10px] font-bold transition-colors cursor-pointer flex items-center gap-1"
-                            >
-                              <Play className="w-2.5 h-2.5" />
-                              <span>Start Work</span>
-                            </button>
-                          )}
-
-                          {/* Report Blocker button */}
-                          {!item.isBlocked && !item.isCompleted && (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setBlockerModal({
-                                  taskId: drawerTask.id,
-                                  checklistItemId: item.id,
-                                  title: item.title,
-                                  isResolving: false,
-                                })
-                              }
-                              className="px-2 py-1 bg-white hover:bg-red-50 text-red-700 border border-red-200 rounded text-[10px] font-medium transition-colors cursor-pointer flex items-center gap-1"
-                            >
-                              <AlertCircle className="w-2.5 h-2.5 text-red-600" />
-                              <span>Report Blocker</span>
-                            </button>
-                          )}
-
-                          {/* Request Extension button */}
-                          {!item.isCompleted && (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setExtensionModal({
-                                  taskId: drawerTask.id,
-                                  checklistItemId: item.id,
-                                  title: item.title,
-                                  currentDueDate: item.dueDate,
-                                })
-                              }
-                              className="px-2 py-1 bg-white hover:bg-amber-50 text-amber-800 border border-amber-200 rounded text-[10px] font-medium transition-colors cursor-pointer flex items-center gap-1"
-                            >
-                              <Clock className="w-2.5 h-2.5 text-amber-600" />
-                              <span>Extend Date</span>
-                            </button>
-                          )}
-
-                          {/* Reopen button */}
-                          {item.isCompleted && isPrivileged && (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setReopenModal({
-                                  taskId: drawerTask.id,
-                                  checklistItemId: item.id,
-                                  title: item.title,
-                                })
-                              }
-                              className="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded text-[10px] font-bold transition-colors cursor-pointer flex items-center gap-1 ml-auto"
-                            >
-                              <RotateCcw className="w-2.5 h-2.5" />
-                              <span>Reopen Work</span>
-                            </button>
+                        {/* Status Badge */}
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {item.isBlocked ? (
+                            <span className="px-2 py-0.5 bg-rose-100 text-rose-800 font-bold text-[10px] rounded border border-rose-200">
+                              BLOCKED
+                            </span>
+                          ) : item.status === "IN_REVIEW" ? (
+                            <span className="px-2 py-0.5 bg-purple-100 text-purple-800 font-bold text-[10px] rounded border border-purple-200">
+                              IN REVIEW
+                            </span>
+                          ) : item.status === "IN_PROGRESS" ? (
+                            <span className="px-2 py-0.5 bg-blue-100 text-blue-800 font-bold text-[10px] rounded border border-blue-200">
+                              IN PROGRESS
+                            </span>
+                          ) : item.isCompleted ? (
+                            <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 font-bold text-[10px] rounded border border-emerald-200">
+                              DONE
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 bg-slate-100 text-slate-700 font-medium text-[10px] rounded border border-slate-200">
+                              NOT STARTED
+                            </span>
                           )}
                         </div>
                       </div>
-                    ))}
+
+                      {/* Prerequisite Indicator */}
+                      {item.prerequisiteItem && (
+                        <div className="text-[10px] text-slate-600 bg-white p-2 rounded-lg border border-slate-200 flex items-center justify-between">
+                          <span>
+                            Prerequisite: <strong className="text-slate-800">{item.prerequisiteItem.title}</strong>
+                          </span>
+                          <span
+                            className={
+                              item.prerequisiteItem.isCompleted
+                                ? "text-emerald-700 font-bold"
+                                : "text-amber-700 font-medium"
+                            }
+                          >
+                            {item.prerequisiteItem.isCompleted ? "Completed" : "Pending completion"}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Blocker Alert Banner */}
+                      {item.isBlocked && (
+                        <div className="p-2.5 bg-rose-100/80 border border-rose-200 rounded-lg text-xs text-rose-900 flex items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <span className="font-bold">Blocked: </span>
+                            <span>{item.blockerReason || "Blocker logged"}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setBlockerModal({
+                                taskId: drawerTask.id,
+                                checklistItemId: item.id,
+                                title: item.title,
+                                isResolving: true,
+                                existingReason: item.blockerReason || undefined,
+                              })
+                            }
+                            className="px-2 py-1 bg-rose-700 hover:bg-rose-800 text-white text-[10px] font-bold rounded cursor-pointer shrink-0 transition-colors shadow-2xs"
+                          >
+                            Resolve Blocker
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Item Action Controls */}
+                      <div className="flex flex-wrap items-center gap-1.5 pt-1.5 border-t border-slate-200/60">
+                        {(!item.status || item.status === "NOT_STARTED") && !item.isCompleted && (
+                          <button
+                            type="button"
+                            onClick={() => handleStartChecklistItem(drawerTask.id, item.id)}
+                            className="px-2 py-1 bg-[#F2F4FF] hover:bg-[#5A81FA] text-[#5A81FA] hover:text-white rounded text-[10px] font-bold transition-colors cursor-pointer flex items-center gap-1"
+                          >
+                            <Play className="w-2.5 h-2.5" />
+                            <span>Start Work</span>
+                          </button>
+                        )}
+
+                        {!item.isBlocked && !item.isCompleted && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setBlockerModal({
+                                taskId: drawerTask.id,
+                                checklistItemId: item.id,
+                                title: item.title,
+                                isResolving: false,
+                              })
+                            }
+                            className="px-2 py-1 bg-white hover:bg-rose-50 text-rose-700 border border-rose-200 rounded text-[10px] font-medium transition-colors cursor-pointer flex items-center gap-1"
+                          >
+                            <AlertCircle className="w-2.5 h-2.5 text-rose-600" />
+                            <span>Report Blocker</span>
+                          </button>
+                        )}
+
+                        {!item.isCompleted && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setExtensionModal({
+                                taskId: drawerTask.id,
+                                checklistItemId: item.id,
+                                title: item.title,
+                                currentDueDate: item.dueDate,
+                              })
+                            }
+                            className="px-2 py-1 bg-white hover:bg-amber-50 text-amber-800 border border-amber-200 rounded text-[10px] font-medium transition-colors cursor-pointer flex items-center gap-1"
+                          >
+                            <Clock className="w-2.5 h-2.5 text-amber-600" />
+                            <span>Extend Date</span>
+                          </button>
+                        )}
+
+                        {item.isCompleted && isPrivileged && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setReopenModal({
+                                taskId: drawerTask.id,
+                                checklistItemId: item.id,
+                                title: item.title,
+                              })
+                            }
+                            className="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded text-[10px] font-bold transition-colors cursor-pointer flex items-center gap-1 ml-auto"
+                          >
+                            <RotateCcw className="w-2.5 h-2.5" />
+                            <span>Reopen Work</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                };
+
+                return (
+                  <div className="space-y-4 pt-2 border-t border-[#E2E6F0]">
+                    {/* Header: Title, Progress Bar, and Submit for Review */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <div className="flex items-center gap-2">
+                          <CheckSquare className="w-4 h-4 text-[#5A81FA]" />
+                          <h4 className="font-bold text-slate-900 text-sm tracking-tight">
+                            Assigned Responsibilities & Checklists
+                          </h4>
+                          <span className="text-xs font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">
+                            {totalAllCompleted} / {totalAllChecklist} ({overallPct}%)
+                          </span>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSubmissionSelectedItems(rawChecklist.map((ci) => ci.id));
+                            setSubmissionModal({ task: drawerTask });
+                          }}
+                          className="px-3 py-1.5 bg-[#5A81FA] hover:bg-[#426EE8] text-white text-xs font-bold rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors"
+                        >
+                          <Send className="w-3.5 h-3.5" />
+                          <span>Submit for Review</span>
+                        </button>
+                      </div>
+
+                      {/* Overall Progress Bar */}
+                      <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden border border-slate-200/50">
+                        <div
+                          className={`h-full rounded-full transition-all duration-300 ${
+                            overallPct === 100
+                              ? "bg-emerald-500"
+                              : "bg-gradient-to-r from-blue-500 to-indigo-600"
+                          }`}
+                          style={{ width: `${overallPct}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Employee Checklist Sections */}
+                    {employeeSections.length > 0 ? (
+                      <div className="space-y-3.5">
+                        {employeeSections.map((emp) => (
+                          <div
+                            key={emp.memberId}
+                            className="bg-white border border-[#E2E6F0] rounded-2xl overflow-hidden shadow-xs"
+                          >
+                            {/* Employee Header Banner */}
+                            <div className="bg-[#F8F9FD] px-4 py-3 border-b border-[#E2E6F0] flex items-center justify-between gap-3 flex-wrap">
+                              {/* Left: Avatar + FULL NAME clearly visible + Designation */}
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 border border-blue-200 font-bold text-xs flex items-center justify-center shrink-0 shadow-2xs">
+                                  {emp.initials}
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="font-bold text-slate-900 text-sm tracking-tight truncate">
+                                      {emp.fullName}
+                                    </span>
+                                    {emp.isCurrentUser && (
+                                      <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-1.5 py-0.2 rounded border border-emerald-200">
+                                        YOU
+                                      </span>
+                                    )}
+                                    {emp.employeeId && (
+                                      <span className="font-mono text-[10px] text-indigo-600 bg-indigo-50 border border-indigo-100 px-1.5 py-0.2 rounded font-medium">
+                                        {emp.employeeId}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {emp.designation && (
+                                    <p className="text-[11px] text-slate-500 truncate">{emp.designation}</p>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Right: Employee Progress Metric & Bar */}
+                              <div className="flex items-center gap-2.5 shrink-0">
+                                <div className="text-right">
+                                  <span className="text-xs font-semibold text-slate-700 block">
+                                    {emp.completedCount}/{emp.totalCount} completed
+                                  </span>
+                                  <div className="w-20 bg-slate-200 h-1.5 rounded-full overflow-hidden mt-1">
+                                    <div
+                                      className={`h-full rounded-full transition-all duration-300 ${
+                                        emp.progressPct === 100 ? "bg-emerald-500" : "bg-blue-600"
+                                      }`}
+                                      style={{ width: `${emp.progressPct}%` }}
+                                    />
+                                  </div>
+                                </div>
+
+                                {emp.progressPct === 100 && emp.totalCount > 0 ? (
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                    Done
+                                  </span>
+                                ) : (
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+                                    {emp.progressPct}%
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Employee Checklist Items */}
+                            <div className="p-3.5 space-y-2">
+                              {emp.items.length === 0 ? (
+                                <p className="text-xs text-slate-400 italic py-1 px-1">
+                                  No checklist tasks currently assigned to {emp.fullName}.
+                                </p>
+                              ) : (
+                                emp.items.map((item) => renderChecklistItem(item))
+                              )}
+                            </div>
+                          </div>
+                        ))}
+
+                        {/* Unassigned / Studio General Checklist items if any */}
+                        {unassignedItems.length > 0 && (
+                          <div className="bg-white border border-[#E2E6F0] rounded-2xl overflow-hidden shadow-xs">
+                            <div className="bg-[#F8F9FD] px-4 py-2.5 border-b border-[#E2E6F0] flex items-center justify-between">
+                              <span className="font-bold text-slate-700 text-xs uppercase tracking-wider">
+                                General / Studio Deliverable Tasks ({unassignedItems.length})
+                              </span>
+                            </div>
+                            <div className="p-3.5 space-y-2">
+                              {unassignedItems.map((item) => renderChecklistItem(item))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      /* Fallback when 0 assignees on task */
+                      <div className="bg-white border border-[#E2E6F0] rounded-2xl overflow-hidden shadow-xs p-3.5 space-y-2">
+                        {rawChecklist.length === 0 ? (
+                          <p className="text-xs text-slate-400 italic">No checklist items defined.</p>
+                        ) : (
+                          rawChecklist.map((item) => renderChecklistItem(item))
+                        )}
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
+                );
+              })()}
 
               {/* 6. SUBMISSIONS & REVIEW DECISIONS QUEUE */}
               {drawerTask.submissions && drawerTask.submissions.length > 0 && (
@@ -4431,159 +4683,6 @@ export default function TasksClientView({
                 </div>
               )}
 
-              {/* 7. CLARIFICATIONS & Q&A THREAD */}
-              <div className="space-y-3 pt-2 border-t border-[#E2E6F0]">
-                <div className="flex items-center justify-between">
-                  <h4 className="font-bold text-[#1F1F1F] text-xs uppercase tracking-wider flex items-center gap-1.5">
-                    <MessageSquare className="w-3.5 h-3.5 text-[#5A81FA]" />
-                    <span>Clarifications & Queries ({drawerTask.clarifications?.length || 0})</span>
-                  </h4>
-                </div>
-
-                {/* Question Input Form */}
-                <form onSubmit={(e) => handleAskClarification(e, drawerTask.id)} className="space-y-2 bg-[#F8F9FD] p-3 rounded-xl border border-[#E2E6F0]">
-                  <textarea
-                    rows={2}
-                    value={clarificationQuestion}
-                    onChange={(e) => setClarificationQuestion(e.target.value)}
-                    placeholder="Ask a question or request clarification regarding specifications, drawings, or requirements..."
-                    className="w-full p-2 bg-white border border-[#E2E6F0] rounded-lg text-xs text-[#1F1F1F] focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
-                  />
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <select
-                        value={clarificationUrgency}
-                        onChange={(e) => setClarificationUrgency(e.target.value as any)}
-                        className="p-1 bg-white border border-[#E2E6F0] rounded text-[11px] text-[#696E82]"
-                      >
-                        <option value="NORMAL">Standard Question</option>
-                        <option value="URGENT">Urgent Blocker Query</option>
-                      </select>
-                      {drawerTask.checklistItems.length > 0 && (
-                        <select
-                          value={clarificationItemId}
-                          onChange={(e) => setClarificationItemId(e.target.value)}
-                          className="p-1 bg-white border border-[#E2E6F0] rounded text-[11px] text-[#696E82] max-w-[140px] truncate"
-                        >
-                          <option value="">General (All)</option>
-                          {drawerTask.checklistItems.map((ci) => (
-                            <option key={ci.id} value={ci.id}>
-                              {ci.title}
-                            </option>
-                          ))}
-                        </select>
-                      )}
-                    </div>
-                    <button
-                      type="submit"
-                      disabled={submittingClarification || !clarificationQuestion.trim()}
-                      className="px-3 py-1 bg-[#5A81FA] hover:bg-[#426EE8] text-white font-bold rounded-lg text-xs disabled:opacity-50 cursor-pointer transition-colors shadow-xs flex items-center gap-1"
-                    >
-                      <Send className="w-3 h-3" />
-                      <span>Post Query</span>
-                    </button>
-                  </div>
-                </form>
-
-                {/* Clarifications List */}
-                {drawerTask.clarifications && drawerTask.clarifications.length > 0 ? (
-                  <div className="space-y-2">
-                    {drawerTask.clarifications.map((c) => (
-                      <div key={c.id} className="p-3 bg-white border border-[#E2E6F0] rounded-xl space-y-2 text-xs">
-                        <div className="flex items-center justify-between">
-                          <span className="font-bold text-[#1F1F1F]">{c.authorName}</span>
-                          <span className="text-[10px] text-[#696E82]">{new Date(c.createdAt).toLocaleDateString()}</span>
-                        </div>
-                        <p className="text-[#1F1F1F] leading-relaxed">{c.question}</p>
-
-                        {/* Answers / Replies */}
-                        {c.answers && c.answers.length > 0 && (
-                          <div className="space-y-1.5 pl-3 border-l-2 border-[#5A81FA]/30 pt-1">
-                            {c.answers.map((ans) => (
-                              <div key={ans.id} className="p-2 bg-[#F8F9FD] rounded-lg text-xs space-y-0.5">
-                                <div className="flex items-center justify-between text-[10px]">
-                                  <span className="font-bold text-[#5A81FA]">{ans.authorName}</span>
-                                  <span className="text-[#696E82]">{new Date(ans.createdAt).toLocaleDateString()}</span>
-                                </div>
-                                <p className="text-[#1F1F1F]">{ans.message}</p>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-
-                        {/* Reply Action button */}
-                        <div className="pt-1 flex justify-end">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setReplyModal({
-                                clarificationId: c.id,
-                                question: c.question,
-                                taskId: drawerTask.id,
-                              })
-                            }
-                            className="text-[#5A81FA] hover:underline text-[11px] font-semibold cursor-pointer"
-                          >
-                            Reply / Answer →
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-xs text-[#696E82] italic">No clarification questions posted yet.</p>
-                )}
-              </div>
-
-              {/* 8. COMMENTS & COLLABORATION */}
-              <div className="space-y-3 pt-2 border-t border-[#E2E6F0]">
-                <h4 className="font-bold text-[#1F1F1F] text-xs uppercase tracking-wider flex items-center gap-1.5">
-                  <MessageSquare className="w-3.5 h-3.5 text-[#5A81FA]" />
-                  <span>Discussion & Deliverable Notes</span>
-                </h4>
-
-                <form onSubmit={handleAddComment} className="flex gap-2">
-                  <input
-                    type="text"
-                    value={newCommentText}
-                    onChange={(e) => setNewCommentText(e.target.value)}
-                    placeholder="Add an architectural note, file link, or query..."
-                    className="flex-1 p-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-xs text-[#1F1F1F] focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
-                  />
-                  <button
-                    type="submit"
-                    disabled={submittingComment || !newCommentText.trim()}
-                    className="px-3 py-2 bg-[#5A81FA] hover:bg-[#426EE8] text-white text-xs font-semibold rounded-xl disabled:opacity-50 cursor-pointer flex items-center gap-1 shadow-xs"
-                  >
-                    <Send className="w-3.5 h-3.5" />
-                    <span>Send</span>
-                  </button>
-                </form>
-
-                <div className="space-y-2 pt-1 max-h-48 overflow-y-auto">
-                  {drawerTask.comments.length === 0 ? (
-                    <p className="text-xs text-[#696E82] italic">No comments posted yet.</p>
-                  ) : (
-                    drawerTask.comments.map((comment) => {
-                      const authorInfo = comment.authorId ? memberMap.get(comment.authorId) : null;
-                      return (
-                        <div key={comment.id} className="p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl">
-                          <div className="flex items-center justify-between text-[10px] text-[#696E82] mb-1">
-                            <span className="font-semibold text-[#1F1F1F]">
-                              {authorInfo?.name || "Studio Member"}{" "}
-                              {authorInfo?.empId && `[${authorInfo.empId}]`}
-                            </span>
-                            {comment.createdAt && (
-                              <span>{new Date(comment.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
-                            )}
-                          </div>
-                          <p className="text-xs text-[#696E82]">{comment.content}</p>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
 
               {/* 8B. SITE ISSUES & FIELD SNAGS REPORTING */}
               <div className="space-y-3 pt-3 border-t border-[#E2E6F0]">
@@ -5349,6 +5448,36 @@ export default function TasksClientView({
                   onChange={setSelectedPhaseId}
                   allowOther={false}
                 />
+              </div>
+
+              {/* DELIVERABLE TITLE */}
+              <div id="field-title">
+                <label className="block font-semibold text-[#1F1F1F] mb-1">
+                  Deliverable Title <span className="text-red-600">*</span>
+                </label>
+                <input
+                  id="task-title-input"
+                  type="text"
+                  required
+                  value={taskTitle}
+                  onChange={(e) => {
+                    setTaskTitle(e.target.value);
+                    if (formErrors.title) {
+                      setFormErrors((prev) => {
+                        const copy = { ...prev };
+                        delete copy.title;
+                        return copy;
+                      });
+                    }
+                  }}
+                  placeholder="e.g. Prepare 1:20 Pergola Joinery Detail & Column Junctions"
+                  className={`w-full p-2.5 bg-[#F8F9FD] border rounded-xl text-[#1F1F1F] focus:outline-none focus:ring-2 focus:ring-[#5A81FA] transition-all ${
+                    formErrors.title ? "border-red-400 bg-red-50/30" : "border-[#E2E6F0]"
+                  }`}
+                />
+                {formErrors.title && (
+                  <p className="text-[11px] text-red-600 font-medium mt-1">{formErrors.title}</p>
+                )}
               </div>
 
               {/* 3. ARCHITECTURAL BRIEF & INSTRUCTIONS (VOICE/GRAMMAR ASSISTANT OPTED-IN) */}

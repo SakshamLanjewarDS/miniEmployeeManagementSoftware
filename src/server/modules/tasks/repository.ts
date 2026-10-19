@@ -712,10 +712,22 @@ export async function createTask(ctx: TenantContext, data: CreateTaskData) {
   // 4. Server-side concise title generation if omitted
   let deliverableTitle = (data.title || "").trim();
   if (!deliverableTitle) {
+    let phaseName = "";
+    if (data.phaseId) {
+      const ph = await prisma.projectPhase.findFirst({
+        where: { id: data.phaseId, projectId: project.id, tenantId: ctx.tenantId },
+        select: { phaseName: true },
+      });
+      if (ph) phaseName = ph.phaseName;
+    }
     const taskCount = await prisma.task.count({
       where: { projectId: project.id, tenantId: ctx.tenantId },
     });
-    deliverableTitle = `${project.code} — Deliverable #${taskCount + 1}`;
+    if (phaseName) {
+      deliverableTitle = `${phaseName} Deliverable #${taskCount + 1}`;
+    } else {
+      deliverableTitle = `${project.name} Deliverable #${taskCount + 1}`;
+    }
   }
 
   // 5. Checklist items validation & Parent due date derivation
