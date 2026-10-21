@@ -244,6 +244,7 @@ export function UserProfileDropdown({ context }: UserProfileDropdownProps) {
 
             <button
               type="button"
+              suppressHydrationWarning
               onClick={handleLogout}
               className="px-3.5 py-1.5 bg-white hover:bg-red-50 text-red-700 hover:text-red-800 border border-red-200 rounded-xl text-xs font-semibold shadow-2xs transition-colors flex items-center gap-1.5 cursor-pointer"
             >

@@ -143,6 +143,28 @@ export default function RootLayout({
                       return res;
                     };
 
+                    var origElemQuerySel = Element.prototype.querySelector;
+                    if (origElemQuerySel) {
+                      Element.prototype.querySelector = function(sel) {
+                        var el = origElemQuerySel.apply(this, arguments);
+                        if (!el && isExtensionCall(sel)) {
+                          return dummyTarget;
+                        }
+                        return el;
+                      };
+                    }
+
+                    var origElemQuerySelAll = Element.prototype.querySelectorAll;
+                    if (origElemQuerySelAll) {
+                      Element.prototype.querySelectorAll = function(sel) {
+                        var res = origElemQuerySelAll.apply(this, arguments);
+                        if ((!res || res.length === 0) && isExtensionCall(sel)) {
+                          return [dummyTarget];
+                        }
+                        return res;
+                      };
+                    }
+
                     var origGetByClass = document.getElementsByClassName.bind(document);
                     document.getElementsByClassName = function(cls) {
                       var res = origGetByClass(cls);
@@ -151,6 +173,32 @@ export default function RootLayout({
                       }
                       return res;
                     };
+
+                    // Safely intercept Chrome extension JSON.parse failures (e.g. set-json-global.js)
+                    try {
+                      var origJSONParse = JSON.parse;
+                      JSON.parse = function(text, reviver) {
+                        try {
+                          return origJSONParse.apply(this, arguments);
+                        } catch (err) {
+                          if (err instanceof SyntaxError) {
+                            try {
+                              var stack = (new Error().stack || '') + ' ' + ((err && err.stack) || '');
+                              stack = stack.toLowerCase();
+                              if (
+                                stack.indexOf('set-json-global') !== -1 ||
+                                stack.indexOf('bcjindcccaagfpapjjmafapmmgkkhgoa') !== -1 ||
+                                stack.indexOf('chrome-extension') !== -1 ||
+                                stack.indexOf('json-formatter') !== -1
+                              ) {
+                                return {};
+                              }
+                            } catch(e) {}
+                          }
+                          throw err;
+                        }
+                      };
+                    } catch(e) {}
                   }
                 } catch(e) {}
 
@@ -159,17 +207,33 @@ export default function RootLayout({
                   var str = (String(msg || '') + ' ' + String(url || '') + ' ' + String(stack || '')).toLowerCase();
                   return (
                     str.indexOf('share-modal') !== -1 ||
+                    str.indexOf('share_modal') !== -1 ||
+                    str.indexOf('sharemodal') !== -1 ||
                     str.indexOf('chext') !== -1 ||
                     str.indexOf('inspector') !== -1 ||
                     str.indexOf('json formatter') !== -1 ||
                     str.indexOf('set-json-global') !== -1 ||
+                    str.indexOf('bcjindcccaagfpapjjmafapmmgkkhgoa') !== -1 ||
+                    str.indexOf('chrome-extension') !== -1 ||
+                    str.indexOf('unexpected end of json input') !== -1 ||
                     str.indexOf('fdprocessedid') !== -1 ||
                     str.indexOf('permissions policy violation') !== -1 ||
+                    str.indexOf('unload is not allowed') !== -1 ||
                     str.indexOf('beforeinstallprompt') !== -1 ||
                     str.indexOf('preloaded using link preload but not used') !== -1 ||
                     str.indexOf('preload but not used within a few seconds') !== -1 ||
                     (str.indexOf('cannot read properties of null') !== -1 && str.indexOf('addeventlistener') !== -1)
                   );
+                };
+
+                // Intercept window.onerror to prevent browser DevTools and Next dev overlay popups
+                var origOnError = window.onerror;
+                window.onerror = function(msg, url, line, col, error) {
+                  var stack = (error && error.stack) || '';
+                  if (isIgnored(msg, url, stack)) {
+                    return true;
+                  }
+                  if (origOnError) return origOnError.apply(this, arguments);
                 };
 
                 // Suppress noisy logs from external extensions in dev console

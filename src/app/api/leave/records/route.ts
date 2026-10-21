@@ -79,11 +79,15 @@ export async function POST(req: NextRequest) {
       reason: body.reason,
       isHalfDay: body.isHalfDay,
       isHourly: body.isHourly,
+      sessionType: body.sessionType,
       startMinutes: body.startMinutes,
       endMinutes: body.endMinutes,
       totalMinutes: body.totalMinutes,
       days: body.days,
       isPaidEligible: body.isPaidEligible,
+      isExemptShortNotice: body.isExemptShortNotice,
+      exemptionReason: body.exemptionReason,
+      supportingFileId: body.supportingFileId,
     });
 
     return NextResponse.json({ success: true, record: newRecord }, { status: 201 });

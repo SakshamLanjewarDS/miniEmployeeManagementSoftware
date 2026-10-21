@@ -29,6 +29,7 @@ export function AppTopbar({ context }: AppTopbarProps) {
       <div className="flex items-center gap-2 sm:gap-3 min-w-0">
         <button
           type="button"
+          suppressHydrationWarning
           onClick={handleOpenMobileSidebar}
           className="w-9 h-9 -ml-1 text-slate-600 hover:text-[#3562E8] hover:bg-slate-100 rounded-xl cursor-pointer transition-colors flex items-center justify-center shrink-0 lg:!hidden topbar-mobile-menu-btn active:scale-95"
           title="Open Navigation"
@@ -52,6 +53,7 @@ export function AppTopbar({ context }: AppTopbarProps) {
       {/* Center: Command Palette Trigger Button (Cmd+K) */}
       <button
         type="button"
+        suppressHydrationWarning
         onClick={handleOpenCommandPalette}
         className="hidden sm:flex items-center gap-2 px-3.5 py-1.5 text-xs text-slate-500 bg-slate-100/80 hover:bg-white hover:text-slate-900 border border-slate-200/80 hover:border-[#3562E8]/40 rounded-xl transition-all duration-150 cursor-pointer shadow-2xs hover:shadow-xs group press-feedback"
         title="Open Command Palette (⌘K)"

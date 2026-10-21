@@ -33,6 +33,8 @@ import {
   CalendarRange,
 } from "lucide-react";
 import { broadcastRealtimeEvent, useRealtimeSubscription } from "@/lib/realtime";
+import AdvancedLeaveFormModal from "@/components/leave/AdvancedLeaveFormModal";
+import { parseCompositeLeaveReason, formatMinutesToTime } from "@/lib/leave/form-helpers";
 
 interface LeavePreviewData {
   requestedDays: number;
@@ -76,6 +78,18 @@ export default function EmployeeMyLeavePage() {
   const [cancellationReason, setCancellationReason] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
   const [actionMessage, setActionMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [colleagues, setColleagues] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetch(`/api/employees?workspaceSlug=${workspaceSlug}&limit=100`)
+      .then((res) => res.json())
+      .then((json) => {
+        if (json.employees || json.data) {
+          setColleagues(json.employees || json.data || []);
+        }
+      })
+      .catch(() => {});
+  }, [workspaceSlug]);
 
   // Application form state
   const [formData, setFormData] = useState({
@@ -1686,390 +1700,42 @@ export default function EmployeeMyLeavePage() {
         )}
       </div>
 
-      {/* ================= MODAL: APPLY LEAVE ================= */}
-      {isApplyModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="bg-white rounded-3xl border border-[#E2E6F0] shadow-xl w-full max-w-xl overflow-hidden my-8">
-            <div className="flex items-center justify-between p-5 border-b border-[#E2E6F0]">
-              <div>
-                <h3 className="type-card-title text-[#1F1F1F]">Apply For Studio Leave</h3>
-                <p className="type-helper text-[#4B5565]">
-                  Dynamic preview with 24-hour notice validation and provisional quota split
-                </p>
-              </div>
-              <button
-                onClick={() => setIsApplyModalOpen(false)}
-                className="p-1 rounded-xl hover:bg-[#F8F9FE] text-[#696E82] cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+      {/* ================= MODAL: ADVANCED GOOGLE FORM APPLY LEAVE ================= */}
+      <AdvancedLeaveFormModal
+        isOpen={isApplyModalOpen}
+        onClose={() => setIsApplyModalOpen(false)}
+        onSuccess={(msg) => {
+          setActionMessage({
+            type: "success",
+            text: msg || "Leave application submitted successfully for studio review.",
+          });
+          fetchMyLeave();
+          broadcastRealtimeEvent("LEAVE_UPDATED");
+          broadcastRealtimeEvent("NOTIFICATION_UPDATED");
+        }}
+        workspaceSlug={workspaceSlug}
+        mode="CREATE"
+        employees={colleagues}
+      />
 
-            <form onSubmit={handleApplySubmit} className="p-5 space-y-4 text-xs">
-              {/* Mode Selection */}
-              <div>
-                <label className="block text-[11px] font-semibold text-[#696E82] uppercase mb-1">
-                  Duration Mode
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {(["FULL", "HALF", "HOURLY"] as const).map((m) => (
-                    <button
-                      key={m}
-                      type="button"
-                      onClick={() => setFormData({ ...formData, mode: m })}
-                      className={`py-2 rounded-xl border text-xs font-bold transition-colors cursor-pointer ${
-                        formData.mode === m
-                          ? "bg-[#5A81FA] text-white border-[#5A81FA]"
-                          : "bg-white text-[#1F1F1F] border-[#E2E6F0] hover:bg-[#F8F9FE]"
-                      }`}
-                    >
-                      {m === "FULL" ? "Full Day" : m === "HALF" ? "Half Day" : "Hourly"}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Leave Type */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[11px] font-semibold text-[#696E82] uppercase mb-1">
-                    Leave Type
-                  </label>
-                  <select
-                    value={formData.leaveType}
-                    onChange={(e) => setFormData({ ...formData, leaveType: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border border-[#E2E6F0] bg-white text-xs font-medium focus:outline-none focus:border-[#5A81FA]"
-                  >
-                    <option value="CASUAL">Casual Leave</option>
-                    <option value="SICK">Sick Leave (Exempt Notice)</option>
-                    <option value="ANNUAL">Annual Leave</option>
-                    <option value="MATERNITY">Maternity / Paternity</option>
-                    <option value="LOSS_OF_PAY">Loss of Pay (Unpaid)</option>
-                  </select>
-                </div>
-
-                {formData.mode === "HALF" && (
-                  <div>
-                    <label className="block text-[11px] font-semibold text-[#696E82] uppercase mb-1">
-                      Half-Day Session
-                    </label>
-                    <select
-                      value={formData.sessionType}
-                      onChange={(e) => setFormData({ ...formData, sessionType: e.target.value as any })}
-                      className="w-full px-3 py-2 rounded-xl border border-[#E2E6F0] bg-white text-xs font-medium focus:outline-none focus:border-[#5A81FA]"
-                    >
-                      <option value="FIRST_HALF">First Half (10:30–14:30)</option>
-                      <option value="SECOND_HALF">Second Half (14:30–18:30)</option>
-                    </select>
-                  </div>
-                )}
-              </div>
-
-              {/* Date Pickers */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[11px] font-semibold text-[#696E82] uppercase mb-1">
-                    Start Date
-                  </label>
-                  <input
-                    type="date"
-                    value={formData.startDate}
-                    onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border border-[#E2E6F0] bg-white text-xs focus:outline-none focus:border-[#5A81FA]"
-                    required
-                  />
-                </div>
-
-                {formData.mode === "FULL" && (
-                  <div>
-                    <label className="block text-[11px] font-semibold text-[#696E82] uppercase mb-1">
-                      End Date
-                    </label>
-                    <input
-                      type="date"
-                      value={formData.endDate}
-                      onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                      className="w-full px-3 py-2 rounded-xl border border-[#E2E6F0] bg-white text-xs focus:outline-none focus:border-[#5A81FA]"
-                      required
-                    />
-                  </div>
-                )}
-              </div>
-
-              {/* Hourly Mode Controls */}
-              {formData.mode === "HOURLY" && (
-                <div className="grid grid-cols-2 gap-3 p-3 bg-[#F8F9FE] rounded-2xl border border-[#CEDEFF]">
-                  <div>
-                    <label className="block text-[11px] font-semibold text-[#696E82] mb-1">
-                      Duration in Minutes
-                    </label>
-                    <input
-                      type="number"
-                      step="15"
-                      min="15"
-                      max="480"
-                      value={formData.totalMinutes}
-                      onChange={(e) => {
-                        const mins = parseInt(e.target.value, 10) || 60;
-                        setFormData({
-                          ...formData,
-                          totalMinutes: mins,
-                          endMinutes: formData.startMinutes + mins,
-                        });
-                      }}
-                      className="w-full px-3 py-1.5 rounded-xl border border-[#E2E6F0] bg-white text-xs"
-                    />
-                  </div>
-                  <div>
-                    <span className="block text-[11px] font-semibold text-[#696E82] mb-1">
-                      Equivalent Days
-                    </span>
-                    <span className="inline-block py-1.5 font-bold font-mono text-[#2C308D]">
-                      {(formData.totalMinutes / 480).toFixed(3)} Day(s) (8-hr day)
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              {/* Exemption Checkbox for Short Notice */}
-              <div className="p-3 bg-[#F8F9FD] rounded-2xl border border-[#E2E6F0] space-y-2">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.isExemptShortNotice}
-                    onChange={(e) => setFormData({ ...formData, isExemptShortNotice: e.target.checked })}
-                    className="rounded text-[#5A81FA] focus:ring-[#5A81FA]"
-                  />
-                  <span className="text-[11px] font-semibold text-[#1F1F1F]">
-                    Emergency / Unforeseen Exemption from 24h Notice Requirement
-                  </span>
-                </label>
-                {formData.isExemptShortNotice && (
-                  <input
-                    type="text"
-                    placeholder="Provide exemption justification (e.g., sudden illness, hospital visit)..."
-                    value={formData.exemptionReason}
-                    onChange={(e) => setFormData({ ...formData, exemptionReason: e.target.value })}
-                    className="w-full px-3 py-1.5 rounded-xl border border-[#E2E6F0] bg-white text-xs"
-                  />
-                )}
-              </div>
-
-              {/* Reason */}
-              <div>
-                <label className="block text-[11px] font-semibold text-[#696E82] uppercase mb-1">
-                  Reason for Absence
-                </label>
-                <textarea
-                  rows={2}
-                  value={formData.reason}
-                  onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
-                  placeholder="State your reason for requesting leave..."
-                  className="w-full px-3 py-2 rounded-xl border border-[#E2E6F0] bg-white text-xs focus:outline-none focus:border-[#5A81FA]"
-                  required
-                />
-              </div>
-
-              {/* DYNAMIC REAL-TIME PREVIEW PANEL */}
-              {preview && (
-                <div className="p-3.5 bg-[#F2F4FF] rounded-2xl border border-[#CEDEFF] space-y-2 text-xs">
-                  <div className="flex items-center justify-between font-bold text-[#2C308D]">
-                    <span className="flex items-center gap-1.5">
-                      <Info className="w-3.5 h-3.5 text-[#5A81FA]" />
-                      <span>Provisional Calculation Preview</span>
-                    </span>
-                    <span className="text-[10px] font-normal italic text-[#696E82]">
-                      Subject to leadership approval
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 text-[11px]">
-                    <div>
-                      <span className="text-[#696E82]">Duration: </span>
-                      <strong className="text-[#1F1F1F] font-mono">
-                        {preview.requestedDays.toFixed(2)} Day(s)
-                      </strong>
-                    </div>
-                    <div>
-                      <span className="text-[#696E82]">Schedule: </span>
-                      <strong className="text-[#1F1F1F] font-mono">10:30–18:30 IST</strong>
-                    </div>
-                    <div>
-                      <span className="text-[#696E82]">Provisional Paid: </span>
-                      <strong className="text-emerald-700 font-mono">
-                        {preview.estimatedPaidDays.toFixed(2)} Day(s)
-                      </strong>
-                    </div>
-                    <div>
-                      <span className="text-[#696E82]">Provisional LOP: </span>
-                      <strong className="text-rose-700 font-mono">
-                        {preview.estimatedUnpaidLopDays.toFixed(2)} Day(s)
-                      </strong>
-                    </div>
-                  </div>
-
-                  {/* Notice policy status */}
-                  {preview.willAutoReject ? (
-                    <div className="p-2 bg-rose-100 text-rose-800 rounded-xl text-[11px] font-semibold flex items-center gap-1.5">
-                      <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-                      <span>Notice alert: {preview.rejectionReason}</span>
-                    </div>
-                  ) : preview.isShortNotice && preview.isExempt ? (
-                    <div className="p-2 bg-amber-100 text-amber-800 rounded-xl text-[11px] font-semibold flex items-center gap-1.5">
-                      <Info className="w-3.5 h-3.5 shrink-0" />
-                      <span>Short-notice exemption applied (requires leadership review).</span>
-                    </div>
-                  ) : (
-                    <div className="text-[11px] text-emerald-700 font-semibold flex items-center gap-1">
-                      <Check className="w-3 h-3" />
-                      <span>Notice policy: Compliant (&ge;24h notice).</span>
-                    </div>
-                  )}
-
-                  {/* Overlap warnings */}
-                  {preview.overlapWarnings?.length > 0 && (
-                    <div className="p-2 bg-amber-50 text-amber-800 rounded-xl text-[11px]">
-                      {preview.overlapWarnings.join(" ")}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Submit Buttons */}
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#E2E6F0]">
-                <button
-                  type="button"
-                  onClick={() => setIsApplyModalOpen(false)}
-                  className="px-4 py-2 rounded-xl border border-[#E2E6F0] text-[#696E82] hover:bg-[#F8F9FE] font-semibold cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={actionLoading}
-                  className="px-5 py-2 rounded-xl bg-[#5A81FA] text-white font-bold hover:bg-[#4870EB] transition-colors disabled:opacity-50 cursor-pointer"
-                >
-                  {actionLoading ? "Submitting..." : "Submit Application"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ================= MODAL: EDIT PENDING LEAVE ================= */}
-      {isEditModalOpen && selectedRecord && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="bg-white rounded-3xl border border-[#E2E6F0] shadow-xl w-full max-w-xl overflow-hidden my-8">
-            <div className="flex items-center justify-between p-5 border-b border-[#E2E6F0]">
-              <div>
-                <h3 className="type-card-title text-[#1F1F1F]">Edit Pending Application</h3>
-                <p className="type-helper text-[#4B5565]">
-                  Modifying a pending request revalidates policy and increments request version
-                </p>
-              </div>
-              <button
-                onClick={() => setIsEditModalOpen(false)}
-                className="p-1 rounded-xl hover:bg-[#F8F9FE] text-[#696E82] cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleEditSubmit} className="p-5 space-y-4 text-xs">
-              {/* Leave Type */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[11px] font-semibold text-[#696E82] uppercase mb-1">
-                    Leave Type
-                  </label>
-                  <select
-                    value={formData.leaveType}
-                    onChange={(e) => setFormData({ ...formData, leaveType: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border border-[#E2E6F0] bg-white text-xs font-medium focus:outline-none focus:border-[#5A81FA]"
-                  >
-                    <option value="CASUAL">Casual Leave</option>
-                    <option value="SICK">Sick Leave</option>
-                    <option value="ANNUAL">Annual Leave</option>
-                    <option value="MATERNITY">Maternity / Paternity</option>
-                    <option value="LOSS_OF_PAY">Loss of Pay (Unpaid)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-semibold text-[#696E82] uppercase mb-1">
-                    Start Date
-                  </label>
-                  <input
-                    type="date"
-                    value={formData.startDate}
-                    onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border border-[#E2E6F0] bg-white text-xs focus:outline-none focus:border-[#5A81FA]"
-                    required
-                  />
-                </div>
-              </div>
-
-              {formData.mode === "FULL" && (
-                <div>
-                  <label className="block text-[11px] font-semibold text-[#696E82] uppercase mb-1">
-                    End Date
-                  </label>
-                  <input
-                    type="date"
-                    value={formData.endDate}
-                    onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border border-[#E2E6F0] bg-white text-xs focus:outline-none focus:border-[#5A81FA]"
-                    required
-                  />
-                </div>
-              )}
-
-              {/* Reason */}
-              <div>
-                <label className="block text-[11px] font-semibold text-[#696E82] uppercase mb-1">
-                  Reason for Absence
-                </label>
-                <textarea
-                  rows={2}
-                  value={formData.reason}
-                  onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl border border-[#E2E6F0] bg-white text-xs focus:outline-none focus:border-[#5A81FA]"
-                  required
-                />
-              </div>
-
-              {/* Dynamic Preview */}
-              {preview && (
-                <div className="p-3 bg-[#F2F4FF] rounded-2xl border border-[#CEDEFF] text-[11px] space-y-1 text-[#2C308D]">
-                  <span className="font-bold">Updated Provisional Split: </span>
-                  <span>{preview.requestedDays.toFixed(2)} Day(s)</span> •{" "}
-                  <span>{preview.estimatedPaidDays.toFixed(2)} Paid</span> •{" "}
-                  <span>{preview.estimatedUnpaidLopDays.toFixed(2)} Unpaid LOP</span>
-                </div>
-              )}
-
-              {/* Submit Buttons */}
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#E2E6F0]">
-                <button
-                  type="button"
-                  onClick={() => setIsEditModalOpen(false)}
-                  className="px-4 py-2 rounded-xl border border-[#E2E6F0] text-[#696E82] hover:bg-[#F8F9FE] font-semibold cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={actionLoading}
-                  className="px-5 py-2 rounded-xl bg-[#5A81FA] text-white font-bold hover:bg-[#4870EB] transition-colors disabled:opacity-50 cursor-pointer"
-                >
-                  {actionLoading ? "Saving..." : "Save Changes"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* ================= MODAL: ADVANCED GOOGLE FORM EDIT PENDING LEAVE ================= */}
+      <AdvancedLeaveFormModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        onSuccess={(msg) => {
+          setActionMessage({
+            type: "success",
+            text: msg || "Pending leave application updated successfully.",
+          });
+          fetchMyLeave();
+          broadcastRealtimeEvent("LEAVE_UPDATED");
+          broadcastRealtimeEvent("NOTIFICATION_UPDATED");
+        }}
+        workspaceSlug={workspaceSlug}
+        mode="EDIT"
+        initialRecord={selectedRecord}
+        employees={colleagues}
+      />
 
       {/* ================= MODAL: REQUEST CANCELLATION ================= */}
       {isCancelModalOpen && selectedRecord && (
@@ -2161,32 +1827,78 @@ export default function EmployeeMyLeavePage() {
               </div>
 
               <div className="space-y-2 text-[#1F1F1F]">
-                <div>
-                  <span className="text-[#696E82] block text-[11px]">Dates</span>
-                  <span className="font-bold font-mono">
-                    {formatLocalDate(selectedRecord.startDate)}
-                    {formatLocalDate(selectedRecord.startDate) !== formatLocalDate(selectedRecord.endDate) ? ` — ${formatLocalDate(selectedRecord.endDate)}` : ""}
-                  </span>
-                </div>
+                {(() => {
+                  const meta = parseCompositeLeaveReason(selectedRecord.reason);
+                  return (
+                    <>
+                      <div>
+                        <span className="text-[#696E82] block text-[11px]">Dates</span>
+                        <span className="font-bold font-mono">
+                          {formatLocalDate(selectedRecord.startDate)}
+                          {formatLocalDate(selectedRecord.startDate) !== formatLocalDate(selectedRecord.endDate) ? ` — ${formatLocalDate(selectedRecord.endDate)}` : ""}
+                        </span>
+                      </div>
 
-                <div>
-                  <span className="text-[#696E82] block text-[11px]">Type & Duration</span>
-                  <span className="font-semibold">
-                    {selectedRecord.leaveType} • {Number(selectedRecord.days)} Day(s)
-                  </span>
-                </div>
+                      <div>
+                        <span className="text-[#696E82] block text-[11px]">Type & Duration</span>
+                        <span className="font-semibold text-[#1F1F1F]">
+                          {selectedRecord.isHourly
+                            ? `Few Hours Permission (${formatMinutesToTime(selectedRecord.startMinutes || 630)} – ${formatMinutesToTime(selectedRecord.endMinutes || 690)}, ${selectedRecord.totalMinutes || 60}m) • ${Number(selectedRecord.days)} Day(s)`
+                            : selectedRecord.isHalfDay
+                            ? `Half Day (${selectedRecord.sessionType === "SECOND_HALF" ? "Afternoon 14:30–18:30" : "Morning 10:30–14:30"}) • 0.5 Day`
+                            : `${selectedRecord.leaveType} • ${Number(selectedRecord.days)} Day(s)`}
+                        </span>
+                      </div>
 
-                <div>
-                  <span className="text-[#696E82] block text-[11px]">Reason</span>
-                  <p className="italic text-[#696E82] mt-0.5">&ldquo;{selectedRecord.reason || "None"}&rdquo;</p>
-                </div>
+                      <div>
+                        <span className="text-[#696E82] block text-[11px]">Primary Reason</span>
+                        <p className="italic text-[#1F1F1F] mt-0.5">&ldquo;{meta.reason || selectedRecord.reason || "None stated"}&rdquo;</p>
+                      </div>
 
-                {selectedRecord.rejectionReason && (
-                  <div className="p-3 bg-rose-50 border border-rose-200 rounded-2xl text-rose-800">
-                    <span className="font-bold block text-[11px]">Rejection Reason</span>
-                    <span>{selectedRecord.rejectionReason}</span>
-                  </div>
-                )}
+                      {meta.coveringColleague && (
+                        <div className="p-2.5 bg-[#F8F9FE] border border-[#CEDEFF] rounded-xl">
+                          <span className="text-[#696E82] block text-[10px] uppercase font-bold">Covering Colleague (Handover)</span>
+                          <span className="font-semibold text-[#1456F0]">{meta.coveringColleague}</span>
+                          {meta.handoverNotes && (
+                            <p className="text-[11px] text-[#4B5565] mt-0.5">{meta.handoverNotes}</p>
+                          )}
+                        </div>
+                      )}
+
+                      {meta.emergencyContact && (
+                        <div className="p-2.5 bg-[#F8F9FE] border border-[#CEDEFF] rounded-xl flex items-center justify-between">
+                          <span className="text-[#696E82] text-[11px]">Emergency Contact:</span>
+                          <span className="font-bold font-mono text-[#1F1F1F]">{meta.emergencyContact}</span>
+                        </div>
+                      )}
+
+                      {(meta.supportingDocUrl || meta.supportingDocName || selectedRecord.supportingFileId) && (
+                        <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between">
+                          <span className="text-emerald-900 text-[11px] font-semibold">
+                            Attachment: {meta.supportingDocName || "Document Attached"}
+                          </span>
+                          {meta.supportingDocUrl && (
+                            <a
+                              href={meta.supportingDocUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[#1456F0] font-bold underline text-[11px]"
+                            >
+                              View Link ↗
+                            </a>
+                          )}
+                        </div>
+                      )}
+
+                      {selectedRecord.rejectionReason && (
+                        <div className="p-3 bg-rose-50 border border-rose-200 rounded-2xl text-rose-800">
+                          <span className="font-bold block text-[11px]">Rejection Reason</span>
+                          <span>{selectedRecord.rejectionReason}</span>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
             </div>
 

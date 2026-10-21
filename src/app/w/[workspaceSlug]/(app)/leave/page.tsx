@@ -38,6 +38,8 @@ import {
   BarChart3,
 } from "lucide-react";
 import { broadcastRealtimeEvent, useRealtimeSubscription } from "@/lib/realtime";
+import AdvancedLeaveFormModal from "@/components/leave/AdvancedLeaveFormModal";
+import { parseCompositeLeaveReason, formatMinutesToTime } from "@/lib/leave/form-helpers";
 
 export default function LeaveManagementPage() {
   const params = useParams();
@@ -47,6 +49,11 @@ export default function LeaveManagementPage() {
   const [records, setRecords] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Filters
   const [statusFilter, setStatusFilter] = useState<string>("");
@@ -130,17 +137,21 @@ export default function LeaveManagementPage() {
   const formatDuration = (rec: any) => {
     if (!rec) return "";
     if (rec.isHourly) {
+      const times = rec.startMinutes
+        ? ` (${formatMinutesToTime(rec.startMinutes)} – ${formatMinutesToTime(rec.endMinutes || rec.startMinutes + (rec.totalMinutes || 60))})`
+        : "";
       if (rec.totalMinutes) {
         if (rec.totalMinutes >= 60) {
-          return `${(rec.totalMinutes / 60).toFixed(1).replace(/\.0$/, "")} hours`;
+          return `${(rec.totalMinutes / 60).toFixed(1).replace(/\.0$/, "")} hrs${times}`;
         }
-        return `${rec.totalMinutes} min`;
+        return `${rec.totalMinutes} min${times}`;
       }
       const hrs = Number(rec.days || 0) * 8;
-      return `${hrs.toFixed(1).replace(/\.0$/, "")} hours`;
+      return `${hrs.toFixed(1).replace(/\.0$/, "")} hrs${times}`;
     }
     if (rec.isHalfDay) {
-      return "0.5 day";
+      const session = rec.sessionType === "SECOND_HALF" ? " (Afternoon)" : " (Morning)";
+      return `0.5 day${session}`;
     }
     const daysNum = Number(rec.days);
     return `${daysNum} ${daysNum === 1 ? "day" : "days"}`;
@@ -646,7 +657,7 @@ export default function LeaveManagementPage() {
   };
 
   return (
-    <div className="space-y-5 pb-24 md:pb-12 text-[#1F1F1F]">
+    <div className="space-y-5 pb-24 md:pb-12 text-[#1F1F1F]" suppressHydrationWarning>
       {/* Top Breadcrumb */}
       <div className="flex items-center gap-2 text-xs font-medium text-[#696E82]">
         <span>People &amp; HR</span>
@@ -662,18 +673,18 @@ export default function LeaveManagementPage() {
               Staff leave
             </h1>
           </div>
-          <div className="flex flex-wrap items-center gap-3 text-xs text-[#696E82] mt-1">
+          <div className="flex flex-wrap items-center gap-3 text-xs text-[#696E82] mt-1" suppressHydrationWarning>
             <span>Review requests and plan team availability.</span>
             <span className="hidden sm:inline">•</span>
             {/* Live Sheets Indicator Strip matching Reference */}
-            <div className="inline-flex items-center gap-2">
+            <div className="inline-flex items-center gap-2" suppressHydrationWarning>
               <span className="flex items-center gap-1.5 font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                 <span>Sheets connected</span>
               </span>
-              <span>
+              <span suppressHydrationWarning>
                 Last synced:{" "}
-                {syncStatus?.lastAttemptAt
+                {mounted && syncStatus?.lastAttemptAt
                   ? new Date(syncStatus.lastAttemptAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
                   : "11:20 AM"}
               </span>
@@ -681,7 +692,8 @@ export default function LeaveManagementPage() {
                 type="button"
                 onClick={handleManualSync}
                 disabled={syncLoading}
-                className="text-[#1456F0] font-semibold hover:underline flex items-center gap-1"
+                suppressHydrationWarning
+                className="text-[#1456F0] font-semibold hover:underline flex items-center gap-1 cursor-pointer"
               >
                 <span>Sync now</span>
                 {syncLoading && <RefreshCw className="w-3 h-3 animate-spin" />}
@@ -689,7 +701,8 @@ export default function LeaveManagementPage() {
               <button
                 type="button"
                 onClick={() => setIsAppsScriptModalOpen(true)}
-                className="p-1 rounded-lg text-[#696E82] hover:text-[#1F1F1F] hover:bg-[#F8F9FE]"
+                suppressHydrationWarning
+                className="p-1 rounded-lg text-[#696E82] hover:text-[#1F1F1F] hover:bg-[#F8F9FE] cursor-pointer"
                 title="Sheets settings"
               >
                 <Settings className="w-3.5 h-3.5" />
@@ -710,6 +723,7 @@ export default function LeaveManagementPage() {
 
           <button
             type="button"
+            suppressHydrationWarning
             onClick={() => setIsCreateOpen(true)}
             className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl bg-[#1456F0] hover:bg-[#0F47D1] text-white shadow-xs transition-all"
           >
@@ -881,6 +895,7 @@ export default function LeaveManagementPage() {
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
           <button
             type="button"
+            suppressHydrationWarning
             onClick={() => {
               setStatusFilter("");
               setPage(1);
@@ -896,6 +911,7 @@ export default function LeaveManagementPage() {
 
           <button
             type="button"
+            suppressHydrationWarning
             onClick={() => {
               setStatusFilter("PENDING");
               setPage(1);
@@ -911,6 +927,7 @@ export default function LeaveManagementPage() {
 
           <button
             type="button"
+            suppressHydrationWarning
             onClick={() => {
               setStatusFilter("APPROVED");
               setPage(1);
@@ -926,6 +943,7 @@ export default function LeaveManagementPage() {
 
           <button
             type="button"
+            suppressHydrationWarning
             onClick={() => {
               setStatusFilter("REJECTED");
               setPage(1);
@@ -949,6 +967,7 @@ export default function LeaveManagementPage() {
             <Search className="w-4 h-4 text-[#696E82] absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
+              suppressHydrationWarning
               placeholder="Search by name or employee ID..."
               value={searchQuery}
               onChange={(e) => {
@@ -961,6 +980,7 @@ export default function LeaveManagementPage() {
 
           {/* Employee / Staff Filter Dropdown */}
           <select
+            suppressHydrationWarning
             value={employeeFilter}
             onChange={(e) => {
               setEmployeeFilter(e.target.value);
@@ -983,6 +1003,7 @@ export default function LeaveManagementPage() {
 
           {/* Leave Type Dropdown */}
           <select
+            suppressHydrationWarning
             value={leaveTypeFilter}
             onChange={(e) => {
               setLeaveTypeFilter(e.target.value);
@@ -1000,6 +1021,7 @@ export default function LeaveManagementPage() {
           {/* Date Selector */}
           <div className="relative">
             <select
+              suppressHydrationWarning
               value={dateFilter}
               onChange={(e) => {
                 setDateFilter(e.target.value);
@@ -1019,6 +1041,7 @@ export default function LeaveManagementPage() {
 
           {/* Sort Selector */}
           <select
+            suppressHydrationWarning
             value={sortOrder}
             onChange={(e) => {
               setSortOrder(e.target.value);
@@ -1037,6 +1060,7 @@ export default function LeaveManagementPage() {
           {(statusFilter || leaveTypeFilter || employeeFilter !== "ALL" || dateFilter !== "ALL" || searchQuery || sortOrder !== "RECENT") && (
             <button
               type="button"
+              suppressHydrationWarning
               onClick={() => {
                 setStatusFilter("");
                 setLeaveTypeFilter("");
@@ -1057,6 +1081,8 @@ export default function LeaveManagementPage() {
         {/* View Toggle */}
         <div className="hidden sm:flex items-center bg-[#F4F6FB] p-0.5 rounded-xl border border-[#E2E6F0]">
           <button
+            type="button"
+            suppressHydrationWarning
             onClick={() => setViewMode("table")}
             className={`p-1.5 rounded-lg transition-colors ${
               viewMode === "table" ? "bg-white text-[#1456F0] shadow-2xs" : "text-[#696E82] hover:text-[#1F1F1F]"
@@ -1066,6 +1092,8 @@ export default function LeaveManagementPage() {
             <FileText className="w-3.5 h-3.5" />
           </button>
           <button
+            type="button"
+            suppressHydrationWarning
             onClick={() => setViewMode("grid")}
             className={`p-1.5 rounded-lg transition-colors ${
               viewMode === "grid" ? "bg-white text-[#1456F0] shadow-2xs" : "text-[#696E82] hover:text-[#1F1F1F]"
@@ -1610,16 +1638,58 @@ export default function LeaveManagementPage() {
               </div>
             </div>
 
-            {/* Reason Card matching Reference */}
-            <div className="p-3.5 bg-[#F8F9FE] border border-[#E2E6F0] rounded-2xl space-y-1 text-xs">
-              <div className="font-semibold text-[#1F1F1F] flex items-center gap-1.5">
-                <FileText className="w-3.5 h-3.5 text-[#696E82]" />
-                <span>Reason</span>
-              </div>
-              <p className="text-[#696E82] pl-5 italic">
-                {selectedLeave.reason ? `"${selectedLeave.reason}"` : "Going out of station / Personal commitment"}
-              </p>
-            </div>
+            {/* Reason Card with Parsed Google Form Fields */}
+            {(() => {
+              const meta = parseCompositeLeaveReason(selectedLeave.reason);
+              return (
+                <div className="p-3.5 bg-[#F8F9FE] border border-[#E2E6F0] rounded-2xl space-y-2 text-xs">
+                  <div className="font-semibold text-[#1F1F1F] flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5 text-[#696E82]" />
+                    <span>Reason for Absence</span>
+                  </div>
+                  <p className="text-[#1F1F1F] pl-5 italic">
+                    &ldquo;{meta.reason || selectedLeave.reason || "Going out of station / Personal commitment"}&rdquo;
+                  </p>
+
+                  {meta.coveringColleague && (
+                    <div className="pl-5 pt-1.5 border-t border-[#E2E6F0] space-y-0.5">
+                      <span className="text-[10px] uppercase font-bold text-[#696E82] block">
+                        Covering Colleague (Delegated Responsibilities)
+                      </span>
+                      <span className="font-semibold text-[#1456F0]">{meta.coveringColleague}</span>
+                      {meta.handoverNotes && (
+                        <p className="text-[11px] text-[#4B5565] mt-0.5">{meta.handoverNotes}</p>
+                      )}
+                    </div>
+                  )}
+
+                  {meta.emergencyContact && (
+                    <div className="pl-5 pt-1.5 border-t border-[#E2E6F0] flex items-center justify-between">
+                      <span className="text-[10px] uppercase font-bold text-[#696E82]">Emergency Reachable Phone:</span>
+                      <span className="font-mono font-bold text-[#1F1F1F]">{meta.emergencyContact}</span>
+                    </div>
+                  )}
+
+                  {(meta.supportingDocUrl || meta.supportingDocName || selectedLeave.supportingFileId) && (
+                    <div className="pl-5 pt-1.5 border-t border-[#E2E6F0] flex items-center justify-between">
+                      <span className="text-emerald-800 font-semibold text-[11px]">
+                        Attachment: {meta.supportingDocName || "Document Attached"}
+                      </span>
+                      {meta.supportingDocUrl && (
+                        <a
+                          href={meta.supportingDocUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[#1456F0] font-bold underline text-[11px]"
+                        >
+                          View Link ↗
+                        </a>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Allowance & Allocation Card with Real Employee Stats */}
             <div className="p-4 bg-white border border-[#E2E6F0] rounded-2xl space-y-2.5 text-xs">
@@ -1773,120 +1843,20 @@ export default function LeaveManagementPage() {
         </div>
       )}
 
-      {/* Apply on Behalf Modal */}
-      {isCreateOpen && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-[#E2E6F0] space-y-4 animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between border-b border-[#F0F2F7] pb-3">
-              <h3 className="type-card-title text-[#1F1F1F]">Apply Leave on Behalf</h3>
-              <button
-                type="button"
-                onClick={() => setIsCreateOpen(false)}
-                className="w-8 h-8 rounded-lg flex items-center justify-center text-[#696E82] hover:text-[#1F1F1F] hover:bg-[#F8F9FE]"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateOnBehalf} className="space-y-4 text-xs">
-              <div>
-                <label className="font-semibold text-[#1F1F1F] block mb-1">Select Employee</label>
-                <select
-                  required
-                  value={createForm.employeeId}
-                  onChange={(e) => setCreateForm({ ...createForm, employeeId: e.target.value })}
-                  className="w-full p-2.5 bg-[#F8F9FE] border border-[#E2E6F0] rounded-xl text-xs font-medium"
-                >
-                  <option value="">Select an employee...</option>
-                  {employees.map((emp) => (
-                    <option key={emp.id} value={emp.id}>
-                      {emp.fullName || emp.name} ({emp.employeeId || "EMP"})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="font-semibold text-[#1F1F1F] block mb-1">Start Date</label>
-                  <input
-                    type="date"
-                    required
-                    value={createForm.startDate}
-                    onChange={(e) => setCreateForm({ ...createForm, startDate: e.target.value })}
-                    className="w-full p-2 bg-[#F8F9FE] border border-[#E2E6F0] rounded-xl text-xs"
-                  />
-                </div>
-                <div>
-                  <label className="font-semibold text-[#1F1F1F] block mb-1">End Date</label>
-                  <input
-                    type="date"
-                    value={createForm.endDate}
-                    onChange={(e) => setCreateForm({ ...createForm, endDate: e.target.value })}
-                    className="w-full p-2 bg-[#F8F9FE] border border-[#E2E6F0] rounded-xl text-xs"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="font-semibold text-[#1F1F1F] block mb-1">Leave Type</label>
-                  <select
-                    value={createForm.leaveType}
-                    onChange={(e) => setCreateForm({ ...createForm, leaveType: e.target.value })}
-                    className="w-full p-2.5 bg-[#F8F9FE] border border-[#E2E6F0] rounded-xl text-xs"
-                  >
-                    <option value="CASUAL">Casual Leave</option>
-                    <option value="SICK">Sick / Medical</option>
-                    <option value="ANNUAL">Annual Leave</option>
-                    <option value="LOSS_OF_PAY">Loss of Pay (LOP)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="font-semibold text-[#1F1F1F] block mb-1">Duration (Days)</label>
-                  <input
-                    type="number"
-                    step="0.5"
-                    min="0.5"
-                    value={createForm.days}
-                    onChange={(e) => setCreateForm({ ...createForm, days: parseFloat(e.target.value) || 1 })}
-                    className="w-full p-2 bg-[#F8F9FE] border border-[#E2E6F0] rounded-xl text-xs"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="font-semibold text-[#1F1F1F] block mb-1">Reason</label>
-                <textarea
-                  rows={2}
-                  value={createForm.reason}
-                  onChange={(e) => setCreateForm({ ...createForm, reason: e.target.value })}
-                  placeholder="Justification for absence..."
-                  className="w-full p-2.5 bg-[#F8F9FE] border border-[#E2E6F0] rounded-xl text-xs resize-none"
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2 border-t border-[#F0F2F7]">
-                <button
-                  type="button"
-                  onClick={() => setIsCreateOpen(false)}
-                  className="px-4 py-2 border border-[#E2E6F0] rounded-xl font-semibold text-[#696E82] hover:bg-[#F8F9FE]"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={actionLoading}
-                  className="px-4 py-2 bg-[#1456F0] hover:bg-[#0F47D1] text-white rounded-xl font-bold disabled:opacity-50"
-                >
-                  {actionLoading ? "Submitting..." : "Submit Application"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* ================= MODAL: ADVANCED GOOGLE FORM APPLY ON BEHALF ================= */}
+      <AdvancedLeaveFormModal
+        isOpen={isCreateOpen}
+        onClose={() => setIsCreateOpen(false)}
+        onSuccess={(msg) => {
+          setActionSuccess(msg || "Leave application submitted on behalf of staff member!");
+          fetchLeaves();
+          broadcastRealtimeEvent("LEAVE_UPDATED");
+          broadcastRealtimeEvent("NOTIFICATION_UPDATED");
+        }}
+        workspaceSlug={workspaceSlug}
+        mode="ADMIN_CREATE"
+        employees={employees}
+      />
 
       {/* Google Apps Script Modal */}
       {isAppsScriptModalOpen && (

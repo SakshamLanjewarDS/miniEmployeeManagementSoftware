@@ -553,6 +553,7 @@ export function AppSidebar({ context }: AppSidebarProps) {
   if (isCollapsed) {
     return (
       <aside
+        suppressHydrationWarning
         className="w-[78px] shrink-0 h-screen sticky top-0 z-30 p-2.5 hidden lg:flex flex-col"
         aria-label="Studio Navigation (Rail)"
       >
@@ -561,6 +562,7 @@ export function AppSidebar({ context }: AppSidebarProps) {
           <div className="flex flex-col items-center gap-3 shrink-0">
             <button
               type="button"
+              suppressHydrationWarning
               onClick={toggleCollapse}
               title="Expand Sidebar"
               aria-label="Expand Sidebar"
@@ -630,6 +632,7 @@ export function AppSidebar({ context }: AppSidebarProps) {
                 <div key={group.id} className="relative group flex justify-center">
                   <button
                     type="button"
+                    suppressHydrationWarning
                     ref={(el) => {
                       groupButtonRefs.current[group.id] = el;
                     }}
@@ -696,6 +699,7 @@ export function AppSidebar({ context }: AppSidebarProps) {
             <div className="relative flex justify-center" ref={userMenuRef}>
               <button
                 type="button"
+                suppressHydrationWarning
                 onClick={() => setUserMenuOpen((prev) => !prev)}
                 title={`${context.userFullName} (${context.role})`}
                 aria-label="User Account Menu"
@@ -754,6 +758,7 @@ export function AppSidebar({ context }: AppSidebarProps) {
 
                   <button
                     type="button"
+                    suppressHydrationWarning
                     onClick={handleLogout}
                     role="menuitem"
                     className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
@@ -768,6 +773,7 @@ export function AppSidebar({ context }: AppSidebarProps) {
             {/* Quick Sign Out button in compact rail */}
             <button
               type="button"
+              suppressHydrationWarning
               onClick={handleLogout}
               title="Sign Out"
               aria-label="Sign Out"
@@ -791,6 +797,7 @@ export function AppSidebar({ context }: AppSidebarProps) {
               <span>{activeCompactGroup.title}</span>
               <button
                 type="button"
+                suppressHydrationWarning
                 onClick={() => {
                   const groupId = compactFlyoutGroup;
                   setCompactFlyoutGroup(null);
@@ -852,9 +859,9 @@ export function AppSidebar({ context }: AppSidebarProps) {
   // EXPANDED DESKTOP SIDEBAR & MOBILE DRAWER (Standard Layout)
   // =============================================================
   const sidebarContent = (
-    <div className="h-full bg-white rounded-3xl border border-slate-200/80 shadow-xs flex flex-col justify-between overflow-hidden">
+    <div className="h-full bg-white rounded-3xl border border-slate-200/80 shadow-xs flex flex-col justify-between overflow-hidden" suppressHydrationWarning>
       {/* 1. BRAND HEADER (Fixed Top) */}
-      <div className="p-4 border-b border-slate-100 flex items-center justify-between gap-3 shrink-0">
+      <div className="p-4 border-b border-slate-100 flex items-center justify-between gap-3 shrink-0" suppressHydrationWarning>
         <div className="flex items-center gap-3 min-w-0">
           <div className="w-10 h-10 rounded-2xl overflow-hidden bg-[#0B122B] p-0.5 border border-amber-400/20 shadow-xs shrink-0 flex items-center justify-center">
             <Image
@@ -881,6 +888,7 @@ export function AppSidebar({ context }: AppSidebarProps) {
         {/* Collapse toggle (Desktop) or Close toggle (Mobile) */}
         <button
           type="button"
+          suppressHydrationWarning
           onClick={() => {
             if (isMobileOpen) setIsMobileOpen(false);
             else toggleCollapse();
@@ -957,6 +965,7 @@ export function AppSidebar({ context }: AppSidebarProps) {
                 {/* Group Accordion Header Button */}
                 <button
                   type="button"
+                  suppressHydrationWarning
                   id={`group-header-${group.id}`}
                   aria-expanded={isExpanded}
                   aria-controls={`group-panel-${group.id}`}
@@ -1091,6 +1100,7 @@ export function AppSidebar({ context }: AppSidebarProps) {
           <div className="flex items-center justify-between gap-2 p-1.5 rounded-2xl hover:bg-white/80 transition-colors">
             <button
               type="button"
+              suppressHydrationWarning
               onClick={() => setUserMenuOpen((prev) => !prev)}
               aria-expanded={userMenuOpen}
               aria-haspopup="menu"
@@ -1117,6 +1127,7 @@ export function AppSidebar({ context }: AppSidebarProps) {
 
             <button
               type="button"
+              suppressHydrationWarning
               onClick={handleLogout}
               title="Sign out of workspace"
               aria-label="Sign out of workspace"
@@ -1163,6 +1174,7 @@ export function AppSidebar({ context }: AppSidebarProps) {
 
               <button
                 type="button"
+                suppressHydrationWarning
                 onClick={handleLogout}
                 role="menuitem"
                 className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
@@ -1181,6 +1193,7 @@ export function AppSidebar({ context }: AppSidebarProps) {
     <>
       {/* Desktop Inset Floating Sidebar */}
       <aside
+        suppressHydrationWarning
         className="w-[276px] shrink-0 h-screen sticky top-0 z-30 p-2.5 hidden lg:block"
         aria-label="Studio Navigation"
       >
@@ -1190,6 +1203,7 @@ export function AppSidebar({ context }: AppSidebarProps) {
       {/* Mobile Drawer Overlay */}
       {isMobileOpen && (
         <div
+          suppressHydrationWarning
           className="fixed inset-0 z-50 lg:hidden"
           role="dialog"
           aria-modal="true"
