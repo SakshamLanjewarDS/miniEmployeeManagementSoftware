@@ -40,3 +40,8 @@ studio_users_and_passwords.csv
 *passwords*.csv
 *.key
 
+# Database backups & snapshots
+backups/
+*.sql
+*.sql.gz
+

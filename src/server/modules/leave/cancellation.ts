@@ -106,7 +106,7 @@ export async function requestLeaveCancellation(
       tenantId: context.tenantId,
       roles: ["OWNER", "ADMIN"],
       title: "Leave Cancellation Requested",
-      message: `${leave.employee?.fullName || context.userFullName} requested cancellation of approved leave: "${input.reason.trim()}".`,
+      message: `${leave.employeeNameRaw || context.userFullName} requested cancellation of approved leave: "${input.reason.trim()}".`,
       link: `/w/${context.tenantSlug}/leave`,
       tag: `leave-cancel-${cancellation.id}`,
       excludeMembershipId: context.membershipId,
@@ -214,10 +214,11 @@ export async function reviewLeaveCancellation(
       notes: "Your leave cancellation request was approved.",
     });
 
-    if (cancellation.employee?.membershipId) {
+    const recipientMemberId = cancellation.leaveRequest?.employee?.membershipId;
+    if (recipientMemberId) {
       dispatchNotification({
         tenantId: context.tenantId,
-        recipientId: cancellation.employee.membershipId,
+        recipientId: recipientMemberId,
         title: input.decision === "APPROVE" ? "Leave Cancellation Approved" : "Leave Cancellation Declined",
         message: `Your leave cancellation request was ${input.decision === "APPROVE" ? "approved and days restored." : `declined: ${input.rejectionReason || "Operational requirements."}`}`,
         link: `/w/${context.tenantSlug}/leave/my-leave`,

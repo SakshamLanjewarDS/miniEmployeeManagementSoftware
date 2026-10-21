@@ -384,6 +384,7 @@ export default function DailyEmployeeWorkDashboard() {
         date: "Today",
         author: task.assignee?.fullName || "Lead Drafter",
         status: "FOR_REVIEW",
+        changeSummary: docRef?.changeSummary || "Architectural corrections applied.",
       },
     };
     setAirlockDrawingData(airlockPayload);
@@ -1341,19 +1342,29 @@ export default function DailyEmployeeWorkDashboard() {
 
       {/* Visual Drawing Airlock Flyout Modal */}
       {airlockModalOpen && airlockDrawingData && (
-        <VisualDrawingAirlock
-          isOpen={airlockModalOpen}
-          onClose={() => setAirlockModalOpen(false)}
-          drawingData={airlockDrawingData as DrawingAirlockData}
-          onApprove={() => {
-            setAirlockModalOpen(false);
-            fetchWork();
-          }}
-          onRequestChanges={() => {
-            setAirlockModalOpen(false);
-            fetchWork();
-          }}
-        />
+        <div className="fixed inset-0 z-50 bg-[#0B122B]/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-white rounded-3xl w-full max-w-5xl h-[85vh] flex flex-col overflow-hidden relative shadow-2xl border border-slate-200">
+            <button
+              type="button"
+              onClick={() => setAirlockModalOpen(false)}
+              className="absolute top-4 right-4 z-50 p-2 bg-white/90 rounded-full hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors shadow-xs cursor-pointer"
+              title="Close comparison"
+            >
+              ✕
+            </button>
+            <VisualDrawingAirlock
+              data={airlockDrawingData as DrawingAirlockData}
+              onApprove={() => {
+                setAirlockModalOpen(false);
+                fetchWork();
+              }}
+              onRequestChanges={() => {
+                setAirlockModalOpen(false);
+                fetchWork();
+              }}
+            />
+          </div>
+        </div>
       )}
     </div>
   );

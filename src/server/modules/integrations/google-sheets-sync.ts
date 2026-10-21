@@ -849,6 +849,13 @@ export async function syncLiveVendorSheet(
         continue;
       }
 
+      const existingHistory = (existing?.visitHistoryJson as Record<string, any>) || {};
+      const newVisitHistory = {
+        ...existingHistory,
+        formFilledAt: timestampRaw || existingHistory.formFilledAt || null,
+        meetingStatus: existingHistory.meetingStatus || "PENDING",
+      };
+
       if (!existing) {
         await prisma.studioVendor.create({
           data: {
@@ -861,6 +868,7 @@ export async function syncLiveVendorSheet(
             email: emailRaw || null,
             purposeOfVisit: purposeRaw || null,
             status: "ACTIVE",
+            visitHistoryJson: newVisitHistory,
             sourceSystem: "GOOGLE_SHEETS",
             sourceRecordId,
           },
@@ -871,7 +879,8 @@ export async function syncLiveVendorSheet(
           existing.name !== (nameRaw || companyRaw) ||
           existing.companyName !== (companyRaw || null) ||
           existing.phoneNumber !== (phoneRaw || null) ||
-          existing.industryType !== (industryRaw || existing.industryType);
+          existing.industryType !== (industryRaw || existing.industryType) ||
+          (!existingHistory.formFilledAt && Boolean(timestampRaw));
 
         if (hasChange) {
           await prisma.studioVendor.update({
@@ -884,6 +893,7 @@ export async function syncLiveVendorSheet(
               phoneNumber: phoneRaw || existing.phoneNumber,
               email: emailRaw || existing.email,
               purposeOfVisit: purposeRaw || existing.purposeOfVisit,
+              visitHistoryJson: newVisitHistory,
             },
           });
           updatedCount++;

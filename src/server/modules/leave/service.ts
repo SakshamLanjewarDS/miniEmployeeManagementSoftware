@@ -250,7 +250,7 @@ export async function createLeaveRequest(context: TenantContext, input: CreateLe
     input.startMinutes ?? (input.sessionType === "SECOND_HALF" ? 870 : 630),
     input.leaveType,
     input.reason ?? "",
-    input.isExemptShortNotice ?? false,
+    (input.isExemptShortNotice ?? false) || context.role === "OWNER" || context.role === "ADMIN",
     input.isHourly ?? false,
     input.sessionType
   );
@@ -299,7 +299,7 @@ export async function createLeaveRequest(context: TenantContext, input: CreateLe
       tenantId: context.tenantId,
       roles: ["OWNER", "ADMIN"],
       title: "New Leave Application Submitted",
-      message: `${employee.fullName || context.userFullName} applied for ${daysQuantity} day(s) of ${input.leaveType} leave (${input.startDate} to ${input.endDate}).`,
+      message: `${employee.membership?.user?.fullName || context.userFullName} applied for ${daysQuantity} day(s) of ${input.leaveType} leave (${input.startDate} to ${input.endDate}).`,
       link: `/w/${context.tenantSlug}/leave`,
       tag: `leave-sub-${newRecord.id}`,
       excludeMembershipId: context.membershipId,

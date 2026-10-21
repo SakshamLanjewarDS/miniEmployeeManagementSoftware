@@ -22,6 +22,7 @@ export interface CreateVendorInput {
   notes?: string;
   followupDate?: string;
   rating?: number;
+  visitHistoryJson?: any;
 }
 
 /**
@@ -130,6 +131,8 @@ export async function listVendorsForEmployee(
         email: true,
         websiteUrl: true,
         status: true,
+        createdAt: true,
+        visitHistoryJson: true,
       },
       orderBy: { name: "asc" },
       skip,
@@ -173,6 +176,7 @@ export async function createVendor(context: TenantContext, input: CreateVendorIn
       notes: input.notes?.trim() || null,
       followupDate: input.followupDate ? new Date(input.followupDate) : null,
       rating: input.rating || 3,
+      visitHistoryJson: input.visitHistoryJson || undefined,
       sourceSystem: "MANUAL",
     },
   });
@@ -232,6 +236,7 @@ export async function updateVendor(
         ? { followupDate: input.followupDate ? new Date(input.followupDate) : null }
         : {}),
       ...(input.rating !== undefined ? { rating: input.rating } : {}),
+      ...(input.visitHistoryJson !== undefined ? { visitHistoryJson: input.visitHistoryJson } : {}),
     },
   });
 

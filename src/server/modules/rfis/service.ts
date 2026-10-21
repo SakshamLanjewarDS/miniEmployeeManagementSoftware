@@ -84,11 +84,12 @@ export async function listProjectRFIs(ctx: TenantContext, params: ListRFIsParams
       project: { select: { id: true, code: true, name: true } },
       reporter: { include: { user: { select: { fullName: true, email: true } } } },
       responsibleEmployee: {
-        select: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          designation: true,
+        include: {
+          membership: {
+            include: {
+              user: { select: { fullName: true, email: true } },
+            },
+          },
         },
       },
       verifier: { include: { user: { select: { fullName: true } } } },
@@ -140,9 +141,7 @@ export async function listProjectRFIs(ctx: TenantContext, params: ListRFIsParams
       siteLocation: r.siteLocation,
       dueDate: r.dueDate ? r.dueDate.toISOString().split("T")[0] : null,
       reporterName: r.reporter.user.fullName,
-      responsiblePerson: r.responsibleEmployee
-        ? `${r.responsibleEmployee.firstName} ${r.responsibleEmployee.lastName}`
-        : null,
+      responsiblePerson: r.responsibleEmployee?.membership?.user?.fullName || null,
       resolutionNotes: r.resolutionNotes,
       verifiedAt: r.verifiedAt ? r.verifiedAt.toISOString() : null,
       verifierName: r.verifier?.user?.fullName || null,

@@ -131,6 +131,8 @@ export interface TaskItem {
     }>;
   }>;
   createdAt?: string | null;
+  updatedAt?: string | null;
+  completionDate?: string | null;
   dueDate: string | null;
   estimatedHours: any;
   customFields?: Record<string, any>;
@@ -193,6 +195,74 @@ export interface TaskItem {
     reason: string | null;
     createdAt: string;
   }>;
+  siteVisits?: Array<{
+    id: string;
+    purpose?: string | null;
+    operationalState?: string | null;
+  }>;
+}
+
+/**
+ * Determines whether a task is related to an on-site visit or inspection.
+ * Checks explicit SiteVisit relation, customField flags, or contextual site keywords.
+ */
+export function isSiteVisitTask(task: TaskItem | null | undefined): boolean {
+  if (!task) return false;
+
+  // 1. Explicit relation to a SiteVisit entity
+  if (task.siteVisits && task.siteVisits.length > 0) return true;
+
+  // 2. Explicit custom field or metadata flags
+  const custom = (task as any).customFields;
+  if (custom) {
+    if (custom.isSiteVisit === true || custom.isSiteVisit === "true") return true;
+    if (custom.isSiteVisit === false || custom.isSiteVisit === "false") return false;
+    if (typeof custom.taskType === "string" && custom.taskType.toUpperCase().includes("SITE_VISIT")) return true;
+    if (typeof custom.category === "string" && custom.category.toUpperCase().includes("SITE_VISIT")) return true;
+    if (typeof custom.deliverableType === "string" && custom.deliverableType.toUpperCase().includes("SITE_VISIT")) return true;
+  }
+
+  // 3. Keyword detection in title, description, phase, or checklist items
+  const textParts = [
+    task.title || "",
+    task.description || "",
+    task.phase?.phaseName || "",
+    ...(task.checklistItems || []).map((ci) => ci.title || ""),
+  ];
+  const combined = textParts.join(" ").toLowerCase();
+
+  const siteVisitKeywords = [
+    "site visit",
+    "visit site",
+    "visite site",
+    "site inspection",
+    "site survey",
+    "field visit",
+    "site snag",
+    "snag list",
+    "snagging",
+    "site audit",
+    "site review",
+    "site measurement",
+    "site measurements",
+    "site progress",
+    "site walk",
+    "site walk-through",
+    "site walkthrough",
+    "site meeting",
+    "site supervision",
+    "site execution",
+    "field inspection",
+    "onsite visit",
+    "on-site visit",
+    "on-site inspection",
+    "onsite inspection",
+    "site check",
+    "site checkin",
+    "site check-in",
+  ];
+
+  return siteVisitKeywords.some((kw) => combined.includes(kw));
 }
 
 export interface ProjectOption {
@@ -407,6 +477,47 @@ export default function TasksClientView({
     }
   };
 
+  const handleToggleSiteVisitMode = async (taskId: string, forceValue?: boolean) => {
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task) return;
+
+    const currentIsSiteVisit = isSiteVisitTask(task);
+    const newIsSiteVisit = forceValue !== undefined ? forceValue : !currentIsSiteVisit;
+
+    const currentCustom = customValuesByTask[taskId] || (task as any).customFields || {};
+    const updatedCustom = {
+      ...currentCustom,
+      isSiteVisit: newIsSiteVisit,
+    };
+
+    setTasks((prev) =>
+      prev.map((t) => (t.id === taskId ? { ...t, customFields: updatedCustom } : t))
+    );
+
+    if (drawerTask && drawerTask.id === taskId) {
+      setDrawerTask((prev) => (prev ? { ...prev, customFields: updatedCustom } : null));
+    }
+
+    setCustomValuesByTask((prev) => ({
+      ...prev,
+      [taskId]: updatedCustom,
+    }));
+
+    try {
+      await fetch(`/api/custom-fields/values?workspaceSlug=${workspaceSlug}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          entity: "TASK",
+          recordId: taskId,
+          values: updatedCustom,
+        }),
+      });
+    } catch (e) {
+      console.error("Failed to persist site visit mode:", e);
+    }
+  };
+
   // Workflow Modal states
   const [changeRequestModal, setChangeRequestModal] = useState<{ taskId: string; title: string } | null>(null);
   const [changeComment, setChangeComment] = useState("");
@@ -499,6 +610,7 @@ export default function TasksClientView({
   const [editEstimatedHours, setEditEstimatedHours] = useState("");
   const [editChecklistItems, setEditChecklistItems] = useState<string[]>([""]);
   const [editCustomFieldValues, setEditCustomFieldValues] = useState<Record<string, any>>({});
+  const [editIsSiteVisit, setEditIsSiteVisit] = useState(false);
   const [editing, setEditing] = useState(false);
 
   // Delete Task state
@@ -508,6 +620,7 @@ export default function TasksClientView({
   // Create Task Modal state
   const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false);
   const [creatingTask, setCreatingTask] = useState(false);
+  const [taskIsSiteVisit, setTaskIsSiteVisit] = useState(false);
   const [taskTitle, setTaskTitle] = useState("");
   const [selectedProjectId, setSelectedProjectId] = useState<string>(projects[0]?.id || "");
   const [selectedPhaseId, setSelectedPhaseId] = useState<string>("");
@@ -784,8 +897,8 @@ export default function TasksClientView({
           if (task.status !== "CHECKING" && task.status !== "IN_REVIEW" && !hasPendingSubmission && !hasItemInReview) return false;
         } else if (selectedStatusCategory === "CHANGES_REQUESTED" || selectedStatusCategory === "REWORK_REQUESTED") {
           const hasChanges =
-            task.status === "CHANGES_REQUESTED" ||
-            task.status === "REVISION" ||
+            (task.status as string) === "CHANGES_REQUESTED" ||
+            (task.status as string) === "REVISION" ||
             (Array.isArray(task.submissions) && task.submissions.some((s: any) => s.status === "CHANGES_REQUESTED" || s.status === "REWORK_REQUESTED"));
           if (!hasChanges) return false;
         } else if (selectedStatusCategory === "COMPLETED") {
@@ -943,11 +1056,6 @@ export default function TasksClientView({
     e.preventDefault();
     const errors: Record<string, string> = {};
 
-    // 0. Deliverable Title Validation
-    if (!taskTitle.trim()) {
-      errors.title = "Deliverable Title is required.";
-    }
-
     // 1. Project Validation
     if (!selectedProjectId) {
       errors.project = "Please select an active architectural project.";
@@ -1052,7 +1160,7 @@ export default function TasksClientView({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title: taskTitle.trim(),
+          title: taskTitle.trim() || undefined,
           projectId: selectedProjectId,
           phaseId: selectedPhaseId || undefined,
           description: taskDescription.trim(),
@@ -1074,7 +1182,7 @@ export default function TasksClientView({
       // Add real task returned by server
       const createdTask: TaskItem = {
         ...data.task,
-        title: taskTitle.trim() || data.task.title,
+        title: data.task.title || taskTitle.trim() || "Architectural Deliverable",
         project: targetProj
           ? { id: targetProj.id, code: targetProj.code, name: targetProj.name, projectType: targetProj.projectType ?? null }
           : { id: selectedProjectId, code: "PROJ", name: "Project", projectType: null },
@@ -1119,6 +1227,32 @@ export default function TasksClientView({
         activityHistory: [],
       };
 
+      const payloadCustomValues: Record<string, any> = {
+        ...customFieldValues,
+        ...(taskIsSiteVisit ? { isSiteVisit: true } : {}),
+      };
+
+      if (Object.keys(payloadCustomValues).length > 0) {
+        try {
+          await fetch(`/api/custom-fields/values?workspaceSlug=${workspaceSlug}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              entity: "TASK",
+              recordId: data.task.id,
+              values: payloadCustomValues,
+            }),
+          });
+          setCustomValuesByTask((prev) => ({
+            ...prev,
+            [data.task.id]: payloadCustomValues,
+          }));
+          createdTask.customFields = payloadCustomValues;
+        } catch (e) {
+          console.error("Failed to persist custom fields on task create:", e);
+        }
+      }
+
       setTasks((prev) => [createdTask, ...prev]);
       setSuccessMessage(`Deliverable "${createdTask.title}" assigned successfully to ${assignedNames}!`);
       setIsCreateTaskModalOpen(false);
@@ -1131,6 +1265,7 @@ export default function TasksClientView({
       setTaskDescription("");
       setTaskReviewerId("");
       setTaskEstimatedHours("");
+      setTaskIsSiteVisit(false);
       setTaskAssigneeIds(userRole === "OWNER" || userRole === "ADMIN" ? [] : [currentMembershipId]);
       setEmployeeChecklists({});
       setFormErrors({});
@@ -1436,6 +1571,9 @@ export default function TasksClientView({
 
     // 8. Custom fields
     setEditCustomFieldValues(existingCustom);
+
+    // 9. Site Visit Mode
+    setEditIsSiteVisit(isSiteVisitTask(task));
   };
 
   // Submit Edit Task - Instant Optimistic UI Update (< 5ms response)
@@ -1454,6 +1592,7 @@ export default function TasksClientView({
 
     const payloadCustomValues: Record<string, any> = {
       ...editCustomFieldValues,
+      isSiteVisit: editIsSiteVisit,
       ...(editTypology ? { typology: editTypology === "OTHER" ? editOtherTypology.trim() : editTypology.trim() } : {}),
       ...(editOtherProjectName ? { customProject: editOtherProjectName.trim() } : {}),
       ...(editOtherPhaseName ? { customPhase: editOtherPhaseName.trim() } : {}),
@@ -2181,6 +2320,8 @@ export default function TasksClientView({
       setSuccessMessage("✓ Task reopened and moved back to In Progress!");
       setReopenModal(null);
       setReopenReasonInput("");
+      broadcastRealtimeEvent("TASK_UPDATED");
+      broadcastRealtimeEvent("NOTIFICATION_UPDATED");
       router.refresh();
     } catch (err: any) {
       setErrorMessage(err.message);
@@ -3708,6 +3849,12 @@ export default function TasksClientView({
                       {drawerTask.phase.phaseName}
                     </span>
                   )}
+                  {isSiteVisitTask(drawerTask) && (
+                    <span className="text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded flex items-center gap-1 shadow-2xs">
+                      <AlertTriangle className="w-3 h-3 text-amber-500" />
+                      <span>Site Visit Task</span>
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -4684,109 +4831,139 @@ export default function TasksClientView({
               )}
 
 
-              {/* 8B. SITE ISSUES & FIELD SNAGS REPORTING */}
-              <div className="space-y-3 pt-3 border-t border-[#E2E6F0]">
-                <div className="flex items-center justify-between">
-                  <h4 className="font-bold text-[#1F1F1F] text-xs uppercase tracking-wider flex items-center gap-1.5">
-                    <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
-                    <span>Site Issues & Snag Reporting</span>
-                  </h4>
-                  <a
-                    href={`/w/${workspaceSlug}/visits`}
-                    className="text-[11px] font-semibold text-[#5A81FA] hover:underline"
+              {/* 8B. SITE ISSUES & FIELD SNAGS REPORTING (Only for Site Visit Tasks) */}
+              {isSiteVisitTask(drawerTask) ? (
+                <div className="space-y-3 pt-3 border-t border-[#E2E6F0]">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-bold text-[#1F1F1F] text-xs uppercase tracking-wider flex items-center gap-1.5">
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+                      <span>Site Issues & Snag Reporting</span>
+                      <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-1.5 py-0.5 rounded-full border border-amber-200">
+                        Site Visit
+                      </span>
+                    </h4>
+                    <div className="flex items-center gap-2">
+                      <a
+                        href={`/w/${workspaceSlug}/visits`}
+                        className="text-[11px] font-semibold text-[#5A81FA] hover:underline"
+                      >
+                        Open Site Visits & Issues →
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleSiteVisitMode(drawerTask.id, false)}
+                        className="text-[10px] text-slate-400 hover:text-slate-600 hover:underline cursor-pointer"
+                        title="Remove site visit snag reporting for this task"
+                      >
+                        (Disable)
+                      </button>
+                    </div>
+                  </div>
+
+                  {siteIssueSuccessMsg && (
+                    <div className="p-2.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span>{siteIssueSuccessMsg}</span>
+                    </div>
+                  )}
+
+                  <form
+                    onSubmit={handleLogTaskSiteIssue}
+                    className="p-3 bg-[#FAFBFD] rounded-xl border border-[#E2E6F0] space-y-2.5"
                   >
-                    Open Site Visits & Issues →
-                  </a>
+                    <p className="text-[11px] text-[#696E82]">
+                      Encountered a site defect, safety hazard, or snag during this task? Log it directly here:
+                    </p>
+
+                    <div>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Issue title / defect (e.g. Column honeycombing, conduit missing)..."
+                        value={taskSiteIssueTitle}
+                        onChange={(e) => setTaskSiteIssueTitle(e.target.value)}
+                        className="w-full p-2 bg-white border border-[#E2E6F0] rounded-lg text-xs text-[#1F1F1F] focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[10px] font-semibold text-[#696E82] block mb-0.5">Category</label>
+                        <select
+                          value={taskSiteIssueCategory}
+                          onChange={(e) => setTaskSiteIssueCategory(e.target.value)}
+                          className="w-full p-1.5 bg-white border border-[#E2E6F0] rounded-lg text-xs text-[#1F1F1F]"
+                        >
+                          <option value="CIVIL">Civil / Structural</option>
+                          <option value="MEP">MEP & Services</option>
+                          <option value="FINISHES">Architectural Finishes</option>
+                          <option value="SAFETY">Safety Hazard</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] font-semibold text-[#696E82] block mb-0.5">Severity</label>
+                        <select
+                          value={taskSiteIssuePriority}
+                          onChange={(e) => setTaskSiteIssuePriority(e.target.value as any)}
+                          className="w-full p-1.5 bg-white border border-[#E2E6F0] rounded-lg text-xs text-[#1F1F1F]"
+                        >
+                          <option value="LOW">Low</option>
+                          <option value="MEDIUM">Medium</option>
+                          <option value="HIGH">High</option>
+                          <option value="URGENT">Urgent / Critical</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <input
+                        type="text"
+                        placeholder="Site location / grid coordinates..."
+                        value={taskSiteIssueLocation}
+                        onChange={(e) => setTaskSiteIssueLocation(e.target.value)}
+                        className="w-full p-2 bg-white border border-[#E2E6F0] rounded-lg text-xs text-[#1F1F1F] focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
+                      />
+                    </div>
+
+                    <div>
+                      <textarea
+                        rows={2}
+                        placeholder="Detailed defect observations & contractor instructions..."
+                        value={taskSiteIssueDesc}
+                        onChange={(e) => setTaskSiteIssueDesc(e.target.value)}
+                        className="w-full p-2 bg-white border border-[#E2E6F0] rounded-lg text-xs text-[#1F1F1F] focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
+                      />
+                    </div>
+
+                    <div className="flex justify-end">
+                      <button
+                        type="submit"
+                        disabled={isLoggingSiteIssue || !taskSiteIssueTitle.trim()}
+                        className="px-3.5 py-1.5 bg-[#5A81FA] hover:bg-[#426EE8] text-white rounded-lg text-xs font-bold transition cursor-pointer disabled:opacity-50 flex items-center gap-1.5 shadow-xs"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>{isLoggingSiteIssue ? "Submitting..." : "Report Site Issue"}</span>
+                      </button>
+                    </div>
+                  </form>
                 </div>
-
-                {siteIssueSuccessMsg && (
-                  <div className="p-2.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <span>{siteIssueSuccessMsg}</span>
-                  </div>
-                )}
-
-                <form
-                  onSubmit={handleLogTaskSiteIssue}
-                  className="p-3 bg-[#FAFBFD] rounded-xl border border-[#E2E6F0] space-y-2.5"
-                >
-                  <p className="text-[11px] text-[#696E82]">
-                    Encountered a site defect, safety hazard, or snag during this task? Log it directly here:
-                  </p>
-
-                  <div>
-                    <input
-                      type="text"
-                      required
-                      placeholder="Issue title / defect (e.g. Column honeycombing, conduit missing)..."
-                      value={taskSiteIssueTitle}
-                      onChange={(e) => setTaskSiteIssueTitle(e.target.value)}
-                      className="w-full p-2 bg-white border border-[#E2E6F0] rounded-lg text-xs text-[#1F1F1F] focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="text-[10px] font-semibold text-[#696E82] block mb-0.5">Category</label>
-                      <select
-                        value={taskSiteIssueCategory}
-                        onChange={(e) => setTaskSiteIssueCategory(e.target.value)}
-                        className="w-full p-1.5 bg-white border border-[#E2E6F0] rounded-lg text-xs text-[#1F1F1F]"
-                      >
-                        <option value="CIVIL">Civil / Structural</option>
-                        <option value="MEP">MEP & Services</option>
-                        <option value="FINISHES">Architectural Finishes</option>
-                        <option value="SAFETY">Safety Hazard</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="text-[10px] font-semibold text-[#696E82] block mb-0.5">Severity</label>
-                      <select
-                        value={taskSiteIssuePriority}
-                        onChange={(e) => setTaskSiteIssuePriority(e.target.value as any)}
-                        className="w-full p-1.5 bg-white border border-[#E2E6F0] rounded-lg text-xs text-[#1F1F1F]"
-                      >
-                        <option value="LOW">Low</option>
-                        <option value="MEDIUM">Medium</option>
-                        <option value="HIGH">High</option>
-                        <option value="URGENT">Urgent / Critical</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div>
-                    <input
-                      type="text"
-                      placeholder="Site location / grid coordinates..."
-                      value={taskSiteIssueLocation}
-                      onChange={(e) => setTaskSiteIssueLocation(e.target.value)}
-                      className="w-full p-2 bg-white border border-[#E2E6F0] rounded-lg text-xs text-[#1F1F1F] focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
-                    />
-                  </div>
-
-                  <div>
-                    <textarea
-                      rows={2}
-                      placeholder="Detailed defect observations & contractor instructions..."
-                      value={taskSiteIssueDesc}
-                      onChange={(e) => setTaskSiteIssueDesc(e.target.value)}
-                      className="w-full p-2 bg-white border border-[#E2E6F0] rounded-lg text-xs text-[#1F1F1F] focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
-                    />
-                  </div>
-
-                  <div className="flex justify-end">
-                    <button
-                      type="submit"
-                      disabled={isLoggingSiteIssue || !taskSiteIssueTitle.trim()}
-                      className="px-3.5 py-1.5 bg-[#5A81FA] hover:bg-[#426EE8] text-white rounded-lg text-xs font-bold transition cursor-pointer disabled:opacity-50 flex items-center gap-1.5 shadow-xs"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>{isLoggingSiteIssue ? "Submitting..." : "Report Site Issue"}</span>
-                    </button>
-                  </div>
-                </form>
-              </div>
+              ) : (
+                /* Normal tasks: Site snag panel hidden; optional subtle toggle available if conducting on-site work */
+                <div className="pt-2 border-t border-[#E2E6F0]/60 flex items-center justify-between text-xs text-[#696E82]">
+                  <span className="flex items-center gap-1.5 text-[11px] text-[#8C93A8]">
+                    <AlertTriangle className="w-3 h-3 text-slate-400 shrink-0" />
+                    <span>On-site inspection or visit for this task?</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleToggleSiteVisitMode(drawerTask.id, true)}
+                    className="text-[11px] font-semibold text-[#5A81FA] hover:underline cursor-pointer"
+                  >
+                    + Enable Site Snags & Issues
+                  </button>
+                </div>
+              )}
 
               {/* 9. ACTIVITY HISTORY */}
               {drawerTask.activityHistory && drawerTask.activityHistory.length > 0 && (
@@ -5298,6 +5475,27 @@ export default function TasksClientView({
                 disabled={editing}
               />
 
+              {/* Site Visit Task Toggle */}
+              <div className="pt-2 border-t border-[#E2E6F0]">
+                <label className="flex items-center gap-2.5 cursor-pointer select-none p-2 rounded-xl hover:bg-[#F8F9FD] border border-transparent hover:border-[#E2E6F0] transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={editIsSiteVisit}
+                    onChange={(e) => setEditIsSiteVisit(e.target.checked)}
+                    className="w-4 h-4 rounded border-slate-300 text-[#5A81FA] focus:ring-[#5A81FA] cursor-pointer"
+                  />
+                  <div className="text-xs">
+                    <span className="font-semibold text-[#1F1F1F] flex items-center gap-1.5">
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+                      <span>Site Visit Task</span>
+                    </span>
+                    <p className="text-[11px] text-[#696E82]">
+                      Enables on-site defect, safety hazard, and field snag reporting in task details
+                    </p>
+                  </div>
+                </label>
+              </div>
+
               {/* 9. MODAL BUTTONS (WITH DELETE BUTTON) */}
               <div className="flex items-center justify-between pt-3 border-t border-[#E2E6F0]">
                 {isPrivileged || editModal.task.creatorId === currentMembershipId || editModal.task.creator?.id === currentMembershipId ? (
@@ -5448,36 +5646,6 @@ export default function TasksClientView({
                   onChange={setSelectedPhaseId}
                   allowOther={false}
                 />
-              </div>
-
-              {/* DELIVERABLE TITLE */}
-              <div id="field-title">
-                <label className="block font-semibold text-[#1F1F1F] mb-1">
-                  Deliverable Title <span className="text-red-600">*</span>
-                </label>
-                <input
-                  id="task-title-input"
-                  type="text"
-                  required
-                  value={taskTitle}
-                  onChange={(e) => {
-                    setTaskTitle(e.target.value);
-                    if (formErrors.title) {
-                      setFormErrors((prev) => {
-                        const copy = { ...prev };
-                        delete copy.title;
-                        return copy;
-                      });
-                    }
-                  }}
-                  placeholder="e.g. Prepare 1:20 Pergola Joinery Detail & Column Junctions"
-                  className={`w-full p-2.5 bg-[#F8F9FD] border rounded-xl text-[#1F1F1F] focus:outline-none focus:ring-2 focus:ring-[#5A81FA] transition-all ${
-                    formErrors.title ? "border-red-400 bg-red-50/30" : "border-[#E2E6F0]"
-                  }`}
-                />
-                {formErrors.title && (
-                  <p className="text-[11px] text-red-600 font-medium mt-1">{formErrors.title}</p>
-                )}
               </div>
 
               {/* 3. ARCHITECTURAL BRIEF & INSTRUCTIONS (VOICE/GRAMMAR ASSISTANT OPTED-IN) */}
@@ -5778,6 +5946,27 @@ export default function TasksClientView({
                 onChange={handleCustomFieldChange}
                 disabled={creatingTask}
               />
+
+              {/* Site Visit Task Toggle */}
+              <div className="pt-2 border-t border-[#E2E6F0]">
+                <label className="flex items-center gap-2.5 cursor-pointer select-none p-2 rounded-xl hover:bg-[#F8F9FD] border border-transparent hover:border-[#E2E6F0] transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={taskIsSiteVisit}
+                    onChange={(e) => setTaskIsSiteVisit(e.target.checked)}
+                    className="w-4 h-4 rounded border-slate-300 text-[#5A81FA] focus:ring-[#5A81FA] cursor-pointer"
+                  />
+                  <div className="text-xs">
+                    <span className="font-semibold text-[#1F1F1F] flex items-center gap-1.5">
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+                      <span>Site Visit Task</span>
+                    </span>
+                    <p className="text-[11px] text-[#696E82]">
+                      Enables on-site defect, safety hazard, and field snag reporting in task details
+                    </p>
+                  </div>
+                </label>
+              </div>
 
               {/* Modal Action Buttons */}
               <div className="flex justify-end gap-2 pt-4 border-t border-[#E2E6F0]">

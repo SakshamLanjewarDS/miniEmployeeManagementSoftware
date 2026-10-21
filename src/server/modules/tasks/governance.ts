@@ -105,7 +105,7 @@ export function evaluateTaskCompletionGovernance(
       requiresReview: true,
       policy: "REVIEW_REQUIRED",
       reason:
-        "Four-Eyes Principle: Deliverable assignees or submitters cannot approve their own governed deliverable. Independent review by Studio Leadership is required.",
+        "Four-Eyes Policy: Self-approval is forbidden. Deliverable assignees or submitters cannot approve their own governed deliverable. Only Studio Owners or Admins can approve work.",
     };
   }
 

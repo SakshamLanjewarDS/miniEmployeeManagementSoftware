@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import { prisma } from "../db/prisma";
+import { Prisma } from "@prisma/client";
 import { TenantContext, ForbiddenException, UnauthorizedException } from "../tenancy/context";
 
 /**
@@ -214,7 +215,7 @@ export async function disableUserMfa(
     data: {
       mfaEnabled: false,
       mfaSecret: null,
-      mfaRecoveryCodes: null,
+      mfaRecoveryCodes: Prisma.DbNull,
     },
   });
 

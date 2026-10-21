@@ -12,6 +12,7 @@ import {
   Building,
   User,
   ShieldCheck,
+  Calendar,
 } from "lucide-react";
 
 export default function EmployeeVendorDirectoryPage() {
@@ -24,6 +25,8 @@ export default function EmployeeVendorDirectoryPage() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [industryFilter, setIndustryFilter] = useState("");
+  const [contactFilter, setContactFilter] = useState<string>("ALL");
+  const [vendorSortBy, setVendorSortBy] = useState<string>("NEWEST");
 
   const fetchDirectory = async () => {
     setLoading(true);
@@ -50,6 +53,33 @@ export default function EmployeeVendorDirectoryPage() {
   useEffect(() => {
     fetchDirectory();
   }, [workspaceSlug, industryFilter]);
+
+  const filteredVendors = React.useMemo(() => {
+    let list = vendors.filter((v) => {
+      if (contactFilter === "HAS_PHONE") {
+        if (!v.phoneNumber || v.phoneNumber.trim() === "") return false;
+      } else if (contactFilter === "HAS_WEBSITE") {
+        if (!v.websiteUrl || v.websiteUrl.trim() === "") return false;
+      } else if (contactFilter === "HAS_EMAIL") {
+        if (!v.email || v.email.trim() === "") return false;
+      }
+      return true;
+    });
+
+    return [...list].sort((a, b) => {
+      switch (vendorSortBy) {
+        case "COMPANY_ASC":
+          return (a.companyName || a.name || "").localeCompare(b.companyName || b.name || "");
+        case "NAME_ASC":
+          return (a.name || "").localeCompare(b.name || "");
+        case "NEWEST":
+        default:
+          return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+      }
+    });
+  }, [vendors, contactFilter, vendorSortBy]);
+
+  const isFiltered = industryFilter !== "" || contactFilter !== "ALL" || searchQuery.trim() !== "";
 
   return (
     <div className="space-y-6">
@@ -80,34 +110,100 @@ export default function EmployeeVendorDirectoryPage() {
       )}
 
       {/* Filter Bar */}
-      <div className="p-3 bg-white rounded-2xl border border-[#E2E6F0] shadow-2xs flex flex-wrap items-center justify-between gap-3">
-        <div className="relative flex-1 min-w-[240px]">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#696E82]" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && fetchDirectory()}
-            placeholder="Search by company, contact person, or material category..."
-            className="w-full pl-9 pr-3 py-1.5 text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:outline-none focus:border-[#5A81FA] text-[#1F1F1F]"
-          />
+      <div className="p-3 bg-white rounded-2xl border border-[#E2E6F0] shadow-2xs space-y-2.5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="relative flex-1 min-w-[240px]">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#696E82]" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && fetchDirectory()}
+              placeholder="Search by company, contact person, or material category..."
+              className="w-full pl-9 pr-3 py-1.5 text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl focus:outline-none focus:border-[#5A81FA] text-[#1F1F1F]"
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={industryFilter}
+              onChange={(e) => setIndustryFilter(e.target.value)}
+              aria-label="Filter by industry category"
+              className="px-2.5 py-1.5 text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] font-medium focus:outline-none focus:border-[#5A81FA]"
+            >
+              <option value="">All Categories</option>
+              <option value="Marble & Granite">Marble & Granite</option>
+              <option value="Carpentry & Joinery">Carpentry & Joinery</option>
+              <option value="Glass & Aluminium">Glass & Aluminium</option>
+              <option value="Architectural Lighting">Architectural Lighting</option>
+              <option value="HVAC & Automation">HVAC & Automation</option>
+              <option value="Sanitaryware & Tiles">Sanitaryware & Tiles</option>
+            </select>
+
+            <select
+              value={contactFilter}
+              onChange={(e) => setContactFilter(e.target.value)}
+              aria-label="Filter by contact channel"
+              className="px-2.5 py-1.5 text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] font-medium focus:outline-none focus:border-[#5A81FA]"
+            >
+              <option value="ALL">All Contacts</option>
+              <option value="HAS_PHONE">Has Phone</option>
+              <option value="HAS_WEBSITE">Has Website</option>
+              <option value="HAS_EMAIL">Has Email</option>
+            </select>
+
+            <select
+              value={vendorSortBy}
+              onChange={(e) => setVendorSortBy(e.target.value)}
+              aria-label="Sort vendors by"
+              className="px-2.5 py-1.5 text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] font-semibold focus:outline-none focus:border-[#5A81FA]"
+            >
+              <option value="NEWEST">Date Added (Newest)</option>
+              <option value="COMPANY_ASC">Company Name (A → Z)</option>
+              <option value="NAME_ASC">Contact Name (A → Z)</option>
+            </select>
+
+            {isFiltered && (
+              <button
+                type="button"
+                onClick={() => {
+                  setIndustryFilter("");
+                  setContactFilter("ALL");
+                  setVendorSortBy("NEWEST");
+                  setSearchQuery("");
+                }}
+                className="text-xs font-semibold text-rose-600 hover:text-rose-800 hover:underline px-1 cursor-pointer"
+              >
+                Reset
+              </button>
+            )}
+          </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <select
-            value={industryFilter}
-            onChange={(e) => setIndustryFilter(e.target.value)}
-            className="px-2.5 py-1.5 text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] focus:outline-none focus:border-[#5A81FA]"
-          >
-            <option value="">All Categories</option>
-            <option value="Marble & Granite">Marble & Granite</option>
-            <option value="Carpentry & Joinery">Carpentry & Joinery</option>
-            <option value="Glass & Aluminium">Glass & Aluminium</option>
-            <option value="Architectural Lighting">Architectural Lighting</option>
-            <option value="HVAC & Automation">HVAC & Automation</option>
-            <option value="Sanitaryware & Tiles">Sanitaryware & Tiles</option>
-          </select>
-        </div>
+        {/* Active Filter Chips */}
+        {isFiltered && (
+          <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-[#E2E6F0] text-xs">
+            <span className="text-[#696E82] text-[11px] font-medium mr-1">Active:</span>
+            {industryFilter && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#F2F4FF] text-[#2C308D] border border-[#CEDEFF] text-[11px] font-semibold">
+                Category: {industryFilter}
+              </span>
+            )}
+            {contactFilter !== "ALL" && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 text-[11px] font-semibold">
+                Channel: {contactFilter.replace("HAS_", "")}
+              </span>
+            )}
+            {searchQuery && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-800 border border-slate-200 text-[11px] font-semibold">
+                "{searchQuery}"
+              </span>
+            )}
+            <span className="ml-auto text-[#696E82] text-[11px]">
+              Showing <strong>{filteredVendors.length}</strong> of {vendors.length}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Directory Grid */}
@@ -115,13 +211,13 @@ export default function EmployeeVendorDirectoryPage() {
         <div className="p-16 text-center text-xs text-[#696E82] bg-white rounded-3xl border border-[#E2E6F0]">
           Loading approved vendor directory...
         </div>
-      ) : vendors.length === 0 ? (
+      ) : filteredVendors.length === 0 ? (
         <div className="p-16 text-center text-xs text-[#696E82] bg-white rounded-3xl border border-[#E2E6F0]">
           No approved vendor contacts found.
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {vendors.map((v) => (
+          {filteredVendors.map((v) => (
             <div
               key={v.id}
               className="bg-white rounded-3xl border border-[#E2E6F0] p-5 shadow-2xs hover:border-[#5A81FA]/40 transition-all space-y-3 text-xs"
@@ -140,10 +236,24 @@ export default function EmployeeVendorDirectoryPage() {
                 </span>
               </div>
 
-              <div>
+              <div className="flex flex-wrap items-center gap-2">
                 <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-[#F2F4FF] text-[#2C308D]">
                   {v.industryType || "General"}
                 </span>
+                {(v.visitHistoryJson?.formFilledAt || v.createdAt) && (
+                  <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200/80 px-2 py-0.5 rounded-lg flex items-center gap-1">
+                    <Calendar className="w-3 h-3 text-emerald-600" />
+                    <span>
+                      Form Filled:{" "}
+                      {v.visitHistoryJson?.formFilledAt ||
+                        new Date(v.createdAt).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })}
+                    </span>
+                  </span>
+                )}
               </div>
 
               {/* Public-to-staff business contact channels */}

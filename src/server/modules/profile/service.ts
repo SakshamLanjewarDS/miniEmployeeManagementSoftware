@@ -1,5 +1,5 @@
 import { prisma } from "../../db/prisma";
-import { TenantContext, assertAdminOrOwner, isAdminOrOwner } from "../../tenancy/context";
+import { TenantContext, assertAdminOrOwner, isAdminOrOwner, ForbiddenException } from "../../tenancy/context";
 import { ProfileChangeRequestStatus } from "@prisma/client";
 
 /**

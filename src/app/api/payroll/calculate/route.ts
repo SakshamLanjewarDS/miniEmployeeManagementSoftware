@@ -222,7 +222,7 @@ export async function GET(req: NextRequest) {
             const balance = Number(loan.balanceAmount);
             const monthly = Number(loan.monthlyRecoveryAmount);
             const deduction = Math.min(balance, monthly);
-            if (loan.loanType === "SALARY_ADVANCE") {
+            if (loan.type === "SALARY_ADVANCE") {
               advanceRecovery += deduction;
             } else {
               loanRecovery += deduction;

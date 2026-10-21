@@ -8,7 +8,7 @@ export interface PerformanceFilterParams {
   department?: string;
   designation?: string;
   projectId?: string;
-  priority?: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  priority?: "LOW" | "MEDIUM" | "HIGH" | "URGENT" | "ALL";
   governanceType?: "ALL" | "GOVERNED" | "OPERATIONAL";
   deliveryStatus?: "ALL" | "ON_TIME" | "LATE" | "OVERDUE";
   isBlocked?: boolean;

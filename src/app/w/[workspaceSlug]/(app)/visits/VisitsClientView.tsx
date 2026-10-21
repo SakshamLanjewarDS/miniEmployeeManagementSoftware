@@ -78,6 +78,10 @@ export interface SiteVisitItem {
   reviewComment: string | null;
   inspectionType?: string | null;
   priority?: string | null;
+  status?: string;
+  checkInTime?: string | null;
+  checkOutTime?: string | null;
+  visitor?: { name: string } | null;
   milestoneId?: string | null;
   milestone?: { id: string; title: string } | null;
   taskId?: string | null;

@@ -185,6 +185,22 @@ export interface AdminDashboardData {
 
 }
 
+export interface ReopenedTaskAlert {
+  id: string;
+  taskId: string;
+  checklistItemId?: string | null;
+  taskTitle: string;
+  itemTitle?: string | null;
+  projectCode: string;
+  projectName: string;
+  reopenedBy: string;
+  reopenReason: string;
+  reopenedAt: string;
+  dueDate: string | null;
+  priority: TaskPriority | string;
+  status: TaskWorkflowStatus | string;
+}
+
 export interface EmployeeDashboardData {
   mySummary: {
     pendingTasksCount: number;
@@ -196,7 +212,9 @@ export interface EmployeeDashboardData {
     unacknowledgedCount?: number;
     blockedCount?: number;
     pendingExtensionsCount?: number;
+    reopenedCount?: number;
   };
+  reopenedTasks?: Array<ReopenedTaskAlert>;
   unacknowledgedAssignments?: Array<{
     id: string;
     title: string;
@@ -221,6 +239,10 @@ export interface EmployeeDashboardData {
     isDueToday: boolean;
     blockerReason: string | null;
     isChecklistItem: boolean;
+    isReopened?: boolean;
+    reopenReason?: string;
+    reopenedBy?: string;
+    reopenedAt?: string;
     description?: string | null;
     checklistItems?: Array<{ id: string; title: string; isCompleted: boolean }>;
   }>;
@@ -1017,6 +1039,7 @@ export async function getEmployeeDashboardData(ctx: TenantContext): Promise<Empl
     unacknowledgedAssignmentsData,
     blockedCount,
     pendingExtensionsCount,
+    reopenedActivities,
   ] = await Promise.all([
     // 1. Deliverables where this employee is primary or creator
     prisma.task.findMany({
@@ -1163,7 +1186,121 @@ export async function getEmployeeDashboardData(ctx: TenantContext): Promise<Empl
         status: "PENDING",
       },
     }),
+    // 12. Query recently reopened task activities for this employee
+    prisma.taskActivityHistory.findMany({
+      where: {
+        tenantId: ctx.tenantId,
+        action: "TASK_REOPENED",
+        task: {
+          status: { notIn: [TaskWorkflowStatus.COMPLETED, TaskWorkflowStatus.CANCELLED] },
+          OR: [
+            { assigneeId: ctx.membershipId },
+            { creatorId: ctx.membershipId },
+            { assignments: { some: { membershipId: ctx.membershipId } } },
+            { checklistItems: { some: { assignedMemberId: ctx.membershipId } } },
+          ],
+        },
+      },
+      include: {
+        task: {
+          include: {
+            project: { select: { id: true, code: true, name: true } },
+            checklistItems: true,
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+    }),
   ]);
+
+  // Build lookup of actor names for reopened tasks
+  const actorIds = Array.from(new Set(reopenedActivities.map((a) => a.actorId).filter(Boolean)));
+  const actorMemberships =
+    actorIds.length > 0
+      ? await prisma.tenantMembership.findMany({
+          where: { id: { in: actorIds } },
+          include: { user: { select: { fullName: true } } },
+        })
+      : [];
+  const actorNameMap = new Map<string, string>(
+    actorMemberships.map((m) => [m.id, m.user?.fullName || "Studio Leadership"])
+  );
+
+  const reopenedTasksMap = new Map<string, ReopenedTaskAlert>();
+
+  for (const act of reopenedActivities) {
+    let actorName = actorNameMap.get(act.actorId) || "Studio Leadership";
+    let itemTitle = "";
+    let cleanReason = act.reason || "Deliverable work was reopened by studio leadership.";
+
+    const match = act.reason?.match(/^(.*?) reopened "(.*?)": (.*)$/);
+    if (match) {
+      if (!actorName || actorName === "Studio Leadership") {
+        actorName = match[1].trim();
+      }
+      itemTitle = match[2].trim();
+      cleanReason = match[3].trim();
+    }
+
+    const matchingItem = act.task.checklistItems.find(
+      (ci) => ci.title === itemTitle || (ci.blockerDetails as any)?.reopened
+    );
+
+    const dedupeKey = `${act.taskId}_${matchingItem?.id || itemTitle || "main"}`;
+    if (!reopenedTasksMap.has(dedupeKey)) {
+      reopenedTasksMap.set(dedupeKey, {
+        id: act.id,
+        taskId: act.taskId,
+        checklistItemId: matchingItem?.id || null,
+        taskTitle: act.task.title,
+        itemTitle: itemTitle || matchingItem?.title || null,
+        projectCode: act.task.project.code,
+        projectName: act.task.project.name,
+        reopenedBy: actorName,
+        reopenReason: cleanReason,
+        reopenedAt: act.createdAt.toISOString(),
+        dueDate: act.task.dueDate ? act.task.dueDate.toISOString() : null,
+        priority: act.task.priority,
+        status: matchingItem?.status || act.task.status,
+      });
+    }
+  }
+
+  // Also check specificChecklistItems with structured blockerDetails.reopened
+  for (const item of specificChecklistItems) {
+    const reopenedMeta = (item.blockerDetails as any)?.reopened;
+    if (reopenedMeta && item.status !== TaskWorkflowStatus.COMPLETED && item.status !== TaskWorkflowStatus.CANCELLED) {
+      const dedupeKey = `${item.taskId}_${item.id}`;
+      if (!reopenedTasksMap.has(dedupeKey)) {
+        reopenedTasksMap.set(dedupeKey, {
+          id: `item-${item.id}`,
+          taskId: item.taskId,
+          checklistItemId: item.id,
+          taskTitle: item.task.title,
+          itemTitle: item.title,
+          projectCode: item.task.project.code,
+          projectName: item.task.project.name,
+          reopenedBy: reopenedMeta.reopenedBy || "Studio Leadership",
+          reopenReason: reopenedMeta.reason || "Work was reopened by leadership",
+          reopenedAt: reopenedMeta.reopenedAt || item.updatedAt.toISOString(),
+          dueDate: item.dueDate ? item.dueDate.toISOString() : null,
+          priority: item.priority,
+          status: item.status,
+        });
+      }
+    }
+  }
+
+  const reopenedTasksList = Array.from(reopenedTasksMap.values()).sort(
+    (a, b) => new Date(b.reopenedAt).getTime() - new Date(a.reopenedAt).getTime()
+  );
+
+  const reopenedLookup = new Map<string, ReopenedTaskAlert>();
+  for (const r of reopenedTasksList) {
+    if (r.checklistItemId) reopenedLookup.set(r.checklistItemId, r);
+    reopenedLookup.set(r.taskId, r);
+  }
 
   // Flatten into the employee's personal work queue
   const workQueueItems: Array<EmployeeDashboardData["workQueue"][0]> = [];
@@ -1175,6 +1312,7 @@ export async function getEmployeeDashboardData(ctx: TenantContext): Promise<Empl
     const d = item.dueDate;
     const isDueToday = Boolean(d && d >= startOfToday && d <= endOfToday);
     const isOverdue = Boolean(d && d < startOfToday && item.status !== TaskWorkflowStatus.COMPLETED && !item.isCompleted);
+    const reopenInfo = reopenedLookup.get(item.id) || reopenedLookup.get(item.taskId);
 
     workQueueItems.push({
       id: item.id,
@@ -1191,6 +1329,10 @@ export async function getEmployeeDashboardData(ctx: TenantContext): Promise<Empl
       isDueToday,
       blockerReason: item.blockerReason,
       isChecklistItem: true,
+      isReopened: Boolean(reopenInfo),
+      reopenReason: reopenInfo?.reopenReason,
+      reopenedBy: reopenInfo?.reopenedBy,
+      reopenedAt: reopenInfo?.reopenedAt,
       description: item.task.description,
       checklistItems: undefined,
     });
@@ -1202,6 +1344,7 @@ export async function getEmployeeDashboardData(ctx: TenantContext): Promise<Empl
       const d = task.dueDate;
       const isDueToday = Boolean(d && d >= startOfToday && d <= endOfToday);
       const isOverdue = Boolean(d && d < startOfToday && task.status !== TaskWorkflowStatus.COMPLETED);
+      const reopenInfo = reopenedLookup.get(task.id);
 
       workQueueItems.push({
         id: task.id,
@@ -1218,6 +1361,10 @@ export async function getEmployeeDashboardData(ctx: TenantContext): Promise<Empl
         isDueToday,
         blockerReason: task.blockerReason,
         isChecklistItem: false,
+        isReopened: Boolean(reopenInfo),
+        reopenReason: reopenInfo?.reopenReason,
+        reopenedBy: reopenInfo?.reopenedBy,
+        reopenedAt: reopenInfo?.reopenedAt,
         description: task.description,
         checklistItems: task.checklistItems.map((ci) => ({ id: ci.id, title: ci.title, isCompleted: ci.isCompleted })),
       });
@@ -1370,7 +1517,9 @@ export async function getEmployeeDashboardData(ctx: TenantContext): Promise<Empl
       unacknowledgedCount: unacknowledgedAssignments.length,
       blockedCount,
       pendingExtensionsCount,
+      reopenedCount: reopenedTasksList.length,
     },
+    reopenedTasks: reopenedTasksList,
     unacknowledgedAssignments,
     workQueue: workQueueItems,
     todayPriorities,

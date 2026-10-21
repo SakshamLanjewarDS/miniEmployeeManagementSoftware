@@ -25,6 +25,10 @@ import {
   Trash2,
   Edit3,
   RefreshCw,
+  ArrowUpDown,
+  Clock,
+  FileText,
+  Users,
 } from "lucide-react";
 import { broadcastRealtimeEvent, useRealtimeSubscription } from "@/lib/realtime";
 import MobileFilterDrawer from "@/components/ui/MobileFilterDrawer";
@@ -40,10 +44,30 @@ export default function VendorManagementPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [industryFilter, setIndustryFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [ratingFilter, setRatingFilter] = useState<string>("ALL");
+  const [contactFilter, setContactFilter] = useState<string>("ALL");
+  const [meetingFilter, setMeetingFilter] = useState<string>("ALL");
+  const [vendorSortBy, setVendorSortBy] = useState<string>("NEWEST");
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
 
+  // Quick Meeting Modal & Logging state
+  const [meetingModalVendor, setMeetingModalVendor] = useState<any | null>(null);
+  const [meetingForm, setMeetingForm] = useState({
+    status: "DONE" as "DONE" | "PENDING" | "NONE",
+    date: new Date().toISOString().split("T")[0],
+    notes: "",
+    hasSample: false,
+    hasCatalog: false,
+  });
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+
   // Active filter count for mobile badge
-  const mobileActiveFilterCount = (industryFilter ? 1 : 0) + (statusFilter ? 1 : 0);
+  const mobileActiveFilterCount =
+    (industryFilter ? 1 : 0) +
+    (statusFilter ? 1 : 0) +
+    (ratingFilter !== "ALL" ? 1 : 0) +
+    (contactFilter !== "ALL" ? 1 : 0) +
+    (meetingFilter !== "ALL" ? 1 : 0);
 
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [form, setForm] = useState({
@@ -234,6 +258,178 @@ export default function VendorManagementPage() {
     }, 250);
     return () => clearTimeout(timer);
   }, [workspaceSlug, industryFilter, statusFilter, searchQuery]);
+
+  // Format form fill date from Google Sheet timestamp or database created date
+  const formatFormDate = (raw?: string | null, fallback?: string | Date) => {
+    if (raw && typeof raw === "string" && raw.trim()) {
+      const parsed = new Date(raw);
+      if (!isNaN(parsed.getTime())) {
+        return parsed.toLocaleDateString("en-US", {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+      }
+      return raw;
+    }
+    if (fallback) {
+      const parsed = new Date(fallback);
+      if (!isNaN(parsed.getTime())) {
+        return parsed.toLocaleDateString("en-US", {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+      }
+    }
+    return "N/A";
+  };
+
+  // Quick 1-click meeting status toggle: Done or Pending
+  const handleQuickMeetingStatus = async (vendor: any, newStatus: "DONE" | "PENDING") => {
+    try {
+      const existingHistory = (vendor.visitHistoryJson as Record<string, any>) || {};
+      const updatedHistory = {
+        ...existingHistory,
+        meetingStatus: newStatus,
+        meetingCompletedAt: newStatus === "DONE" ? new Date().toISOString() : existingHistory.meetingCompletedAt,
+      };
+
+      const res = await fetch(`/api/vendors/${vendor.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          workspaceSlug,
+          visitHistoryJson: updatedHistory,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to update meeting status");
+
+      setVendors((prev) =>
+        prev.map((item) =>
+          item.id === vendor.id ? { ...item, visitHistoryJson: updatedHistory } : item
+        )
+      );
+      setActionSuccess(`Meeting status for "${vendor.companyName || vendor.name}" marked as ${newStatus}.`);
+      broadcastRealtimeEvent("VENDOR_UPDATED");
+    } catch (err: any) {
+      alert(err.message || "Failed to update meeting status");
+    }
+  };
+
+  const openMeetingModal = (vendor: any) => {
+    const history = (vendor.visitHistoryJson as Record<string, any>) || {};
+    setMeetingModalVendor(vendor);
+    setMeetingForm({
+      status: (history.meetingStatus as any) || "DONE",
+      date: history.meetingDate || new Date().toISOString().split("T")[0],
+      notes: history.meetingNotes || "",
+      hasSample: Boolean(history.hasSample),
+      hasCatalog: Boolean(history.hasCatalog),
+    });
+  };
+
+  const handleSaveMeetingDetails = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!meetingModalVendor) return;
+
+    setActionLoading(true);
+    try {
+      const existingHistory = (meetingModalVendor.visitHistoryJson as Record<string, any>) || {};
+      const updatedHistory = {
+        ...existingHistory,
+        meetingStatus: meetingForm.status,
+        meetingDate: meetingForm.date,
+        meetingNotes: meetingForm.notes,
+        hasSample: meetingForm.hasSample,
+        hasCatalog: meetingForm.hasCatalog,
+        meetingCompletedAt:
+          meetingForm.status === "DONE"
+            ? existingHistory.meetingCompletedAt || new Date().toISOString()
+            : undefined,
+      };
+
+      const res = await fetch(`/api/vendors/${meetingModalVendor.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          workspaceSlug,
+          visitHistoryJson: updatedHistory,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to save meeting details");
+
+      setVendors((prev) =>
+        prev.map((item) =>
+          item.id === meetingModalVendor.id ? { ...item, visitHistoryJson: updatedHistory } : item
+        )
+      );
+      setMeetingModalVendor(null);
+      setActionSuccess(`Meeting details saved for "${meetingModalVendor.companyName || meetingModalVendor.name}".`);
+      broadcastRealtimeEvent("VENDOR_UPDATED");
+    } catch (err: any) {
+      alert(err.message || "Failed to save meeting details");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const copyToClipboard = (text: string, fieldId: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedField(fieldId);
+    setTimeout(() => setCopiedField(null), 2000);
+  };
+
+  // Memoized advanced filtering and sorting
+  const filteredVendors = React.useMemo(() => {
+    let list = vendors.filter((v) => {
+      if (ratingFilter !== "ALL") {
+        const minRating = parseInt(ratingFilter, 10);
+        if ((v.rating || 0) < minRating) return false;
+      }
+      if (contactFilter === "HAS_PHONE") {
+        if (!v.phoneNumber || v.phoneNumber.trim() === "") return false;
+      } else if (contactFilter === "HAS_WEBSITE") {
+        if (!v.websiteUrl || v.websiteUrl.trim() === "") return false;
+      } else if (contactFilter === "HAS_EMAIL") {
+        if (!v.email || v.email.trim() === "") return false;
+      }
+
+      // Meeting status filter
+      if (meetingFilter === "DONE") {
+        const mStatus = v.visitHistoryJson?.meetingStatus;
+        if (mStatus !== "DONE") return false;
+      } else if (meetingFilter === "PENDING") {
+        const mStatus = v.visitHistoryJson?.meetingStatus;
+        if (mStatus !== "PENDING") return false;
+      } else if (meetingFilter === "NONE") {
+        const mStatus = v.visitHistoryJson?.meetingStatus;
+        if (mStatus && mStatus !== "NONE") return false;
+      }
+
+      return true;
+    });
+
+    return [...list].sort((a, b) => {
+      switch (vendorSortBy) {
+        case "RATING_DESC":
+          return (b.rating || 0) - (a.rating || 0);
+        case "RATING_ASC":
+          return (a.rating || 0) - (b.rating || 0);
+        case "NAME_ASC":
+          return (a.name || "").localeCompare(b.name || "");
+        case "COMPANY_ASC":
+          return (a.companyName || a.name || "").localeCompare(b.companyName || b.name || "");
+        case "NEWEST":
+        default:
+          return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+      }
+    });
+  }, [vendors, ratingFilter, contactFilter, meetingFilter, vendorSortBy]);
 
   // Real-time dynamic updates: visible polling + tab focus revalidation + cross-tab live events
   useRealtimeSubscription(
@@ -433,12 +629,12 @@ export default function VendorManagementPage() {
           </button>
 
           {/* Desktop Filter Dropdowns */}
-          <div className="hidden sm:flex items-center gap-2">
+          <div className="hidden sm:flex flex-wrap items-center gap-2">
             <select
               value={industryFilter}
               onChange={(e) => setIndustryFilter(e.target.value)}
               aria-label="Filter by industry category"
-              className="px-2.5 py-1.5 text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] focus:outline-none focus:border-[#5A81FA] cursor-pointer"
+              className="px-2.5 py-1.5 text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] font-medium focus:outline-none focus:border-[#5A81FA] cursor-pointer"
             >
               <option value="">All Categories</option>
               <option value="Marble & Granite">Marble & Granite</option>
@@ -453,7 +649,7 @@ export default function VendorManagementPage() {
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
               aria-label="Filter by relationship status"
-              className="px-2.5 py-1.5 text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] focus:outline-none focus:border-[#5A81FA] cursor-pointer"
+              className="px-2.5 py-1.5 text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] font-medium focus:outline-none focus:border-[#5A81FA] cursor-pointer"
             >
               <option value="">All Statuses</option>
               <option value="ACTIVE">Active</option>
@@ -462,12 +658,68 @@ export default function VendorManagementPage() {
               <option value="INACTIVE">Inactive</option>
             </select>
 
-            {(industryFilter || statusFilter || searchQuery) && (
+            <select
+              value={ratingFilter}
+              onChange={(e) => setRatingFilter(e.target.value)}
+              aria-label="Filter by rating"
+              className="px-2.5 py-1.5 text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] font-medium focus:outline-none focus:border-[#5A81FA] cursor-pointer"
+            >
+              <option value="ALL">All Ratings</option>
+              <option value="5">5 Stars (★★★★★)</option>
+              <option value="4">4+ Stars (★★★★☆)</option>
+              <option value="3">3+ Stars (★★★☆☆)</option>
+            </select>
+
+            <select
+              value={contactFilter}
+              onChange={(e) => setContactFilter(e.target.value)}
+              aria-label="Filter by contact channel"
+              className="px-2.5 py-1.5 text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] font-medium focus:outline-none focus:border-[#5A81FA] cursor-pointer"
+            >
+              <option value="ALL">All Channels</option>
+              <option value="HAS_PHONE">Has Phone</option>
+              <option value="HAS_WEBSITE">Has Website</option>
+              <option value="HAS_EMAIL">Has Email</option>
+            </select>
+
+            <select
+              value={meetingFilter}
+              onChange={(e) => setMeetingFilter(e.target.value)}
+              aria-label="Filter by meeting status"
+              className="px-2.5 py-1.5 text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] font-medium focus:outline-none focus:border-[#5A81FA] cursor-pointer"
+            >
+              <option value="ALL">All Meetings</option>
+              <option value="DONE">✓ Meeting Done</option>
+              <option value="PENDING">⏳ Meeting Pending</option>
+              <option value="NONE">○ No Meeting Yet</option>
+            </select>
+
+            <div className="flex items-center gap-1 px-2 py-1 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-xs text-[#696E82]">
+              <ArrowUpDown className="w-3 h-3 text-[#5A81FA]" />
+              <select
+                value={vendorSortBy}
+                onChange={(e) => setVendorSortBy(e.target.value)}
+                aria-label="Sort vendors by"
+                className="bg-transparent border-none text-[#1F1F1F] font-semibold text-xs focus:outline-none cursor-pointer pr-1"
+              >
+                <option value="NEWEST">Date Added (Newest)</option>
+                <option value="RATING_DESC">Rating (High → Low)</option>
+                <option value="RATING_ASC">Rating (Low → High)</option>
+                <option value="COMPANY_ASC">Company Name (A → Z)</option>
+                <option value="NAME_ASC">Contact Person (A → Z)</option>
+              </select>
+            </div>
+
+            {(industryFilter || statusFilter || ratingFilter !== "ALL" || contactFilter !== "ALL" || meetingFilter !== "ALL" || searchQuery) && (
               <button
                 type="button"
                 onClick={() => {
                   setIndustryFilter("");
                   setStatusFilter("");
+                  setRatingFilter("ALL");
+                  setContactFilter("ALL");
+                  setMeetingFilter("ALL");
+                  setVendorSortBy("NEWEST");
                   setSearchQuery("");
                 }}
                 className="text-xs font-semibold text-rose-600 hover:text-rose-800 hover:underline px-1 cursor-pointer"
@@ -478,6 +730,65 @@ export default function VendorManagementPage() {
             )}
           </div>
         </div>
+
+        {/* Active Filter Chips Row */}
+        {(industryFilter || statusFilter || ratingFilter !== "ALL" || contactFilter !== "ALL" || meetingFilter !== "ALL" || searchQuery) && (
+          <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-[#E2E6F0] text-xs">
+            <span className="text-[#696E82] text-[11px] font-medium mr-1">Active Filters:</span>
+            {industryFilter && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#F2F4FF] text-[#2C308D] border border-[#CEDEFF] text-[11px] font-semibold">
+                Category: {industryFilter}
+                <button type="button" onClick={() => setIndustryFilter("")} className="hover:text-red-500 cursor-pointer">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            {statusFilter && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-[11px] font-semibold">
+                Status: {statusFilter}
+                <button type="button" onClick={() => setStatusFilter("")} className="hover:text-red-500 cursor-pointer">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            {meetingFilter !== "ALL" && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-purple-50 text-purple-800 border border-purple-200 text-[11px] font-semibold">
+                Meeting: {meetingFilter === "DONE" ? "Done" : meetingFilter === "PENDING" ? "Pending" : "Not Scheduled"}
+                <button type="button" onClick={() => setMeetingFilter("ALL")} className="hover:text-red-500 cursor-pointer">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            {ratingFilter !== "ALL" && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 text-amber-900 border border-amber-200 text-[11px] font-semibold">
+                Rating: {ratingFilter}★ & above
+                <button type="button" onClick={() => setRatingFilter("ALL")} className="hover:text-red-500 cursor-pointer">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            {contactFilter !== "ALL" && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 text-[11px] font-semibold">
+                Channel: {contactFilter.replace("HAS_", "")}
+                <button type="button" onClick={() => setContactFilter("ALL")} className="hover:text-red-500 cursor-pointer">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            {searchQuery && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 text-slate-800 border border-slate-200 text-[11px] font-semibold">
+                Search: "{searchQuery}"
+                <button type="button" onClick={() => setSearchQuery("")} className="hover:text-red-500 cursor-pointer">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+
+            <span className="ml-auto text-[#696E82] text-[11px] font-medium">
+              Showing <strong className="text-[#1F1F1F]">{filteredVendors.length}</strong> of {vendors.length} vendors
+            </span>
+          </div>
+        )}
 
         {/* Mobile Horizontal Quick Status Carousel (1-tap access) */}
         <div className="sm:hidden flex items-center gap-1.5 overflow-x-auto touch-scroll-x scrollbar-none pb-0.5 pt-0.5">
@@ -516,8 +827,11 @@ export default function VendorManagementPage() {
         onReset={() => {
           setIndustryFilter("");
           setStatusFilter("");
+          setRatingFilter("ALL");
+          setContactFilter("ALL");
+          setVendorSortBy("NEWEST");
         }}
-        resultsCount={vendors.length}
+        resultsCount={filteredVendors.length}
       >
         <div className="space-y-4">
           <div>
@@ -551,6 +865,49 @@ export default function VendorManagementPage() {
               <option value="INACTIVE">Inactive</option>
             </select>
           </div>
+
+          <div>
+            <label className="block text-xs font-bold text-[#1F1F1F] mb-1.5">Minimum Quality Rating</label>
+            <select
+              value={ratingFilter}
+              onChange={(e) => setRatingFilter(e.target.value)}
+              className="w-full px-3 py-2 text-xs bg-white border border-[#E2E6F0] rounded-xl text-[#1F1F1F] focus:outline-none focus:border-[#5A81FA]"
+            >
+              <option value="ALL">All Ratings</option>
+              <option value="5">5 Stars (★★★★★)</option>
+              <option value="4">4+ Stars (★★★★☆)</option>
+              <option value="3">3+ Stars (★★★☆☆)</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-[#1F1F1F] mb-1.5">Contact Channel Available</label>
+            <select
+              value={contactFilter}
+              onChange={(e) => setContactFilter(e.target.value)}
+              className="w-full px-3 py-2 text-xs bg-white border border-[#E2E6F0] rounded-xl text-[#1F1F1F] focus:outline-none focus:border-[#5A81FA]"
+            >
+              <option value="ALL">All Contacts</option>
+              <option value="HAS_PHONE">Has Phone Number</option>
+              <option value="HAS_WEBSITE">Has Website / Catalog</option>
+              <option value="HAS_EMAIL">Has Email Address</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-[#1F1F1F] mb-1.5">Sort Results By</label>
+            <select
+              value={vendorSortBy}
+              onChange={(e) => setVendorSortBy(e.target.value)}
+              className="w-full px-3 py-2 text-xs bg-white border border-[#E2E6F0] rounded-xl text-[#1F1F1F] focus:outline-none focus:border-[#5A81FA]"
+            >
+              <option value="NEWEST">Date Added (Newest First)</option>
+              <option value="RATING_DESC">Rating (High → Low)</option>
+              <option value="RATING_ASC">Rating (Low → High)</option>
+              <option value="COMPANY_ASC">Company Name (A → Z)</option>
+              <option value="NAME_ASC">Contact Person (A → Z)</option>
+            </select>
+          </div>
         </div>
       </MobileFilterDrawer>
 
@@ -559,13 +916,13 @@ export default function VendorManagementPage() {
         <div className="p-16 text-center text-xs text-[#696E82] bg-white rounded-3xl border border-[#E2E6F0]">
           Loading studio vendor records...
         </div>
-      ) : vendors.length === 0 ? (
+      ) : filteredVendors.length === 0 ? (
         <div className="p-16 text-center text-xs text-[#696E82] bg-white rounded-3xl border border-[#E2E6F0]">
           No vendor records match your search criteria.
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {vendors.map((v) => (
+          {filteredVendors.map((v) => (
             <div
               key={v.id}
               className="bg-white rounded-3xl border border-[#E2E6F0] p-5 shadow-2xs hover:shadow-xs transition-all space-y-3 text-xs flex flex-col justify-between"
@@ -595,7 +952,7 @@ export default function VendorManagementPage() {
                   </span>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-[#F2F4FF] text-[#2C308D]">
                     {v.industryType || "General"}
                   </span>
@@ -606,33 +963,183 @@ export default function VendorManagementPage() {
                       <Star key={i} className="w-3 h-3 fill-amber-400 text-amber-400" />
                     ))}
                   </div>
+
+                  {/* Live Spreadsheet Form Fill Date */}
+                  <div className="flex items-center gap-1.5 text-[10px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200/80 px-2 py-0.5 rounded-lg">
+                    <Calendar className="w-3 h-3 text-emerald-600" />
+                    <span>Form Filled:</span>
+                    <span className="font-bold">
+                      {formatFormDate(v.visitHistoryJson?.formFilledAt, v.createdAt)}
+                    </span>
+                  </div>
                 </div>
 
-                {/* Contact Snippets */}
-                <div className="space-y-1 text-[11px] text-[#696E82] pt-1">
+                {/* Contact Snippets with Direct Actions */}
+                <div className="space-y-1.5 text-[11px] text-[#696E82] pt-1">
                   {v.phoneNumber && (
-                    <div className="flex items-center gap-1.5 font-mono">
-                      <Phone className="w-3 h-3 text-[#5A81FA]" />
-                      <span>{v.phoneNumber}</span>
+                    <div className="flex items-center justify-between gap-1 bg-[#F8F9FD] px-2 py-1.5 rounded-xl border border-[#E2E6F0]/80">
+                      <div className="flex items-center gap-1.5 font-mono text-[#1F1F1F]">
+                        <Phone className="w-3 h-3 text-[#5A81FA] shrink-0" />
+                        <span className="truncate">{v.phoneNumber}</span>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <a
+                          href={`tel:${v.phoneNumber}`}
+                          className="px-2 py-0.5 text-[10px] font-bold bg-white border border-[#E2E6F0] rounded-md text-[#5A81FA] hover:bg-[#F2F4FF] transition-colors"
+                          title="Call vendor"
+                        >
+                          Call
+                        </a>
+                        <button
+                          type="button"
+                          onClick={() => copyToClipboard(v.phoneNumber, `phone-${v.id}`)}
+                          className="p-1 text-[#696E82] hover:text-[#1F1F1F] rounded cursor-pointer"
+                          title="Copy phone"
+                        >
+                          <Copy className="w-3 h-3" />
+                        </button>
+                        {copiedField === `phone-${v.id}` && (
+                          <span className="text-[9px] text-emerald-600 font-bold">Copied!</span>
+                        )}
+                      </div>
                     </div>
                   )}
                   {v.email && (
-                    <div className="flex items-center gap-1.5 font-mono">
-                      <Mail className="w-3 h-3 text-[#5A81FA]" />
-                      <span>{v.email}</span>
+                    <div className="flex items-center justify-between gap-1 bg-[#F8F9FD] px-2 py-1.5 rounded-xl border border-[#E2E6F0]/80">
+                      <div className="flex items-center gap-1.5 font-mono text-[#1F1F1F] truncate">
+                        <Mail className="w-3 h-3 text-[#5A81FA] shrink-0" />
+                        <span className="truncate">{v.email}</span>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <a
+                          href={`mailto:${v.email}`}
+                          className="px-2 py-0.5 text-[10px] font-bold bg-white border border-[#E2E6F0] rounded-md text-[#5A81FA] hover:bg-[#F2F4FF] transition-colors"
+                          title="Send email"
+                        >
+                          Email
+                        </a>
+                        <button
+                          type="button"
+                          onClick={() => copyToClipboard(v.email, `email-${v.id}`)}
+                          className="p-1 text-[#696E82] hover:text-[#1F1F1F] rounded cursor-pointer"
+                          title="Copy email"
+                        >
+                          <Copy className="w-3 h-3" />
+                        </button>
+                        {copiedField === `email-${v.id}` && (
+                          <span className="text-[9px] text-emerald-600 font-bold">Copied!</span>
+                        )}
+                      </div>
                     </div>
                   )}
                   {v.websiteUrl && (
-                    <div className="flex items-center gap-1.5">
-                      <Globe className="w-3 h-3 text-[#5A81FA]" />
+                    <div className="flex items-center gap-1.5 pt-0.5">
+                      <Globe className="w-3 h-3 text-[#5A81FA] shrink-0" />
                       <a
-                        href={v.websiteUrl}
+                        href={v.websiteUrl.startsWith("http") ? v.websiteUrl : `https://${v.websiteUrl}`}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-[#5A81FA] hover:underline truncate max-w-[200px]"
+                        className="text-[#5A81FA] hover:underline truncate"
                       >
                         {v.websiteUrl}
                       </a>
+                    </div>
+                  )}
+                </div>
+
+                {/* Meeting Operations & Categorization Panel */}
+                <div className="p-3 bg-gradient-to-b from-[#F8F9FD] to-white rounded-2xl border border-[#E2E6F0] space-y-2">
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="text-[10px] font-bold text-[#696E82] uppercase tracking-wider flex items-center gap-1">
+                      <Users className="w-3 h-3 text-[#5A81FA]" />
+                      <span>Meeting Status</span>
+                    </span>
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                        v.visitHistoryJson?.meetingStatus === "DONE"
+                          ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                          : v.visitHistoryJson?.meetingStatus === "PENDING"
+                          ? "bg-amber-50 text-amber-800 border-amber-200"
+                          : "bg-slate-100 text-slate-700 border-slate-200"
+                      }`}
+                    >
+                      {v.visitHistoryJson?.meetingStatus === "DONE"
+                        ? "✓ Done"
+                        : v.visitHistoryJson?.meetingStatus === "PENDING"
+                        ? "⏳ Pending"
+                        : "○ Not Scheduled"}
+                    </span>
+                  </div>
+
+                  {/* 1-Click Operations: Done & Pending */}
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handleQuickMeetingStatus(v, "DONE")}
+                      className={`flex-1 py-1.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1 border transition-all cursor-pointer ${
+                        v.visitHistoryJson?.meetingStatus === "DONE"
+                          ? "bg-emerald-600 text-white border-emerald-600 shadow-2xs font-bold"
+                          : "bg-white text-emerald-700 border-emerald-200 hover:bg-emerald-50 hover:border-emerald-300"
+                      }`}
+                      title="Mark meeting as Completed"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>Done</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleQuickMeetingStatus(v, "PENDING")}
+                      className={`flex-1 py-1.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1 border transition-all cursor-pointer ${
+                        v.visitHistoryJson?.meetingStatus === "PENDING"
+                          ? "bg-amber-500 text-white border-amber-500 shadow-2xs font-bold"
+                          : "bg-white text-amber-700 border-amber-200 hover:bg-amber-50 hover:border-amber-300"
+                      }`}
+                      title="Mark meeting as Pending"
+                    >
+                      <Clock className="w-3.5 h-3.5" />
+                      <span>Pending</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => openMeetingModal(v)}
+                      className="p-1.5 bg-white border border-[#E2E6F0] hover:border-[#5A81FA] text-[#696E82] hover:text-[#5A81FA] rounded-xl text-xs transition-colors cursor-pointer"
+                      title="Log meeting notes & collateral"
+                    >
+                      <FileText className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  {/* Meeting Notes / Collateral Snippet */}
+                  {(v.visitHistoryJson?.meetingNotes ||
+                    v.visitHistoryJson?.hasSample ||
+                    v.visitHistoryJson?.hasCatalog ||
+                    v.visitHistoryJson?.meetingDate) && (
+                    <div className="text-[11px] text-[#696E82] pt-2 border-t border-[#E2E6F0] space-y-1">
+                      {v.visitHistoryJson?.meetingDate && (
+                        <div className="text-[10px] text-[#5A81FA] font-medium flex items-center gap-1">
+                          <Calendar className="w-2.5 h-2.5" />
+                          <span>Date: {v.visitHistoryJson.meetingDate}</span>
+                        </div>
+                      )}
+                      {v.visitHistoryJson?.meetingNotes && (
+                        <p className="line-clamp-2 text-[#1F1F1F] italic text-[11px]">
+                          &ldquo;{v.visitHistoryJson.meetingNotes}&rdquo;
+                        </p>
+                      )}
+                      <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                        {v.visitHistoryJson?.hasSample && (
+                          <span className="text-[9px] font-bold px-2 py-0.5 bg-purple-50 text-purple-700 border border-purple-200 rounded-md">
+                            Sample Given
+                          </span>
+                        )}
+                        {v.visitHistoryJson?.hasCatalog && (
+                          <span className="text-[9px] font-bold px-2 py-0.5 bg-sky-50 text-sky-700 border border-sky-200 rounded-md">
+                            Catalog Received
+                          </span>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1106,6 +1613,126 @@ export default function VendorManagementPage() {
         </div>
       )}
 
+      {/* Meeting Details / Outcome Log Modal */}
+      {meetingModalVendor && (
+        <div className="fixed inset-0 z-50 bg-[#0B122B]/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 border border-[#E2E6F0] shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-[#E2E6F0] pb-3">
+              <div>
+                <h3 className="type-card-title text-[#1F1F1F]">Log Vendor Meeting & Outcomes</h3>
+                <p className="text-xs text-[#696E82]">
+                  {meetingModalVendor.companyName || meetingModalVendor.name}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMeetingModalVendor(null)}
+                className="p-1 rounded-lg text-[#696E82] hover:bg-gray-100 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveMeetingDetails} className="space-y-4 text-xs">
+              <div>
+                <label className="font-semibold text-[#1F1F1F] block mb-1">Meeting Status</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setMeetingForm({ ...meetingForm, status: "DONE" })}
+                    className={`p-2.5 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                      meetingForm.status === "DONE"
+                        ? "bg-emerald-600 text-white border-emerald-600 shadow-2xs font-bold"
+                        : "bg-white text-emerald-800 border-emerald-200 hover:bg-emerald-50"
+                    }`}
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Meeting Done</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMeetingForm({ ...meetingForm, status: "PENDING" })}
+                    className={`p-2.5 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                      meetingForm.status === "PENDING"
+                        ? "bg-amber-500 text-white border-amber-500 shadow-2xs font-bold"
+                        : "bg-white text-amber-800 border-amber-200 hover:bg-amber-50"
+                    }`}
+                  >
+                    <Clock className="w-4 h-4" />
+                    <span>Meeting Pending</span>
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="font-semibold text-[#1F1F1F] block mb-1">Meeting Date</label>
+                <input
+                  type="date"
+                  value={meetingForm.date}
+                  onChange={(e) => setMeetingForm({ ...meetingForm, date: e.target.value })}
+                  className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F]"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-[#1F1F1F] block mb-1">Discussion Points & Meeting Notes</label>
+                <textarea
+                  rows={3}
+                  value={meetingForm.notes}
+                  onChange={(e) => setMeetingForm({ ...meetingForm, notes: e.target.value })}
+                  placeholder="Discussed pricing, finish samples, catalogs, warranty, project specifications..."
+                  className="w-full px-3 py-2 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] placeholder-[#696E82]"
+                />
+              </div>
+
+              <div className="pt-2 border-t border-[#E2E6F0] space-y-2">
+                <span className="text-[11px] font-bold text-[#696E82] uppercase tracking-wider block">
+                  Studio Collateral Received
+                </span>
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="flex items-center gap-2 p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl cursor-pointer hover:bg-slate-100 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={meetingForm.hasSample}
+                      onChange={(e) => setMeetingForm({ ...meetingForm, hasSample: e.target.checked })}
+                      className="rounded text-[#5A81FA] focus:ring-[#5A81FA]"
+                    />
+                    <span className="font-medium text-[#1F1F1F]">Physical Samples</span>
+                  </label>
+
+                  <label className="flex items-center gap-2 p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl cursor-pointer hover:bg-slate-100 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={meetingForm.hasCatalog}
+                      onChange={(e) => setMeetingForm({ ...meetingForm, hasCatalog: e.target.checked })}
+                      className="rounded text-[#5A81FA] focus:ring-[#5A81FA]"
+                    />
+                    <span className="font-medium text-[#1F1F1F]">Catalog / Brochure</span>
+                  </label>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#E2E6F0]">
+                <button
+                  type="button"
+                  onClick={() => setMeetingModalVendor(null)}
+                  className="px-4 py-2 text-xs font-semibold text-[#696E82] hover:bg-gray-100 rounded-xl cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={actionLoading}
+                  className="px-4 py-2 text-xs font-semibold text-white bg-[#5A81FA] hover:bg-[#4870EB] rounded-xl disabled:opacity-50 transition-colors cursor-pointer"
+                >
+                  {actionLoading ? "Saving..." : "Save Meeting Details"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Mobile Filter Drawer */}
       <MobileFilterDrawer
         isOpen={isMobileFilterOpen}
@@ -1115,6 +1742,10 @@ export default function VendorManagementPage() {
         onReset={() => {
           setIndustryFilter("");
           setStatusFilter("");
+          setRatingFilter("ALL");
+          setContactFilter("ALL");
+          setMeetingFilter("ALL");
+          setVendorSortBy("NEWEST");
         }}
         resultCount={vendors.length}
       >
@@ -1136,6 +1767,23 @@ export default function VendorManagementPage() {
               <option value="Architectural Lighting">Lighting</option>
               <option value="HVAC & Automation">HVAC & Automation</option>
               <option value="Sanitaryware & Tiles">Sanitaryware</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">
+              Meeting Status
+            </label>
+            <select
+              value={meetingFilter}
+              onChange={(e) => setMeetingFilter(e.target.value)}
+              aria-label="Filter by meeting status"
+              className="w-full p-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#5A81FA] cursor-pointer"
+            >
+              <option value="ALL">All Meeting Statuses</option>
+              <option value="DONE">✓ Meeting Done</option>
+              <option value="PENDING">⏳ Meeting Pending</option>
+              <option value="NONE">○ No Meeting Yet</option>
             </select>
           </div>
 

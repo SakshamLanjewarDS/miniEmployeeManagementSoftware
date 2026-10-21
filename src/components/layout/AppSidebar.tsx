@@ -1135,7 +1135,7 @@ export function AppSidebar({ context }: AppSidebarProps) {
             >
               <div className="pb-2.5 border-b border-slate-100">
                 <div className="text-xs font-bold text-slate-900">{context.userFullName}</div>
-                <div className="text-[11px] text-slate-500">{context.email || context.tenantSlug}</div>
+                <div className="text-[11px] text-slate-500">{context.userEmail || context.tenantSlug}</div>
               </div>
 
               <div className="py-1.5 space-y-0.5">

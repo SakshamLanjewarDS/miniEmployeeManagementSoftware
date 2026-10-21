@@ -85,9 +85,20 @@ export function daysToMinutes(days: number): number {
 /**
  * Normalizes date to Date object at UTC 00:00:00 for @db.Date fields
  */
-export function parseDateOnly(dateInput: string | Date): Date {
+export function parseDateOnly(dateInput: string | Date, timezone: string = "Asia/Kolkata"): Date {
   if (dateInput instanceof Date) {
-    return new Date(Date.UTC(dateInput.getUTCFullYear(), dateInput.getUTCMonth(), dateInput.getUTCDate()));
+    try {
+      const formatter = new Intl.DateTimeFormat("en-CA", {
+        timeZone: timezone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      });
+      const parts = formatter.format(dateInput).split("-");
+      return new Date(Date.UTC(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10)));
+    } catch {
+      return new Date(Date.UTC(dateInput.getFullYear(), dateInput.getMonth(), dateInput.getDate()));
+    }
   }
   const parts = dateInput.split("T")[0].split("-");
   return new Date(Date.UTC(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10)));

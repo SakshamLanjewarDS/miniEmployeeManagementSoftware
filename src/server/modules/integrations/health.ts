@@ -330,7 +330,7 @@ export async function getIntegrationHealthOverview(
   const failingCount = connectors.filter((c) => c.status === "ERROR").length;
   const totalBacklog = connectors.reduce((acc, c) => acc + c.metrics.backlogCount, 0);
 
-  return {
+  const result: IntegrationHealthDashboardData = {
     generatedAt: now.toISOString(),
     overallHealth: failingCount > 0 ? "ATTENTION_REQUIRED" : totalBacklog > 20 ? "DEGRADED" : "HEALTHY",
     activeConnectorsCount: connectors.filter((c) => c.isEnabled).length,

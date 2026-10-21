@@ -157,8 +157,8 @@ export async function compareDrawingRevisions(
     },
     select: {
       id: true,
-      filename: true,
-      sizeBytes: true,
+      fileName: true,
+      byteSize: true,
     },
   });
 
@@ -212,8 +212,8 @@ export async function compareDrawingRevisions(
       issuePurpose: versionA.issuePurpose,
       approvalState: versionA.approvalState,
       fileId: versionA.fileId,
-      fileName: fileMap.get(versionA.fileId)?.filename,
-      fileSize: fileMap.get(versionA.fileId)?.sizeBytes,
+      fileName: fileMap.get(versionA.fileId)?.fileName,
+      fileSize: fileMap.get(versionA.fileId)?.byteSize,
       uploaderId: versionA.uploaderId,
       uploaderName: uploaderMap.get(versionA.uploaderId) || "Studio Member",
       createdAt: versionA.createdAt.toISOString(),
@@ -230,8 +230,8 @@ export async function compareDrawingRevisions(
       issuePurpose: versionB.issuePurpose,
       approvalState: versionB.approvalState,
       fileId: versionB.fileId,
-      fileName: fileMap.get(versionB.fileId)?.filename,
-      fileSize: fileMap.get(versionB.fileId)?.sizeBytes,
+      fileName: fileMap.get(versionB.fileId)?.fileName,
+      fileSize: fileMap.get(versionB.fileId)?.byteSize,
       uploaderId: versionB.uploaderId,
       uploaderName: uploaderMap.get(versionB.uploaderId) || "Studio Member",
       createdAt: versionB.createdAt.toISOString(),

@@ -126,7 +126,7 @@ export async function registerDevicePush(workspaceSlug: string): Promise<{
     const convertedVapidKey = urlBase64ToUint8Array(vapidPublicKey);
     subscription = await reg.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: convertedVapidKey,
+      applicationServerKey: convertedVapidKey as unknown as BufferSource,
     });
 
     // 5. Send subscription to our server

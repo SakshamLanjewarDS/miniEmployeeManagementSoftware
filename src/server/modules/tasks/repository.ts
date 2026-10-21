@@ -409,6 +409,13 @@ export async function findTasks(ctx: TenantContext, params: TaskFilterParams = {
         orderBy: { createdAt: "desc" },
         take: 10,
       },
+      siteVisits: {
+        select: {
+          id: true,
+          purpose: true,
+          operationalState: true,
+        },
+      },
     },
     orderBy: [{ priority: "desc" }, { dueDate: "asc" }],
   });
@@ -570,6 +577,13 @@ export async function findTaskById(ctx: TenantContext, taskId: string) {
       activityHistory: {
         orderBy: { createdAt: "desc" },
       },
+      siteVisits: {
+        select: {
+          id: true,
+          purpose: true,
+          operationalState: true,
+        },
+      },
     },
   });
 }
@@ -724,9 +738,9 @@ export async function createTask(ctx: TenantContext, data: CreateTaskData) {
       where: { projectId: project.id, tenantId: ctx.tenantId },
     });
     if (phaseName) {
-      deliverableTitle = `${phaseName} Deliverable #${taskCount + 1}`;
+      deliverableTitle = `${project.code} - ${phaseName} Deliverable #${taskCount + 1}`;
     } else {
-      deliverableTitle = `${project.name} Deliverable #${taskCount + 1}`;
+      deliverableTitle = `${project.code} - ${project.name} Deliverable #${taskCount + 1}`;
     }
   }
 
@@ -950,7 +964,7 @@ export async function transitionTaskStatus(
   const isCreator = task.creatorId === ctx.membershipId;
 
   if (!isPrivileged && !isAssignee && !isCreator) {
-    if (newStatus === TaskWorkflowStatus.COMPLETED && !ALLOW_EMPLOYEE_SELF_COMPLETION) {
+    if (newStatus === TaskWorkflowStatus.COMPLETED) {
       throw new ForbiddenException(
         "Direct completion override requires Administrator or Partner authority."
       );
@@ -970,10 +984,13 @@ export async function transitionTaskStatus(
       );
     }
 
-    if (isPrivileged) {
-      // Studio Leadership (Owner and Admin) has sovereign authority to mark any task as completed.
-      // Automatically complete all remaining incomplete checklist items.
-      if (task.checklistItems && task.checklistItems.length > 0) {
+    const incompleteItems = (task.checklistItems || []).filter(
+      (item) => item.status !== TaskWorkflowStatus.COMPLETED && !item.isCompleted
+    );
+
+    if (incompleteItems.length > 0) {
+      if (isPrivileged && options?.auditReason?.trim()) {
+        // Studio Leadership sovereign override with mandatory documented audit reason
         await prisma.taskChecklistItem.updateMany({
           where: { taskId: task.id, isCompleted: false },
           data: {
@@ -983,32 +1000,13 @@ export async function transitionTaskStatus(
             completedById: ctx.membershipId,
           },
         });
-      }
-    } else if (governance.policy === "REVIEW_REQUIRED" && !ALLOW_EMPLOYEE_SELF_COMPLETION) {
-      // Standard review completion: Check if checklist items exist. If so, all must be completed/approved!
-      if (task.checklistItems && task.checklistItems.length > 0) {
-        const incompleteItems = task.checklistItems.filter(
-          (item) => item.status !== TaskWorkflowStatus.COMPLETED && !item.isCompleted
+      } else {
+        const reasonRequirement = isPrivileged
+          ? " A mandatory documented audit reason is required for leadership direct completion override of incomplete items."
+          : "";
+        throw new Error(
+          `Cannot complete deliverable: All assigned employee checklist items must be completed and approved first (${incompleteItems.length} remaining).${reasonRequirement}`
         );
-        if (incompleteItems.length > 0) {
-          throw new Error(
-            `Cannot complete deliverable: All assigned employee checklist items must be completed and approved first (${incompleteItems.length} remaining).`
-          );
-        }
-      }
-    } else {
-      // When SELF_COMPLETION_ALLOWED or ALLOW_EMPLOYEE_SELF_COMPLETION is true:
-      // Mark any remaining incomplete checklist items as completed
-      if (task.checklistItems && task.checklistItems.length > 0) {
-        await prisma.taskChecklistItem.updateMany({
-          where: { taskId: task.id, isCompleted: false },
-          data: {
-            isCompleted: true,
-            status: TaskWorkflowStatus.COMPLETED,
-            completedAt: new Date(),
-            completedById: ctx.membershipId,
-          },
-        });
       }
     }
 

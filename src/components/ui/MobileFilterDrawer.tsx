@@ -10,6 +10,7 @@ interface MobileFilterDrawerProps {
   activeCount?: number;
   onReset?: () => void;
   resultCount?: number;
+  resultsCount?: number;
   children: React.ReactNode;
 }
 
@@ -20,8 +21,10 @@ export function MobileFilterDrawer({
   activeCount = 0,
   onReset,
   resultCount,
+  resultsCount,
   children,
 }: MobileFilterDrawerProps) {
+  const effectiveResultCount = resultCount ?? resultsCount;
   // Lock body scroll while drawer is open
   useEffect(() => {
     if (isOpen) {
@@ -105,8 +108,8 @@ export function MobileFilterDrawer({
           >
             <Check className="w-4 h-4 stroke-[2.5]" />
             <span>
-              {resultCount !== undefined
-                ? `Show ${resultCount} Results`
+              {effectiveResultCount !== undefined
+                ? `Show ${effectiveResultCount} Results`
                 : "Apply Filters"}
             </span>
           </button>

@@ -4,6 +4,7 @@ import { prisma, assertSafeTestDatabase } from "../helpers/test-db";
 import {
   getOwnerDecisionInbox,
   executeInboxDecision,
+  clearInboxCache,
 } from "../../src/server/modules/inbox/service";
 import { createTask } from "../../src/server/modules/tasks/repository";
 import {
@@ -279,6 +280,7 @@ describe("Module 1: Owner Decision Inbox — Executive Authorization Suite", () 
       feeImpactAmount: 50000,
     });
 
+    clearInboxCache(ownerCtx.tenantId);
     const inbox = await getOwnerDecisionInbox(ownerCtx, { tab: "all-authorized" });
     const ownerItem = inbox.items.find((i) => i.rawId === ownerScopeReq.id);
     assert.ok(ownerItem, "Owner-submitted scope change must appear in all-authorized inbox");

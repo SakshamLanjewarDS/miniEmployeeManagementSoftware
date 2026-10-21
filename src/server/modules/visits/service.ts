@@ -526,7 +526,7 @@ export async function reviewSiteVisit(
   dispatchNotification({
     tenantId: ctx.tenantId,
     recipientId: updated.employeeId,
-    title: decision === SiteVisitReviewDecision.APPROVED ? "Site Visit Report Approved 🎉" : "Site Visit Report - Action Needed",
+    title: decision === SiteVisitReviewDecision.ACCEPTED ? "Site Visit Report Approved 🎉" : "Site Visit Report - Action Needed",
     message: `${ctx.userFullName} reviewed your visit to '${updated.site.name}': ${decision}.${comment ? ` Note: ${comment}` : ""}`,
     link: `/w/${ctx.tenantSlug}/visits`,
     tag: `visit-review-${visitId}`,

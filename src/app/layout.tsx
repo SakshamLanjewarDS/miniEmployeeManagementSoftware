@@ -7,6 +7,7 @@ const dmSans = DM_Sans({
   weight: ["400", "500", "600", "700"],
   variable: "--font-dm-sans",
   display: "swap",
+  preload: false,
 });
 
 export const viewport: Viewport = {
@@ -59,10 +60,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={dmSans.variable} data-scroll-behavior="smooth" suppressHydrationWarning>
       <head>
-        <link rel="preload" href="/fonts/dmsans-latin.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
-      </head>
-      <body suppressHydrationWarning className={`${dmSans.className} antialiased min-h-screen selection:bg-[#5A81FA] selection:text-white`}>
-        {/* Browser Extension Safety Shield: Clean event suppression without DOM or prototype mutation */}
+        {/* Browser Extension Safety Shield: Prevent external extensions from corrupting DOM before hydration and suppress extension noise */}
         <script
           id="browser-extension-error-shield"
           dangerouslySetInnerHTML={{
@@ -70,6 +68,93 @@ export default function RootLayout({
               (function() {
                 if (typeof window === 'undefined') return;
 
+                // 1. Prevent extensions (autofill, password managers) from mutating DOM elements with fdprocessedid before/during hydration
+                try {
+                  if (typeof Element !== 'undefined' && Element.prototype && Element.prototype.setAttribute) {
+                    var origSetAttribute = Element.prototype.setAttribute;
+                    Element.prototype.setAttribute = function(name, value) {
+                      if (typeof name === 'string' && name.toLowerCase() === 'fdprocessedid') {
+                        return;
+                      }
+                      return origSetAttribute.apply(this, arguments);
+                    };
+                  }
+                } catch(e) {}
+
+                // 2. Safe element fallback for extension content scripts (share-modal, chext) querying DOM before complete
+                try {
+                  if (typeof document !== 'undefined') {
+                    var dummyTarget = document.createElement('div');
+                    dummyTarget.id = 'share-modal-dummy';
+                    dummyTarget.addEventListener = function() { return this; };
+                    dummyTarget.removeEventListener = function() { return this; };
+                    dummyTarget.setAttribute = function() { return this; };
+                    dummyTarget.getAttribute = function() { return ''; };
+                    dummyTarget.querySelector = function() { return dummyTarget; };
+                    dummyTarget.querySelectorAll = function() { return [dummyTarget]; };
+                    dummyTarget.getElementsByTagName = function() { return [dummyTarget]; };
+                    dummyTarget.getElementsByClassName = function() { return [dummyTarget]; };
+
+                    var isExtensionCall = function(val) {
+                      try {
+                        var err = new Error();
+                        var stack = (err.stack || '').toLowerCase();
+                        if (
+                          stack.indexOf('share-modal') !== -1 ||
+                          stack.indexOf('chext') !== -1 ||
+                          stack.indexOf('chrome-extension') !== -1
+                        ) {
+                          return true;
+                        }
+                      } catch(e) {}
+                      if (typeof val === 'string') {
+                        var v = val.toLowerCase();
+                        if (v.indexOf('share') !== -1 || v.indexOf('copy') !== -1 || v.indexOf('modal') !== -1) {
+                          return true;
+                        }
+                      }
+                      return false;
+                    };
+
+                    var origGetById = document.getElementById.bind(document);
+                    document.getElementById = function(id) {
+                      var el = origGetById(id);
+                      if (!el && isExtensionCall(id)) {
+                        return dummyTarget;
+                      }
+                      return el;
+                    };
+
+                    var origQuerySel = document.querySelector.bind(document);
+                    document.querySelector = function(sel) {
+                      var el = origQuerySel(sel);
+                      if (!el && isExtensionCall(sel)) {
+                        return dummyTarget;
+                      }
+                      return el;
+                    };
+
+                    var origQuerySelAll = document.querySelectorAll.bind(document);
+                    document.querySelectorAll = function(sel) {
+                      var res = origQuerySelAll(sel);
+                      if ((!res || res.length === 0) && isExtensionCall(sel)) {
+                        return [dummyTarget];
+                      }
+                      return res;
+                    };
+
+                    var origGetByClass = document.getElementsByClassName.bind(document);
+                    document.getElementsByClassName = function(cls) {
+                      var res = origGetByClass(cls);
+                      if ((!res || res.length === 0) && isExtensionCall(cls)) {
+                        return [dummyTarget];
+                      }
+                      return res;
+                    };
+                  }
+                } catch(e) {}
+
+                // 2. Identify and filter known noisy external browser extension errors and hydration false-positives
                 var isIgnored = function(msg, url, stack) {
                   var str = (String(msg || '') + ' ' + String(url || '') + ' ' + String(stack || '')).toLowerCase();
                   return (
@@ -78,9 +163,12 @@ export default function RootLayout({
                     str.indexOf('inspector') !== -1 ||
                     str.indexOf('json formatter') !== -1 ||
                     str.indexOf('set-json-global') !== -1 ||
-                    str.indexOf('cannot read properties of null (reading \\'addeventlistener\\')') !== -1 ||
-                    str.indexOf('permissions policy violation: unload') !== -1 ||
-                    str.indexOf('beforeinstallprompt') !== -1
+                    str.indexOf('fdprocessedid') !== -1 ||
+                    str.indexOf('permissions policy violation') !== -1 ||
+                    str.indexOf('beforeinstallprompt') !== -1 ||
+                    str.indexOf('preloaded using link preload but not used') !== -1 ||
+                    str.indexOf('preload but not used within a few seconds') !== -1 ||
+                    (str.indexOf('cannot read properties of null') !== -1 && str.indexOf('addeventlistener') !== -1)
                   );
                 };
 
@@ -133,10 +221,28 @@ export default function RootLayout({
                     if (event.stopImmediatePropagation) event.stopImmediatePropagation();
                   }
                 });
+
+                // Clean up preloaded links on window load to prevent Chromium unused-preload timer warnings
+                if (typeof window !== 'undefined') {
+                  window.addEventListener('load', function() {
+                    setTimeout(function() {
+                      try {
+                        var preloads = document.querySelectorAll('link[rel="preload"]');
+                        preloads.forEach(function(l) {
+                          if (l && l.parentNode) {
+                            l.parentNode.removeChild(l);
+                          }
+                        });
+                      } catch(e) {}
+                    }, 500);
+                  });
+                }
               })();
             `,
           }}
         />
+      </head>
+      <body suppressHydrationWarning className={`${dmSans.className} antialiased min-h-screen selection:bg-[#5A81FA] selection:text-white`}>
 
         {/* Hidden static elements for browser extensions that expect standard share buttons on page */}
         <div id="share-modal-container" className="share-modal-container" style={{ display: "none" }} aria-hidden="true">

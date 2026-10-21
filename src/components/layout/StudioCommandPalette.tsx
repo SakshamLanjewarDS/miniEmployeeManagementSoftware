@@ -37,7 +37,7 @@ interface StudioCommandPaletteProps {
 interface CommandItem {
   id: string;
   title: string;
-  category: "Navigation" | "Projects" | "Quick Actions" | "People";
+  category: string;
   icon: React.ComponentType<{ className?: string }>;
   shortcut?: string;
   href?: string;

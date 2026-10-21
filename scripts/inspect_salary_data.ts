@@ -22,7 +22,7 @@ async function main() {
 
   for (const emp of employees) {
     const comp = emp.compensations[0];
-    console.log(`- ${emp.employeeId} | ${emp.membership.user.fullName} | Base: ${comp ? comp.baseSalary : "NO COMPENSATION"} | Leaves: ${emp.leaveRequests.length}`);
+    console.log(`- ${emp.employeeId} | ${emp.membership.user.fullName} | Base: ${comp ? comp.baseMonthlySalary : "NO COMPENSATION"} | Leaves: ${emp.leaveRequests.length}`);
   }
 }
 

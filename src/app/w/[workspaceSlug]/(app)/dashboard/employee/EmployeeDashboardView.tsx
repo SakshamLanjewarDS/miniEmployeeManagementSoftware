@@ -50,6 +50,7 @@ import { EmployeeDashboardData } from "@/server/modules/dashboard/service";
 import { TaskPriorityBadge } from "@/components/tasks/TaskPriorityBadge";
 import { useStudioRealtime } from "@/components/realtime/useStudioRealtime";
 import { LiveSyncIndicator } from "@/components/realtime/LiveSyncIndicator";
+import { ReopenedTaskAlertModal } from "@/components/dashboard/ReopenedTaskAlertModal";
 
 interface EmployeeDashboardViewProps {
   data: EmployeeDashboardData;
@@ -92,7 +93,8 @@ export default function EmployeeDashboardView({
   const router = useRouter();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<"MY_DAY" | "QUEUE" | "DRAWINGS" | "VISITS" | "SCRATCHPAD">("MY_DAY");
-  const [filterTab, setFilterTab] = useState<"ALL" | "PENDING" | "TODAY" | "OVERDUE" | "REVIEW" | "CHANGES">("ALL");
+  const [filterTab, setFilterTab] = useState<"ALL" | "PENDING" | "TODAY" | "OVERDUE" | "REVIEW" | "CHANGES" | "REOPENED">("ALL");
+  const [isReopenModalOpen, setIsReopenModalOpen] = useState(false);
 
   // Realtime Live SSE Bus Sync
   const { isConnected, lastEvent, forceRefresh } = useStudioRealtime({
@@ -606,6 +608,9 @@ export default function EmployeeDashboardView({
     if (filterTab === "CHANGES") {
       return Boolean(item.blockerReason);
     }
+    if (filterTab === "REOPENED") {
+      return Boolean(item.isReopened);
+    }
     return true;
   });
 
@@ -644,6 +649,14 @@ export default function EmployeeDashboardView({
 
   return (
     <div className="space-y-6 pb-12 max-w-7xl mx-auto">
+      {/* POPUP MODAL: WORK REOPENED BY LEADERSHIP ALERT MODAL */}
+      <ReopenedTaskAlertModal
+        workspaceSlug={workspaceSlug}
+        reopenedTasks={data.reopenedTasks || []}
+        forceOpen={isReopenModalOpen}
+        onClose={() => setIsReopenModalOpen(false)}
+      />
+
       {/* ============================================================== */}
       {/* 1. TOP GREETING PANEL                                          */}
       {/* ============================================================== */}
@@ -744,9 +757,9 @@ export default function EmployeeDashboardView({
       </div>
 
       {/* ============================================================== */}
-      {/* 3. FOUR KPI CARDS                                              */}
+      {/* 3. KPI CARDS (INCLUDING REOPENED DELIVERABLES)                 */}
       {/* ============================================================== */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div className={`grid grid-cols-1 sm:grid-cols-2 ${data.mySummary.reopenedCount && data.mySummary.reopenedCount > 0 ? "lg:grid-cols-5" : "lg:grid-cols-4"} gap-3 sm:gap-4`}>
         {/* KPI 1: In Progress */}
         <button
           type="button"
@@ -830,6 +843,31 @@ export default function EmployeeDashboardView({
           </div>
           <span className="type-helper text-slate-500 mt-1 block">Awaiting lead sign-off</span>
         </button>
+
+        {/* KPI 5: Reopened by Leadership */}
+        {data.mySummary.reopenedCount !== undefined && data.mySummary.reopenedCount > 0 && (
+          <button
+            type="button"
+            onClick={() => setFilterTab("REOPENED")}
+            className={`p-4 sm:p-5 rounded-2xl border text-left transition-all shadow-xs cursor-pointer ${
+              filterTab === "REOPENED"
+                ? "bg-amber-500/15 border-amber-500 ring-2 ring-amber-400/30"
+                : "bg-white border-amber-300 hover:border-amber-500"
+            }`}
+          >
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="type-kpi-label text-amber-900 font-bold flex items-center gap-1.5">
+                <RotateCcw className="w-3.5 h-3.5 text-amber-600" />
+                <span>Reopened</span>
+              </span>
+              <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+            </div>
+            <div className="type-kpi-value text-amber-700">
+              {data.mySummary.reopenedCount}
+            </div>
+            <span className="type-helper text-amber-800 font-semibold mt-1 block">Action required</span>
+          </button>
+        )}
       </div>
 
       {/* ============================================================== */}
@@ -1114,6 +1152,110 @@ export default function EmployeeDashboardView({
             </div>
           )}
 
+          {/* Reopened Deliverables Operation Information Banner */}
+          {data.reopenedTasks && data.reopenedTasks.length > 0 && (
+            <div className="bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/10 border-2 border-amber-300 rounded-3xl p-5 sm:p-6 shadow-xs space-y-4 animate-in fade-in">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-500 text-white flex items-center justify-center shadow-xs shrink-0">
+                    <RotateCcw className="w-5 h-5 animate-spin-reverse-once" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm sm:text-base font-bold text-amber-950">
+                        Work Reopened by Leadership ({data.reopenedTasks.length})
+                      </h3>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-200 text-amber-900 border border-amber-300 uppercase tracking-wider">
+                        Action Required
+                      </span>
+                    </div>
+                    <p className="text-xs text-amber-800">
+                      Studio Owner/Admin reopened completed tasks with specific revision instructions.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 self-start sm:self-auto">
+                  <button
+                    type="button"
+                    onClick={() => setFilterTab("REOPENED")}
+                    className="px-3 py-1.5 bg-white hover:bg-amber-50 text-amber-900 border border-amber-300 text-xs font-bold rounded-xl shadow-2xs transition-colors shrink-0 flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <span>Filter Queue</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsReopenModalOpen(true)}
+                    className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors shrink-0 flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                    <span>View Alert Popup</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 pt-1">
+                {data.reopenedTasks.map((task) => (
+                  <div
+                    key={task.id}
+                    className="bg-white/95 backdrop-blur-xs p-4 rounded-2xl border border-amber-200 shadow-2xs space-y-3 flex flex-col justify-between"
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="font-mono text-[10px] font-bold text-[#3562E8] bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100 shrink-0">
+                            {task.projectCode}
+                          </span>
+                          <span className="text-[11px] font-medium text-slate-500 truncate" title={task.projectName}>
+                            {task.projectName}
+                          </span>
+                        </div>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200 shrink-0 uppercase tracking-wider">
+                          {task.priority}
+                        </span>
+                      </div>
+
+                      <div>
+                        <h4 className="text-xs sm:text-sm font-bold text-slate-900" title={task.taskTitle}>
+                          {task.taskTitle}
+                        </h4>
+                        {task.itemTitle && task.itemTitle !== task.taskTitle && (
+                          <p className="text-xs font-semibold text-amber-900 flex items-center gap-1 mt-0.5">
+                            <span className="text-amber-600 font-normal">Subtask:</span> {task.itemTitle}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Leadership Justification Box */}
+                      <div className="p-2.5 rounded-xl bg-amber-50/80 border border-amber-200/80 space-y-1">
+                        <div className="flex items-center justify-between text-[10px] text-amber-800 font-semibold">
+                          <span>Reopened by {task.reopenedBy}</span>
+                          <span>{new Date(task.reopenedAt).toLocaleDateString()}</span>
+                        </div>
+                        <p className="text-xs text-amber-950 italic font-medium leading-relaxed">
+                          "{task.reopenReason}"
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
+                      <span className="text-[10px] text-slate-400">
+                        {task.dueDate ? `Due: ${new Date(task.dueDate).toLocaleDateString()}` : "No deadline"}
+                      </span>
+                      <Link
+                        href={`/w/${workspaceSlug}/tasks?taskId=${task.taskId}`}
+                        className="px-3 py-1.5 bg-[#3562E8] hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-2xs transition-colors flex items-center gap-1 cursor-pointer"
+                      >
+                        <span>Fix Deliverable</span>
+                        <ArrowRight className="w-3 h-3" />
+                      </Link>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Pending Deliverable Acknowledgements Banner */}
           {data.unacknowledgedAssignments && data.unacknowledgedAssignments.length > 0 && (
             <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-3xl p-6 shadow-xs space-y-3">
@@ -1323,18 +1465,36 @@ export default function EmployeeDashboardView({
                 </h3>
 
                 <div className="flex flex-wrap items-center gap-1 text-xs">
-                  {(["ALL", "PENDING", "TODAY", "OVERDUE", "REVIEW", "CHANGES"] as const).map((tab) => (
+                  {([
+                    "ALL",
+                    "PENDING",
+                    "TODAY",
+                    "OVERDUE",
+                    "REVIEW",
+                    "CHANGES",
+                    ...(data.mySummary.reopenedCount && data.mySummary.reopenedCount > 0 ? ["REOPENED"] : []),
+                  ] as const).map((tab) => (
                     <button
                       key={tab}
                       type="button"
-                      onClick={() => setFilterTab(tab)}
-                      className={`px-3 py-1 rounded-xl text-[11px] font-bold cursor-pointer transition-colors ${
+                      onClick={() => setFilterTab(tab as any)}
+                      className={`px-3 py-1 rounded-xl text-[11px] font-bold cursor-pointer transition-colors flex items-center gap-1 ${
                         filterTab === tab
-                          ? "bg-[#3562E8] text-white"
+                          ? tab === "REOPENED"
+                            ? "bg-amber-600 text-white"
+                            : "bg-[#3562E8] text-white"
+                          : tab === "REOPENED"
+                          ? "text-amber-800 bg-amber-50 border border-amber-200 hover:bg-amber-100"
                           : "text-slate-500 hover:bg-slate-100 hover:text-slate-800"
                       }`}
                     >
-                      {tab === "ALL" ? "All" : tab.charAt(0) + tab.slice(1).toLowerCase()}
+                      {tab === "REOPENED" && <RotateCcw className="w-2.5 h-2.5" />}
+                      <span>{tab === "ALL" ? "All" : tab.charAt(0) + tab.slice(1).toLowerCase()}</span>
+                      {tab === "REOPENED" && (
+                        <span className="px-1 py-0.2 rounded-full text-[9px] bg-white text-amber-900 font-mono font-bold">
+                          {data.mySummary.reopenedCount}
+                        </span>
+                      )}
                     </button>
                   ))}
                 </div>
@@ -1352,7 +1512,9 @@ export default function EmployeeDashboardView({
                     <div
                       key={item.id}
                       className={`p-4 rounded-2xl border transition-all space-y-2.5 shadow-2xs group ${
-                        item.isOverdue
+                        item.isReopened
+                          ? "border-amber-300 bg-amber-50/30 hover:bg-white"
+                          : item.isOverdue
                           ? "border-rose-200 bg-rose-50/20 hover:bg-white"
                           : item.blockerReason
                           ? "border-amber-200 bg-amber-50/20 hover:bg-white"
@@ -1380,11 +1542,33 @@ export default function EmployeeDashboardView({
                         </div>
 
                         <div className="shrink-0 flex items-center gap-1.5">
+                          {item.isReopened && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1">
+                              <RotateCcw className="w-2.5 h-2.5 text-amber-700" />
+                              <span>Reopened</span>
+                            </span>
+                          )}
                           <TaskPriorityBadge priority={item.priority} size="sm" />
                         </div>
                       </div>
 
-                      {item.blockerReason && (
+                      {item.isReopened && (
+                        <div className="p-2.5 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-300 rounded-xl text-[11px] text-amber-950 flex items-start gap-2 shadow-2xs">
+                          <RotateCcw className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+                          <div className="space-y-0.5 min-w-0">
+                            <div className="font-bold text-amber-900 flex items-center gap-1">
+                              <span>Reopened by {item.reopenedBy || "Leadership"}</span>
+                            </div>
+                            {item.reopenReason && (
+                              <p className="italic text-amber-900 line-clamp-2">
+                                "{item.reopenReason}"
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {item.blockerReason && !item.isReopened && (
                         <div className="p-2 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-900 flex items-start gap-1.5">
                           <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
                           <div>

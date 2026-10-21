@@ -206,6 +206,9 @@ export default function ContractorsClientView({
   const [searchQuery, setSearchQuery] = useState("");
   const [statusTab, setStatusTab] = useState<"all" | "active" | "archived">("active");
   const [selectedTrade, setSelectedTrade] = useState<string>("ALL");
+  const [selectedProjectId, setSelectedProjectId] = useState<string>("ALL");
+  const [quotationFilter, setQuotationFilter] = useState<string>("ALL");
+  const [contactChannelFilter, setContactChannelFilter] = useState<string>("ALL");
   const [contractorSortBy, setContractorSortBy] = useState<string>("DATE_DESC");
 
   // Messages
@@ -262,16 +265,53 @@ export default function ContractorsClientView({
 
       if (selectedTrade !== "ALL" && c.trade !== selectedTrade) return false;
 
+      // Project filter
+      if (selectedProjectId === "UNASSIGNED") {
+        if (c.projects && c.projects.length > 0) return false;
+      } else if (selectedProjectId !== "ALL") {
+        if (!c.projects || !c.projects.some((p) => p.projectId === selectedProjectId)) return false;
+      }
+
+      // Quotation status filter
+      if (quotationFilter === "HAS_QUOTATIONS") {
+        const hasQuotes = c.projects.some((p) => p.quotations && p.quotations.length > 0);
+        if (!hasQuotes) return false;
+      } else if (quotationFilter === "APPROVED_QUOTATIONS") {
+        const hasApproved = c.projects.some(
+          (p) => p.quotations && p.quotations.some((q) => q.status === "APPROVED")
+        );
+        if (!hasApproved) return false;
+      } else if (quotationFilter === "NO_QUOTATIONS") {
+        const hasQuotes = c.projects.some((p) => p.quotations && p.quotations.length > 0);
+        if (hasQuotes) return false;
+      }
+
+      // Contact channel filter
+      if (contactChannelFilter === "HAS_PHONE" && (!c.contact || c.contact.trim() === "")) return false;
+      if (contactChannelFilter === "HAS_EMAIL" && (!c.email || c.email.trim() === "")) return false;
+      if (contactChannelFilter === "HAS_ADDRESS" && (!c.address || c.address.trim() === "")) return false;
+
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const matchName = c.name.toLowerCase().includes(q);
         const matchFirm = c.firmName?.toLowerCase().includes(q);
         const matchTrade = c.trade.toLowerCase().includes(q);
         const matchContact = c.contact?.toLowerCase().includes(q);
+        const matchEmail = c.email?.toLowerCase().includes(q);
+        const matchAddress = c.address?.toLowerCase().includes(q);
         const matchProject = c.projects.some(
           (p) => p.project.code.toLowerCase().includes(q) || p.project.name.toLowerCase().includes(q)
         );
-        if (!matchName && !matchFirm && !matchTrade && !matchContact && !matchProject) return false;
+        if (
+          !matchName &&
+          !matchFirm &&
+          !matchTrade &&
+          !matchContact &&
+          !matchEmail &&
+          !matchAddress &&
+          !matchProject
+        )
+          return false;
       }
 
       return true;
@@ -678,8 +718,8 @@ export default function ContractorsClientView({
           </div>
 
           {/* Filter Trade & Sort Dropdown */}
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="min-w-[170px]">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="min-w-[160px]">
               <SearchableDropdown
                 size="sm"
                 value={selectedTrade}
@@ -696,7 +736,49 @@ export default function ContractorsClientView({
               />
             </div>
 
-            <div className="min-w-[190px]">
+            <div className="min-w-[170px]">
+              <SearchableDropdown
+                size="sm"
+                value={selectedProjectId}
+                onChange={setSelectedProjectId}
+                placeholder="All Assigned Projects"
+                clearable={false}
+                options={[
+                  { value: "ALL", label: "All Assigned Projects" },
+                  { value: "UNASSIGNED", label: "Unassigned / Open Capacity" },
+                  ...projects.map((p) => ({
+                    value: p.id,
+                    label: `${p.code} - ${p.name}`,
+                  })),
+                ]}
+              />
+            </div>
+
+            <select
+              value={quotationFilter}
+              onChange={(e) => setQuotationFilter(e.target.value)}
+              aria-label="Filter by quotation status"
+              className="px-2.5 py-1.5 text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] font-medium focus:outline-none focus:border-[#5A81FA] cursor-pointer"
+            >
+              <option value="ALL">All Quotation Statuses</option>
+              <option value="HAS_QUOTATIONS">Has Quotations on File</option>
+              <option value="APPROVED_QUOTATIONS">Approved Quotations Only</option>
+              <option value="NO_QUOTATIONS">No Quotations Yet</option>
+            </select>
+
+            <select
+              value={contactChannelFilter}
+              onChange={(e) => setContactChannelFilter(e.target.value)}
+              aria-label="Filter by contact channel"
+              className="px-2.5 py-1.5 text-xs bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-[#1F1F1F] font-medium focus:outline-none focus:border-[#5A81FA] cursor-pointer"
+            >
+              <option value="ALL">All Contacts</option>
+              <option value="HAS_PHONE">Has Phone Number</option>
+              <option value="HAS_EMAIL">Has Email Address</option>
+              <option value="HAS_ADDRESS">Has Physical Address</option>
+            </select>
+
+            <div className="min-w-[180px]">
               <SearchableDropdown
                 size="sm"
                 value={contractorSortBy}
@@ -716,22 +798,95 @@ export default function ContractorsClientView({
               />
             </div>
 
-            {(selectedTrade !== "ALL" || contractorSortBy !== "DATE_DESC" || searchQuery || statusTab !== "active") && (
+            {(selectedTrade !== "ALL" ||
+              selectedProjectId !== "ALL" ||
+              quotationFilter !== "ALL" ||
+              contactChannelFilter !== "ALL" ||
+              contractorSortBy !== "DATE_DESC" ||
+              searchQuery ||
+              statusTab !== "active") && (
               <button
                 type="button"
                 onClick={() => {
                   setSelectedTrade("ALL");
+                  setSelectedProjectId("ALL");
+                  setQuotationFilter("ALL");
+                  setContactChannelFilter("ALL");
                   setContractorSortBy("DATE_DESC");
                   setSearchQuery("");
                   setStatusTab("active");
                 }}
-                className="text-xs text-[#5A81FA] hover:text-[#3562E8] font-semibold underline cursor-pointer"
+                className="text-xs text-rose-600 hover:text-rose-800 font-semibold underline cursor-pointer px-1"
               >
                 Reset
               </button>
             )}
           </div>
         </div>
+
+        {/* Active Filter Chips Row */}
+        {(selectedTrade !== "ALL" ||
+          selectedProjectId !== "ALL" ||
+          quotationFilter !== "ALL" ||
+          contactChannelFilter !== "ALL" ||
+          statusTab !== "active" ||
+          searchQuery) && (
+          <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-[#E2E6F0] text-xs">
+            <span className="text-[#696E82] text-[11px] font-medium mr-1">Active:</span>
+            {statusTab !== "active" && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-800 border border-slate-200 text-[11px] font-semibold">
+                Status: {statusTab.toUpperCase()}
+                <button type="button" onClick={() => setStatusTab("active")} className="hover:text-red-500 cursor-pointer">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            {selectedTrade !== "ALL" && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-900 border border-amber-200 text-[11px] font-semibold">
+                Trade: {selectedTrade}
+                <button type="button" onClick={() => setSelectedTrade("ALL")} className="hover:text-red-500 cursor-pointer">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            {selectedProjectId !== "ALL" && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#F2F4FF] text-[#2C308D] border border-[#CEDEFF] text-[11px] font-semibold">
+                Project: {selectedProjectId === "UNASSIGNED" ? "Unassigned" : projects.find((p) => p.id === selectedProjectId)?.code || "Assigned"}
+                <button type="button" onClick={() => setSelectedProjectId("ALL")} className="hover:text-red-500 cursor-pointer">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            {quotationFilter !== "ALL" && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-800 border border-indigo-200 text-[11px] font-semibold">
+                Quote: {quotationFilter.replace("_QUOTATIONS", "").replace("_", " ")}
+                <button type="button" onClick={() => setQuotationFilter("ALL")} className="hover:text-red-500 cursor-pointer">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            {contactChannelFilter !== "ALL" && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-[11px] font-semibold">
+                Channel: {contactChannelFilter.replace("HAS_", "")}
+                <button type="button" onClick={() => setContactChannelFilter("ALL")} className="hover:text-red-500 cursor-pointer">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            {searchQuery && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-800 border border-slate-200 text-[11px] font-semibold">
+                "{searchQuery}"
+                <button type="button" onClick={() => setSearchQuery("")} className="hover:text-red-500 cursor-pointer">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+
+            <span className="ml-auto text-[#696E82] text-[11px] font-medium">
+              Showing <strong>{filteredContractors.length}</strong> of {contractors.length} contractors
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Bulk Selection Bar */}

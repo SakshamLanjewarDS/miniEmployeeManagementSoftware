@@ -232,6 +232,11 @@ export default async function TasksPage({ params, searchParams }: TasksPageProps
       reason: ah.reason,
       createdAt: ah.createdAt.toISOString(),
     })) || [],
+    siteVisits: ((t as any).siteVisits || []).map((sv: any) => ({
+      id: sv.id,
+      purpose: sv.purpose,
+      operationalState: sv.operationalState,
+    })),
     customFields: (customFieldValues && (customFieldValues as Record<string, any>)[t.id]) || {},
   }));
 

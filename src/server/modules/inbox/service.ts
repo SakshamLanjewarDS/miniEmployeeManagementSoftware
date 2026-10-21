@@ -970,6 +970,9 @@ export async function executeInboxDecision(
       throw new Error(`Unsupported decision inbox item type: ${type}`);
   }
 
+  // Invalidate in-memory cache so next query reads fresh decisions
+  clearInboxCache(ctx.tenantId);
+
   // Realtime Broadcast across active tabs and clients
   broadcastStudioEvent(ctx.tenantId, {
     type: "DECISION_UPDATED",

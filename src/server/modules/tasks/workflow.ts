@@ -1253,7 +1253,21 @@ export async function reopenChecklistTask(
   if (!item) throw new Error("Checklist task not found.");
 
   return await prisma.$transaction(async (tx) => {
-    // 1. Reopen checklist task to IN_PROGRESS
+    // 1. Reopen checklist task to IN_PROGRESS and attach structured reopen metadata
+    const currentDetails =
+      item.blockerDetails && typeof item.blockerDetails === "object"
+        ? (item.blockerDetails as Record<string, any>)
+        : {};
+    const updatedDetails = {
+      ...currentDetails,
+      reopened: {
+        reason: data.reason.trim(),
+        reopenedBy: ctx.userFullName,
+        reopenedById: ctx.membershipId,
+        reopenedAt: new Date().toISOString(),
+      },
+    };
+
     const updatedItem = await tx.taskChecklistItem.update({
       where: { id: itemId },
       data: {
@@ -1261,6 +1275,7 @@ export async function reopenChecklistTask(
         isCompleted: false,
         completedAt: null,
         completedById: null,
+        blockerDetails: updatedDetails,
       },
     });
 
@@ -1275,12 +1290,15 @@ export async function reopenChecklistTask(
       });
     }
 
-    // 3. Reopen employee assignment if completed
-    if (item.assignedMemberId) {
+    // 3. Reopen employee assignments if completed
+    const targetMemberIds = new Set<string>();
+    if (item.assignedMemberId) targetMemberIds.add(item.assignedMemberId);
+    if (task.assigneeId) targetMemberIds.add(task.assigneeId);
+    if (targetMemberIds.size > 0) {
       await tx.taskAssignment.updateMany({
         where: {
           taskId: task.id,
-          membershipId: item.assignedMemberId,
+          membershipId: { in: Array.from(targetMemberIds) },
         },
         data: {
           isCompleted: false,
@@ -1302,12 +1320,19 @@ export async function reopenChecklistTask(
       },
     });
 
-    // 5. Notify affected employee
+    // 5. Notify all affected assignees
+    const recipientIds = new Set<string>();
     if (item.assignedMemberId && item.assignedMemberId !== ctx.membershipId) {
+      recipientIds.add(item.assignedMemberId);
+    }
+    if (task.assigneeId && task.assigneeId !== ctx.membershipId) {
+      recipientIds.add(task.assigneeId);
+    }
+    for (const recipientId of recipientIds) {
       await tx.notification.create({
         data: {
           tenantId: ctx.tenantId,
-          recipientId: item.assignedMemberId,
+          recipientId,
           title: "Deliverable Work Reopened",
           message: `${ctx.userFullName} reopened completed task "${item.title}": ${data.reason.trim()}`,
           link: `/w/${ctx.tenantSlug}/tasks?taskId=${task.id}`,

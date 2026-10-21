@@ -2,7 +2,7 @@ import { prisma } from "../../db/prisma";
 import { TenantContext, assertAdminOrOwner, ForbiddenException } from "../../tenancy/context";
 import { parsePeriodDates, DatePreset } from "./date-controls";
 import { PerformanceFilterParams } from "./filters";
-import { TaskWorkflowStatus } from "@prisma/client";
+import { TaskWorkflowStatus, TaskPriority } from "@prisma/client";
 
 /**
  * Employee Performance Core Analytics & Aggregation Engine (PERF-07)
@@ -293,7 +293,7 @@ export async function getStudioPerformanceData(
             ? { projectId: filters.projectId }
             : {}),
           ...(filters.priority && filters.priority !== "ALL"
-            ? { priority: filters.priority }
+            ? { priority: filters.priority as TaskPriority }
             : {}),
         },
         include: {

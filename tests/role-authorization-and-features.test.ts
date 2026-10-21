@@ -68,6 +68,17 @@ describe("Phase 4, 5 & 6: Full Role Authorization, Task Dashboard, Directories &
   before(async () => {
     tenant1 = await prisma.tenant.findUnique({ where: { slug: "100percentdesign" } });
     tenant2 = await prisma.tenant.findUnique({ where: { slug: "apex-studio" } });
+    if (!tenant2) {
+      tenant2 = await prisma.tenant.create({
+        data: {
+          slug: "apex-studio",
+          name: "Apex Studio",
+          timezone: "Asia/Kolkata",
+          currency: "INR",
+          lifecycleState: "ACTIVE",
+        },
+      });
+    }
     assert.ok(tenant1, "Tenant 1 must exist");
     assert.ok(tenant2, "Tenant 2 must exist");
 
