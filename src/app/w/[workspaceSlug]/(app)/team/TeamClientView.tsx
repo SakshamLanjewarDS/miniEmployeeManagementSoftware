@@ -949,7 +949,7 @@ export default function TeamClientView({
                     className="hidden sm:inline-flex items-center justify-center gap-2 px-3.5 py-2 bg-gradient-to-r from-[#1456F0] to-[#3B82F6] hover:from-[#0E46D0] hover:to-[#2563EB] text-white text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer min-h-[44px]"
                   >
                     <Briefcase className="w-4 h-4" />
-                    <span>Hiring &amp; Letters</span>
+                    <span>Hiring &amp; Records</span>
                   </button>
                 )}
 

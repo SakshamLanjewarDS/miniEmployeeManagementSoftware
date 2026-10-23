@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getCurrentTenantContext } from "@/server/auth/session";
 import { listEmployeesService } from "@/server/modules/employees/service";
 import { getLetterTemplates } from "@/server/modules/letters/service";
+import { getAllEmployeesDocumentRecords } from "@/server/modules/documents/service";
 import { serializeForClient } from "@/server/utils/serialize";
 import HiringClientView from "./HiringClientView";
 
@@ -18,14 +19,15 @@ export default async function HiringPage({ params }: HiringPageProps) {
     redirect(`/w/${workspaceSlug}/login`);
   }
 
-  // Strict role enforcement: Only Studio Administrator or Owner can access Hiring Studio
+  // Strict role enforcement: Only Studio Administrator or Owner can access Hiring & Records Studio
   if (ctx.role !== "ADMIN" && ctx.role !== "OWNER") {
     redirect(`/w/${workspaceSlug}/team`);
   }
 
-  const [employees, templates] = await Promise.all([
+  const [employees, templates, documentRecords] = await Promise.all([
     listEmployeesService(ctx),
     getLetterTemplates(ctx),
+    getAllEmployeesDocumentRecords(ctx),
   ]);
 
   return (
@@ -34,6 +36,7 @@ export default async function HiringPage({ params }: HiringPageProps) {
       context={serializeForClient(ctx)}
       employees={serializeForClient(employees) as any}
       templates={serializeForClient(templates) as any}
+      initialDocumentRecords={serializeForClient(documentRecords) as any}
     />
   );
 }

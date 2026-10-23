@@ -339,3 +339,109 @@ export async function getDocumentReviewQueue(ctx: TenantContext) {
 
   return pendingDocuments;
 }
+
+export interface EmployeeDocumentRecordItem {
+  id: string;
+  membershipId: string;
+  employeeId: string;
+  fullName: string;
+  email: string;
+  role: string;
+  department: string | null;
+  designation: string | null;
+  phone: string | null;
+  employmentStatus: string | null;
+  isOwner: boolean;
+  complianceState: "VERIFIED" | "PENDING_REVIEW" | "ACTION_REQUIRED" | "INCOMPLETE" | "OWNER_EXEMPT";
+  verifiedCount: number;
+  pendingCount: number;
+  totalRequired: number;
+  documents: {
+    aadhaar: any | null;
+    degree: any | null;
+    bankPassbook: any | null;
+    other: any[];
+  };
+}
+
+/**
+ * Get employee-wise document filing and compliance records across the studio.
+ * Permitted exclusively for HR Admin / Owner.
+ */
+export async function getAllEmployeesDocumentRecords(ctx: TenantContext): Promise<EmployeeDocumentRecordItem[]> {
+  assertCanManageHR(ctx);
+
+  const employees = await prisma.employee.findMany({
+    where: { tenantId: ctx.tenantId },
+    include: {
+      membership: {
+        include: { user: { select: { fullName: true, email: true } } },
+      },
+      documents: {
+        where: { isCurrent: true },
+        include: {
+          privateFile: {
+            select: { id: true, fileName: true, byteSize: true, mimeType: true, scanStatus: true },
+          },
+        },
+      },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+
+  return employees.map((emp) => {
+    const isOwner = emp.membership.role === "OWNER";
+    const docs = emp.documents;
+    const aadhaarDoc = docs.find((d) => d.category === "AADHAAR");
+    const degreeDoc = docs.find((d) => d.category === "DEGREE");
+    const bankDoc = docs.find((d) => d.category === "BANK_PASSBOOK");
+
+    const mandatoryCategories = ["AADHAAR", "DEGREE", "BANK_PASSBOOK"];
+    const verifiedCount = docs.filter(
+      (d) => mandatoryCategories.includes(d.category) && d.status === "VERIFIED"
+    ).length;
+    const pendingCount = docs.filter(
+      (d) => mandatoryCategories.includes(d.category) && (d.status === "PENDING_REVIEW" || d.status === "UPLOADED")
+    ).length;
+    const rejectedCount = docs.filter(
+      (d) => mandatoryCategories.includes(d.category) && (d.status === "REJECTED" || d.status === "REPLACEMENT_REQUESTED")
+    ).length;
+
+    let complianceState: "VERIFIED" | "PENDING_REVIEW" | "ACTION_REQUIRED" | "INCOMPLETE" | "OWNER_EXEMPT";
+    if (isOwner) {
+      complianceState = "OWNER_EXEMPT";
+    } else if (verifiedCount === 3) {
+      complianceState = "VERIFIED";
+    } else if (rejectedCount > 0) {
+      complianceState = "ACTION_REQUIRED";
+    } else if (verifiedCount + pendingCount === 3) {
+      complianceState = "PENDING_REVIEW";
+    } else {
+      complianceState = "INCOMPLETE";
+    }
+
+    return {
+      id: emp.id,
+      membershipId: emp.membershipId,
+      employeeId: emp.employeeId,
+      fullName: emp.membership.user.fullName,
+      email: emp.membership.user.email,
+      role: emp.membership.role,
+      department: emp.department,
+      designation: emp.designation,
+      phone: emp.phone,
+      employmentStatus: emp.employmentStatus,
+      isOwner,
+      complianceState,
+      verifiedCount,
+      pendingCount,
+      totalRequired: 3,
+      documents: {
+        aadhaar: aadhaarDoc || null,
+        degree: degreeDoc || null,
+        bankPassbook: bankDoc || null,
+        other: docs.filter((d) => d.category === "OTHER"),
+      },
+    };
+  });
+}

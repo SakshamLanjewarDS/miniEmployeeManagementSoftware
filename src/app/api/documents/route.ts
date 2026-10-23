@@ -3,6 +3,7 @@ import { getCurrentTenantContext } from "@/server/auth/session";
 import {
   getEmployeeDocuments,
   uploadEmployeeDocument,
+  getAllEmployeesDocumentRecords,
 } from "@/server/modules/documents/service";
 import { EmployeeDocumentCategory } from "@prisma/client";
 
@@ -11,6 +12,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const workspaceSlug = searchParams.get("workspaceSlug");
     const employeeId = searchParams.get("employeeId");
+    const action = searchParams.get("action");
 
     if (!workspaceSlug) {
       return NextResponse.json({ error: "Missing workspaceSlug" }, { status: 400 });
@@ -19,6 +21,12 @@ export async function GET(req: NextRequest) {
     const ctx = await getCurrentTenantContext(workspaceSlug);
     if (!ctx) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Action: All employee document records for Admin/Owner
+    if (action === "ALL_RECORDS") {
+      const records = await getAllEmployeesDocumentRecords(ctx);
+      return NextResponse.json(records);
     }
 
     // Default to current logged-in employee if employeeId not specified
