@@ -24,6 +24,9 @@ export async function GET(req: NextRequest) {
     // Default to current logged-in employee if employeeId not specified
     const targetEmployeeId = employeeId || ctx.employeeId;
     if (!targetEmployeeId) {
+      if (ctx.role === "OWNER") {
+        return NextResponse.json({ documents: [], stats: { isDocumentationComplete: true, isOwnerExempt: true } });
+      }
       return NextResponse.json({ error: "No employee profile linked to current account" }, { status: 400 });
     }
 

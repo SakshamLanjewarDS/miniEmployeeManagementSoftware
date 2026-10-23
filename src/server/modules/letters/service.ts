@@ -4,12 +4,14 @@ import {
   assertTenantAccess,
   canManageHR,
   assertCanManageHR,
+  assertAdminOnly,
   assertCannotSelfReview,
   ForbiddenException,
 } from "@/server/tenancy/context";
 import { LetterTemplateType, LetterTemplateStatus, IssuedLetterStatus } from "@prisma/client";
 import { generateLetterPdf } from "./pdf-generator";
 import { savePrivateFile } from "@/server/storage/storage-adapter";
+import bcrypt from "bcryptjs";
 
 export const DEFAULT_HR_TEMPLATES: Record<
   LetterTemplateType,
@@ -19,13 +21,13 @@ export const DEFAULT_HR_TEMPLATES: Record<
     title: "Employment Offer Letter",
     description: "Standard formal offer of employment for architectural & studio candidates.",
     bodyTemplate:
-      "Dear {{employeeName}},\n\nOn behalf of {{companyName}}, we are delighted to extend this formal offer of employment for the position of {{designation}} in the {{department}} Department.\n\nYour joining date is scheduled for {{joinDate}}. You will report directly to {{reportingManager}}. Your annual gross compensation will be INR {{salary}}, subject to statutory deductions.\n\nWe look forward to welcoming you to our architecture practice. Please review, sign, and return the duplicate copy of this letter as confirmation of your acceptance.",
+      "Dear {{employeeName}},\n\nOn behalf of {{companyName}}, we are pleased to extend this formal offer of employment for the position of {{designation}} in the {{department}} Department.\n\n1. Joining & Reporting Details:\nYour joining date is scheduled for {{joinDate}}. You will report directly to {{reportingManager}} at our studio.\n\n2. Compensation Package:\nYour annual gross compensation will be INR {{salary}}, subject to statutory deductions as per applicable tax regulations.\n\n3. Roles & Key Responsibilities:\n{{responsibilities}}\n\n4. Offer Acceptance:\nPlease review this letter and acknowledge acceptance through the studio portal or sign and return a duplicate copy within 5 business days.\n\nWe look forward to welcoming you to our architecture practice.",
   },
   APPOINTMENT: {
     title: "Formal Letter of Appointment",
     description: "Official appointment letter setting terms and conditions of studio employment.",
     bodyTemplate:
-      "Dear {{employeeName}},\n\nWith reference to your offer acceptance, {{companyName}} is pleased to appoint you as {{designation}} effective {{effectiveDate}}.\n\nYour employment terms, professional responsibilities, and operational commitments are governed by the studio's policies and project appointment schedule.\n\nWe wish you a rewarding career with us.",
+      "Dear {{employeeName}},\n\nWith reference to your offer acceptance, {{companyName}} is pleased to appoint you as {{designation}} in the {{department}} Department effective {{effectiveDate}}.\n\n1. Appointment Particulars:\n- Designation: {{designation}}\n- Department: {{department}}\n- Reporting Lead: {{reportingManager}}\n- Annual Compensation: INR {{salary}}\n\n2. Key Operational Responsibilities:\n{{responsibilities}}\n\n3. Code of Conduct & Standards:\nYour employment terms, professional commitments, and drawing governance are governed by the studio's operational manual. You are expected to uphold the highest standards of architectural excellence.\n\nWe congratulate you and wish you a rewarding career with us.",
   },
   JOINING_CONFIRMATION: {
     title: "Joining Confirmation Letter",
@@ -70,10 +72,10 @@ export const DEFAULT_HR_TEMPLATES: Record<
       "Dear {{employeeName}},\n\nYou are hereby notified that effective {{effectiveDate}}, your assignment is transferred to the {{department}} Department under the leadership of {{reportingManager}}.\n\nAll existing contractual terms and accrued benefits remain fully preserved.",
   },
   EXPERIENCE_CERTIFICATE: {
-    title: "Certificate of Experience",
-    description: "Summary of professional tenure and responsibilities upon departure.",
+    title: "Certificate of Experience & Completion",
+    description: "Summary of professional tenure and responsibilities upon tenure completion.",
     bodyTemplate:
-      "To Whom It May Concern,\n\nThis is to certify that {{employeeName}} was employed with {{companyName}} from {{joinDate}} to {{effectiveDate}}, concluding their tenure as {{designation}}.\n\nDuring their employment, they exhibited commendable architectural acumen, professionalism, and dedication. We wish them every success in future endeavors.",
+      "To Whom It May Concern,\n\nThis is to certify that {{employeeName}} (Employee ID: {{employeeId}}) was employed with {{companyName}} from {{joinDate}} to {{effectiveDate}}, concluding their tenure as {{designation}} in the {{department}} Department.\n\n1. Role & Project Contributions:\n{{responsibilities}}\n\n2. Professional Conduct:\nDuring their employment, they exhibited commendable architectural acumen, teamwork, and professional dedication across their project deliverables.\n\nWe appreciate their service and wish them every success in their future endeavors.",
   },
   RELIEVING: {
     title: "Official Relieving Letter",
@@ -83,9 +85,9 @@ export const DEFAULT_HR_TEMPLATES: Record<
   },
   TERMINATION: {
     title: "Notice of Employment Termination",
-    description: "Requires explicit authorized approval. Never auto-generated without human decision.",
+    description: "Official employment conclusion notice issued strictly by Administrator.",
     bodyTemplate:
-      "Dear {{employeeName}},\n\nThis letter serves as formal notification that your employment with {{companyName}} as {{designation}} is terminated effective {{effectiveDate}} in accordance with the terms of your contract.\n\nPlease coordinate with HR regarding asset handover and final settlement.",
+      "Dear {{employeeName}},\n\nThis letter serves as formal notification that your employment with {{companyName}} as {{designation}} in the {{department}} Department is terminated effective {{effectiveDate}} in accordance with the terms of your contract.\n\n1. Reason & Background:\n{{responsibilities}}\n\n2. Asset Handover & Clearances:\nPlease coordinate with HR regarding immediate handover of all physical drawings, CAD files, project assets, and studio keys.\n\n3. Final Settlement:\nYour final settlement will be processed following completion of asset clearances.",
   },
   EMPLOYMENT_VERIFICATION: {
     title: "Employment Verification Letter",
@@ -567,3 +569,352 @@ export async function getEmployeeLetters(ctx: TenantContext, employeeId: string)
     orderBy: { createdAt: "desc" },
   });
 }
+
+export interface HiringLetterInput {
+  templateType: LetterTemplateType;
+  candidateName: string;
+  candidateEmail: string;
+  candidatePhone?: string;
+  designation: string;
+  department: string;
+  salary: string;
+  joinDate?: string;
+  effectiveDate?: string;
+  reportingManager?: string;
+  responsibilities?: string;
+  existingEmployeeId?: string;
+}
+
+/**
+ * Build formal Gmail Compose Link & desktop mailto link with architectural greeting
+ */
+export function buildGmailLetterLink(params: {
+  candidateEmail: string;
+  candidateName: string;
+  letterTitle: string;
+  letterNumber: string;
+  templateType: LetterTemplateType;
+  designation: string;
+  department: string;
+  salary: string;
+  dateStr: string;
+  responsibilities: string;
+  reportingManager: string;
+  companyName: string;
+  portalUrl: string;
+}): { gmailUrl: string; mailtoUrl: string; emailSubject: string; emailBody: string } {
+  const companyMail = "designadmin08@gmail.com";
+  let subject = `${params.companyName} — Official ${params.letterTitle}: ${params.candidateName}`;
+  let body = "";
+
+  if (params.templateType === "OFFER") {
+    subject = `${params.companyName} — Formal Employment Offer: ${params.candidateName} (${params.designation})`;
+    body = `Dear ${params.candidateName},\n\nGreetings from ${params.companyName}!\n\nWe are delighted to extend this formal offer of employment for the position of ${params.designation} in our ${params.department} Department.\n\nOffer Summary:\n• Reference Number: ${params.letterNumber}\n• Position: ${params.designation}\n• Department: ${params.department}\n• Scheduled Joining Date: ${params.dateStr}\n• Reporting Partner / Lead: ${params.reportingManager}\n• Gross Compensation Package: INR ${params.salary}\n\nKey Roles & Responsibilities:\n${params.responsibilities}\n\nPlease review your formal offer letter and confirm your acceptance through our Studio Portal at ${params.portalUrl} or by signing and replying to this email within 5 business days.\n\nWe look forward to welcoming you to our architecture and design team.\n\nWarm regards,\nStudio Administrator\n${params.companyName}\n${companyMail}`;
+  } else if (params.templateType === "APPOINTMENT") {
+    subject = `${params.companyName} — Official Appointment Letter: ${params.candidateName}`;
+    body = `Dear ${params.candidateName},\n\nGreetings from ${params.companyName}!\n\nConsequent to your acceptance of our offer, we are pleased to confirm your official appointment as ${params.designation} in the ${params.department} Department effective ${params.dateStr}.\n\nAppointment Particulars:\n• Reference: ${params.letterNumber}\n• Designation: ${params.designation}\n• Department: ${params.department}\n• Effective Date: ${params.dateStr}\n• Gross Compensation: INR ${params.salary}\n\nYour appointment record has been published to your studio profile at ${params.portalUrl}.\n\nCongratulations and we wish you a rewarding career with our practice.\n\nWarm regards,\nStudio Administrator\n${params.companyName}`;
+  } else if (params.templateType === "TERMINATION") {
+    subject = `${params.companyName} — Notice of Employment Termination: ${params.candidateName}`;
+    body = `Dear ${params.candidateName},\n\nThis communication serves as formal notice that your employment with ${params.companyName} as ${params.designation} will conclude effective ${params.dateStr} (Ref: ${params.letterNumber}).\n\nPlease coordinate with HR regarding the immediate handover of all physical drawings, CAD files, and studio assets.\n\nRegards,\nStudio Administrator\n${params.companyName}`;
+  } else {
+    subject = `${params.companyName} — Certificate of Experience: ${params.candidateName}`;
+    body = `Dear ${params.candidateName},\n\nPlease find your official Certificate of Experience & Service Completion from ${params.companyName} (Ref: ${params.letterNumber}).\n\nTenure Summary:\n• Designation: ${params.designation}\n• Department: ${params.department}\n• Effective Date: ${params.dateStr}\n\nWe thank you for your contributions to our architectural commissions and wish you success in your future endeavors.\n\nWarm regards,\nStudio Administrator\n${params.companyName}`;
+  }
+
+  const gmailUrl = `https://mail.google.com/mail/u/?authuser=${encodeURIComponent(
+    companyMail
+  )}&view=cm&fs=1&to=${encodeURIComponent(params.candidateEmail)}&su=${encodeURIComponent(
+    subject
+  )}&body=${encodeURIComponent(body)}`;
+
+  const mailtoUrl = `mailto:${encodeURIComponent(params.candidateEmail)}?subject=${encodeURIComponent(
+    subject
+  )}&body=${encodeURIComponent(body)}`;
+
+  return { gmailUrl, mailtoUrl, emailSubject: subject, emailBody: body };
+}
+
+/**
+ * Generate instantaneous test letter preview for Administrator verification
+ */
+export async function generateHiringLetterPreview(ctx: TenantContext, input: HiringLetterInput) {
+  assertAdminOnly(ctx, "Forbidden: Only Studio Administrators can generate or design letters.");
+  await ensureDefaultTemplates(ctx);
+
+  const template = await prisma.letterTemplate.findFirst({
+    where: { tenantId: ctx.tenantId, type: input.templateType, status: "PUBLISHED" },
+  });
+
+  const bodyTemplate = template?.bodyTemplate || DEFAULT_HR_TEMPLATES[input.templateType]?.bodyTemplate;
+  const title = template?.title || DEFAULT_HR_TEMPLATES[input.templateType]?.title;
+
+  const effectiveDateStr = input.effectiveDate || new Date().toISOString().split("T")[0];
+  const joinDateStr = input.joinDate || effectiveDateStr;
+
+  const placeholders: Record<string, string> = {
+    employeeName: input.candidateName,
+    employeeId: input.existingEmployeeId || "EMP-PREVIEW",
+    department: input.department || "Architecture & Design",
+    designation: input.designation || "Studio Associate",
+    joinDate: joinDateStr,
+    effectiveDate: effectiveDateStr,
+    reportingManager: input.reportingManager || "Studio Partner / Owner",
+    companyName: ctx.tenantName || "100% DESIGN Studio",
+    responsibilities: input.responsibilities || "Standard architectural project deliverables and studio coordination.",
+    salary: input.salary || "As per agreed terms",
+  };
+
+  let filledBody = bodyTemplate;
+  for (const [key, val] of Object.entries(placeholders)) {
+    const reg = new RegExp(`\\{\\{${key}\\}\\}`, "g");
+    filledBody = filledBody.replace(reg, val);
+  }
+
+  const currentYear = new Date().getFullYear();
+  const previewRef = `100DS/HR/${currentYear}/PREVIEW-${Math.floor(100 + Math.random() * 900)}`;
+
+  const emailLinks = buildGmailLetterLink({
+    candidateEmail: input.candidateEmail,
+    candidateName: input.candidateName,
+    letterTitle: title,
+    letterNumber: previewRef,
+    templateType: input.templateType,
+    designation: input.designation,
+    department: input.department,
+    salary: input.salary,
+    dateStr: joinDateStr,
+    responsibilities: placeholders.responsibilities,
+    reportingManager: placeholders.reportingManager,
+    companyName: placeholders.companyName,
+    portalUrl: `https://${ctx.tenantSlug}.100percentdesign.com/w/${ctx.tenantSlug}/login`,
+  });
+
+  return {
+    title,
+    referenceNumber: previewRef,
+    bodyContent: filledBody,
+    signatoryName: ctx.userFullName,
+    signatoryTitle: "Studio Administrator",
+    companyName: ctx.tenantName || "100% DESIGN Studio",
+    dateStr: new Date().toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    }),
+    ...emailLinks,
+  };
+}
+
+/**
+ * Issue official hiring letter: creates candidate/employee if needed,
+ * renders PDF, freezes snapshot, persists in vault, and provides instant Gmail link.
+ */
+export async function issueHiringLetter(ctx: TenantContext, input: HiringLetterInput) {
+  assertAdminOnly(ctx, "Forbidden: Only Studio Administrators have authority to generate and circulate employment letters.");
+  await ensureDefaultTemplates(ctx);
+
+  return await prisma.$transaction(async (tx) => {
+    let employeeRecord: any = null;
+
+    if (input.existingEmployeeId) {
+      employeeRecord = await tx.employee.findUnique({
+        where: { tenantId_employeeId: { tenantId: ctx.tenantId, employeeId: input.existingEmployeeId } },
+        include: { membership: { include: { user: true } } },
+      });
+      if (!employeeRecord) {
+        throw new Error(`Employee '${input.existingEmployeeId}' not found.`);
+      }
+    } else {
+      // Find or provision candidate into the workspace
+      const existingUser = await tx.user.findFirst({
+        where: { email: input.candidateEmail.trim().toLowerCase() },
+        include: { memberships: { where: { tenantId: ctx.tenantId }, include: { employee: true } } },
+      });
+
+      if (existingUser && existingUser.memberships[0]?.employee) {
+        employeeRecord = {
+          ...existingUser.memberships[0].employee,
+          membership: { ...existingUser.memberships[0], user: existingUser },
+        };
+      } else {
+        // Auto-provision candidate employee record
+        const nextEmpNumber = Math.floor(100 + Math.random() * 899);
+        const assignedEmployeeId = `EMP-${nextEmpNumber}`;
+        const tempPasswordHash = await bcrypt.hash("StudioWelcome2026!", 10);
+
+        let user = existingUser;
+        if (!user) {
+          user = await tx.user.create({
+            data: {
+              email: input.candidateEmail.trim().toLowerCase(),
+              fullName: input.candidateName.trim(),
+              passwordHash: tempPasswordHash,
+            },
+            include: { memberships: true },
+          });
+        }
+
+        let membership = user.memberships?.find((m: any) => m.tenantId === ctx.tenantId);
+        if (!membership) {
+          membership = await tx.tenantMembership.create({
+            data: {
+              tenantId: ctx.tenantId,
+              userId: user.id,
+              role: "EMPLOYEE",
+              isActive: true,
+            },
+          });
+        }
+
+        const employee = await tx.employee.create({
+          data: {
+            tenantId: ctx.tenantId,
+            membershipId: membership.id,
+            employeeId: assignedEmployeeId,
+            phone: input.candidatePhone || null,
+            department: input.department,
+            designation: input.designation,
+            employmentStatus: input.templateType === "OFFER" ? "ONBOARDING" : "ACTIVE",
+            joinDate: input.joinDate ? new Date(input.joinDate) : new Date(),
+          },
+        });
+
+        employeeRecord = {
+          ...employee,
+          membership: { ...membership, user },
+        };
+      }
+    }
+
+    // Allocate real sequential letter number
+    const letterNumber = await allocateNextLetterNumber(tx, ctx.tenantId);
+
+    const template = await tx.letterTemplate.findFirst({
+      where: { tenantId: ctx.tenantId, type: input.templateType, status: "PUBLISHED" },
+    });
+    const bodyTemplate = template?.bodyTemplate || DEFAULT_HR_TEMPLATES[input.templateType]?.bodyTemplate;
+    const title = template?.title || DEFAULT_HR_TEMPLATES[input.templateType]?.title;
+
+    const effectiveDateStr = input.effectiveDate || new Date().toISOString().split("T")[0];
+    const joinDateStr = input.joinDate || effectiveDateStr;
+
+    const placeholders: Record<string, string> = {
+      employeeName: input.candidateName,
+      employeeId: employeeRecord.employeeId,
+      department: input.department || "Architecture & Design",
+      designation: input.designation || "Studio Associate",
+      joinDate: joinDateStr,
+      effectiveDate: effectiveDateStr,
+      reportingManager: input.reportingManager || "Studio Partner / Owner",
+      companyName: ctx.tenantName || "100% DESIGN Studio",
+      responsibilities: input.responsibilities || "Standard architectural project deliverables and studio coordination.",
+      salary: input.salary || "As per agreed terms",
+    };
+
+    let filledBody = bodyTemplate;
+    for (const [key, val] of Object.entries(placeholders)) {
+      const reg = new RegExp(`\\{\\{${key}\\}\\}`, "g");
+      filledBody = filledBody.replace(reg, val);
+    }
+
+    const dateStr = new Date().toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+
+    const tenant = await tx.tenant.findUnique({
+      where: { id: ctx.tenantId },
+      select: { settings: true, branding: true },
+    });
+    const settings = (tenant?.settings as any) || {};
+    const branding = (tenant?.branding as any) || {};
+    const companyAddress = settings.companyAddress || branding.address || "Studio 100, Design Boulevard, Mumbai, India";
+
+    // Generate official PDF
+    const pdfBuffer = generateLetterPdf({
+      referenceNumber: letterNumber,
+      title,
+      dateStr,
+      bodyText: filledBody,
+      companyName: ctx.tenantName || "100% DESIGN Studio",
+      companyAddress,
+      employeeName: input.candidateName,
+      employeeDesignation: input.designation,
+      signatoryName: ctx.userFullName,
+      signatoryTitle: "Studio Administrator",
+      isDraft: false,
+    });
+
+    const pdfFile = await savePrivateFile(ctx, {
+      fileName: `${letterNumber.replace(/\//g, "-")}.pdf`,
+      mimeType: "application/pdf",
+      buffer: pdfBuffer,
+      isDocumentVault: true,
+      isTrustedInternal: true,
+    });
+
+    // Create issued letter record
+    const issued = await tx.issuedLetter.create({
+      data: {
+        tenantId: ctx.tenantId,
+        templateId: template?.id,
+        employeeId: employeeRecord.id,
+        letterNumber,
+        title,
+        status: "ISSUED",
+        bodyContent: filledBody,
+        renderedPdfFileId: pdfFile.id,
+        issuedAt: new Date(),
+        issuedById: ctx.membershipId,
+        signatorySnapshotJson: {
+          signatoryName: ctx.userFullName,
+          signatoryTitle: "Studio Administrator",
+          membershipId: ctx.membershipId,
+        },
+        employeeSnapshotJson: {
+          employeeId: employeeRecord.employeeId,
+          fullName: input.candidateName,
+          department: input.department,
+          designation: input.designation,
+        },
+      },
+    });
+
+    // Notify employee in-app
+    if (employeeRecord.membership?.id) {
+      await tx.notification.create({
+        data: {
+          tenantId: ctx.tenantId,
+          recipientId: employeeRecord.membership.id,
+          title: `Official Letter Issued: ${title}`,
+          message: `Your official ${title} (Ref: ${letterNumber}) is now available in your studio profile.`,
+          link: `/w/${ctx.tenantSlug}/profile`,
+        },
+      }).catch(() => {});
+    }
+
+    const emailLinks = buildGmailLetterLink({
+      candidateEmail: input.candidateEmail,
+      candidateName: input.candidateName,
+      letterTitle: title,
+      letterNumber,
+      templateType: input.templateType,
+      designation: input.designation,
+      department: input.department,
+      salary: input.salary,
+      dateStr: joinDateStr,
+      responsibilities: placeholders.responsibilities,
+      reportingManager: placeholders.reportingManager,
+      companyName: placeholders.companyName,
+      portalUrl: `https://${ctx.tenantSlug}.100percentdesign.com/w/${ctx.tenantSlug}/login`,
+    });
+
+    return {
+      letter: issued,
+      assignedEmployeeId: employeeRecord.employeeId,
+      ...emailLinks,
+    };
+  });
+}
+

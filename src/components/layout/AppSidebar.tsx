@@ -379,6 +379,13 @@ export function AppSidebar({ context }: AppSidebarProps) {
             isPermitted: true,
           },
           {
+            id: "hiring",
+            label: "Hiring & Letters",
+            href: `/w/${context.tenantSlug}/hiring`,
+            icon: FileCheck2,
+            isPermitted: context.role === "ADMIN",
+          },
+          {
             id: "leave",
             label: isOwnerOrAdmin ? "Staff Leaves" : "My Leave",
             href: isOwnerOrAdmin

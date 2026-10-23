@@ -941,6 +941,17 @@ export default function TeamClientView({
                   <span>Import CSV</span>
                 </button>
 
+                {userRole === "ADMIN" && (
+                  <button
+                    type="button"
+                    onClick={() => router.push(`/w/${workspaceSlug}/hiring`)}
+                    className="hidden sm:inline-flex items-center justify-center gap-2 px-3.5 py-2 bg-gradient-to-r from-[#1456F0] to-[#3B82F6] hover:from-[#0E46D0] hover:to-[#2563EB] text-white text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer min-h-[44px]"
+                  >
+                    <Briefcase className="w-4 h-4" />
+                    <span>Hiring &amp; Letters</span>
+                  </button>
+                )}
+
                 <button
                   type="button"
                   onClick={openAddEmployeeModal}
@@ -2071,32 +2082,56 @@ export default function TeamClientView({
               {/* Tab 4: Documents Vault */}
               {profileTab === "DOCUMENTS" && (
                 <div className="bg-white rounded-2xl border border-[#E2E6F0] p-4 shadow-2xs">
-                  <EmployeeDocumentVaultView
-                    context={{
-                      tenantSlug: workspaceSlug,
-                      role: userRole as any,
-                      membershipId: currentUserId,
-                      employeeId: "",
-                    } as any}
-                    employeeId={selectedProfileEmployee.employeeId}
-                    canManageHR={isPrivileged}
-                  />
+                  {selectedProfileEmployee.role === "OWNER" ? (
+                    <div className="p-8 text-center space-y-3">
+                      <div className="w-12 h-12 rounded-2xl bg-[#EBF1FF] text-[#1456F0] flex items-center justify-center mx-auto shadow-sm">
+                        <Shield className="w-6 h-6" />
+                      </div>
+                      <h4 className="text-sm font-bold text-[#1F1F1F]">Studio Partner &amp; Sovereign Owner</h4>
+                      <p className="text-xs text-[#696E82] max-w-md mx-auto leading-relaxed">
+                        Studio Owners and Partners are exempt from employee onboarding document filing. This account holds sovereign ownership authority over the studio.
+                      </p>
+                    </div>
+                  ) : (
+                    <EmployeeDocumentVaultView
+                      context={{
+                        tenantSlug: workspaceSlug,
+                        role: userRole as any,
+                        membershipId: currentUserId,
+                        employeeId: "",
+                      } as any}
+                      employeeId={selectedProfileEmployee.employeeId}
+                      canManageHR={isPrivileged}
+                    />
+                  )}
                 </div>
               )}
 
               {/* Tab 5: HR Letters */}
               {profileTab === "LETTERS" && (
                 <div className="bg-white rounded-2xl border border-[#E2E6F0] p-4 shadow-2xs">
-                  <EmployeeLettersView
-                    context={{
-                      tenantSlug: workspaceSlug,
-                      role: userRole as any,
-                      membershipId: currentUserId,
-                      employeeId: "",
-                    } as any}
-                    employeeId={selectedProfileEmployee.employeeId}
-                    canManageHR={isPrivileged}
-                  />
+                  {selectedProfileEmployee.role === "OWNER" ? (
+                    <div className="p-8 text-center space-y-3">
+                      <div className="w-12 h-12 rounded-2xl bg-[#EBF1FF] text-[#1456F0] flex items-center justify-center mx-auto shadow-sm">
+                        <FileText className="w-6 h-6" />
+                      </div>
+                      <h4 className="text-sm font-bold text-[#1F1F1F]">Studio Partner &amp; Sovereign Owner</h4>
+                      <p className="text-xs text-[#696E82] max-w-md mx-auto leading-relaxed">
+                        Employment offer letters and appointment letters apply only to Admins and Employees. Studio Owners are exempt from employee letters.
+                      </p>
+                    </div>
+                  ) : (
+                    <EmployeeLettersView
+                      context={{
+                        tenantSlug: workspaceSlug,
+                        role: userRole as any,
+                        membershipId: currentUserId,
+                        employeeId: "",
+                      } as any}
+                      employeeId={selectedProfileEmployee.employeeId}
+                      canManageHR={isPrivileged}
+                    />
+                  )}
                 </div>
               )}
             </div>

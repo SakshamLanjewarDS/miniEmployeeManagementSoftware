@@ -55,7 +55,8 @@ export function EmployeeLettersView({
 
   const isSelf = context.employeeId === employeeId;
   const isOwner = context.role === "OWNER";
-  const canManage = canManageHR || isOwner;
+  const isAdmin = context.role === "ADMIN";
+  const canManage = isAdmin; // Strictly Admin has access to generate and draft letters
 
   const fetchLetters = async () => {
     try {

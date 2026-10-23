@@ -63,6 +63,15 @@ export function isAdmin(context: TenantContext): boolean {
 }
 
 /**
+ * Admin Authority: Only ADMIN can generate, design, and circulate employment letters.
+ */
+export function assertAdminOnly(context: TenantContext, message = "Forbidden: Studio Administrator authority required to generate or circulate letters"): void {
+  if (context.role !== TenantRole.ADMIN) {
+    throw new ForbiddenException(message);
+  }
+}
+
+/**
  * Sovereign Tenant Authority: Only OWNER can alter billing, delete tenant,
  * or manage global integrations and financial locks.
  */

@@ -3,6 +3,8 @@ import { getCurrentTenantContext } from "@/server/auth/session";
 import {
   getEmployeeLetters,
   generateLetterDraft,
+  generateHiringLetterPreview,
+  issueHiringLetter,
 } from "@/server/modules/letters/service";
 
 export async function GET(req: NextRequest) {
@@ -20,9 +22,10 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // If an owner visits without an employee profile, return empty list cleanly
     const targetEmployeeId = employeeId || ctx.employeeId;
     if (!targetEmployeeId) {
-      return NextResponse.json({ error: "No employee profile found" }, { status: 400 });
+      return NextResponse.json([]);
     }
 
     const letters = await getEmployeeLetters(ctx, targetEmployeeId);
@@ -48,8 +51,22 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { templateType, employeeId, overrides } = body;
+    const action = body.action;
 
+    // Action 1: Instant Test Letter Preview
+    if (action === "PREVIEW_HIRING") {
+      const preview = await generateHiringLetterPreview(ctx, body);
+      return NextResponse.json(preview);
+    }
+
+    // Action 2: Formal Hiring Letter Issuance
+    if (action === "ISSUE_HIRING") {
+      const result = await issueHiringLetter(ctx, body);
+      return NextResponse.json(result, { status: 201 });
+    }
+
+    // Action 3: Legacy Draft Generation
+    const { templateType, employeeId, overrides } = body;
     if (!templateType || !employeeId) {
       return NextResponse.json(
         { error: "Missing templateType or employeeId" },
@@ -61,6 +78,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(draft, { status: 201 });
   } catch (err: any) {
     const status = err.name === "ForbiddenException" ? 403 : 400;
-    return NextResponse.json({ error: err.message || "Failed to generate draft" }, { status });
+    return NextResponse.json({ error: err.message || "Failed to process letter action" }, { status });
   }
 }
+

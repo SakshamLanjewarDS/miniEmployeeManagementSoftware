@@ -486,29 +486,33 @@ export function ProfileClientView({ context, initialData }: ProfileClientViewPro
           <span>HR record</span>
         </button>
 
-        <button
-          onClick={() => setActiveTab("documents")}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs md:text-sm font-semibold transition-all ${
-            activeTab === "documents"
-              ? "bg-[#1456F0] text-white shadow-2xs"
-              : "text-[#696E82] hover:text-[#1F1F1F] hover:bg-white/60"
-          }`}
-        >
-          <Shield className="w-3.5 h-3.5" />
-          <span>Documents Vault</span>
-        </button>
+        {context.role !== "OWNER" && (
+          <>
+            <button
+              onClick={() => setActiveTab("documents")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs md:text-sm font-semibold transition-all ${
+                activeTab === "documents"
+                  ? "bg-[#1456F0] text-white shadow-2xs"
+                  : "text-[#696E82] hover:text-[#1F1F1F] hover:bg-white/60"
+              }`}
+            >
+              <Shield className="w-3.5 h-3.5" />
+              <span>Documents Vault</span>
+            </button>
 
-        <button
-          onClick={() => setActiveTab("letters")}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs md:text-sm font-semibold transition-all ${
-            activeTab === "letters"
-              ? "bg-[#1456F0] text-white shadow-2xs"
-              : "text-[#696E82] hover:text-[#1F1F1F] hover:bg-white/60"
-          }`}
-        >
-          <Stamp className="w-3.5 h-3.5" />
-          <span>HR Letters</span>
-        </button>
+            <button
+              onClick={() => setActiveTab("letters")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs md:text-sm font-semibold transition-all ${
+                activeTab === "letters"
+                  ? "bg-[#1456F0] text-white shadow-2xs"
+                  : "text-[#696E82] hover:text-[#1F1F1F] hover:bg-white/60"
+              }`}
+            >
+              <Stamp className="w-3.5 h-3.5" />
+              <span>HR Letters</span>
+            </button>
+          </>
+        )}
       </div>
 
       {/* TAB 1: MY PROFILE (Active Default) */}
@@ -828,20 +832,62 @@ export function ProfileClientView({ context, initialData }: ProfileClientViewPro
 
       {/* TAB 4: DOCUMENTS VAULT */}
       {activeTab === "documents" && (
-        <EmployeeDocumentVaultView
-          context={context}
-          employeeId={initialData.directoryProfile?.employeeId || context.employeeId || ""}
-          canManageHR={context.role === "OWNER" || (context.role === "ADMIN" && context.hasHrAccess)}
-        />
+        context.role === "OWNER" ? (
+          <div className="bg-white rounded-3xl border border-[#E2E6F0] p-8 text-center space-y-3 shadow-2xs">
+            <div className="w-12 h-12 rounded-2xl bg-[#EBF1FF] text-[#1456F0] flex items-center justify-center mx-auto shadow-sm">
+              <Shield className="w-6 h-6" />
+            </div>
+            <h3 className="text-base font-bold text-[#1F1F1F]">Studio Partner &amp; Sovereign Owner</h3>
+            <p className="text-xs text-[#696E82] max-w-md mx-auto leading-relaxed">
+              Studio Owners and Partners are exempt from employee onboarding document filing. You can review and audit all employee records in the Studio Team page.
+            </p>
+            <div className="pt-2">
+              <Link
+                href={`/w/${context.tenantSlug}/team`}
+                className="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl bg-[#1456F0] text-white hover:bg-[#0E46D0] transition-all"
+              >
+                <span>Go to Studio Team</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+          </div>
+        ) : (
+          <EmployeeDocumentVaultView
+            context={context}
+            employeeId={initialData.directoryProfile?.employeeId || context.employeeId || ""}
+            canManageHR={false}
+          />
+        )
       )}
 
       {/* TAB 5: HR LETTERS */}
       {activeTab === "letters" && (
-        <EmployeeLettersView
-          context={context}
-          employeeId={initialData.directoryProfile?.employeeId || context.employeeId || ""}
-          canManageHR={context.role === "OWNER" || (context.role === "ADMIN" && context.hasHrAccess)}
-        />
+        context.role === "OWNER" ? (
+          <div className="bg-white rounded-3xl border border-[#E2E6F0] p-8 text-center space-y-3 shadow-2xs">
+            <div className="w-12 h-12 rounded-2xl bg-[#EBF1FF] text-[#1456F0] flex items-center justify-center mx-auto shadow-sm">
+              <Stamp className="w-6 h-6" />
+            </div>
+            <h3 className="text-base font-bold text-[#1F1F1F]">Studio Partner &amp; Sovereign Owner</h3>
+            <p className="text-xs text-[#696E82] max-w-md mx-auto leading-relaxed">
+              Employment offer letters and appointment letters apply only to Admins and Employees. You can inspect all studio letters in the Studio Team page.
+            </p>
+            <div className="pt-2">
+              <Link
+                href={`/w/${context.tenantSlug}/team`}
+                className="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl bg-[#1456F0] text-white hover:bg-[#0E46D0] transition-all"
+              >
+                <span>View Team Letters</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+          </div>
+        ) : (
+          <EmployeeLettersView
+            context={context}
+            employeeId={initialData.directoryProfile?.employeeId || context.employeeId || ""}
+            canManageHR={false}
+          />
+        )
       )}
 
       {/* Sticky Bottom Bar on Mobile */}
