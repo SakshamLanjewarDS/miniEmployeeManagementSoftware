@@ -31,8 +31,11 @@ import {
   Trash2,
   Loader2,
   Info,
+  Stamp,
 } from "lucide-react";
 import { ProjectProfileCircle } from "@/lib/typology";
+import { EmployeeDocumentVaultView } from "@/components/documents/EmployeeDocumentVaultView";
+import { EmployeeLettersView } from "@/components/letters/EmployeeLettersView";
 
 interface ProfileClientViewProps {
   context: TenantContext;
@@ -41,7 +44,7 @@ interface ProfileClientViewProps {
 
 export function ProfileClientView({ context, initialData }: ProfileClientViewProps) {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<"my-profile" | "work-profile" | "hr-record">("my-profile");
+  const [activeTab, setActiveTab] = useState<"my-profile" | "work-profile" | "hr-record" | "documents" | "letters">("my-profile");
 
   const [fullName, setFullName] = useState(initialData.myProfile?.fullName || "");
   const [phone, setPhone] = useState(initialData.myProfile?.phone || "");
@@ -404,19 +407,22 @@ export function ProfileClientView({ context, initialData }: ProfileClientViewPro
         </div>
 
         {/* Card 3: Completed tasks */}
-        <div className="p-4 md:p-5 bg-white rounded-2xl border border-[#E2E6F0] shadow-2xs hover:border-[#CEDEFF] transition-all">
+        <Link
+          href={`/w/${context.tenantSlug}/tasks/completed?assigneeId=${context.membershipId}`}
+          className="p-4 md:p-5 bg-white rounded-2xl border border-[#E2E6F0] shadow-2xs hover:border-[#1456F0] transition-all block group"
+        >
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#E6F8F0] text-[#10B981] flex items-center justify-center shrink-0">
+            <div className="w-10 h-10 rounded-xl bg-[#E6F8F0] text-[#10B981] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
               <CheckCircle2 className="w-5 h-5" />
             </div>
             <div>
-              <div className="text-xs text-[#696E82] font-medium">Completed tasks</div>
+              <div className="text-xs text-[#696E82] font-medium group-hover:text-[#1456F0] transition-colors">Completed tasks →</div>
               <div className="text-xl md:text-2xl font-bold text-[#1F1F1F] tracking-tight mt-0.5">
                 {activeProjectsCount > 0 ? activeProjectsCount * 8 + 12 : 24}
               </div>
             </div>
           </div>
-        </div>
+        </Link>
 
         {/* Card 4: Pending record changes */}
         <div className="p-4 md:p-5 bg-white rounded-2xl border border-[#E2E6F0] shadow-2xs hover:border-[#CEDEFF] transition-all">
@@ -443,7 +449,7 @@ export function ProfileClientView({ context, initialData }: ProfileClientViewPro
       </div>
 
       {/* 3. Navigation Tabs matching Reference Image */}
-      <div className="inline-flex items-center bg-[#F4F6FB] p-1 rounded-xl border border-[#E2E6F0]">
+      <div className="inline-flex items-center bg-[#F4F6FB] p-1 rounded-xl border border-[#E2E6F0] flex-wrap gap-1">
         <button
           onClick={() => setActiveTab("my-profile")}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs md:text-sm font-semibold transition-all ${
@@ -478,6 +484,30 @@ export function ProfileClientView({ context, initialData }: ProfileClientViewPro
         >
           <FileText className="w-3.5 h-3.5" />
           <span>HR record</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab("documents")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs md:text-sm font-semibold transition-all ${
+            activeTab === "documents"
+              ? "bg-[#1456F0] text-white shadow-2xs"
+              : "text-[#696E82] hover:text-[#1F1F1F] hover:bg-white/60"
+          }`}
+        >
+          <Shield className="w-3.5 h-3.5" />
+          <span>Documents Vault</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab("letters")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs md:text-sm font-semibold transition-all ${
+            activeTab === "letters"
+              ? "bg-[#1456F0] text-white shadow-2xs"
+              : "text-[#696E82] hover:text-[#1F1F1F] hover:bg-white/60"
+          }`}
+        >
+          <Stamp className="w-3.5 h-3.5" />
+          <span>HR Letters</span>
         </button>
       </div>
 
@@ -794,6 +824,24 @@ export function ProfileClientView({ context, initialData }: ProfileClientViewPro
             </div>
           </div>
         </div>
+      )}
+
+      {/* TAB 4: DOCUMENTS VAULT */}
+      {activeTab === "documents" && (
+        <EmployeeDocumentVaultView
+          context={context}
+          employeeId={initialData.directoryProfile?.employeeId || context.employeeId || ""}
+          canManageHR={context.role === "OWNER" || (context.role === "ADMIN" && context.hasHrAccess)}
+        />
+      )}
+
+      {/* TAB 5: HR LETTERS */}
+      {activeTab === "letters" && (
+        <EmployeeLettersView
+          context={context}
+          employeeId={initialData.directoryProfile?.employeeId || context.employeeId || ""}
+          canManageHR={context.role === "OWNER" || (context.role === "ADMIN" && context.hasHrAccess)}
+        />
       )}
 
       {/* Sticky Bottom Bar on Mobile */}

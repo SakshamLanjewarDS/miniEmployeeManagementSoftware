@@ -235,12 +235,19 @@ export function NotificationDropdown({ context }: NotificationDropdownProps) {
 
   // Real-time dynamic notifications subscription: 15s visible poll + tab focus + cross-module broadcasts
   useRealtimeSubscription(
-    ["NOTIFICATION_UPDATED", "TASK_UPDATED", "LEAVE_UPDATED", "VENDOR_UPDATED", "PROJECT_UPDATED"],
+    ["NOTIFICATION_UPDATED", "TASK_UPDATED", "LEAVE_UPDATED", "VENDOR_UPDATED", "PROJECT_UPDATED", "MEETING_SCHEDULED", "MEETING_UPDATED"],
     () => {
       fetchNotifications(false);
     },
     { intervalMs: 15000 }
   );
+
+  // Listen for instant in-tab and cross-module notification refresh events
+  useEffect(() => {
+    const handleRefresh = () => fetchNotifications(false);
+    window.addEventListener("studio-notification-refresh", handleRefresh);
+    return () => window.removeEventListener("studio-notification-refresh", handleRefresh);
+  }, []);
 
   // Handle clicking outside or Escape key to close dropdown
   useEffect(() => {
@@ -359,6 +366,15 @@ export function NotificationDropdown({ context }: NotificationDropdownProps) {
         bg: "bg-[#FEECEC]",
         color: "text-[#EF4444]",
         icon: <Calendar className="w-5 h-5 stroke-[2]" />,
+      };
+    }
+
+    // Studio Meetings / MoM (Indigo/Purple circle with Clock)
+    if (lowerTitle.includes("meeting") || lowerTitle.includes("mom") || lowerMsg.includes("meeting")) {
+      return {
+        bg: "bg-[#EEF2FF]",
+        color: "text-[#4F46E5]",
+        icon: <Clock className="w-5 h-5 stroke-[2]" />,
       };
     }
 

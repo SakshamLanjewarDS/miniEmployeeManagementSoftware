@@ -28,6 +28,7 @@ export async function POST(req: NextRequest) {
       customSiteLandmarkNotes,
       customSiteGoogleMapsUrl,
       employeeId,
+      employeeIds,
       purpose,
       scheduledTime,
       inspectionType,
@@ -41,8 +42,11 @@ export async function POST(req: NextRequest) {
     if (!projectId) {
       return NextResponse.json({ error: "Project selection is mandatory" }, { status: 400 });
     }
-    if (!employeeId) {
-      return NextResponse.json({ error: "Assigned employee is mandatory" }, { status: 400 });
+    const resolvedIds = Array.isArray(employeeIds) && employeeIds.length > 0
+      ? employeeIds
+      : employeeId ? [employeeId] : [];
+    if (resolvedIds.length === 0) {
+      return NextResponse.json({ error: "At least one assigned employee is mandatory" }, { status: 400 });
     }
     if (!purpose || !purpose.trim()) {
       return NextResponse.json({ error: "Visit purpose / meeting agenda is mandatory" }, { status: 400 });
@@ -61,7 +65,8 @@ export async function POST(req: NextRequest) {
       customSiteRadiusMeters: customSiteRadiusMeters ? parseFloat(customSiteRadiusMeters) : undefined,
       customSiteLandmarkNotes,
       customSiteGoogleMapsUrl,
-      employeeId,
+      employeeId: resolvedIds[0],
+      employeeIds: resolvedIds,
       purpose,
       scheduledTime: new Date(scheduledTime),
       inspectionType,

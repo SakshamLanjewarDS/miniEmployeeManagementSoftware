@@ -16,7 +16,7 @@
     "db:push": "prisma db push",
     "db:seed": "tsx scripts/seed.ts",
     "db:backup": "tsx scripts/backup-db.ts",
-    "test": "node --import tsx --test tests/employee-task-workflow.test.ts",
+    "test": "node --import tsx --test --test-concurrency=1 tests/employee-task-workflow.test.ts tests/first-batch-reproduction.test.ts tests/permission-revocation.test.ts tests/assignment-upgrades.test.ts",
     "test:all": "node --import tsx --test --test-concurrency=1 tests/*.test.ts"
   },
   "dependencies": {

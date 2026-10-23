@@ -54,6 +54,8 @@ import { DynamicCardFields } from "@/components/custom-fields/DynamicCardFields"
 import { CustomFieldDefinition } from "@/server/modules/custom-fields/repository";
 import { SearchableDropdown, SearchableSelect } from "@/components/ui/SearchableDropdown";
 import { correctGrammar } from "@/lib/grammar/grammarEngine";
+import { EmployeeDocumentVaultView } from "@/components/documents/EmployeeDocumentVaultView";
+import { EmployeeLettersView } from "@/components/letters/EmployeeLettersView";
 
 const DEPARTMENT_OPTIONS = [
   { value: "Architecture", label: "Architecture", subLabel: "Design & Masterplanning" },
@@ -154,7 +156,7 @@ export default function TeamClientView({
   const [viewMode, setViewMode] = useState<"GRID" | "TABLE">("GRID");
   const [activeCardMenuId, setActiveCardMenuId] = useState<string | null>(null);
   const [selectedProfileEmployee, setSelectedProfileEmployee] = useState<EmployeeItem | null>(null);
-  const [profileTab, setProfileTab] = useState<"OVERVIEW" | "PROJECTS" | "ACTIVITY">("OVERVIEW");
+  const [profileTab, setProfileTab] = useState<"OVERVIEW" | "PROJECTS" | "ACTIVITY" | "DOCUMENTS" | "LETTERS">("OVERVIEW");
   const [accountManagementOpen, setAccountManagementOpen] = useState(false);
   const [moreOptionsOpen, setMoreOptionsOpen] = useState(false);
   const pageSize = 12;
@@ -1814,14 +1816,14 @@ export default function TeamClientView({
                 )}
               </div>
 
-              {/* Sub-tabs: Overview, Projects, Activity */}
-              <div className="flex border-b border-[#E2E6F0] bg-white rounded-xl px-2 pt-1 shadow-2xs">
-                {(["OVERVIEW", "PROJECTS", "ACTIVITY"] as const).map((tab) => (
+              {/* Sub-tabs: Overview, Projects, Activity, Documents, Letters */}
+              <div className="flex border-b border-[#E2E6F0] bg-white rounded-xl px-2 pt-1 shadow-2xs overflow-x-auto">
+                {(["OVERVIEW", "PROJECTS", "ACTIVITY", "DOCUMENTS", "LETTERS"] as const).map((tab) => (
                   <button
                     key={tab}
                     type="button"
                     onClick={() => setProfileTab(tab)}
-                    className={`flex-1 py-2 text-xs font-semibold capitalize border-b-2 -mb-px transition-colors cursor-pointer ${
+                    className={`flex-1 py-2 px-2 text-xs font-semibold capitalize border-b-2 -mb-px transition-colors cursor-pointer shrink-0 ${
                       profileTab === tab
                         ? "border-[#5A81FA] text-[#5A81FA]"
                         : "border-transparent text-[#696E82] hover:text-[#1F1F1F]"
@@ -2063,6 +2065,38 @@ export default function TeamClientView({
                       </div>
                     </div>
                   </div>
+                </div>
+              )}
+
+              {/* Tab 4: Documents Vault */}
+              {profileTab === "DOCUMENTS" && (
+                <div className="bg-white rounded-2xl border border-[#E2E6F0] p-4 shadow-2xs">
+                  <EmployeeDocumentVaultView
+                    context={{
+                      tenantSlug: workspaceSlug,
+                      role: userRole as any,
+                      membershipId: currentUserId,
+                      employeeId: "",
+                    } as any}
+                    employeeId={selectedProfileEmployee.employeeId}
+                    canManageHR={isPrivileged}
+                  />
+                </div>
+              )}
+
+              {/* Tab 5: HR Letters */}
+              {profileTab === "LETTERS" && (
+                <div className="bg-white rounded-2xl border border-[#E2E6F0] p-4 shadow-2xs">
+                  <EmployeeLettersView
+                    context={{
+                      tenantSlug: workspaceSlug,
+                      role: userRole as any,
+                      membershipId: currentUserId,
+                      employeeId: "",
+                    } as any}
+                    employeeId={selectedProfileEmployee.employeeId}
+                    canManageHR={isPrivileged}
+                  />
                 </div>
               )}
             </div>

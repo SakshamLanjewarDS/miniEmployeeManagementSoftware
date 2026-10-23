@@ -45,6 +45,7 @@ import {
   Sun,
   Pencil,
   ChevronRight,
+  Video,
 } from "lucide-react";
 import { EmployeeDashboardData } from "@/server/modules/dashboard/service";
 import { TaskPriorityBadge } from "@/components/tasks/TaskPriorityBadge";
@@ -92,7 +93,7 @@ export default function EmployeeDashboardView({
 }: EmployeeDashboardViewProps) {
   const router = useRouter();
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState<"MY_DAY" | "QUEUE" | "DRAWINGS" | "VISITS" | "SCRATCHPAD">("MY_DAY");
+  const [activeTab, setActiveTab] = useState<"MY_DAY" | "QUEUE" | "MEETINGS" | "DRAWINGS" | "VISITS" | "SCRATCHPAD">("MY_DAY");
   const [filterTab, setFilterTab] = useState<"ALL" | "PENDING" | "TODAY" | "OVERDUE" | "REVIEW" | "CHANGES" | "REOPENED">("ALL");
   const [isReopenModalOpen, setIsReopenModalOpen] = useState(false);
 
@@ -100,6 +101,13 @@ export default function EmployeeDashboardView({
   const { isConnected, lastEvent, forceRefresh } = useStudioRealtime({
     workspaceSlug,
     autoRefresh: true,
+    onEvent: (event) => {
+      if (event.type === "MEETING_SCHEDULED") {
+        setActionMessage(`🗓️ Studio meeting update: "${event.payload?.title || "Session scheduled"}"`);
+        window.dispatchEvent(new CustomEvent("studio-notification-refresh"));
+        router.refresh();
+      }
+    },
   });
 
   const handleRefresh = () => {
@@ -738,6 +746,7 @@ export default function EmployeeDashboardView({
         {[
           { key: "MY_DAY", label: "My Day" },
           { key: "QUEUE", label: `Work queue (${data.workQueue.length})` },
+          { key: "MEETINGS", label: `Studio meetings (${data.studioMeetings?.length || 0})` },
           { key: "DRAWINGS", label: `GFC drawings (${data.latestApprovedDrawings?.length || 0})` },
           { key: "VISITS", label: `Site visits (${data.mySiteVisits.length})` },
           { key: "SCRATCHPAD", label: `Field memos (${savedMemos.length})` },
@@ -1070,6 +1079,154 @@ export default function EmployeeDashboardView({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* LEFT / MAIN COLUMN (~70%) */}
         <div className="lg:col-span-2 space-y-6">
+          {/* Studio Meetings & Sessions Widget (Image A Live Integration) */}
+          {(activeTab === "MY_DAY" || activeTab === "MEETINGS") && (
+            <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-xs space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-100 text-[#4F46E5] flex items-center justify-center shrink-0">
+                    <Clock className="w-5 h-5 stroke-[2.2]" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-bold text-sm text-slate-900">Studio Meetings & Sessions</h3>
+                      {data.todayMeetingsCount > 0 ? (
+                        <span className="px-2 py-0.5 rounded-full font-mono text-[10px] font-bold bg-emerald-100 text-emerald-800 flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                          <span>{data.todayMeetingsCount} Today</span>
+                        </span>
+                      ) : data.upcomingMeetingsCount > 0 ? (
+                        <span className="px-2 py-0.5 rounded-full font-mono text-[10px] font-bold bg-blue-100 text-[#3562E8]">
+                          {data.upcomingMeetingsCount} Upcoming
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="text-xs text-slate-500">
+                      Design reviews, site coordinations & leadership decisions
+                    </p>
+                  </div>
+                </div>
+
+                <Link
+                  href={`/w/${workspaceSlug}/meetings`}
+                  className="text-xs font-bold text-[#3562E8] hover:text-[#264FCB] flex items-center gap-1 group py-1 px-2 rounded-lg hover:bg-blue-50 transition-colors"
+                >
+                  <span>Open Meeting Hub</span>
+                  <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+                </Link>
+              </div>
+
+              {!data.studioMeetings || data.studioMeetings.length === 0 ? (
+                <div className="p-8 text-center bg-slate-50/60 rounded-2xl border border-dashed border-slate-200 space-y-1.5">
+                  <Clock className="w-6 h-6 text-slate-400 mx-auto" />
+                  <p className="text-xs font-semibold text-slate-800">No upcoming meetings scheduled</p>
+                  <p className="text-[11px] text-slate-500">
+                    You have uninterrupted design focus time. When leadership schedules a review, it will arrive here instantly.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  {data.studioMeetings.map((m) => {
+                    const dotColor =
+                      m.meetingType === "Design Review"
+                        ? "bg-blue-500"
+                        : m.meetingType === "Client Presentation"
+                        ? "bg-purple-500"
+                        : m.meetingType === "Site Coordination"
+                        ? "bg-amber-500"
+                        : "bg-emerald-500";
+
+                    return (
+                      <div
+                        key={m.id}
+                        className={`p-4 rounded-2xl border transition-all space-y-3 shadow-2xs group hover:bg-white ${
+                          m.isToday
+                            ? "border-indigo-200 bg-gradient-to-br from-indigo-50/30 to-white hover:border-[#3562E8]"
+                            : "border-slate-200/80 bg-slate-50/50 hover:border-[#3562E8]"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md font-mono text-[10px] font-bold bg-white border border-slate-200 text-slate-700 shadow-2xs">
+                              <span className={`w-1.5 h-1.5 rounded-full ${dotColor}`} />
+                              <span>{m.meetingType}</span>
+                            </span>
+
+                            {m.isToday ? (
+                              <span className="px-2 py-0.5 rounded-md font-mono text-[9px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 animate-pulse">
+                                TODAY
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-md font-mono text-[9px] font-semibold bg-slate-100 text-slate-600">
+                                {new Date(m.meetingDate).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-1 text-[11px] font-mono font-bold text-slate-700 bg-white px-2 py-0.5 rounded border border-slate-200 shrink-0">
+                            <Clock className="w-3 h-3 text-[#3562E8]" />
+                            <span>{m.startTime} - {m.endTime}</span>
+                          </div>
+                        </div>
+
+                        <div>
+                          <h4 className="font-bold text-sm text-slate-900 group-hover:text-[#3562E8] transition-colors line-clamp-1">
+                            {m.title}
+                          </h4>
+                          {m.projectName && (
+                            <p className="text-[11px] text-slate-500 truncate mt-0.5">
+                              {m.projectCode ? `[${m.projectCode}] ` : ""}{m.projectName}
+                            </p>
+                          )}
+                        </div>
+
+                        {m.agenda && (
+                          <p className="text-xs text-slate-600 bg-white/80 p-2.5 rounded-xl border border-slate-100 line-clamp-2 leading-relaxed">
+                            {m.agenda}
+                          </p>
+                        )}
+
+                        {m.myActionItemsCount > 0 && (
+                          <div className="flex items-center gap-1 text-[10px] font-bold text-amber-800 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200">
+                            <CheckSquare className="w-3 h-3 text-amber-600" />
+                            <span>{m.myActionItemsCount} action item{m.myActionItemsCount > 1 ? "s" : ""} assigned to you</span>
+                          </div>
+                        )}
+
+                        <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+                          <span className="text-[10px] text-slate-400">
+                            By {m.creatorName || "Leadership"}
+                          </span>
+
+                          <div className="flex items-center gap-2">
+                            {m.meetingLink && (
+                              <a
+                                href={m.meetingLink}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] flex items-center gap-1 transition-colors shadow-2xs"
+                              >
+                                <Video className="w-3 h-3" />
+                                <span>Join</span>
+                              </a>
+                            )}
+                            <Link
+                              href={`/w/${workspaceSlug}/meetings`}
+                              className="text-[10px] font-bold text-[#3562E8] hover:underline flex items-center gap-1"
+                            >
+                              <span>View MoM</span>
+                              <ChevronRight className="w-3 h-3" />
+                            </Link>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Active Site Inspection Console (if scheduled today) */}
           {data.activeSiteInspection && (
             <div className="bg-white rounded-3xl border-2 border-blue-200 p-6 shadow-xs space-y-3 bg-gradient-to-r from-blue-50/20 to-white">
@@ -1809,6 +1966,24 @@ export default function EmployeeDashboardView({
             </h3>
 
             <div className="space-y-2 text-xs">
+              {data.todayMeetingsCount > 0 && (
+                <Link
+                  href={`/w/${workspaceSlug}/meetings`}
+                  className="w-full text-left p-3 rounded-2xl bg-indigo-50/70 border border-indigo-200/80 flex items-center justify-between group hover:bg-indigo-50 transition-colors"
+                >
+                  <div>
+                    <div className="font-bold text-indigo-950 text-xs">Studio Meeting Today</div>
+                    <div className="text-[10px] text-indigo-600 font-medium">
+                      {data.todayMeetingsCount} scheduled session{data.todayMeetingsCount > 1 ? "s" : ""} on agenda
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-bold bg-indigo-200 text-indigo-800 px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 animate-pulse" />
+                    <span>TODAY</span>
+                  </span>
+                </Link>
+              )}
+
               <button
                 type="button"
                 onClick={() => setFilterTab("TODAY")}
@@ -1852,14 +2027,27 @@ export default function EmployeeDashboardView({
             </div>
           </div>
 
-          {/* Quick Actions 2x2 Grid (Image A Bottom Right) */}
+          {/* Quick Actions Grid */}
           <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-xs space-y-3">
             <h3 className="text-sm font-bold text-slate-900">Quick Actions</h3>
 
-            <div className="grid grid-cols-2 gap-3 text-xs">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs">
+              <Link
+                href={`/w/${workspaceSlug}/meetings`}
+                className="p-3 bg-slate-50 hover:bg-indigo-50 hover:border-indigo-200 border border-slate-200/60 rounded-2xl flex flex-col items-center justify-center gap-1.5 text-center transition-all group relative cursor-pointer"
+              >
+                {data.todayMeetingsCount > 0 && (
+                  <span className="absolute top-2 right-2 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-[#3562E8] text-white animate-pulse">
+                    {data.todayMeetingsCount}
+                  </span>
+                )}
+                <Clock className="w-5 h-5 text-slate-500 group-hover:text-[#3562E8] transition-colors" />
+                <span className="font-bold text-slate-700 group-hover:text-[#3562E8]">Meetings</span>
+              </Link>
+
               <Link
                 href={`/w/${workspaceSlug}/leave`}
-                className="p-3.5 bg-slate-50 hover:bg-blue-50 hover:border-blue-200 border border-slate-200/60 rounded-2xl flex flex-col items-center justify-center gap-1.5 text-center transition-all group"
+                className="p-3 bg-slate-50 hover:bg-blue-50 hover:border-blue-200 border border-slate-200/60 rounded-2xl flex flex-col items-center justify-center gap-1.5 text-center transition-all group"
               >
                 <Calendar className="w-5 h-5 text-slate-500 group-hover:text-[#3562E8] transition-colors" />
                 <span className="font-bold text-slate-700 group-hover:text-[#3562E8]">Apply Leave</span>
@@ -1867,7 +2055,7 @@ export default function EmployeeDashboardView({
 
               <Link
                 href={`/w/${workspaceSlug}/visits`}
-                className="p-3.5 bg-slate-50 hover:bg-blue-50 hover:border-blue-200 border border-slate-200/60 rounded-2xl flex flex-col items-center justify-center gap-1.5 text-center transition-all group"
+                className="p-3 bg-slate-50 hover:bg-blue-50 hover:border-blue-200 border border-slate-200/60 rounded-2xl flex flex-col items-center justify-center gap-1.5 text-center transition-all group"
               >
                 <MapPin className="w-5 h-5 text-slate-500 group-hover:text-emerald-600 transition-colors" />
                 <span className="font-bold text-slate-700 group-hover:text-emerald-600">Site Check-In</span>
@@ -1876,7 +2064,7 @@ export default function EmployeeDashboardView({
               <button
                 type="button"
                 onClick={handleStartTimer}
-                className="p-3.5 bg-slate-50 hover:bg-blue-50 hover:border-blue-200 border border-slate-200/60 rounded-2xl flex flex-col items-center justify-center gap-1.5 text-center transition-all group cursor-pointer"
+                className="p-3 bg-slate-50 hover:bg-blue-50 hover:border-blue-200 border border-slate-200/60 rounded-2xl flex flex-col items-center justify-center gap-1.5 text-center transition-all group cursor-pointer"
               >
                 <Clock className="w-5 h-5 text-slate-500 group-hover:text-[#3562E8] transition-colors" />
                 <span className="font-bold text-slate-700 group-hover:text-[#3562E8]">Log Hours</span>
@@ -1884,7 +2072,7 @@ export default function EmployeeDashboardView({
 
               <Link
                 href={`/w/${workspaceSlug}/tasks`}
-                className="p-3.5 bg-slate-50 hover:bg-blue-50 hover:border-blue-200 border border-slate-200/60 rounded-2xl flex flex-col items-center justify-center gap-1.5 text-center transition-all group"
+                className="p-3 bg-slate-50 hover:bg-blue-50 hover:border-blue-200 border border-slate-200/60 rounded-2xl flex flex-col items-center justify-center gap-1.5 text-center transition-all group"
               >
                 <CheckSquare className="w-5 h-5 text-slate-500 group-hover:text-[#3562E8] transition-colors" />
                 <span className="font-bold text-slate-700 group-hover:text-[#3562E8]">My Tasks</span>

@@ -312,33 +312,66 @@ export async function finalizeAndLockPayrollPeriod(
     );
   }
 
+  // Pre-transaction check: fail fast if period is already finalized/locked
+  if (preview.isLocked) {
+    throw new Error(`Payroll period ${preview.periodKey} is already finalized and locked.`);
+  }
+
   return await prisma.$transaction(async (tx) => {
-    // 1. Create or update period to LOCKED
-    const period = await tx.studioPayrollPeriod.upsert({
+    // 1. Ensure period record exists so we can acquire an exclusive row lock
+    try {
+      await tx.studioPayrollPeriod.upsert({
+        where: {
+          tenantId_periodKey: {
+            tenantId: context.tenantId,
+            periodKey: preview.periodKey,
+          },
+        },
+        create: {
+          tenantId: context.tenantId,
+          periodKey: preview.periodKey,
+          year,
+          month,
+          monthName: preview.monthName,
+          state: "DRAFT",
+          isLocked: false,
+        },
+        update: {},
+      });
+    } catch (e: any) {
+      if (e.code === "P2002") {
+        throw new Error(`Payroll period ${preview.periodKey} is already finalized and locked.`);
+      }
+      throw e;
+    }
+
+    // Acquire exclusive pessimistic row lock (FOR UPDATE) within tenant isolation boundary
+    const lockedRows: Array<{ id: string; isLocked: number | boolean }> = await tx.$queryRaw`
+      SELECT id, isLocked
+      FROM studio_payroll_periods
+      WHERE tenantId = ${context.tenantId} AND periodKey = ${preview.periodKey}
+      FOR UPDATE
+    `;
+
+    if (!lockedRows.length || Boolean(lockedRows[0].isLocked)) {
+      throw new Error(`Payroll period ${preview.periodKey} is already finalized and locked.`);
+    }
+
+    // 2. Atomically transition period to LOCKED state
+    const period = await tx.studioPayrollPeriod.update({
       where: {
         tenantId_periodKey: {
           tenantId: context.tenantId,
           periodKey: preview.periodKey,
         },
       },
-      create: {
-        tenantId: context.tenantId,
-        periodKey: preview.periodKey,
-        year,
-        month,
-        monthName: preview.monthName,
+      data: {
         state: "LOCKED",
         isLocked: true,
         lockedAt: new Date(),
         lockedById: context.membershipId,
         approvedAt: new Date(),
         approvedById: context.membershipId,
-      },
-      update: {
-        state: "LOCKED",
-        isLocked: true,
-        lockedAt: new Date(),
-        lockedById: context.membershipId,
       },
     });
 

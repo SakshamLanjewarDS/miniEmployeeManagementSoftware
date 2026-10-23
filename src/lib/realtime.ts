@@ -8,7 +8,9 @@ export type RealtimeEventType =
   | "NOTIFICATION_UPDATED"
   | "VENDOR_UPDATED"
   | "ATTENDANCE_UPDATED"
-  | "PROJECT_UPDATED";
+  | "PROJECT_UPDATED"
+  | "MEETING_SCHEDULED"
+  | "MEETING_UPDATED";
 
 export interface RealtimeEvent {
   type: RealtimeEventType;

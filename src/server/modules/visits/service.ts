@@ -1,10 +1,11 @@
 import { prisma } from "../../db/prisma";
-import { TenantContext } from "../../tenancy/context";
+import { TenantContext, ForbiddenException } from "../../tenancy/context";
 import {
   SiteVisitOperationalState,
   SiteVisitEventType,
   GeofenceAssessment,
   SiteVisitReviewDecision,
+  JourneyState,
 } from "@prisma/client";
 import { sendDevicePushNotification } from "../notifications/push";
 import { dispatchNotification } from "../notifications/dispatch";
@@ -635,9 +636,13 @@ export interface CreateSiteVisitInput {
   customSiteRadiusMeters?: number;
   customSiteLandmarkNotes?: string;
   customSiteGoogleMapsUrl?: string;
-  employeeId: string;
-  purpose: string;
-  scheduledTime: Date;
+  employeeId?: string;
+  employeeIds?: string[];
+  purpose?: string;
+  meetingAgenda?: string;
+  typologyAndScope?: string;
+  scheduledDate?: string;
+  scheduledTime: Date | string;
   inspectionType?: string;
   priority?: string;
   taskId?: string;
@@ -664,6 +669,29 @@ export async function createSiteVisit(ctx: TenantContext, input: CreateSiteVisit
     }
   }
 
+  // 1. Resolve Assignees (Searchable multi-select: at least 1 active, no duplicates)
+  const rawIds = input.employeeIds && input.employeeIds.length > 0
+    ? input.employeeIds
+    : (input.employeeId ? [input.employeeId] : []);
+  const targetEmployeeIds = Array.from(new Set(rawIds.filter(Boolean)));
+
+  if (targetEmployeeIds.length === 0) {
+    throw new Error("At least one active employee must be assigned to the site visit.");
+  }
+
+  const activeMemberships = await prisma.tenantMembership.findMany({
+    where: {
+      tenantId: ctx.tenantId,
+      id: { in: targetEmployeeIds },
+      isActive: true,
+    },
+  });
+
+  if (activeMemberships.length !== targetEmployeeIds.length) {
+    throw new Error("One or more assigned employees are inactive or do not belong to this studio.");
+  }
+
+  // 2. Resolve / Create Site Location & Perimeter
   let targetSiteId = input.siteId;
 
   if (targetSiteId && (input.customSiteRadiusMeters || input.customSiteLandmarkNotes || input.customSiteGoogleMapsUrl)) {
@@ -699,67 +727,136 @@ export async function createSiteVisit(ctx: TenantContext, input: CreateSiteVisit
     throw new Error("Please select an existing project site or provide a site location name.");
   }
 
-  const visit = await prisma.siteVisit.create({
-    data: {
-      tenantId: ctx.tenantId,
-      projectId: input.projectId,
-      siteId: targetSiteId,
-      employeeId: input.employeeId,
-      taskId: input.taskId || null,
-      milestoneId: input.milestoneId || null,
-      purpose: input.purpose.trim(),
-      inspectionType: input.inspectionType || "ROUTINE",
-      priority: input.priority || "MEDIUM",
-      scheduledTime: input.scheduledTime,
-      operationalState: SiteVisitOperationalState.SCHEDULED,
-      attendeesJson: input.attendeesJson || null,
-      checklistItemsJson: input.checklistItemsJson || null,
-    },
-    include: {
-      site: true,
-      project: {
-        select: {
-          id: true,
-          code: true,
-          name: true,
-        },
-      },
-      employee: {
-        include: {
-          user: true,
-          employee: true,
-        },
-      },
-    },
+  const site = await prisma.site.findUnique({
+    where: { id: targetSiteId },
   });
 
-  // Create notification for assigned employee
-  try {
-    await prisma.notification.create({
+  if (!site || site.tenantId !== ctx.tenantId) {
+    throw new Error("Target site not found or access denied.");
+  }
+
+  // 3. Freeze Destination Snapshot (Preserves historical location independently of future site edits)
+  const destinationSnapshot = {
+    siteId: site.id,
+    name: site.name,
+    address: site.address,
+    latitude: site.latitude,
+    longitude: site.longitude,
+    radiusMeters: site.radiusMeters,
+    accuracyThresholdMeters: site.accuracyThresholdMeters,
+    landmarkNotes: site.landmarkNotes,
+    googleMapsUrl: site.googleMapsUrl,
+  };
+
+  // 4. Default 4 QA/QC checklist items if none provided
+  const canonicalChecklist = [
+    { item: "Latest drawings available", checked: false },
+    { item: "Inspection scope reviewed", checked: false },
+    { item: "Tools/PPE prepared", checked: false },
+    { item: "Access/contractor availability confirmed", checked: false },
+  ];
+  const finalChecklist = (input.checklistItemsJson && Array.isArray(input.checklistItemsJson) && input.checklistItemsJson.length > 0)
+    ? input.checklistItemsJson
+    : canonicalChecklist;
+
+  let resolvedScheduledTime: Date;
+  if (input.scheduledTime instanceof Date) {
+    resolvedScheduledTime = input.scheduledTime;
+  } else if (input.scheduledDate && typeof input.scheduledTime === "string" && !input.scheduledTime.includes("-")) {
+    resolvedScheduledTime = new Date(`${input.scheduledDate}T${input.scheduledTime}:00`);
+  } else if (input.scheduledTime) {
+    resolvedScheduledTime = new Date(input.scheduledTime);
+  } else {
+    resolvedScheduledTime = new Date();
+  }
+
+  const resolvedPurpose = (input.purpose || input.meetingAgenda || input.typologyAndScope || "Site QA/QC Inspection").trim();
+
+  const visit = await prisma.$transaction(async (tx) => {
+    const newVisit = await tx.siteVisit.create({
       data: {
         tenantId: ctx.tenantId,
-        recipientId: input.employeeId,
-        title: "New Site Visit Assigned",
-        message: `You were assigned to visit '${visit.site.name}' for ${visit.project.code}: "${visit.purpose}" on ${new Date(
-          input.scheduledTime
-        ).toLocaleString("en-IN", { timeZone: ctx.timezone || "Asia/Kolkata" })}.`,
-        link: `/w/${ctx.tenantSlug}/visits`,
-        isRead: false,
+        projectId: input.projectId,
+        siteId: site.id,
+        employeeId: targetEmployeeIds[0], // primary assignee for backwards compatibility
+        taskId: input.taskId || null,
+        milestoneId: input.milestoneId || null,
+        purpose: resolvedPurpose,
+        inspectionType: input.inspectionType || "ROUTINE",
+        priority: input.priority || "MEDIUM",
+        scheduledTime: resolvedScheduledTime,
+        operationalState: SiteVisitOperationalState.SCHEDULED,
+        destinationSnapshotJson: destinationSnapshot as any,
+        attendeesJson: input.attendeesJson || null,
+        checklistItemsJson: finalChecklist as any,
+      },
+      include: {
+        site: true,
+        project: {
+          select: {
+            id: true,
+            code: true,
+            name: true,
+          },
+        },
+        employee: {
+          include: {
+            user: true,
+            employee: true,
+          },
+        },
       },
     });
 
-    sendDevicePushNotification(
-      input.employeeId,
-      {
-        title: "New Site Visit Assigned 📍",
-        message: `You were assigned to visit '${visit.site.name}' for ${visit.project.code}: "${visit.purpose}"`,
-        link: `/w/${ctx.tenantSlug}/visits`,
-        tag: `visit-${visit.id}`,
-      },
-      ctx.tenantId
-    ).catch(() => {});
-  } catch (err) {
-    console.error("Failed to create site visit assignment notification:", err);
+    // Create SiteVisitParticipant session for each assigned employee
+    const createdParticipants = [];
+    for (const mId of targetEmployeeIds) {
+      const p = await tx.siteVisitParticipant.create({
+        data: {
+          tenantId: ctx.tenantId,
+          visitId: newVisit.id,
+          membershipId: mId,
+          journeyState: JourneyState.ASSIGNED,
+        },
+      });
+      createdParticipants.push(p);
+    }
+
+    return {
+      ...newVisit,
+      participants: createdParticipants,
+    };
+  });
+
+  // Notify each assigned employee
+  for (const mId of targetEmployeeIds) {
+    try {
+      await prisma.notification.create({
+        data: {
+          tenantId: ctx.tenantId,
+          recipientId: mId,
+          title: "New Site Visit Assigned 📍",
+          message: `You were assigned to visit '${site.name}' for ${visit.project.code}: "${visit.purpose}" on ${new Date(
+            input.scheduledTime
+          ).toLocaleString("en-IN", { timeZone: ctx.timezone || "Asia/Kolkata" })}.`,
+          link: `/w/${ctx.tenantSlug}/visits`,
+          isRead: false,
+        },
+      });
+
+      sendDevicePushNotification(
+        mId,
+        {
+          title: "New Site Visit Assigned 📍",
+          message: `You were assigned to visit '${site.name}' for ${visit.project.code}: "${visit.purpose}"`,
+          link: `/w/${ctx.tenantSlug}/visits`,
+          tag: `visit-${visit.id}`,
+        },
+        ctx.tenantId
+      ).catch(() => {});
+    } catch (err) {
+      console.error("Failed to create site visit assignment notification:", err);
+    }
   }
 
   return visit;
@@ -885,5 +982,540 @@ export async function updateSiteVisit(ctx: TenantContext, input: UpdateSiteVisit
       events: { orderBy: { serverReceiptTime: "desc" } },
     },
   });
+}
+
+// ==========================================
+// INDIVIDUAL JOURNEY & INSPECTION WORKFLOW
+// ==========================================
+
+export interface TransitionJourneyParams {
+  visitId: string;
+  milestone: JourneyState;
+  latitude?: number;
+  longitude?: number;
+  accuracyMeters?: number;
+  deviceTimestamp?: Date;
+  exceptionNotes?: string;
+}
+
+/**
+ * Transitions an individual employee's journey milestone with explicit server validation.
+ * One person's progress does not complete or stop another person's tracking.
+ *
+ * Sequence:
+ * Assigned -> Start Journey -> Arrived at Site -> Start Inspection -> Finish Inspection -> Start Return Journey -> Returned to Office / End Journey.
+ *
+ * NOTE: Finish Inspection ends the inspection session but leaves the journey ACTIVE!
+ * End Journey stops tracking capture.
+ */
+export async function transitionParticipantJourney(
+  ctx: TenantContext,
+  visitIdOrParams: string | (TransitionJourneyParams & { transition?: string }),
+  maybeParams?: any
+) {
+  const isPositional = typeof visitIdOrParams === "string";
+  const visitId = isPositional ? visitIdOrParams : visitIdOrParams.visitId;
+  const rawParams = isPositional ? (maybeParams || {}) : visitIdOrParams;
+  const rawMilestone = rawParams.milestone || rawParams.transition;
+  const milestoneMap: Record<string, JourneyState> = {
+    START_JOURNEY: JourneyState.JOURNEY_STARTED,
+    JOURNEY_STARTED: JourneyState.JOURNEY_STARTED,
+    ARRIVED_AT_SITE: JourneyState.ARRIVED_AT_SITE,
+    START_INSPECTION: JourneyState.INSPECTION_STARTED,
+    INSPECTION_STARTED: JourneyState.INSPECTION_STARTED,
+    FINISH_INSPECTION: JourneyState.INSPECTION_FINISHED,
+    INSPECTION_FINISHED: JourneyState.INSPECTION_FINISHED,
+    START_RETURN_JOURNEY: JourneyState.RETURN_STARTED,
+    RETURN_STARTED: JourneyState.RETURN_STARTED,
+    RETURNED_TO_OFFICE: JourneyState.RETURNED_OFFICE,
+    RETURNED_OFFICE: JourneyState.RETURNED_OFFICE,
+    END_JOURNEY: JourneyState.RETURNED_OFFICE,
+    CANCEL: JourneyState.CANCELLED,
+    CANCELLED: JourneyState.CANCELLED,
+  };
+  const milestone = (milestoneMap[rawMilestone] || rawMilestone) as JourneyState;
+  const { latitude, longitude, accuracyMeters, deviceTimestamp, exceptionNotes } = rawParams;
+
+  // 1. Locate participant record for the current user
+  let participant = await prisma.siteVisitParticipant.findFirst({
+    where: {
+      tenantId: ctx.tenantId,
+      visitId,
+      membershipId: ctx.membershipId,
+    },
+    include: {
+      visit: {
+        include: { site: true, project: true },
+      },
+    },
+  });
+
+  // If Owner/Admin is testing or transitioning for an assigned visit, or if participant session wasn't pre-created
+  if (!participant) {
+    const isOwnerOrAdmin = ctx.role === "OWNER" || ctx.role === "ADMIN";
+    const visitExists = await prisma.siteVisit.findFirst({
+      where: { id: visitId, tenantId: ctx.tenantId },
+      include: { site: true, project: true },
+    });
+
+    if (!visitExists) {
+      throw new Error("Site visit record not found.");
+    }
+
+    if (visitExists.employeeId === ctx.membershipId || isOwnerOrAdmin) {
+      // Auto-initialize participant session
+      participant = await prisma.siteVisitParticipant.create({
+        data: {
+          tenantId: ctx.tenantId,
+          visitId,
+          membershipId: ctx.membershipId,
+          journeyState: JourneyState.ASSIGNED,
+        },
+        include: {
+          visit: {
+            include: { site: true, project: true },
+          },
+        },
+      });
+    } else {
+      throw new ForbiddenException("You are not an assigned participant for this site visit.");
+    }
+  }
+
+  const visit = participant.visit;
+  const now = new Date();
+  const effectiveCaptureTime = deviceTimestamp ? new Date(deviceTimestamp) : now;
+  const currentState = participant.journeyState;
+
+  // 2. Validate state transitions
+  if (currentState === JourneyState.RETURNED_OFFICE && milestone !== JourneyState.ASSIGNED) {
+    throw new Error("Journey has already concluded (Returned to Office). It cannot be transitioned further.");
+  }
+  if (currentState === JourneyState.CANCELLED && milestone !== JourneyState.ASSIGNED) {
+    throw new Error("Journey was cancelled. Only an administrator can reopen it.");
+  }
+
+  const validTransitions: Record<JourneyState, JourneyState[]> = {
+    ASSIGNED: [JourneyState.JOURNEY_STARTED, JourneyState.CANCELLED],
+    JOURNEY_STARTED: [JourneyState.ARRIVED_AT_SITE, JourneyState.RETURN_STARTED, JourneyState.CANCELLED],
+    ARRIVED_AT_SITE: [JourneyState.INSPECTION_STARTED, JourneyState.RETURN_STARTED, JourneyState.CANCELLED],
+    INSPECTION_STARTED: [JourneyState.INSPECTION_FINISHED, JourneyState.CANCELLED],
+    INSPECTION_FINISHED: [JourneyState.RETURN_STARTED, JourneyState.RETURNED_OFFICE, JourneyState.INSPECTION_STARTED, JourneyState.CANCELLED],
+    RETURN_STARTED: [JourneyState.RETURNED_OFFICE, JourneyState.CANCELLED],
+    RETURNED_OFFICE: [],
+    CANCELLED: [JourneyState.ASSIGNED],
+  };
+
+  const allowed = validTransitions[currentState] || [];
+  if (!allowed.includes(milestone)) {
+    throw new Error(`Invalid milestone transition: cannot transition from ${currentState} to ${milestone}.`);
+  }
+
+  // 3. Build update payload
+  const updateData: any = {
+    journeyState: milestone,
+    updatedAt: now,
+  };
+
+  if (latitude !== undefined && longitude !== undefined) {
+    updateData.lastLatitude = latitude;
+    updateData.lastLongitude = longitude;
+    updateData.lastAccuracyMeters = accuracyMeters ?? null;
+    updateData.lastHeartbeatAt = now;
+  }
+
+  if (exceptionNotes) {
+    updateData.exceptionNotes = participant.exceptionNotes
+      ? `${participant.exceptionNotes}\n[${now.toISOString()}]: ${exceptionNotes}`
+      : `[${now.toISOString()}]: ${exceptionNotes}`;
+  }
+
+  if (milestone === JourneyState.JOURNEY_STARTED) {
+    updateData.departureTime = effectiveCaptureTime;
+    updateData.isTrackingActive = true;
+  } else if (milestone === JourneyState.ARRIVED_AT_SITE) {
+    updateData.arrivalTime = effectiveCaptureTime;
+    updateData.isTrackingActive = true; // Still active
+  } else if (milestone === JourneyState.INSPECTION_STARTED) {
+    updateData.inspectionStartTime = effectiveCaptureTime;
+    updateData.isTrackingActive = true; // Still active
+  } else if (milestone === JourneyState.INSPECTION_FINISHED) {
+    updateData.inspectionEndTime = effectiveCaptureTime;
+    // CRITICAL: Finishing inspection ends the inspection session, but leaves journey active!
+    updateData.isTrackingActive = true;
+  } else if (milestone === JourneyState.RETURN_STARTED) {
+    updateData.returnDepartureTime = effectiveCaptureTime;
+    updateData.isTrackingActive = true;
+  } else if (milestone === JourneyState.RETURNED_OFFICE) {
+    updateData.returnEndTime = effectiveCaptureTime;
+    // End Journey stops tracking!
+    updateData.isTrackingActive = false;
+
+    if (participant.departureTime) {
+      const diffMs = effectiveCaptureTime.getTime() - participant.departureTime.getTime();
+      updateData.totalDurationMinutes = Math.max(1, Math.round(diffMs / 60000));
+    }
+  } else if (milestone === JourneyState.CANCELLED) {
+    updateData.isTrackingActive = false;
+  }
+
+  return await prisma.$transaction(async (tx) => {
+    const updated = await tx.siteVisitParticipant.update({
+      where: { id: participant.id },
+      data: updateData,
+      include: {
+        membership: { include: { user: true, employee: true } },
+      },
+    });
+
+    // Record location sample
+    if (latitude !== undefined && longitude !== undefined) {
+      await tx.siteVisitLocationSample.create({
+        data: {
+          tenantId: ctx.tenantId,
+          visitId,
+          participantId: participant.id,
+          latitude,
+          longitude,
+          accuracyMeters: accuracyMeters ?? null,
+          clientCaptureTime: effectiveCaptureTime,
+          serverReceiptTime: now,
+          isException: Boolean(exceptionNotes),
+          exceptionReason: exceptionNotes ?? null,
+        },
+      });
+    }
+
+    // Record audit event
+    await tx.siteVisitEvent.create({
+      data: {
+        tenantId: ctx.tenantId,
+        visitId,
+        eventType: milestone === JourneyState.JOURNEY_STARTED ? SiteVisitEventType.CHECK_IN :
+                   milestone === JourneyState.RETURNED_OFFICE ? SiteVisitEventType.CHECK_OUT :
+                   SiteVisitEventType.EXCEPTION,
+        actorId: ctx.membershipId,
+        serverReceiptTime: now,
+        clientCaptureTime: effectiveCaptureTime,
+        latitude: latitude ?? null,
+        longitude: longitude ?? null,
+        accuracyMeters: accuracyMeters ?? null,
+        failureReason: `JOURNEY_TRANSITION: ${milestone}${exceptionNotes ? ` (${exceptionNotes})` : ""}`,
+        geofenceAssessment: GeofenceAssessment.UNCERTAIN,
+        idempotencyKey: `ms-${participant.id.replace(/-/g, "").slice(0, 16)}-${milestone.slice(0, 12)}-${now.getTime()}`.slice(0, 64),
+        siteCenterLat: visit.site.latitude,
+        siteCenterLng: visit.site.longitude,
+        siteRadiusMeters: visit.site.radiusMeters,
+      },
+    });
+
+    // If visit is still SCHEDULED and journey starts, move operationalState to ACTIVE
+    if (milestone === JourneyState.JOURNEY_STARTED && visit.operationalState === SiteVisitOperationalState.SCHEDULED) {
+      await tx.siteVisit.update({
+        where: { id: visit.id },
+        data: { operationalState: SiteVisitOperationalState.ACTIVE },
+      });
+    }
+
+    const result: any = updated;
+    result.participant = {
+      ...updated,
+      operationalState: updated.journeyState,
+    };
+    result.operationalState = updated.journeyState;
+    return result;
+  });
+}
+
+export interface IngestLocationSamplesParams {
+  visitId: string;
+  samples: Array<{
+    latitude: number;
+    longitude: number;
+    accuracyMeters?: number;
+    clientCaptureTime: string | Date;
+    isException?: boolean;
+    exceptionReason?: string;
+    idempotencyKey?: string;
+  }>;
+}
+
+/**
+ * Ingests a batch of offline/queued or foreground location samples.
+ * Bounded batch size, rate-limited, ownership validated.
+ */
+export async function ingestLocationSamples(
+  ctx: TenantContext,
+  params: IngestLocationSamplesParams
+) {
+  const { visitId, samples } = params;
+  if (!samples || samples.length === 0) return { received: 0 };
+
+  const participant = await prisma.siteVisitParticipant.findFirst({
+    where: {
+      tenantId: ctx.tenantId,
+      visitId,
+      membershipId: ctx.membershipId,
+    },
+  });
+
+  if (!participant) {
+    throw new ForbiddenException("Not an assigned participant for this visit.");
+  }
+
+  // Reject new points if journey has already ended
+  if (participant.journeyState === JourneyState.RETURNED_OFFICE || participant.journeyState === JourneyState.CANCELLED) {
+    return { received: 0, rejectedReason: "Journey has already concluded." };
+  }
+
+  const now = new Date();
+  let latestLat: number | null = null;
+  let latestLng: number | null = null;
+  let latestAccuracy: number | null = null;
+  let savedCount = 0;
+
+  for (const s of samples.slice(0, 50)) {
+    if (typeof s.latitude !== "number" || typeof s.longitude !== "number") continue;
+    if (s.latitude < -90 || s.latitude > 90 || s.longitude < -180 || s.longitude > 180) continue;
+
+    if (s.idempotencyKey) {
+      const exists = await prisma.siteVisitLocationSample.findFirst({
+        where: { tenantId: ctx.tenantId, idempotencyKey: s.idempotencyKey },
+        select: { id: true },
+      });
+      if (exists) continue;
+    }
+
+    const captureTime = new Date(s.clientCaptureTime || now);
+    await prisma.siteVisitLocationSample.create({
+      data: {
+        tenantId: ctx.tenantId,
+        visitId,
+        participantId: participant.id,
+        latitude: s.latitude,
+        longitude: s.longitude,
+        accuracyMeters: s.accuracyMeters ?? null,
+        clientCaptureTime: captureTime,
+        serverReceiptTime: now,
+        isException: Boolean(s.isException),
+        exceptionReason: s.exceptionReason ?? null,
+        idempotencyKey: s.idempotencyKey ?? null,
+      },
+    });
+
+    latestLat = s.latitude;
+    latestLng = s.longitude;
+    latestAccuracy = s.accuracyMeters ?? null;
+    savedCount++;
+  }
+
+  if (latestLat !== null && latestLng !== null) {
+    await prisma.siteVisitParticipant.update({
+      where: { id: participant.id },
+      data: {
+        lastLatitude: latestLat,
+        lastLongitude: latestLng,
+        lastAccuracyMeters: latestAccuracy,
+        lastHeartbeatAt: now,
+      },
+    });
+  }
+
+  return { received: samples.length, saved: savedCount };
+}
+
+export interface SaveInspectionReportInput {
+  visitId: string;
+  checklistAnswersJson?: any;
+  observations?: string;
+  photosJson?: any;
+  snagsJson?: any;
+  isFinalSubmission?: boolean;
+}
+
+/**
+ * Saves inspection report draft or submits it.
+ * Note: Finishing / submitting an inspection report leaves the journey active!
+ */
+export async function saveInspectionReport(
+  ctx: TenantContext,
+  input: SaveInspectionReportInput
+) {
+  let participant = await prisma.siteVisitParticipant.findFirst({
+    where: {
+      tenantId: ctx.tenantId,
+      visitId: input.visitId,
+      membershipId: ctx.membershipId,
+    },
+  });
+
+  if (!participant && ctx.role === "EMPLOYEE") {
+    throw new ForbiddenException("You are not an assigned participant for this visit.");
+  }
+
+  if (!participant) {
+    participant = await prisma.siteVisitParticipant.findFirst({
+      where: { tenantId: ctx.tenantId, visitId: input.visitId },
+    });
+  }
+
+  if (!participant) {
+    throw new Error("No participant session exists for this visit.");
+  }
+
+  let report = await prisma.siteVisitInspectionReport.findFirst({
+    where: {
+      tenantId: ctx.tenantId,
+      visitId: input.visitId,
+      participantId: participant.id,
+    },
+  });
+
+  const now = new Date();
+  const status = input.isFinalSubmission ? "SUBMITTED" : (report?.status || "DRAFT");
+
+  if (!report) {
+    report = await prisma.siteVisitInspectionReport.create({
+      data: {
+        tenantId: ctx.tenantId,
+        visitId: input.visitId,
+        participantId: participant.id,
+        checklistAnswersJson: input.checklistAnswersJson || null,
+        observations: input.observations || null,
+        photosJson: input.photosJson || null,
+        snagsJson: input.snagsJson || null,
+        status,
+        submittedAt: input.isFinalSubmission ? now : null,
+      },
+    });
+  } else {
+    report = await prisma.siteVisitInspectionReport.update({
+      where: { id: report.id },
+      data: {
+        checklistAnswersJson: input.checklistAnswersJson ?? report.checklistAnswersJson,
+        observations: input.observations ?? report.observations,
+        photosJson: input.photosJson ?? report.photosJson,
+        snagsJson: input.snagsJson ?? report.snagsJson,
+        status,
+        submittedAt: input.isFinalSubmission ? now : report.submittedAt,
+      },
+    });
+  }
+
+  // If final submission, update participant inspection status and time
+  if (input.isFinalSubmission) {
+    await prisma.siteVisitParticipant.update({
+      where: { id: participant.id },
+      data: {
+        journeyState: JourneyState.INSPECTION_FINISHED,
+        inspectionEndTime: now,
+      },
+    });
+
+    // Also update parent visit findings and snags for overview visibility
+    await prisma.siteVisit.update({
+      where: { id: input.visitId },
+      data: {
+        findings: input.observations || undefined,
+        submittedReportTime: now,
+        photosJson: input.photosJson || undefined,
+        snagsJson: input.snagsJson || undefined,
+      },
+    });
+  }
+
+  return report;
+}
+
+/**
+ * Admin review for submitted inspection report
+ */
+export async function reviewInspectionReport(
+  ctx: TenantContext,
+  reportId: string,
+  decision: "APPROVED" | "CORRECTIONS_REQUESTED",
+  comment?: string
+) {
+  if (ctx.role !== "OWNER" && ctx.role !== "ADMIN") {
+    throw new ForbiddenException("Only Owner or Admin can review inspection reports.");
+  }
+
+  const updated = await prisma.siteVisitInspectionReport.update({
+    where: { id: reportId },
+    data: {
+      status: decision,
+      reviewerId: ctx.membershipId,
+      reviewedAt: new Date(),
+      reviewComment: comment || null,
+    },
+    include: {
+      participant: { include: { membership: { include: { user: true } } } },
+      visit: { include: { site: true } },
+    },
+  });
+
+  // Notify participant
+  try {
+    await prisma.notification.create({
+      data: {
+        tenantId: ctx.tenantId,
+        recipientId: updated.participant.membershipId,
+        title: decision === "APPROVED" ? "Inspection Report Approved ✅" : "Inspection Report - Corrections Requested",
+        message: `${ctx.userFullName} reviewed your inspection report for '${updated.visit.site.name}': ${decision}.${comment ? ` Note: ${comment}` : ""}`,
+        link: `/w/${ctx.tenantSlug}/visits`,
+      },
+    });
+  } catch {}
+
+  return updated;
+}
+
+/**
+ * Retrieves comprehensive site visit dossier with participants, reports, samples, and destination snapshot.
+ */
+export async function getSiteVisitDossier(ctx: TenantContext, visitId: string) {
+  const visit = await prisma.siteVisit.findFirst({
+    where: { id: visitId, tenantId: ctx.tenantId },
+    include: {
+      site: true,
+      project: { select: { id: true, code: true, name: true } },
+      employee: { include: { user: true, employee: true } },
+      participants: {
+        include: {
+          membership: { include: { user: true, employee: true } },
+          inspectionReports: true,
+        },
+      },
+      events: { orderBy: { serverReceiptTime: "asc" } },
+    },
+  });
+
+  if (!visit) {
+    throw new Error("Site visit not found.");
+  }
+
+  // Authorization check: Employee can only see their own private route; Owner/Admin sees all
+  const isPrivileged = ctx.role === "OWNER" || ctx.role === "ADMIN";
+  const userParticipant = visit.participants.find((p) => p.membershipId === ctx.membershipId);
+
+  // Load location samples
+  let samples: any[] = [];
+  if (isPrivileged) {
+    samples = await prisma.siteVisitLocationSample.findMany({
+      where: { visitId, tenantId: ctx.tenantId },
+      orderBy: { clientCaptureTime: "asc" },
+    });
+  } else if (userParticipant) {
+    samples = await prisma.siteVisitLocationSample.findMany({
+      where: { visitId, tenantId: ctx.tenantId, participantId: userParticipant.id },
+      orderBy: { clientCaptureTime: "asc" },
+    });
+  }
+
+  return {
+    visit,
+    samples,
+    destinationSnapshot: visit.destinationSnapshotJson,
+  };
 }
 

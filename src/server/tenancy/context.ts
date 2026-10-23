@@ -14,6 +14,7 @@ export interface TenantContext {
   readonly phone?: string | null;
   readonly role: TenantRole;
   readonly hasFinanceAccess: boolean;
+  readonly hasHrAccess?: boolean;
   readonly avatarUrl?: string | null;
   readonly timezone: string;
   readonly currency: string;
@@ -113,6 +114,33 @@ export function assertCanManageDirectories(context: TenantContext, message = "Fo
 
 export function assertCanManageFinance(context: TenantContext, message = "Forbidden: Financial management privileges required"): void {
   if (!canManageFinance(context)) {
+    throw new ForbiddenException(message);
+  }
+}
+
+export function canManageHR(context: TenantContext): boolean {
+  return isOwner(context) || (isAdmin(context) && Boolean(context.hasHrAccess));
+}
+
+export function assertCanManageHR(context: TenantContext, message = "Forbidden: HR management privileges required"): void {
+  if (!canManageHR(context)) {
+    throw new ForbiddenException(message);
+  }
+}
+
+/**
+ * An Admin cannot verify their own HR documents or approve their own employment letter.
+ * Route these to the Owner or another authorized reviewer.
+ */
+export function assertCannotSelfReview(
+  context: TenantContext,
+  targetEmployeeOrMembershipId: string,
+  message = "Forbidden: Administrators cannot verify their own HR documents or approve their own employment letter"
+): void {
+  if (
+    context.role !== TenantRole.OWNER &&
+    (context.employeeId === targetEmployeeOrMembershipId || context.membershipId === targetEmployeeOrMembershipId)
+  ) {
     throw new ForbiddenException(message);
   }
 }

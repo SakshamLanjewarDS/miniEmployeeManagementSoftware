@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentTenantContext } from "@/server/auth/session";
+import { ForbiddenException, UnauthorizedException } from "@/server/tenancy/context";
 import {
   getBackupVerificationOverview,
   recordStudioBackupRun,
@@ -25,9 +26,16 @@ export async function GET(req: NextRequest) {
     const overview = await getBackupVerificationOverview(ctx);
     return NextResponse.json(overview);
   } catch (err: any) {
+    if (err instanceof ForbiddenException || err.name === "ForbiddenException") {
+      return NextResponse.json({ error: err.message }, { status: 403 });
+    }
+    if (err instanceof UnauthorizedException || err.name === "UnauthorizedException") {
+      return NextResponse.json({ error: err.message }, { status: 401 });
+    }
+    console.error("GET /api/backup unexpected error:", err);
     return NextResponse.json(
-      { error: err.message || "Failed to load backup verification status" },
-      { status: err.message?.includes("Forbidden") ? 403 : 500 }
+      { error: "Internal server error" },
+      { status: 500 }
     );
   }
 }
@@ -81,9 +89,16 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ error: "Invalid action." }, { status: 400 });
   } catch (err: any) {
+    if (err instanceof ForbiddenException || err.name === "ForbiddenException") {
+      return NextResponse.json({ error: err.message }, { status: 403 });
+    }
+    if (err instanceof UnauthorizedException || err.name === "UnauthorizedException") {
+      return NextResponse.json({ error: err.message }, { status: 401 });
+    }
+    console.error("POST /api/backup unexpected error:", err);
     return NextResponse.json(
-      { error: err.message || "Failed to process backup request" },
-      { status: err.message?.includes("Forbidden") ? 403 : 400 }
+      { error: "Internal server error" },
+      { status: 500 }
     );
   }
 }

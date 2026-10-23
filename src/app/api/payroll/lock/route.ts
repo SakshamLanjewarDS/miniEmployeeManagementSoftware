@@ -44,9 +44,12 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true, period: lockedPeriod });
   } catch (err: any) {
+    const isConflict =
+      err.message?.includes("already finalized") ||
+      err.name === "ConflictException";
     return NextResponse.json(
       { error: err.message || "Failed to finalize and lock payroll period" },
-      { status: err.name === "ForbiddenException" ? 403 : 400 }
+      { status: err.name === "ForbiddenException" ? 403 : isConflict ? 409 : 400 }
     );
   }
 }

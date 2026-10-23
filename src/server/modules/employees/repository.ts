@@ -1,7 +1,7 @@
 import { prisma } from "../../db/prisma";
 import { TenantContext, isAdminOrOwner, ForbiddenException } from "../../tenancy/context";
 import { TenantRole, UserAccountState } from "@prisma/client";
-import { revokeAllUserSessions } from "../../auth/session";
+import { revokeAllUserSessions, clearMembershipCache } from "../../auth/session";
 import bcrypt from "bcryptjs";
 import {
   sendCredentialNotification,
@@ -501,6 +501,7 @@ export async function updateTenantEmployee(
       data: membershipUpdates,
       include: { user: true },
     });
+    clearMembershipCache(membershipId);
 
     // 3. Update employee profile
     const employeeUpdates: any = {};
@@ -593,6 +594,7 @@ export async function reactivateMember(
     where: { id: membershipId },
     data: { isActive: true },
   });
+  clearMembershipCache(membershipId);
 
   // Audit log
   await prisma.auditEvent.create({
@@ -687,6 +689,7 @@ export async function removeMember(
     await tx.tenantMembership.delete({
       where: { id: target.id },
     });
+    clearMembershipCache(membershipId);
 
     // Audit log
     await tx.auditEvent.create({

@@ -36,6 +36,7 @@ import {
   Compass,
   Share2,
 } from "lucide-react";
+import { useRealtimeSubscription } from "@/lib/realtime";
 
 interface EmployeeOption {
   id: string; // membershipId
@@ -95,6 +96,13 @@ interface StudioMeeting {
   projectId?: string | null;
   project?: { id: string; name: string; code: string } | null;
   creator?: { user?: { fullName: string } } | null;
+  isRecurring?: boolean;
+  recurrenceRule?: string | null;
+  seriesId?: string | null;
+  locationType?: string | null;
+  locationDetails?: string | null;
+  isMinutesPublished?: boolean;
+  publishedMinutesAt?: string | null;
   attendeesJson?: {
     allEmployees?: boolean;
     employeeIds?: string[];
@@ -168,11 +176,21 @@ function StudioMeetingsContent() {
     selectedContractorIds: [] as string[],
     selectedClientIds: [] as string[],
     selectedConsultantIds: [] as string[],
+    locationType: "PHYSICAL",
+    locationDetails: "",
+    isRecurring: false,
+    recurrenceRule: "WEEKLY" as "WEEKLY" | "BIWEEKLY" | "MONTHLY",
+    occurrenceCount: 4,
+    recurrenceScope: "THIS_OCCURRENCE" as "THIS_OCCURRENCE" | "THIS_AND_FUTURE",
   });
   const [actionLoading, setActionLoading] = useState(false);
 
   // Calendar Navigation State
   const [calendarMonth, setCalendarMonth] = useState(() => new Date());
+
+  const [userRole, setUserRole] = useState<string>("EMPLOYEE");
+  const [currentMembershipId, setCurrentMembershipId] = useState<string>("");
+  const isLeader = userRole === "OWNER" || userRole === "ADMIN";
 
   const fetchMeetingsData = async () => {
     setLoading(true);
@@ -182,6 +200,9 @@ function StudioMeetingsContent() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to load studio meetings");
       setMeetings(data.meetings || []);
+
+      if (data.userRole) setUserRole(data.userRole);
+      if (data.currentMembershipId) setCurrentMembershipId(data.currentMembershipId);
 
       if (data.participants) {
         setEmployees(data.participants.employees || []);
@@ -208,6 +229,15 @@ function StudioMeetingsContent() {
   useEffect(() => {
     fetchMeetingsData();
   }, [workspaceSlug]);
+
+  // Realtime subscription: updates when leadership creates or modifies meetings
+  useRealtimeSubscription(
+    ["MEETING_SCHEDULED", "MEETING_UPDATED"],
+    () => {
+      fetchMeetingsData();
+    },
+    { intervalMs: 15000 }
+  );
 
   useEffect(() => {
     if (searchParams?.get("action") === "new") {
@@ -249,6 +279,12 @@ function StudioMeetingsContent() {
       selectedContractorIds: [],
       selectedClientIds: [],
       selectedConsultantIds: [],
+      locationType: "PHYSICAL",
+      locationDetails: "",
+      isRecurring: false,
+      recurrenceRule: "WEEKLY",
+      occurrenceCount: 4,
+      recurrenceScope: "THIS_OCCURRENCE",
     });
     setAttendeeTab("employees");
     setAttendeeSearch("");
@@ -274,6 +310,12 @@ function StudioMeetingsContent() {
       selectedContractorIds: att.contractorIds || [],
       selectedClientIds: att.clientIds || [],
       selectedConsultantIds: att.consultantIds || [],
+      locationType: m.locationType || "PHYSICAL",
+      locationDetails: m.locationDetails || att.meetingLink || "",
+      isRecurring: m.isRecurring || false,
+      recurrenceRule: (m.recurrenceRule as any) || "WEEKLY",
+      occurrenceCount: 4,
+      recurrenceScope: "THIS_OCCURRENCE",
     });
     setAttendeeTab("employees");
     setAttendeeSearch("");
@@ -367,6 +409,28 @@ function StudioMeetingsContent() {
     }
   };
 
+  const handlePublishMoM = async (meetingId: string) => {
+    try {
+      const res = await fetch("/api/meetings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          workspaceSlug,
+          meetingId,
+          isMinutesPublished: true,
+        }),
+      });
+      if (!res.ok) {
+        const d = await res.json();
+        throw new Error(d.error || "Failed to publish minutes");
+      }
+      setActionSuccess("Minutes of Meeting & Decisions published to all attendees.");
+      fetchMeetingsData();
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
   const handleUpdateStatus = async (meetingId: string, status: string) => {
     try {
       const res = await fetch("/api/meetings", {
@@ -421,12 +485,20 @@ function StudioMeetingsContent() {
         agenda: form.agenda,
         notes: form.notes,
         decisions: form.decisions,
+        locationType: form.locationType,
+        locationDetails: form.locationDetails,
+        isRecurring: form.isRecurring,
+        recurrenceRule: form.recurrenceRule,
+        occurrenceCount: form.occurrenceCount,
+        recurrenceScope: form.recurrenceScope,
         attendees: {
           allEmployees: form.allEmployees,
           employeeIds: form.allEmployees ? [] : form.selectedEmployeeIds,
           contractorIds: form.selectedContractorIds,
           clientIds: form.selectedClientIds,
           consultantIds: form.selectedConsultantIds,
+          locationType: form.locationType,
+          meetingLink: form.locationDetails,
         },
       };
 
@@ -761,13 +833,20 @@ ${m.actionItems?.map((a, i) => `${i + 1}. [${a.status}] ${a.description} ${a.ass
           </p>
         </div>
 
-        <button
-          onClick={() => openCreateModal()}
-          className="flex items-center justify-center gap-2 px-5 py-2.5 text-xs font-bold rounded-xl bg-[#3562E8] hover:bg-[#284ebd] text-white shadow-xs transition-all cursor-pointer self-start sm:self-auto w-full sm:w-auto"
-        >
-          <Plus className="w-4 h-4 stroke-[2.5]" />
-          <span>Schedule meeting</span>
-        </button>
+        {isLeader ? (
+          <button
+            onClick={() => openCreateModal()}
+            className="flex items-center justify-center gap-2 px-5 py-2.5 text-xs font-bold rounded-xl bg-[#3562E8] hover:bg-[#284ebd] text-white shadow-xs transition-all cursor-pointer self-start sm:self-auto w-full sm:w-auto"
+          >
+            <Plus className="w-4 h-4 stroke-[2.5]" />
+            <span>Schedule meeting</span>
+          </button>
+        ) : (
+          <div className="flex items-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-xl bg-blue-50 text-[#3562E8] border border-blue-200 self-start sm:self-auto">
+            <Clock className="w-4 h-4" />
+            <span>Studio Calendar & Decisions</span>
+          </div>
+        )}
       </div>
 
       {/* 2. 4 KPI METRIC CARDS (Reference: e94f5989) */}
@@ -1709,7 +1788,7 @@ ${m.actionItems?.map((a, i) => `${i + 1}. [${a.status}] ${a.description} ${a.ass
                         <span>Minutes of Meeting (MoM) & Decisions</span>
                       </span>
 
-                      {!isEditingMoM && (
+                      {!isEditingMoM && isLeader && (
                         <button
                           type="button"
                           onClick={() => setIsEditingMoM(true)}
@@ -1764,21 +1843,51 @@ ${m.actionItems?.map((a, i) => `${i + 1}. [${a.status}] ${a.description} ${a.ass
                       </div>
                     ) : (
                       <div className="space-y-2">
-                        {selectedMeeting.notes ? (
-                          <div className="p-3 bg-blue-50/30 rounded-2xl border border-blue-100 text-slate-800 whitespace-pre-wrap">
-                            {selectedMeeting.notes}
+                        <div className="flex items-center justify-between pb-1">
+                          {selectedMeeting.isMinutesPublished ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-semibold text-[11px]">
+                              ✓ Published to Attendees
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 font-semibold text-[11px]">
+                              Draft Minutes (Unpublished)
+                            </span>
+                          )}
+
+                          {!selectedMeeting.isMinutesPublished && isLeader && (
+                            <button
+                              type="button"
+                              onClick={() => handlePublishMoM(selectedMeeting.id)}
+                              className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-[11px] cursor-pointer"
+                            >
+                              Publish Minutes to Attendees
+                            </button>
+                          )}
+                        </div>
+
+                        {!isLeader && !selectedMeeting.isMinutesPublished ? (
+                          <div className="p-3 bg-amber-50/70 rounded-2xl border border-amber-200 text-amber-800 text-xs">
+                            Minutes of Meeting are currently in draft. Final decisions will be displayed here once published by leadership.
                           </div>
                         ) : (
-                          <p className="text-slate-400 italic">No notes recorded yet. Click 'Quick Edit MoM' to log discussion points.</p>
-                        )}
+                          <>
+                            {selectedMeeting.notes ? (
+                              <div className="p-3 bg-blue-50/30 rounded-2xl border border-blue-100 text-slate-800 whitespace-pre-wrap">
+                                {selectedMeeting.notes}
+                              </div>
+                            ) : (
+                              <p className="text-slate-400 italic">No notes recorded yet. {isLeader ? "Click 'Quick Edit MoM' to log discussion points." : ""}</p>
+                            )}
 
-                        {selectedMeeting.decisions && (
-                          <div className="p-3 bg-emerald-50/50 rounded-2xl border border-emerald-200 text-emerald-900 font-medium whitespace-pre-wrap">
-                            <span className="font-bold block text-[11px] uppercase tracking-wider text-emerald-800 mb-1">
-                              Decisions Agreed:
-                            </span>
-                            {selectedMeeting.decisions}
-                          </div>
+                            {selectedMeeting.decisions && (
+                              <div className="p-3 bg-emerald-50/50 rounded-2xl border border-emerald-200 text-emerald-900 font-medium whitespace-pre-wrap">
+                                <span className="font-bold block text-[11px] uppercase tracking-wider text-emerald-800 mb-1">
+                                  Decisions Agreed:
+                                </span>
+                                {selectedMeeting.decisions}
+                              </div>
+                            )}
+                          </>
                         )}
                       </div>
                     )}
@@ -1791,44 +1900,46 @@ ${m.actionItems?.map((a, i) => `${i + 1}. [${a.status}] ${a.description} ${a.ass
                     </span>
 
                     {/* Inline Quick Add */}
-                    <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
-                      <input
-                        type="text"
-                        value={drawerActionText}
-                        onChange={(e) => setDrawerActionText(e.target.value)}
-                        placeholder="Add new action item from meeting..."
-                        className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-slate-900 text-xs"
-                      />
-                      <div className="flex items-center gap-2">
-                        <select
-                          value={drawerActionAssignee}
-                          onChange={(e) => setDrawerActionAssignee(e.target.value)}
-                          className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-700 flex-1"
-                        >
-                          <option value="">Assignee (Optional)</option>
-                          {employees.map((e) => (
-                            <option key={e.id} value={e.id}>
-                              {e.user.fullName}
-                            </option>
-                          ))}
-                        </select>
-
+                    {isLeader && (
+                      <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
                         <input
-                          type="date"
-                          value={drawerActionDueDate}
-                          onChange={(e) => setDrawerActionDueDate(e.target.value)}
-                          className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-700"
+                          type="text"
+                          value={drawerActionText}
+                          onChange={(e) => setDrawerActionText(e.target.value)}
+                          placeholder="Add new action item from meeting..."
+                          className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-slate-900 text-xs"
                         />
+                        <div className="flex items-center gap-2">
+                          <select
+                            value={drawerActionAssignee}
+                            onChange={(e) => setDrawerActionAssignee(e.target.value)}
+                            className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-700 flex-1"
+                          >
+                            <option value="">Assignee (Optional)</option>
+                            {employees.map((e) => (
+                              <option key={e.id} value={e.id}>
+                                {e.user.fullName}
+                              </option>
+                            ))}
+                          </select>
 
-                        <button
-                          type="button"
-                          onClick={() => handleAddDrawerActionItem(selectedMeeting.id)}
-                          className="px-3 py-1.5 bg-[#3562E8] hover:bg-[#264FCB] text-white rounded-xl text-xs font-semibold cursor-pointer"
-                        >
-                          Add
-                        </button>
+                          <input
+                            type="date"
+                            value={drawerActionDueDate}
+                            onChange={(e) => setDrawerActionDueDate(e.target.value)}
+                            className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-700"
+                          />
+
+                          <button
+                            type="button"
+                            onClick={() => handleAddDrawerActionItem(selectedMeeting.id)}
+                            className="px-3 py-1.5 bg-[#3562E8] hover:bg-[#264FCB] text-white rounded-xl text-xs font-semibold cursor-pointer"
+                          >
+                            Add
+                          </button>
+                        </div>
                       </div>
-                    </div>
+                    )}
 
                     {/* Items List */}
                     <div className="space-y-1.5">
@@ -1898,33 +2009,39 @@ ${m.actionItems?.map((a, i) => `${i + 1}. [${a.status}] ${a.description} ${a.ass
                     </button>
 
                     {/* Delete meeting */}
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteMeeting(selectedMeeting.id)}
-                      className="p-2 rounded-xl border border-rose-200 bg-white hover:bg-rose-50 text-rose-600 cursor-pointer"
-                      title="Cancel / Delete Meeting"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    {isLeader && (
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteMeeting(selectedMeeting.id)}
+                        className="p-2 rounded-xl border border-rose-200 bg-white hover:bg-rose-50 text-rose-600 cursor-pointer"
+                        title="Cancel / Delete Meeting"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => openEditModal(selectedMeeting)}
-                      className="px-4 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 font-semibold text-slate-800 cursor-pointer"
-                    >
-                      Full Edit
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleUpdateStatus(selectedMeeting.id, selectedMeeting.status === "COMPLETED" ? "SCHEDULED" : "COMPLETED")}
-                      className={`px-4 py-2 rounded-xl font-semibold text-white cursor-pointer ${
-                        selectedMeeting.status === "COMPLETED" ? "bg-amber-600 hover:bg-amber-700" : "bg-emerald-600 hover:bg-emerald-700"
-                      }`}
-                    >
-                      {selectedMeeting.status === "COMPLETED" ? "Reopen Session" : "Mark as Completed"}
-                    </button>
+                    {isLeader && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => openEditModal(selectedMeeting)}
+                          className="px-4 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 font-semibold text-slate-800 cursor-pointer"
+                        >
+                          Full Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateStatus(selectedMeeting.id, selectedMeeting.status === "COMPLETED" ? "SCHEDULED" : "COMPLETED")}
+                          className={`px-4 py-2 rounded-xl font-semibold text-white cursor-pointer ${
+                            selectedMeeting.status === "COMPLETED" ? "bg-amber-600 hover:bg-amber-700" : "bg-emerald-600 hover:bg-emerald-700"
+                          }`}
+                        >
+                          {selectedMeeting.status === "COMPLETED" ? "Reopen Session" : "Mark as Completed"}
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               </>
@@ -2126,6 +2243,102 @@ ${m.actionItems?.map((a, i) => `${i + 1}. [${a.status}] ${a.description} ${a.ass
                   </select>
                 </div>
               </div>
+
+              {/* Location & Format */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-slate-50 border border-slate-200 rounded-2xl">
+                <div>
+                  <label className="font-semibold text-slate-900 block mb-1">Format / Location Type</label>
+                  <select
+                    value={form.locationType}
+                    onChange={(e) => setForm({ ...form, locationType: e.target.value as any })}
+                    className="w-full px-2.5 py-2 bg-white border border-[#E2E6F0] rounded-xl text-slate-900 cursor-pointer"
+                  >
+                    <option value="PHYSICAL">Physical (Studio Boardroom / Site)</option>
+                    <option value="ONLINE">Virtual (Google Meet / Zoom / Teams)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="font-semibold text-slate-900 block mb-1">
+                    {form.locationType === "ONLINE" ? "Meeting Link / URL" : "Room / Venue Details"}
+                  </label>
+                  <input
+                    type="text"
+                    value={form.locationDetails}
+                    onChange={(e) => setForm({ ...form, locationDetails: e.target.value })}
+                    placeholder={form.locationType === "ONLINE" ? "https://meet.google.com/..." : "e.g. Studio Conference Room A"}
+                    className="w-full px-3 py-2 bg-white border border-[#E2E6F0] rounded-xl text-slate-900 focus:outline-none focus:border-[#3562E8]"
+                  />
+                </div>
+              </div>
+
+              {/* Recurrence Configuration */}
+              {!editingMeetingId && (
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
+                  <label className="flex items-center gap-2 cursor-pointer font-semibold text-slate-800">
+                    <input
+                      type="checkbox"
+                      checked={form.isRecurring}
+                      onChange={(e) => setForm({ ...form, isRecurring: e.target.checked })}
+                      className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
+                    />
+                    <span>Repeat this meeting (Recurring series)</span>
+                  </label>
+
+                  {form.isRecurring && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-200">
+                      <div>
+                        <label className="font-semibold text-slate-700 block mb-1">Repeat Frequency</label>
+                        <select
+                          value={form.recurrenceRule}
+                          onChange={(e) => setForm({ ...form, recurrenceRule: e.target.value as any })}
+                          className="w-full px-2.5 py-2 bg-white border border-slate-200 rounded-xl text-slate-800"
+                        >
+                          <option value="WEEKLY">Weekly (Every 7 days)</option>
+                          <option value="BIWEEKLY">Bi-weekly (Every 14 days)</option>
+                          <option value="MONTHLY">Monthly (Same date each month)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="font-semibold text-slate-700 block mb-1">Occurrences Count</label>
+                        <input
+                          type="number"
+                          min={2}
+                          max={12}
+                          value={form.occurrenceCount}
+                          onChange={(e) => setForm({ ...form, occurrenceCount: parseInt(e.target.value, 10) || 4 })}
+                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-800"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {editingMeetingId && form.isRecurring && (
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-2xl text-xs space-y-1.5">
+                  <span className="font-semibold text-blue-900 block">Recurring Series Update Scope</span>
+                  <div className="flex items-center gap-4">
+                    <label className="flex items-center gap-1.5 cursor-pointer text-slate-800">
+                      <input
+                        type="radio"
+                        name="recurrenceScope"
+                        checked={form.recurrenceScope === "THIS_OCCURRENCE"}
+                        onChange={() => setForm({ ...form, recurrenceScope: "THIS_OCCURRENCE" })}
+                      />
+                      <span>This occurrence only</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer text-slate-800">
+                      <input
+                        type="radio"
+                        name="recurrenceScope"
+                        checked={form.recurrenceScope === "THIS_AND_FUTURE"}
+                        onChange={() => setForm({ ...form, recurrenceScope: "THIS_AND_FUTURE" })}
+                      />
+                      <span>This and all future occurrences</span>
+                    </label>
+                  </div>
+                </div>
+              )}
 
               {/* STAKEHOLDER ATTENDEE MATRIX */}
               <div className="border border-[#E2E6F0] rounded-2xl p-3.5 bg-slate-50/70 space-y-3">

@@ -71,6 +71,14 @@ interface CachedSessionEntry {
 const sessionContextCache = new Map<string, CachedSessionEntry>();
 const SESSION_CACHE_TTL_MS = 60 * 1000; // 60 seconds
 
+export function clearMembershipCache(membershipId: string) {
+  for (const [key, entry] of sessionContextCache.entries()) {
+    if (entry.context.membershipId === membershipId) {
+      sessionContextCache.delete(key);
+    }
+  }
+}
+
 export function clearSessionCache(token?: string) {
   if (token) {
     for (const key of sessionContextCache.keys()) {
@@ -135,7 +143,61 @@ export async function resolveSessionAndTenant(
   const now = Date.now();
   const cached = sessionContextCache.get(cacheKey);
   if (cached && now - cached.cachedAt < SESSION_CACHE_TTL_MS) {
-    return cached.context;
+    // Fast database check to guarantee revoked permissions and deactivations take effect immediately,
+    // including across independent server processes without distributed caching infrastructure.
+    const authRecord = await prisma.session.findUnique({
+      where: { token },
+      select: {
+        revokedAt: true,
+        expiresAt: true,
+        user: {
+          select: {
+            accountState: true,
+            memberships: {
+              where: { tenantId: cached.context.tenantId },
+              select: {
+                role: true,
+                hasFinanceAccess: true,
+                hasHrAccess: true,
+                isActive: true,
+                tenant: { select: { lifecycleState: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!authRecord || authRecord.revokedAt || authRecord.expiresAt < new Date()) {
+      sessionContextCache.delete(cacheKey);
+      throw new UnauthorizedException("Session has expired or was revoked");
+    }
+
+    if (authRecord.user.accountState !== UserAccountState.ACTIVE) {
+      sessionContextCache.delete(cacheKey);
+      throw new UnauthorizedException("User account is disabled");
+    }
+
+    const membership = authRecord.user.memberships[0];
+    if (!membership || !membership.isActive) {
+      sessionContextCache.delete(cacheKey);
+      throw new UnauthorizedException(`User is not an active member of workspace '${workspaceSlug}'`);
+    }
+
+    if (membership.tenant.lifecycleState !== TenantLifecycleState.ACTIVE) {
+      sessionContextCache.delete(cacheKey);
+      throw new UnauthorizedException(`Workspace '${workspaceSlug}' is suspended or pending deletion`);
+    }
+
+    // Immediately reflect current role, finance access, and HR access committed in database
+    const updatedContext: TenantContext = {
+      ...cached.context,
+      role: membership.role,
+      hasFinanceAccess: membership.hasFinanceAccess,
+      hasHrAccess: (membership as any).hasHrAccess ?? false,
+    };
+    cached.context = updatedContext;
+    return updatedContext;
   }
 
   const session = await prisma.session.findUnique({
@@ -200,6 +262,7 @@ export async function resolveSessionAndTenant(
     phone: membership.employee?.phone ?? null,
     role: membership.role,
     hasFinanceAccess: membership.hasFinanceAccess,
+    hasHrAccess: (membership as any).hasHrAccess ?? false,
     avatarUrl: userAvatars[membership.id] ?? null,
     timezone: tenant.timezone,
     currency: tenant.currency,

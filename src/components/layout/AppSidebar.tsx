@@ -300,6 +300,13 @@ export function AppSidebar({ context }: AppSidebarProps) {
             isPermitted: true,
           },
           {
+            id: "completed-tasks",
+            label: isOwnerOrAdmin ? "Completed Tasks" : "My Completed Tasks",
+            href: `/w/${context.tenantSlug}/tasks/completed`,
+            icon: CheckSquare,
+            isPermitted: true,
+          },
+          {
             id: "capacity",
             label: "Workload & Capacity",
             href: `/w/${context.tenantSlug}/capacity`,
@@ -318,7 +325,7 @@ export function AppSidebar({ context }: AppSidebarProps) {
             label: "Studio Meetings",
             href: `/w/${context.tenantSlug}/meetings`,
             icon: Clock,
-            isPermitted: isOwnerOrAdmin,
+            isPermitted: true,
           },
         ],
       },

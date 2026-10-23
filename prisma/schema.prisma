@@ -102,6 +102,15 @@ model Tenant {
   backupLogs               StudioBackupLog[]
   devicePushSubscriptions  DevicePushSubscription[]
 
+  // --- Secure Documents, HR Letters, Visits & Multi-Session Tracking ---
+  employeeDocuments          EmployeeDocument[]
+  letterheadAssets           LetterheadAsset[]
+  letterTemplates            LetterTemplate[]
+  issuedLetters              IssuedLetter[]
+  siteVisitParticipants      SiteVisitParticipant[]
+  siteVisitInspectionReports SiteVisitInspectionReport[]
+  siteVisitLocationSamples   SiteVisitLocationSample[]
+
   @@map("tenants")
 }
 
@@ -131,6 +140,7 @@ model TenantMembership {
   user             User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   role             TenantRole @default(EMPLOYEE)
   hasFinanceAccess Boolean    @default(false)
+  hasHrAccess      Boolean    @default(false)
   isActive         Boolean    @default(true)
   joinedAt         DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
@@ -180,6 +190,15 @@ model TenantMembership {
   verifiedSiteIssues       StudioSiteIssue[]                @relation("VerifiedSiteIssue")
   devicePushSubscriptions  DevicePushSubscription[]
 
+  // --- Secure Documents, HR Letters, Visits & Tasks Relations ---
+  reviewedEmployeeDocuments EmployeeDocument[]           @relation("DocumentReviewer")
+  approvedLetters           IssuedLetter[]               @relation("LetterApprover")
+  visitParticipants         SiteVisitParticipant[]
+  reviewedVisitReports      SiteVisitInspectionReport[]  @relation("ReportReviewer")
+  completedTasks            Task[]                       @relation("TaskCompleter")
+  approvedTasks             Task[]                       @relation("TaskApprover")
+  reopenedTasks             Task[]                       @relation("TaskReopener")
+
   @@unique([tenantId, userId])
   @@index([tenantId, role])
   @@map("tenant_memberships")
@@ -217,6 +236,10 @@ model Employee {
   // --- Studio Improvements Programme ---
   cancellationRequests  StudioLeaveCancellationRequest[]
   responsibleSiteIssues StudioSiteIssue[]                @relation("ResponsibleSiteIssue")
+
+  // --- Secure Documents & HR Letters ---
+  documents             EmployeeDocument[]
+  letters               IssuedLetter[]
 
   @@unique([tenantId, employeeId])
   @@index([tenantId, employeeId])
@@ -578,7 +601,17 @@ model Task {
   dueDate           DateTime?
   estimatedHours    Decimal?           @db.Decimal(6, 2)
   completionDate    DateTime?
-  blockerReason  String?            @db.Text
+  completedById     String?
+  completedBy       TenantMembership?  @relation("TaskCompleter", fields: [completedById], references: [id], onDelete: SetNull)
+  approvedById      String?
+  approvedBy        TenantMembership?  @relation("TaskApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  completionSummary String?            @db.Text
+  reopenedAt        DateTime?
+  reopenedById      String?
+  reopenedBy        TenantMembership?  @relation("TaskReopener", fields: [reopenedById], references: [id], onDelete: SetNull)
+  reopenReason      String?            @db.Text
+  reopenCount       Int                @default(0)
+  blockerReason     String?            @db.Text
   reviewerId        String?
   reviewer          TenantMembership?  @relation("TaskReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
   acceptanceCriteria String?           @db.Text
@@ -856,7 +889,11 @@ model SiteVisit {
   createdAt           DateTime                  @default(now())
   updatedAt           DateTime                  @updatedAt
 
-  events              SiteVisitEvent[]
+  events                  SiteVisitEvent[]
+  destinationSnapshotJson Json?
+  participants            SiteVisitParticipant[]
+  locationSamples         SiteVisitLocationSample[]
+  inspectionReports       SiteVisitInspectionReport[]
 
   @@index([tenantId, employeeId, operationalState])
   @@index([tenantId, projectId, scheduledTime])
@@ -1231,6 +1268,9 @@ model PrivateFile {
   scanStatus    String   @default("SCANNED_CLEAN") @db.VarChar(64)
   uploaderId    String
   createdAt     DateTime @default(now())
+
+  employeeDocuments EmployeeDocument[]
+  issuedLetters     IssuedLetter[]
 
   @@index([tenantId, scanStatus])
   @@map("private_files")
@@ -1727,11 +1767,20 @@ model StudioMeeting {
   agenda       String?                   @db.Text
   notes        String?                   @db.Text
   decisions    String?                   @db.Text
-  creatorId    String
-  creator      TenantMembership          @relation("CreatedMeeting", fields: [creatorId], references: [id], onDelete: Cascade)
-  attendeesJson Json?
-  createdAt    DateTime                  @default(now())
-  updatedAt    DateTime                  @updatedAt
+  creatorId            String
+  creator              TenantMembership          @relation("CreatedMeeting", fields: [creatorId], references: [id], onDelete: Cascade)
+  attendeesJson        Json?
+  isRecurring          Boolean                   @default(false)
+  recurrenceRule       String?                   @db.VarChar(128) // WEEKLY, BIWEEKLY, MONTHLY
+  seriesId             String?                   @db.VarChar(128)
+  locationType         String?                   @default("PHYSICAL") @db.VarChar(32) // PHYSICAL, ONLINE
+  locationDetails      String?                   @db.VarChar(512)
+  audienceSnapshotJson Json?
+  attachmentsJson      Json?
+  publishedMinutesAt   DateTime?
+  isMinutesPublished   Boolean                   @default(false)
+  createdAt            DateTime                  @default(now())
+  updatedAt            DateTime                  @updatedAt
 
   actionItems  StudioMeetingActionItem[]
   convertedTasks ExecutiveTask[]
@@ -2021,4 +2070,273 @@ model StudioBackupLog {
   @@index([tenantId, timestamp, status])
   @@map("studio_backup_logs")
 }
+
+// ==========================================
+// 11. SECURE EMPLOYEE DOCUMENTS
+// ==========================================
+
+enum EmployeeDocumentCategory {
+  AADHAAR
+  DEGREE
+  BANK_PASSBOOK
+  OTHER
+}
+
+enum EmployeeDocumentStatus {
+  MISSING
+  UPLOADED
+  PENDING_REVIEW
+  VERIFIED
+  REJECTED
+  REPLACEMENT_REQUESTED
+}
+
+enum DocumentScanStatus {
+  UNSCANNED
+  QUARANTINED
+  CLEAN
+  INFECTED
+}
+
+model EmployeeDocument {
+  id                String                   @id @default(uuid())
+  tenantId          String
+  tenant            Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employeeId        String
+  employee          Employee                 @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  category          EmployeeDocumentCategory
+  title             String                   @db.VarChar(191)
+  status            EmployeeDocumentStatus   @default(MISSING)
+  scanStatus        DocumentScanStatus       @default(QUARANTINED)
+  privateFileId     String?
+  privateFile       PrivateFile?             @relation(fields: [privateFileId], references: [id], onDelete: SetNull)
+  version           Int                      @default(1)
+  isCurrent         Boolean                  @default(true)
+  metadataJson      Json?                    // e.g. masked Aadhaar number, degree name, bank account last 4 digits
+  reviewerId        String?
+  reviewer          TenantMembership?        @relation("DocumentReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+  reviewedAt        DateTime?
+  reviewerRemarks   String?                  @db.Text
+  rejectionReason   String?                  @db.Text
+  passwordProtected Boolean                  @default(false)
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+
+  @@index([tenantId, employeeId, category])
+  @@index([tenantId, status])
+  @@map("employee_documents")
+}
+
+// ==========================================
+// 12. HR LETTERS & LETTERHEAD ASSETS
+// ==========================================
+
+model LetterheadAsset {
+  id              String           @id @default(uuid())
+  tenantId        String
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name            String           @db.VarChar(191)
+  headerImageUrl  String?          @db.VarChar(512)
+  footerImageUrl  String?          @db.VarChar(512)
+  bodyMarginsJson Json?            // top, bottom, left, right in mm/pt
+  isDefault       Boolean          @default(false)
+  isActive        Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  templates       LetterTemplate[]
+  issuedLetters   IssuedLetter[]
+
+  @@index([tenantId, isActive])
+  @@map("letterhead_assets")
+}
+
+enum LetterTemplateType {
+  OFFER
+  APPOINTMENT
+  JOINING_CONFIRMATION
+  EMPLOYEE_JOINING_REPORT
+  PROBATION_CONFIRMATION
+  PROBATION_EXTENSION
+  SALARY_REVISION
+  PROMOTION
+  TRANSFER
+  EXPERIENCE_CERTIFICATE
+  RELIEVING
+  TERMINATION
+  EMPLOYMENT_VERIFICATION
+}
+
+enum LetterTemplateStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+model LetterTemplate {
+  id                       String               @id @default(uuid())
+  tenantId                 String
+  tenant                   Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  type                     LetterTemplateType
+  title                    String               @db.VarChar(255)
+  description              String?              @db.Text
+  bodyTemplate             String               @db.LongText
+  allowedPlaceholdersJson  Json?
+  requiredPlaceholdersJson Json?
+  letterheadId             String?
+  letterhead               LetterheadAsset?     @relation(fields: [letterheadId], references: [id], onDelete: SetNull)
+  version                  Int                  @default(1)
+  status                   LetterTemplateStatus @default(DRAFT)
+  createdAt                DateTime             @default(now())
+  updatedAt                DateTime             @updatedAt
+
+  issuedLetters            IssuedLetter[]
+
+  @@index([tenantId, type, status])
+  @@map("letter_templates")
+}
+
+enum IssuedLetterStatus {
+  DRAFT
+  UNDER_REVIEW
+  APPROVED
+  ISSUED
+  SUPERSEDED
+  WITHDRAWN
+}
+
+model IssuedLetter {
+  id                    String             @id @default(uuid())
+  tenantId              String
+  tenant                Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  templateId            String?
+  template              LetterTemplate?    @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  letterheadId          String?
+  letterhead            LetterheadAsset?   @relation(fields: [letterheadId], references: [id], onDelete: SetNull)
+  employeeId            String
+  employee              Employee           @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  letterNumber          String?            @db.VarChar(128) // e.g. 100DS/HR/2026/001
+  title                 String             @db.VarChar(255)
+  status                IssuedLetterStatus @default(DRAFT)
+  bodyContent           String             @db.LongText
+  renderedPdfFileId     String?
+  renderedPdfFile       PrivateFile?       @relation(fields: [renderedPdfFileId], references: [id], onDelete: SetNull)
+  employeeSnapshotJson  Json?
+  signatorySnapshotJson Json?
+  templateVersion       Int                @default(1)
+  version               Int                @default(1)
+  supersedesId          String?
+  supersedes            IssuedLetter?      @relation("LetterVersionChain", fields: [supersedesId], references: [id], onDelete: SetNull)
+  supersededBy          IssuedLetter[]     @relation("LetterVersionChain")
+  approvedById          String?
+  approvedBy            TenantMembership?  @relation("LetterApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  approvedAt            DateTime?
+  issuedAt              DateTime?
+  issuedById            String?
+  acknowledgedAt        DateTime?
+  acknowledgmentNotes   String?            @db.Text
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+
+  @@unique([tenantId, letterNumber])
+  @@index([tenantId, employeeId, status])
+  @@map("issued_letters")
+}
+
+// ==========================================
+// 13. MULTI-PARTICIPANT JOURNEY & INSPECTION
+// ==========================================
+
+enum JourneyState {
+  ASSIGNED
+  JOURNEY_STARTED
+  ARRIVED_AT_SITE
+  INSPECTION_STARTED
+  INSPECTION_FINISHED
+  RETURN_STARTED
+  RETURNED_OFFICE
+  CANCELLED
+}
+
+model SiteVisitParticipant {
+  id                   String           @id @default(uuid())
+  tenantId             String
+  tenant               Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  visitId              String
+  visit                SiteVisit        @relation(fields: [visitId], references: [id], onDelete: Cascade)
+  membershipId         String
+  membership           TenantMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  journeyState         JourneyState     @default(ASSIGNED)
+  departureTime        DateTime?
+  arrivalTime          DateTime?
+  inspectionStartTime  DateTime?
+  inspectionEndTime    DateTime?
+  returnDepartureTime  DateTime?
+  returnEndTime        DateTime?
+  totalDurationMinutes Int?
+  distanceMeters       Float?
+  exceptionNotes       String?          @db.Text
+  lastLatitude         Float?
+  lastLongitude        Float?
+  lastAccuracyMeters   Float?
+  lastHeartbeatAt      DateTime?
+  isTrackingActive     Boolean          @default(false)
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+
+  locationSamples      SiteVisitLocationSample[]
+  inspectionReports    SiteVisitInspectionReport[]
+
+  @@unique([visitId, membershipId])
+  @@index([tenantId, membershipId, journeyState])
+  @@map("site_visit_participants")
+}
+
+model SiteVisitLocationSample {
+  id                String               @id @default(uuid())
+  tenantId          String
+  tenant            Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  visitId           String
+  visit             SiteVisit            @relation(fields: [visitId], references: [id], onDelete: Cascade)
+  participantId     String
+  participant       SiteVisitParticipant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  latitude          Float
+  longitude         Float
+  accuracyMeters    Float?
+  clientCaptureTime DateTime
+  serverReceiptTime DateTime             @default(now())
+  sampleBatchId     String?              @db.VarChar(64)
+  isException       Boolean              @default(false)
+  exceptionReason   String?              @db.VarChar(255)
+  idempotencyKey    String?              @db.VarChar(128)
+
+  @@index([tenantId, participantId, clientCaptureTime])
+  @@map("site_visit_location_samples")
+}
+
+model SiteVisitInspectionReport {
+  id                   String                @id @default(uuid())
+  tenantId             String
+  tenant               Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  visitId              String
+  visit                SiteVisit             @relation(fields: [visitId], references: [id], onDelete: Cascade)
+  participantId        String
+  participant          SiteVisitParticipant  @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  checklistAnswersJson Json?
+  observations         String?               @db.Text
+  photosJson           Json?
+  snagsJson            Json?
+  status               String                @default("DRAFT") @db.VarChar(32) // DRAFT, SUBMITTED, APPROVED, CORRECTIONS_REQUESTED
+  submittedAt          DateTime?
+  reviewerId           String?
+  reviewer             TenantMembership?     @relation("ReportReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+  reviewedAt           DateTime?
+  reviewComment        String?               @db.Text
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+
+  @@index([tenantId, visitId, status])
+  @@map("site_visit_inspection_reports")
+}
+
 

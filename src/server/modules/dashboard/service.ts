@@ -333,6 +333,31 @@ export interface EmployeeDashboardData {
     code: string;
     name: string;
   }>;
+  studioMeetings: Array<EmployeeDashboardMeeting>;
+  todayMeetingsCount: number;
+  upcomingMeetingsCount: number;
+}
+
+export interface EmployeeDashboardMeeting {
+  id: string;
+  title: string;
+  meetingDate: string; // YYYY-MM-DD
+  startTime: string;   // "11:00"
+  endTime: string;     // "12:30"
+  meetingType: string;
+  status: string;
+  projectId: string | null;
+  projectCode?: string | null;
+  projectName?: string | null;
+  agenda?: string | null;
+  locationType?: "STUDIO" | "SITE" | "CLIENT_OFFICE" | "VIRTUAL";
+  meetingLink?: string | null;
+  siteLocation?: string | null;
+  creatorName?: string | null;
+  isToday: boolean;
+  isUpcoming: boolean;
+  actionItemsCount: number;
+  myActionItemsCount: number;
 }
 
 // In-memory dashboard cache for ultra-fast route transitions (skips 10 database roundtrips per load)
@@ -1040,6 +1065,7 @@ export async function getEmployeeDashboardData(ctx: TenantContext): Promise<Empl
     blockedCount,
     pendingExtensionsCount,
     reopenedActivities,
+    rawMeetings,
   ] = await Promise.all([
     // 1. Deliverables where this employee is primary or creator
     prisma.task.findMany({
@@ -1210,6 +1236,23 @@ export async function getEmployeeDashboardData(ctx: TenantContext): Promise<Empl
         },
       },
       orderBy: { createdAt: "desc" },
+      take: 20,
+    }),
+    // 13. Studio meetings relevant to this employee (today & upcoming)
+    prisma.studioMeeting.findMany({
+      where: {
+        tenantId: ctx.tenantId,
+        status: { notIn: ["CANCELLED"] },
+        meetingDate: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+      },
+      include: {
+        project: { select: { id: true, code: true, name: true } },
+        creator: { include: { user: { select: { fullName: true } } } },
+        actionItems: {
+          select: { id: true, status: true, assigneeId: true, description: true },
+        },
+      },
+      orderBy: [{ meetingDate: "asc" }, { startTime: "asc" }],
       take: 20,
     }),
   ]);
@@ -1506,6 +1549,50 @@ export async function getEmployeeDashboardData(ctx: TenantContext): Promise<Empl
     version: a.task.version,
   }));
 
+  const todayDateStr = new Date().toISOString().split("T")[0];
+
+  const studioMeetings: EmployeeDashboardMeeting[] = rawMeetings
+    .filter((m) => {
+      const att = (m.attendeesJson as any) || {};
+      if (att.allEmployees === true || att.allEmployees === undefined) return true;
+      if (Array.isArray(att.employeeIds) && att.employeeIds.includes(ctx.membershipId)) return true;
+      if (m.creatorId === ctx.membershipId) return true;
+      if (m.actionItems.some((ai) => ai.assigneeId === ctx.membershipId)) return true;
+      return false;
+    })
+    .map((m) => {
+      const mDateStr = m.meetingDate.toISOString().split("T")[0];
+      const isToday = mDateStr === todayDateStr;
+      const isUpcoming = mDateStr >= todayDateStr;
+      const att = (m.attendeesJson as any) || {};
+      const myActionItems = m.actionItems.filter((ai) => ai.assigneeId === ctx.membershipId);
+
+      return {
+        id: m.id,
+        title: m.title,
+        meetingDate: mDateStr,
+        startTime: m.startTime,
+        endTime: m.endTime,
+        meetingType: m.meetingType,
+        status: m.status,
+        projectId: m.projectId,
+        projectCode: m.project?.code || null,
+        projectName: m.project?.name || null,
+        agenda: m.agenda,
+        locationType: att.locationType || (att.meetingLink ? "VIRTUAL" : "STUDIO"),
+        meetingLink: att.meetingLink || null,
+        siteLocation: att.siteLocation || null,
+        creatorName: m.creator?.user?.fullName || "Studio Leadership",
+        isToday,
+        isUpcoming,
+        actionItemsCount: m.actionItems.length,
+        myActionItemsCount: myActionItems.length,
+      };
+    });
+
+  const todayMeetingsCount = studioMeetings.filter((m) => m.isToday).length;
+  const upcomingMeetingsCount = studioMeetings.filter((m) => m.isUpcoming).length;
+
   const result: EmployeeDashboardData = {
     mySummary: {
       pendingTasksCount: pendingTasks.length,
@@ -1538,6 +1625,9 @@ export async function getEmployeeDashboardData(ctx: TenantContext): Promise<Empl
     activeSiteInspection,
     latestApprovedDrawings,
     projectsList,
+    studioMeetings,
+    todayMeetingsCount,
+    upcomingMeetingsCount,
   };
 
   employeeDashboardCache.set(cacheKey, { data: result, cachedAt: nowMs });

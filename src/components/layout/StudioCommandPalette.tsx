@@ -162,16 +162,16 @@ export function StudioCommandPalette({ context }: StudioCommandPaletteProps) {
               icon: Activity,
               href: `/w/${slug}/integrations`,
             },
-            {
-              id: "nav-meetings",
-              title: "Studio Meetings & Executive MoM",
-              category: "Navigation",
-              icon: Clock,
-              shortcut: "G M",
-              href: `/w/${slug}/meetings`,
-            },
           ]
         : []),
+      {
+        id: "nav-meetings",
+        title: "Studio Meetings & MoM",
+        category: "Navigation",
+        icon: Clock,
+        shortcut: "G M",
+        href: `/w/${slug}/meetings`,
+      },
       {
         id: "nav-attendance",
         title: "Attendance & Shift Punch",

@@ -214,6 +214,13 @@ export const INSPECTION_CATEGORIES: Record<
   },
 };
 
+export const CANONICAL_CHECKLIST: string[] = [
+  "Latest drawings available",
+  "Inspection scope reviewed",
+  "Tools/PPE prepared",
+  "Access/contractor availability confirmed",
+];
+
 const DEFAULT_CHECKLISTS: Record<string, string[]> = {
   STRUCTURAL: [
     "Verify footing / column rebar spacing against Drawing R2",
@@ -387,28 +394,21 @@ export default function VisitsClientView({
   const [googleMapsInputUrl, setGoogleMapsInputUrl] = useState("");
   const [isDetectingSpot, setIsDetectingSpot] = useState(false);
 
-  const [assignEmployeeId, setAssignEmployeeId] = useState(
-    teamMembers[0]?.id || currentMembershipId
-  );
+  const [assignEmployeeIds, setAssignEmployeeIds] = useState<string[]>([
+    teamMembers[0]?.id || currentMembershipId,
+  ]);
+  const [employeeSearchQuery, setEmployeeSearchQuery] = useState("");
   const [assignPurpose, setAssignPurpose] = useState("");
   const [assignScheduledDate, setAssignScheduledDate] = useState(
     new Date().toISOString().split("T")[0]
   );
   const [assignScheduledTime, setAssignScheduledTime] = useState("10:00");
 
-  // New enterprise assignment fields:
   const [assignInspectionType, setAssignInspectionType] = useState<string>("ROUTINE");
   const [assignPriority, setAssignPriority] = useState<string>("MEDIUM");
-  const [assignTaskId, setAssignTaskId] = useState<string>("");
-  const [assignMilestoneId, setAssignMilestoneId] = useState<string>("");
-  const [assignPpeList, setAssignPpeList] = useState<string[]>([
-    "Hard Hat Required",
-    "Safety Boots",
-  ]);
   const [assignChecklist, setAssignChecklist] = useState<
     Array<{ item: string; checked: boolean }>
-  >(DEFAULT_CHECKLISTS.ROUTINE.map((item) => ({ item, checked: false })));
-  const [newChecklistText, setNewChecklistText] = useState("");
+  >(CANONICAL_CHECKLIST.map((item) => ({ item, checked: false })));
 
   const [assignAttendees, setAssignAttendees] = useState<
     Array<{ name: string; role?: string; phone?: string }>
@@ -500,18 +500,6 @@ export default function VisitsClientView({
     return availableMilestones.filter((m) => m.projectId === assignProjectId);
   }, [availableMilestones, assignProjectId]);
 
-  // Clean up dependent child selections when project changes
-  useEffect(() => {
-    if (assignTaskId && !filteredTasks.some((t) => t.id === assignTaskId)) {
-      setAssignTaskId("");
-    }
-  }, [filteredTasks, assignTaskId]);
-
-  useEffect(() => {
-    if (assignMilestoneId && !filteredMilestones.some((m) => m.id === assignMilestoneId)) {
-      setAssignMilestoneId("");
-    }
-  }, [filteredMilestones, assignMilestoneId]);
 
   // Filtered and sorted visits for Recent Studio Site Inspection Log
   const filteredAndSortedVisits = useMemo(() => {
@@ -849,7 +837,7 @@ export default function VisitsClientView({
   };
 
   // Parse Google Maps link on paste or change
-  const handleGoogleMapsUrlChange = (val: string) => {
+  const handleGoogleMapsUrlChange = async (val: string) => {
     setGoogleMapsInputUrl(val);
     const parsed = parseGoogleMapsInput(val);
     if (parsed.lat !== null && parsed.lng !== null) {
@@ -858,19 +846,39 @@ export default function VisitsClientView({
       if (parsed.extractedName && !customSiteName) {
         setCustomSiteName(parsed.extractedName);
       }
-      // Reverse geocode to get locality address
       reverseGeocodeLocality(parsed.lat, parsed.lng).then((addr) => {
         if (!customSiteAddress) setCustomSiteAddress(addr);
       });
       setStatusMessage("✔ Extracted coordinates from Google Maps link!");
       setTimeout(() => setStatusMessage(null), 3000);
+      return;
+    }
+
+    // If link is a web URL, resolve via safe SSRF-protected server endpoint
+    if (val.trim().startsWith("http") && (val.includes("google.com") || val.includes("goo.gl"))) {
+      try {
+        const res = await fetch(`/api/visits/resolve-location?workspaceSlug=${workspaceSlug}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url: val.trim() }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.latitude && data.longitude) {
+            setCustomSiteLat(data.latitude.toFixed(6));
+            setCustomSiteLng(data.longitude.toFixed(6));
+            if (data.name && !customSiteName) setCustomSiteName(data.name);
+            setStatusMessage("✔ Resolved location from Google Maps URL!");
+            setTimeout(() => setStatusMessage(null), 3000);
+          }
+        }
+      } catch {}
     }
   };
 
-  // Load default checklist presets when typology changes
-  const handleLoadChecklistPreset = (typologyKey: string) => {
-    const list = DEFAULT_CHECKLISTS[typologyKey] || DEFAULT_CHECKLISTS.ROUTINE;
-    setAssignChecklist(list.map((item) => ({ item, checked: false })));
+  // Load canonical checklist (exactly 4 items)
+  const handleLoadChecklistPreset = () => {
+    setAssignChecklist(CANONICAL_CHECKLIST.map((item) => ({ item, checked: false })));
   };
 
   // Manual Checkpoint Logging
@@ -1219,8 +1227,8 @@ export default function VisitsClientView({
       setErrorMessage("Please select a project.");
       return;
     }
-    if (!assignEmployeeId) {
-      setErrorMessage("Please select an employee to assign.");
+    if (assignEmployeeIds.length === 0) {
+      setErrorMessage("Please select at least one employee to assign.");
       return;
     }
     if (!assignPurpose.trim()) {
@@ -1230,20 +1238,19 @@ export default function VisitsClientView({
 
     setLoading(true);
     setErrorMessage(null);
-    setStatusMessage("Scheduling and assigning enterprise site visit...");
+    setStatusMessage("Scheduling and assigning site visit...");
 
     try {
       const scheduledDateTime = new Date(`${assignScheduledDate}T${assignScheduledTime}:00`);
 
       const payload: any = {
         projectId: assignProjectId,
-        employeeId: assignEmployeeId,
+        employeeIds: assignEmployeeIds,
+        employeeId: assignEmployeeIds[0],
         purpose: assignPurpose.trim(),
         scheduledTime: scheduledDateTime.toISOString(),
         inspectionType: assignInspectionType,
         priority: assignPriority,
-        taskId: assignTaskId || undefined,
-        milestoneId: assignMilestoneId || undefined,
         customSiteRadiusMeters: customSiteRadius,
         customSiteLandmarkNotes: customLandmarkNotes.trim() || undefined,
         customSiteGoogleMapsUrl: googleMapsInputUrl.trim() || undefined,
@@ -2779,49 +2786,14 @@ export default function VisitsClientView({
             </div>
 
             <form onSubmit={handleAssignVisitSubmit} className="space-y-4 text-xs">
-              {/* 1. Architectural Typology Filter */}
-              <div className="bg-[#FAFBFD] p-3 rounded-xl border border-[#E2E6F0] space-y-1">
-                <SearchableSelect
-                  id="assign-typology"
-                  label="Architectural Project Typology"
-                  required={false}
-                  placeholder="Select typology..."
-                  searchPlaceholder="Search typology..."
-                  options={[
-                    { value: "", label: "All Typologies (Show all projects)" },
-                    ...dynamicTypologies.map((typ) => ({
-                      value: typ,
-                      label: typ,
-                      icon: <TypologyDot typology={typ} />,
-                    })),
-                  ]}
-                  value={assignTypology}
-                  onChange={(val: any) => {
-                    setAssignTypology(val);
-                    const eff = val === "OTHER" ? assignOtherTypology.trim() : val.trim();
-                    if (eff) {
-                      const match = availableProjects.filter((p) =>
-                        isTypologyMatch(p.projectType, eff)
-                      );
-                      if (match.length > 0 && !match.some((p) => p.id === assignProjectId)) {
-                        setAssignProjectId(match[0].id);
-                      }
-                    }
-                  }}
-                  allowOther={true}
-                  otherValue={assignOtherTypology}
-                  onOtherValueChange={setAssignOtherTypology}
-                />
-              </div>
-
-              {/* 2. Project Selection */}
+              {/* 1. Select Project */}
               <SearchableSelect
                 id="assign-project"
                 label="Select Project"
                 required
                 placeholder="Select project..."
                 searchPlaceholder="Search project code or name..."
-                options={filteredAssignProjects.map((p) => ({
+                options={availableProjects.map((p) => ({
                   value: p.id,
                   label: `${p.code} — ${p.name}`,
                   subLabel: p.projectType || undefined,
@@ -2833,118 +2805,123 @@ export default function VisitsClientView({
                 allowOther={false}
               />
 
-              {/* 3. Inspection Typology & Classification */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-semibold text-[#1F1F1F] block mb-1">
-                    Inspection Typology & Scope <span className="text-red-600">*</span>
-                  </label>
-                  <select
-                    value={assignInspectionType}
-                    onChange={(e) => {
-                      const newType = e.target.value;
-                      setAssignInspectionType(newType);
-                      handleLoadChecklistPreset(newType);
-                    }}
-                    className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-xs text-[#1F1F1F] focus:ring-2 focus:ring-[#5A81FA] focus:outline-none"
-                  >
-                    {Object.entries(INSPECTION_CATEGORIES).map(([key, cat]) => (
-                      <option key={key} value={key}>
-                        {cat.icon} {cat.label}
-                      </option>
-                    ))}
-                  </select>
+              {/* 2. Inspection Typology & Scope * */}
+              <div>
+                <label className="text-xs font-semibold text-[#1F1F1F] block mb-1">
+                  Inspection Typology & Scope <span className="text-red-600">*</span>
+                </label>
+                <select
+                  value={assignInspectionType}
+                  onChange={(e) => setAssignInspectionType(e.target.value)}
+                  className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-xs text-[#1F1F1F] focus:ring-2 focus:ring-[#5A81FA] focus:outline-none"
+                >
+                  {Object.entries(INSPECTION_CATEGORIES).map(([key, cat]) => (
+                    <option key={key} value={key}>
+                      {cat.icon} {cat.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 3. Priority / Urgency Level */}
+              <div>
+                <label className="text-xs font-semibold text-[#1F1F1F] block mb-1">
+                  Priority / Urgency Level
+                </label>
+                <select
+                  value={assignPriority}
+                  onChange={(e) => setAssignPriority(e.target.value)}
+                  className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-xs text-[#1F1F1F] focus:ring-2 focus:ring-[#5A81FA] focus:outline-none"
+                >
+                  <option value="ROUTINE">ROUTINE (Standard Scheduled Audit)</option>
+                  <option value="HIGH">HIGH (Hold Point / Shuttering Inspection)</option>
+                  <option value="CRITICAL">CRITICAL (Defect / Stop-Work Advisory)</option>
+                </select>
+              </div>
+
+              {/* 4. Assign To Studio Architect / Employee * — Searchable multi-select, no duplicates */}
+              <div className="space-y-2 p-3 bg-[#FAFBFD] border border-[#E2E6F0] rounded-xl">
+                <label className="text-xs font-bold text-[#1F1F1F] flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <User className="w-3.5 h-3.5 text-[#5A81FA]" />
+                    <span>Assign To Studio Architect / Employee <span className="text-red-600">*</span></span>
+                  </span>
+                  <span className="text-[10px] text-[#696E82] font-normal">
+                    {assignEmployeeIds.length} assigned
+                  </span>
+                </label>
+
+                {/* Selected employee chips */}
+                <div className="flex flex-wrap gap-1.5">
+                  {assignEmployeeIds.map((empId) => {
+                    const member = teamMembers.find((m) => m.id === empId);
+                    const name = member?.user.fullName || "Staff Member";
+                    const code = member?.employee?.employeeId || "STAFF";
+                    return (
+                      <span
+                        key={empId}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white border border-[#CEDEFF] text-[#1F1F1F] rounded-lg text-xs font-medium shadow-2xs"
+                      >
+                        <span className="font-mono text-[10px] text-[#5A81FA] font-bold">{code}</span>
+                        <span>{name}</span>
+                        {assignEmployeeIds.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setAssignEmployeeIds(assignEmployeeIds.filter((id) => id !== empId))
+                            }
+                            className="text-[#696E82] hover:text-rose-600 p-0.5 rounded cursor-pointer"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        )}
+                      </span>
+                    );
+                  })}
                 </div>
 
-                <div>
-                  <label className="text-xs font-semibold text-[#1F1F1F] block mb-1">
-                    Priority / Urgency Level
-                  </label>
-                  <select
-                    value={assignPriority}
-                    onChange={(e) => setAssignPriority(e.target.value)}
-                    className="w-full p-2.5 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-xs text-[#1F1F1F] focus:ring-2 focus:ring-[#5A81FA] focus:outline-none"
-                  >
-                    <option value="ROUTINE">ROUTINE (Standard Scheduled Audit)</option>
-                    <option value="HIGH">HIGH (Hold Point / Shuttering Inspection)</option>
-                    <option value="CRITICAL">CRITICAL (Defect / Stop-Work Advisory)</option>
-                  </select>
+                {/* Searchable multi-select dropdown */}
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Search employee to add..."
+                    value={employeeSearchQuery}
+                    onChange={(e) => setEmployeeSearchQuery(e.target.value)}
+                    className="w-full p-2 bg-white border border-[#E2E6F0] rounded-xl text-xs text-[#1F1F1F] focus:outline-none focus:ring-1 focus:ring-[#5A81FA]"
+                  />
+                  {employeeSearchQuery.trim() && (
+                    <div className="absolute top-full left-0 right-0 mt-1 max-h-40 overflow-y-auto bg-white border border-[#E2E6F0] rounded-xl shadow-lg z-20 divide-y divide-[#F1F3F9]">
+                      {teamMembers
+                        .filter(
+                          (m) =>
+                            (m.user.fullName.toLowerCase().includes(employeeSearchQuery.toLowerCase()) ||
+                              m.employee?.employeeId
+                                ?.toLowerCase()
+                                .includes(employeeSearchQuery.toLowerCase())) &&
+                            !assignEmployeeIds.includes(m.id)
+                        )
+                        .map((m) => (
+                          <button
+                            key={m.id}
+                            type="button"
+                            onClick={() => {
+                              setAssignEmployeeIds([...assignEmployeeIds, m.id]);
+                              setEmployeeSearchQuery("");
+                            }}
+                            className="w-full p-2 text-left hover:bg-[#F2F4FF] flex items-center justify-between text-xs cursor-pointer"
+                          >
+                            <span className="font-medium text-[#1F1F1F]">{m.user.fullName}</span>
+                            <span className="text-[10px] text-[#696E82] font-mono">
+                              {m.employee?.employeeId ?? "STAFF"} • {m.employee?.designation ?? m.role}
+                            </span>
+                          </button>
+                        ))}
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {/* 4. Deliverable & Milestone Linkage */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-[#FAFBFD] border border-[#E2E6F0] rounded-xl">
-                <div>
-                  <label className="text-xs font-semibold text-[#1F1F1F] block mb-1">
-                    Link Project Deliverable (Task)
-                  </label>
-                  <select
-                    value={assignTaskId}
-                    onChange={(e) => setAssignTaskId(e.target.value)}
-                    disabled={!assignProjectId}
-                    className="w-full p-2 bg-white border border-[#E2E6F0] rounded-xl text-xs text-[#1F1F1F] focus:outline-none disabled:bg-[#F1F3F9] disabled:text-[#94A3B8]"
-                  >
-                    <option value="">None (Stand-alone visit)</option>
-                    {!assignProjectId ? (
-                      <option disabled>Select a project first</option>
-                    ) : filteredTasks.length === 0 ? (
-                      <option disabled>No open deliverables for this project</option>
-                    ) : (
-                      filteredTasks.map((t) => (
-                        <option key={t.id} value={t.id}>
-                          {t.title} ({t.priority})
-                        </option>
-                      ))
-                    )}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-xs font-semibold text-[#1F1F1F] block mb-1">
-                    Link Project Delivery Milestone
-                  </label>
-                  <select
-                    value={assignMilestoneId}
-                    onChange={(e) => setAssignMilestoneId(e.target.value)}
-                    disabled={!assignProjectId}
-                    className="w-full p-2 bg-white border border-[#E2E6F0] rounded-xl text-xs text-[#1F1F1F] focus:outline-none disabled:bg-[#F1F3F9] disabled:text-[#94A3B8]"
-                  >
-                    <option value="">None (Routine visit)</option>
-                    {!assignProjectId ? (
-                      <option disabled>Select a project first</option>
-                    ) : filteredMilestones.length === 0 ? (
-                      <option disabled>No milestones for this project</option>
-                    ) : (
-                      filteredMilestones.map((m) => (
-                        <option key={m.id} value={m.id}>
-                          {m.title}
-                        </option>
-                      ))
-                    )}
-                  </select>
-                </div>
-              </div>
-
-              {/* 5. Assign to Employee */}
-              <SearchableSelect
-                id="assign-employee"
-                label="Assign To Studio Architect / Employee"
-                required
-                placeholder="Select employee..."
-                searchPlaceholder="Search employee by name..."
-                options={teamMembers.map((m) => ({
-                  value: m.id,
-                  label: m.user.fullName,
-                  subLabel: `${m.employee?.employeeId ?? "STAFF"} • ${
-                    m.employee?.designation ?? m.role
-                  }`,
-                }))}
-                value={assignEmployeeId}
-                onChange={setAssignEmployeeId}
-                allowOther={false}
-              />
-
-              {/* 6. Smart Location Input & Perimeter Radius Slider */}
+              {/* 5. Site Location & Perimeter Configuration — Existing Site or + New / Custom Site Spot */}
               <div className="p-3.5 bg-[#FAFBFD] border border-[#E2E6F0] rounded-xl space-y-3">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-bold text-[#1F1F1F] flex items-center gap-1.5">
@@ -2998,17 +2975,14 @@ export default function VisitsClientView({
                   />
                 ) : (
                   <div className="space-y-2.5">
-                    {/* Google Maps link parser / Detect My Spot */}
                     <div className="flex gap-2">
-                      <div className="relative flex-1">
-                        <input
-                          type="text"
-                          placeholder="Paste Google Maps URL or Plus Code (e.g. maps.google.com/?q=18.921,72.834)"
-                          value={googleMapsInputUrl}
-                          onChange={(e) => handleGoogleMapsUrlChange(e.target.value)}
-                          className="w-full p-2 bg-white border border-[#E2E6F0] rounded-xl text-xs text-[#1F1F1F] focus:ring-1 focus:ring-[#5A81FA] focus:outline-none"
-                        />
-                      </div>
+                      <input
+                        type="text"
+                        placeholder="Google Maps URL or Plus Code (e.g. maps.google.com/?q=18.921,72.834)"
+                        value={googleMapsInputUrl}
+                        onChange={(e) => handleGoogleMapsUrlChange(e.target.value)}
+                        className="w-full p-2 bg-white border border-[#E2E6F0] rounded-xl text-xs text-[#1F1F1F] focus:ring-1 focus:ring-[#5A81FA] focus:outline-none"
+                      />
                       <button
                         type="button"
                         onClick={handleDetectCurrentSpot}
@@ -3023,20 +2997,28 @@ export default function VisitsClientView({
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <input
                         type="text"
-                        required
-                        placeholder="Site Name (e.g. Horizon Towers - Block B)"
+                        required={assignSiteMode === "CUSTOM"}
+                        placeholder="Site / Spot Name *"
                         value={customSiteName}
                         onChange={(e) => setCustomSiteName(e.target.value)}
                         className="w-full p-2 bg-white border border-[#E2E6F0] rounded-xl text-xs text-[#1F1F1F]"
                       />
                       <input
                         type="text"
-                        placeholder="Human Address / Landmark"
+                        placeholder="Static Address / Landmark"
                         value={customSiteAddress}
                         onChange={(e) => setCustomSiteAddress(e.target.value)}
                         className="w-full p-2 bg-white border border-[#E2E6F0] rounded-xl text-xs text-[#1F1F1F]"
                       />
                     </div>
+
+                    <input
+                      type="text"
+                      placeholder="Landmark & Access Instructions"
+                      value={customLandmarkNotes}
+                      onChange={(e) => setCustomLandmarkNotes(e.target.value)}
+                      className="w-full p-2 bg-white border border-[#E2E6F0] rounded-xl text-xs text-[#1F1F1F]"
+                    />
 
                     <div className="grid grid-cols-2 gap-2 font-mono">
                       <input
@@ -3129,81 +3111,7 @@ export default function VisitsClientView({
                 </div>
               </div>
 
-              {/* 7. Pre-Visit Inspection Checklist Builder */}
-              <div className="p-3.5 bg-[#FAFBFD] border border-[#E2E6F0] rounded-xl space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-[#1F1F1F] flex items-center gap-1.5">
-                    <CheckSquare className="w-3.5 h-3.5 text-[#5A81FA]" />
-                    <span>Pre-Visit QA/QC Inspection Checklist ({assignChecklist.length} items)</span>
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => handleLoadChecklistPreset(assignInspectionType)}
-                    className="text-[10px] text-[#5A81FA] hover:underline font-semibold cursor-pointer"
-                  >
-                    Reset to Typology Defaults
-                  </button>
-                </div>
-
-                <div className="space-y-1.5 max-h-36 overflow-y-auto">
-                  {assignChecklist.map((chk, idx) => (
-                    <div
-                      key={idx}
-                      className="p-2 bg-white border border-[#E2E6F0] rounded-lg flex items-center justify-between gap-2"
-                    >
-                      <span className="text-xs text-[#1F1F1F]">• {chk.item}</span>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setAssignChecklist(assignChecklist.filter((_, i) => i !== idx))
-                        }
-                        className="text-rose-500 hover:text-rose-700 p-0.5"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    placeholder="Add custom verification checkpoint..."
-                    value={newChecklistText}
-                    onChange={(e) => setNewChecklistText(e.target.value)}
-                    className="w-full p-2 bg-white border border-[#E2E6F0] rounded-xl text-xs"
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        if (newChecklistText.trim()) {
-                          setAssignChecklist([
-                            ...assignChecklist,
-                            { item: newChecklistText.trim(), checked: false },
-                          ]);
-                          setNewChecklistText("");
-                        }
-                      }
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (newChecklistText.trim()) {
-                        setAssignChecklist([
-                          ...assignChecklist,
-                          { item: newChecklistText.trim(), checked: false },
-                        ]);
-                        setNewChecklistText("");
-                      }
-                    }}
-                    className="px-3 py-1.5 bg-[#5A81FA] text-white rounded-xl font-bold shrink-0 text-xs"
-                  >
-                    Add Item
-                  </button>
-                </div>
-              </div>
-
-              {/* 8. Attendees & External Contacts */}
+              {/* 6. Site Attendees & Commissioned Contractors */}
               <div className="p-3.5 bg-[#FAFBFD] border border-[#E2E6F0] rounded-xl space-y-2.5">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-bold text-[#1F1F1F] flex items-center gap-1.5">
@@ -3212,7 +3120,6 @@ export default function VisitsClientView({
                   </label>
                 </div>
 
-                {/* Quick Add from Contractors */}
                 {contractors.length > 0 && (
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <span className="text-[10px] text-[#696E82]">Quick Tag:</span>
@@ -3240,7 +3147,6 @@ export default function VisitsClientView({
                   </div>
                 )}
 
-                {/* Tagged list */}
                 {assignAttendees.length > 0 && (
                   <div className="space-y-1">
                     {assignAttendees.map((att, idx) => (
@@ -3249,17 +3155,14 @@ export default function VisitsClientView({
                         className="p-1.5 bg-white border border-[#E2E6F0] rounded-lg flex items-center justify-between text-[11px]"
                       >
                         <div>
-                          <strong>{att.name}</strong> •{" "}
-                          <span className="text-[#696E82]">{att.role}</span>
+                          <strong>{att.name}</strong> • <span className="text-[#696E82]">{att.role}</span>
                           {att.phone && (
                             <span className="ml-2 font-mono text-[#5A81FA]">{att.phone}</span>
                           )}
                         </div>
                         <button
                           type="button"
-                          onClick={() =>
-                            setAssignAttendees(assignAttendees.filter((_, i) => i !== idx))
-                          }
+                          onClick={() => setAssignAttendees(assignAttendees.filter((_, i) => i !== idx))}
                           className="text-rose-500 hover:text-rose-700"
                         >
                           <X className="w-3 h-3" />
@@ -3317,7 +3220,49 @@ export default function VisitsClientView({
                 </div>
               </div>
 
-              {/* Purpose / Agenda */}
+              {/* 7. Pre-Visit QA/QC Inspection Checklist — exactly four items */}
+              <div className="p-3.5 bg-[#FAFBFD] border border-[#E2E6F0] rounded-xl space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-[#1F1F1F] flex items-center gap-1.5">
+                    <CheckSquare className="w-3.5 h-3.5 text-[#5A81FA]" />
+                    <span>Pre-Visit QA/QC Inspection Checklist (4 items)</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleLoadChecklistPreset}
+                    className="text-[10px] text-[#5A81FA] hover:underline font-semibold cursor-pointer"
+                  >
+                    Reset to Default 4
+                  </button>
+                </div>
+
+                <div className="space-y-1.5">
+                  {assignChecklist.map((chk, idx) => (
+                    <div
+                      key={idx}
+                      onClick={() => {
+                        setAssignChecklist(
+                          assignChecklist.map((c, i) => (i === idx ? { ...c, checked: !c.checked } : c))
+                        );
+                      }}
+                      className="p-2 bg-white border border-[#E2E6F0] rounded-lg flex items-center gap-2 cursor-pointer hover:bg-[#F2F4FF]"
+                    >
+                      <span
+                        className={`w-4 h-4 rounded border flex items-center justify-center text-[10px] font-bold ${
+                          chk.checked
+                            ? "bg-[#5A81FA] text-white border-[#5A81FA]"
+                            : "border-[#CEDEFF] bg-white text-transparent"
+                        }`}
+                      >
+                        ✓
+                      </span>
+                      <span className="text-xs text-[#1F1F1F]">{chk.item}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* 8. Meeting Purpose / Inspection Agenda * */}
               <div>
                 <label className="text-xs font-semibold text-[#1F1F1F] block mb-1">
                   Meeting Purpose / Inspection Agenda <span className="text-red-600">*</span>
@@ -3332,7 +3277,7 @@ export default function VisitsClientView({
                 />
               </div>
 
-              {/* Scheduled Date & Time */}
+              {/* 9. Date * & 10. Time * */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-semibold text-[#1F1F1F] block mb-1">

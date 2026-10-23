@@ -22,13 +22,6 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized session" }, { status: 401 });
     }
 
-    if (ctx.role !== "OWNER" && ctx.role !== "ADMIN") {
-      return NextResponse.json(
-        { error: "Forbidden: Studio meetings require Owner or Admin privileges" },
-        { status: 403 }
-      );
-    }
-
     // Parallel fetch meetings and all stakeholder catalogs for fast, single-flight client render
     const [meetings, employees, contractors, clients, consultants, projects] = await Promise.all([
       listStudioMeetings(ctx),
@@ -65,6 +58,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       success: true,
       meetings,
+      userRole: ctx.role,
+      currentMembershipId: ctx.membershipId,
       participants: {
         employees,
         contractors,
@@ -114,6 +109,13 @@ export async function POST(req: NextRequest) {
       decisions: body.decisions,
       attendees: body.attendees,
       attendeeMembershipIds: body.attendeeMembershipIds,
+      locationType: body.locationType,
+      locationDetails: body.locationDetails,
+      isRecurring: body.isRecurring,
+      recurrenceRule: body.recurrenceRule,
+      occurrenceCount: body.occurrenceCount,
+      attachments: body.attachments,
+      isMinutesPublished: body.isMinutesPublished,
     });
 
     return NextResponse.json({ success: true, meeting: newMeeting }, { status: 201 });
@@ -159,6 +161,11 @@ export async function PATCH(req: NextRequest) {
       decisions: body.decisions,
       status: body.status,
       attendees: body.attendees,
+      locationType: body.locationType,
+      locationDetails: body.locationDetails,
+      attachments: body.attachments,
+      isMinutesPublished: body.isMinutesPublished,
+      recurrenceScope: body.recurrenceScope,
     });
 
     return NextResponse.json({ success: true, meeting: updated });

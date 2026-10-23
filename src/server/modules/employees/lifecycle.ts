@@ -15,6 +15,7 @@
 import { prisma } from "../../db/prisma";
 import { TenantContext, assertAdminOrOwner } from "../../tenancy/context";
 import { TenantRole, Prisma } from "@prisma/client";
+import { clearMembershipCache } from "../../auth/session";
 import crypto from "crypto";
 
 export interface CreateInvitationInput {
@@ -311,6 +312,7 @@ export async function executeEmployeeDeactivation(
       data: { isActive: false },
       include: { user: true, employee: true },
     });
+    clearMembershipCache(params.membershipId);
 
     // 2. Update Employee lifecycle record
     if (updatedMembership.employee?.id) {
@@ -408,6 +410,7 @@ export async function reactivateEmployee(
       },
       include: { user: true },
     });
+    clearMembershipCache(member.id);
 
     if (member.employee?.id) {
       await tx.employee.update({

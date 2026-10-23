@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { getCurrentTenantContext } from "@/server/auth/session";
 import { prisma } from "@/server/db/prisma";
 import { Prisma } from "@prisma/client";
@@ -10,6 +11,27 @@ import {
 } from "@/server/modules/payroll/engine";
 import { allocateDaysAcrossMonths } from "@/server/modules/leave/policy";
 
+const CalculateQuerySchema = z.object({
+  year: z
+    .string()
+    .regex(/^\d{4}$/, "Year must be a 4-digit integer")
+    .transform(Number)
+    .refine((val) => val >= 1000 && val <= 9999, { message: "Year must be a valid 4-digit calendar year" })
+    .optional(),
+  month: z
+    .string()
+    .regex(/^\d{1,2}$/, "Month must be an integer between 1 and 12")
+    .transform(Number)
+    .refine((val) => val >= 1 && val <= 12, { message: "Month must be between 1 and 12" })
+    .optional(),
+  workingDays: z
+    .string()
+    .regex(/^\d+(\.\d+)?$/, "workingDays must be a valid number between 1 and 31")
+    .transform(Number)
+    .refine((val) => val >= 1 && val <= 31, { message: "workingDays must be between 1 and 31" })
+    .optional(),
+});
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
@@ -19,16 +41,30 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Missing workspaceSlug" }, { status: 400 });
     }
 
+    const validationResult = CalculateQuerySchema.safeParse({
+      year: searchParams.get("year") ?? undefined,
+      month: searchParams.get("month") ?? undefined,
+      workingDays: searchParams.get("workingDays") ?? undefined,
+    });
+
+    if (!validationResult.success) {
+      return NextResponse.json(
+        { error: validationResult.error.issues[0]?.message || "Invalid query parameters" },
+        { status: 400 }
+      );
+    }
+
     const ctx = await getCurrentTenantContext(workspaceSlug);
     if (!ctx) {
       return NextResponse.json({ error: "Unauthorized session" }, { status: 401 });
     }
 
-    const employeeId = searchParams.get("employeeId") || undefined;
+    const validated = validationResult.data;
     const now = new Date();
-    const year = parseInt(searchParams.get("year") || String(now.getFullYear()), 10);
-    const month = parseInt(searchParams.get("month") || String(now.getMonth() + 1), 10);
-    const configuredWorkingDays = Math.max(1, parseInt(searchParams.get("workingDays") || "26", 10));
+    const year = validated.year ?? now.getFullYear();
+    const month = validated.month ?? now.getMonth() + 1;
+    const configuredWorkingDays = validated.workingDays ?? 26;
+    const employeeId = searchParams.get("employeeId") || undefined;
 
     let baseSalary = parseFloat(searchParams.get("baseSalary") || "0");
     let mode: RateCalculationMode = (searchParams.get("mode") as RateCalculationMode) || "FIXED_30";

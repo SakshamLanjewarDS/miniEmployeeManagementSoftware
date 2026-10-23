@@ -906,6 +906,12 @@ export default function TasksClientView({
         } else if (task.status !== selectedStatusCategory) {
           return false;
         }
+      } else {
+        // Active Tasks page shows unfinished work by default
+        // Completed tasks leave the active page and reside in Completed Tasks archive
+        if (task.status === "COMPLETED" || task.status === "CANCELLED") {
+          return false;
+        }
       }
 
       return true;
