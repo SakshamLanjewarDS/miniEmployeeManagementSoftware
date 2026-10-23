@@ -726,46 +726,52 @@ export async function issueHiringLetter(ctx: TenantContext, input: HiringLetterI
       }
     } else {
       // Find or provision candidate into the workspace
-      const existingUser = await tx.user.findFirst({
-        where: { email: input.candidateEmail.trim().toLowerCase() },
-        include: { memberships: { where: { tenantId: ctx.tenantId }, include: { employee: true } } },
+      const normalizedEmail = input.candidateEmail.trim().toLowerCase();
+      let user = await tx.user.findFirst({
+        where: { email: normalizedEmail },
       });
 
-      if (existingUser && existingUser.memberships[0]?.employee) {
+      if (!user) {
+        const tempPasswordHash = await bcrypt.hash("StudioWelcome2026!", 10);
+        user = await tx.user.create({
+          data: {
+            email: normalizedEmail,
+            fullName: input.candidateName.trim(),
+            passwordHash: tempPasswordHash,
+          },
+        });
+      }
+
+      let membership = await tx.tenantMembership.findUnique({
+        where: {
+          tenantId_userId: {
+            tenantId: ctx.tenantId,
+            userId: user.id,
+          },
+        },
+        include: { employee: true },
+      });
+
+      if (!membership) {
+        membership = await tx.tenantMembership.create({
+          data: {
+            tenantId: ctx.tenantId,
+            userId: user.id,
+            role: "EMPLOYEE",
+            isActive: true,
+          },
+          include: { employee: true },
+        });
+      }
+
+      if (membership.employee) {
         employeeRecord = {
-          ...existingUser.memberships[0].employee,
-          membership: { ...existingUser.memberships[0], user: existingUser },
+          ...membership.employee,
+          membership: { ...membership, user },
         };
       } else {
-        // Auto-provision candidate employee record
         const nextEmpNumber = Math.floor(100 + Math.random() * 899);
         const assignedEmployeeId = `EMP-${nextEmpNumber}`;
-        const tempPasswordHash = await bcrypt.hash("StudioWelcome2026!", 10);
-
-        let user = existingUser;
-        if (!user) {
-          user = await tx.user.create({
-            data: {
-              email: input.candidateEmail.trim().toLowerCase(),
-              fullName: input.candidateName.trim(),
-              passwordHash: tempPasswordHash,
-            },
-            include: { memberships: true },
-          });
-        }
-
-        let membership = user.memberships?.find((m: any) => m.tenantId === ctx.tenantId);
-        if (!membership) {
-          membership = await tx.tenantMembership.create({
-            data: {
-              tenantId: ctx.tenantId,
-              userId: user.id,
-              role: "EMPLOYEE",
-              isActive: true,
-            },
-          });
-        }
-
         const employee = await tx.employee.create({
           data: {
             tenantId: ctx.tenantId,

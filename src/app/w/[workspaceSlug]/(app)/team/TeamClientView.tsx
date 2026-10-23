@@ -17,6 +17,7 @@ import {
   RotateCcw,
   Building,
   Mail,
+  FileText,
   Phone,
   Calendar,
   X,
