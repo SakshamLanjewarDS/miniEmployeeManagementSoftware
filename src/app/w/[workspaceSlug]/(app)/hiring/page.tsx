@@ -18,8 +18,8 @@ export default async function HiringPage({ params }: HiringPageProps) {
     redirect(`/w/${workspaceSlug}/login`);
   }
 
-  // Strict role enforcement: Only Studio Administrator can generate letters
-  if (ctx.role !== "ADMIN") {
+  // Strict role enforcement: Only Studio Administrator or Owner can access Hiring Studio
+  if (ctx.role !== "ADMIN" && ctx.role !== "OWNER") {
     redirect(`/w/${workspaceSlug}/team`);
   }
 
@@ -31,7 +31,7 @@ export default async function HiringPage({ params }: HiringPageProps) {
   return (
     <HiringClientView
       workspaceSlug={ctx.tenantSlug}
-      context={ctx}
+      context={serializeForClient(ctx)}
       employees={serializeForClient(employees) as any}
       templates={serializeForClient(templates) as any}
     />

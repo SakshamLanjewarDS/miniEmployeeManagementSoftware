@@ -383,7 +383,7 @@ export function AppSidebar({ context }: AppSidebarProps) {
             label: "Hiring & Letters",
             href: `/w/${context.tenantSlug}/hiring`,
             icon: FileCheck2,
-            isPermitted: context.role === "ADMIN",
+            isPermitted: context.role === "ADMIN" || context.role === "OWNER",
           },
           {
             id: "leave",

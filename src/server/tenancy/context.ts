@@ -66,7 +66,7 @@ export function isAdmin(context: TenantContext): boolean {
  * Admin Authority: Only ADMIN can generate, design, and circulate employment letters.
  */
 export function assertAdminOnly(context: TenantContext, message = "Forbidden: Studio Administrator authority required to generate or circulate letters"): void {
-  if (context.role !== TenantRole.ADMIN) {
+  if (context.role !== TenantRole.ADMIN && context.role !== TenantRole.OWNER) {
     throw new ForbiddenException(message);
   }
 }
@@ -128,7 +128,7 @@ export function assertCanManageFinance(context: TenantContext, message = "Forbid
 }
 
 export function canManageHR(context: TenantContext): boolean {
-  return isOwner(context) || (isAdmin(context) && Boolean(context.hasHrAccess));
+  return isOwner(context) || isAdmin(context) || Boolean(context.hasHrAccess);
 }
 
 export function assertCanManageHR(context: TenantContext, message = "Forbidden: HR management privileges required"): void {

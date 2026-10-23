@@ -942,7 +942,7 @@ export default function TeamClientView({
                   <span>Import CSV</span>
                 </button>
 
-                {userRole === "ADMIN" && (
+                {(userRole === "ADMIN" || userRole === "OWNER") && (
                   <button
                     type="button"
                     onClick={() => router.push(`/w/${workspaceSlug}/hiring`)}
