@@ -242,3 +242,43 @@ export function compareTasksByWorkflow(
   }
 }
 
+/**
+ * Strips redundant project code and separator prefixes from task titles for clean display in UI cards,
+ * since the project code is already prominently rendered in the top-left of the card.
+ *
+ * Handles formats like:
+ * - "100D-001 - Concept Design Deliverable #1" -> "Concept Design Deliverable #1"
+ * - "100D-001 — Structural Slab" -> "Structural Slab"
+ * - "100D-001 : Drawing Review" -> "Drawing Review"
+ * - "100D-001: Wall elevations" -> "Wall elevations"
+ * - "[100D-001] Site Visit Follow-up" -> "Site Visit Follow-up"
+ */
+export function getCleanTaskTitle(
+  title: string | null | undefined,
+  projectCode?: string | null,
+  projectName?: string | null
+): string {
+  if (!title) return "Untitled Deliverable";
+  let cleaned = title.trim();
+
+  // 1. If projectCode is provided, strip prefix matching projectCode
+  if (projectCode) {
+    const trimmedCode = projectCode.trim();
+    if (trimmedCode) {
+      const escapedCode = trimmedCode.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const codeRegex = new RegExp(
+        `^(\\[?${escapedCode}\\]?\\s*[-:—–|•]\\s*|\\[${escapedCode}\\]\\s*)`,
+        "i"
+      );
+      cleaned = cleaned.replace(codeRegex, "").trim();
+    }
+  }
+
+  // 2. Also strip any generic project code pattern if present at start (e.g. "[A-Z0-9_-]{2,10} - ")
+  const genericCodePrefixRegex = /^\[?[A-Z0-9]{2,8}(?:-[A-Z0-9]{1,8})?\]?\s*[-:—–|•]\s*/i;
+  cleaned = cleaned.replace(genericCodePrefixRegex, "").trim();
+
+  return cleaned || title.trim() || "Untitled Deliverable";
+}
+
+

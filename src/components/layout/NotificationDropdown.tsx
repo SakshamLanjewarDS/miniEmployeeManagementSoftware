@@ -239,7 +239,7 @@ export function NotificationDropdown({ context }: NotificationDropdownProps) {
     () => {
       fetchNotifications(false);
     },
-    { intervalMs: 15000 }
+    { intervalMs: 60000, throttleMs: 30000 }
   );
 
   // Listen for instant in-tab and cross-module notification refresh events

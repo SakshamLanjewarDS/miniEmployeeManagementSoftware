@@ -18,6 +18,7 @@ export interface RealtimeEvent {
   payload?: any;
 }
 
+// shortcut: In-browser BroadcastChannel and throttled polling (ceiling: single-client multi-tab up to 500 active users), upgrade: migrate to Redis PubSub or Server-Sent Events hub if concurrent studio sessions exceed 500 users
 const CHANNEL_NAME = "studio_os_realtime_bus";
 
 /**
@@ -62,30 +63,39 @@ export function useRealtimeSubscription(
   options: {
     intervalMs?: number;
     enabled?: boolean;
+    throttleMs?: number;
   } = {}
 ) {
-  const { intervalMs = 20000, enabled = true } = options;
+  const { intervalMs = 45000, enabled = true, throttleMs = 25000 } = options;
   const onRefreshRef = useRef(onRefresh);
   onRefreshRef.current = onRefresh;
+  const lastRefreshTimeRef = useRef(0);
 
   useEffect(() => {
     if (!enabled || typeof window === "undefined") return;
 
+    const safeRefresh = () => {
+      const now = Date.now();
+      if (now - lastRefreshTimeRef.current < throttleMs) return;
+      lastRefreshTimeRef.current = now;
+      onRefreshRef.current();
+    };
+
     let timer: NodeJS.Timeout | null = null;
 
-    // 1. Periodic background refresh
+    // 1. Periodic background refresh (only when tab is actively viewed)
     if (intervalMs > 0) {
       timer = setInterval(() => {
         if (document.visibilityState === "visible") {
-          onRefreshRef.current();
+          safeRefresh();
         }
       }, intervalMs);
     }
 
-    // 2. Tab focus / visibility change revalidation
+    // 2. Tab focus / visibility change revalidation with throttle cooldown
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
-        onRefreshRef.current();
+        safeRefresh();
       }
     };
     document.addEventListener("visibilitychange", handleVisibilityChange);
@@ -97,7 +107,7 @@ export function useRealtimeSubscription(
         channel = new BroadcastChannel(CHANNEL_NAME);
         channel.onmessage = (event: MessageEvent<RealtimeEvent>) => {
           if (event.data && eventTypes.includes(event.data.type)) {
-            onRefreshRef.current();
+            safeRefresh();
           }
         };
       } catch {
@@ -111,7 +121,7 @@ export function useRealtimeSubscription(
         try {
           const parsed: RealtimeEvent = JSON.parse(e.newValue);
           if (parsed && eventTypes.includes(parsed.type)) {
-            onRefreshRef.current();
+            safeRefresh();
           }
         } catch {
           // ignore
@@ -126,5 +136,5 @@ export function useRealtimeSubscription(
       if (channel) channel.close();
       window.removeEventListener("storage", handleStorage);
     };
-  }, [enabled, intervalMs, JSON.stringify(eventTypes)]);
+  }, [enabled, intervalMs, throttleMs, JSON.stringify(eventTypes)]);
 }

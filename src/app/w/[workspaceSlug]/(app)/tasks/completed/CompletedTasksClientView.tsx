@@ -23,6 +23,7 @@ import {
   Layers,
   Sparkles,
 } from "lucide-react";
+import { getCleanTaskTitle } from "@/components/tasks/task-utils";
 
 interface CompletedTasksClientViewProps {
   workspaceSlug: string;
@@ -522,7 +523,7 @@ export default function CompletedTasksClientView({
                     >
                       <td className="py-3.5 px-4 font-semibold text-slate-900 max-w-[280px]">
                         <div className="flex items-center gap-2">
-                          <span className="truncate">{task.title}</span>
+                          <span className="truncate">{getCleanTaskTitle(task.title, task.project?.code)}</span>
                           {task.reopenCount > 0 && (
                             <span
                               className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-bold text-[9px]"
@@ -668,7 +669,7 @@ export default function CompletedTasksClientView({
                 <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
                   Completed Deliverable
                 </span>
-                <h2 className="text-lg font-bold text-slate-900 mt-1">{selectedTask.title}</h2>
+                <h2 className="text-lg font-bold text-slate-900 mt-1">{getCleanTaskTitle(selectedTask.title, selectedTask.project?.code)}</h2>
               </div>
               <button
                 type="button"

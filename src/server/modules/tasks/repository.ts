@@ -731,9 +731,9 @@ export async function createTask(ctx: TenantContext, data: CreateTaskData) {
       where: { projectId: project.id, tenantId: ctx.tenantId },
     });
     if (phaseName) {
-      deliverableTitle = `${project.code} - ${phaseName} Deliverable #${taskCount + 1}`;
+      deliverableTitle = `${phaseName} Deliverable #${taskCount + 1}`;
     } else {
-      deliverableTitle = `${project.code} - ${project.name} Deliverable #${taskCount + 1}`;
+      deliverableTitle = `${project.name} Deliverable #${taskCount + 1}`;
     }
   }
 

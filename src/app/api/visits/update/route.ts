@@ -66,3 +66,8 @@ export async function PATCH(req: NextRequest) {
     );
   }
 }
+
+export async function POST(req: NextRequest) {
+  return PATCH(req);
+}
+

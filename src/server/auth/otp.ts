@@ -50,6 +50,7 @@ export interface VerifyChallengeResult {
   challenge?: StoredOtpChallenge;
 }
 
+// shortcut: In-memory Map challenge and rate limit store (ceiling: single Node.js runtime process, resets on restart), upgrade: migrate to Redis or persistent database challenge table when scaling out to multi-instance/serverless Next.js pods
 // Global store to persist challenges across Next.js HMR reloads in development
 const globalForOtp = globalThis as unknown as {
   otpStore?: Map<string, StoredOtpChallenge>;

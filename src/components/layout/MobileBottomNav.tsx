@@ -73,9 +73,9 @@ export function MobileBottomNav({ context }: MobileBottomNavProps) {
         },
         {
           name: "Site Visits",
-          href: `/w/${slug}/visits`,
+          href: `/w/${slug}/tasks?tab=visits`,
           icon: MapPin,
-          isActive: pathname?.includes("/visits"),
+          isActive: pathname?.includes("/visits") || (pathname?.includes("/tasks") && typeof window !== "undefined" && new URLSearchParams(window.location.search).get("tab") === "visits"),
         },
         {
           name: "Meetings",
@@ -95,13 +95,13 @@ export function MobileBottomNav({ context }: MobileBottomNavProps) {
           name: "Task",
           href: `/w/${slug}/tasks`,
           icon: Layers,
-          isActive: pathname?.includes("/tasks") || pathname?.includes("/my-work"),
+          isActive: (pathname?.includes("/tasks") && !(typeof window !== "undefined" && new URLSearchParams(window.location.search).get("tab") === "visits")) || pathname?.includes("/my-work"),
         },
         {
           name: "Site Visits",
-          href: `/w/${slug}/visits`,
+          href: `/w/${slug}/tasks?tab=visits`,
           icon: MapPin,
-          isActive: pathname?.includes("/visits"),
+          isActive: pathname?.includes("/visits") || (pathname?.includes("/tasks") && typeof window !== "undefined" && new URLSearchParams(window.location.search).get("tab") === "visits"),
         },
         {
           name: "Meetings",

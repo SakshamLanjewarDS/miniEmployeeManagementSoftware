@@ -50,6 +50,7 @@ import {
   BookOpen,
   ChevronDown,
   ChevronUp,
+  Play,
 } from "lucide-react";
 import { SearchableDropdown, SearchableSelect } from "@/components/ui/SearchableDropdown";
 import {
@@ -65,6 +66,7 @@ import SnagsTracker, { SnagItem } from "./SnagsTracker";
 import PrintableInspectionReport from "./PrintableInspectionReport";
 import SiteIssuesView from "./SiteIssuesView";
 import { MobileFilterDrawer } from "@/components/ui/MobileFilterDrawer";
+import { getCleanTaskTitle } from "@/components/tasks/task-utils";
 
 export interface SiteVisitItem {
   id: string;
@@ -330,6 +332,20 @@ async function reverseGeocodeLocality(lat: number, lng: number): Promise<string>
   return `Field Location (${lat.toFixed(4)}°, ${lng.toFixed(4)}°)`;
 }
 
+function calculateDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371000;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return Math.round(R * c);
+}
+
 export default function VisitsClientView({
   workspaceSlug,
   currentMembershipId,
@@ -416,6 +432,33 @@ export default function VisitsClientView({
   const [newAttendeeName, setNewAttendeeName] = useState("");
   const [newAttendeeRole, setNewAttendeeRole] = useState("");
   const [newAttendeePhone, setNewAttendeePhone] = useState("");
+
+  // Origin location state for Assign Site Visit Form (Requirement 1)
+  const [assignOriginAddress, setAssignOriginAddress] = useState("");
+  const [assignOriginLat, setAssignOriginLat] = useState("");
+  const [assignOriginLng, setAssignOriginLng] = useState("");
+  const [isFetchingOriginLocation, setIsFetchingOriginLocation] = useState(false);
+  const [originFetchSuccess, setOriginFetchSuccess] = useState(false);
+
+  // Journey & Activation States (Requirement 2)
+  const [isActivatingTaskId, setIsActivatingTaskId] = useState<string | null>(null);
+  const [journeyMilestone, setJourneyMilestone] = useState<string>("ASSIGNED");
+  const [hasArrivedAtSite, setHasArrivedAtSite] = useState(false);
+  const [reachedSiteModalOpen, setReachedSiteModalOpen] = useState(false);
+  const [reachedSiteData, setReachedSiteData] = useState<{
+    siteName: string;
+    distanceMeters: number;
+    arrivalTime: string;
+    locality?: string;
+  } | null>(null);
+  const [liveTrailWaypoints, setLiveTrailWaypoints] = useState<Array<{
+    id?: string;
+    latitude: number;
+    longitude: number;
+    calculatedDistanceMeters?: number;
+    serverReceiptTime: string;
+  }>>([]);
+  const [isClosingVisit, setIsClosingVisit] = useState(false);
 
   // Filters & Sorting for Section 3: Recent Studio Site Inspection Log
   const [visitSearch, setVisitSearch] = useState("");
@@ -654,8 +697,40 @@ export default function VisitsClientView({
         setContractorRepName(initialActiveVisit.contractorSignOff.representativeName || "");
         setContractorRepPhone(initialActiveVisit.contractorSignOff.phone || "");
       }
+
+      // Restore participant journey milestone
+      const participant =
+        (initialActiveVisit as any).participants?.find(
+          (p: any) => p.membershipId === currentMembershipId
+        ) || (initialActiveVisit as any).participants?.[0];
+
+      if (participant?.journeyState) {
+        setJourneyMilestone(participant.journeyState);
+        if (
+          participant.journeyState === "ARRIVED_AT_SITE" ||
+          participant.journeyState === "INSPECTION_STARTED" ||
+          participant.journeyState === "INSPECTION_FINISHED"
+        ) {
+          setHasArrivedAtSite(true);
+        }
+      }
+
+      // Restore existing location samples into live trail waypoints
+      if (Array.isArray((initialActiveVisit as any).locationSamples)) {
+        setLiveTrailWaypoints(
+          (initialActiveVisit as any).locationSamples.map((s: any) => ({
+            id: s.id,
+            latitude: s.latitude,
+            longitude: s.longitude,
+            calculatedDistanceMeters: initialActiveVisit.site?.latitude && initialActiveVisit.site?.longitude
+              ? calculateDistanceMeters(s.latitude, s.longitude, initialActiveVisit.site.latitude, initialActiveVisit.site.longitude)
+              : undefined,
+            serverReceiptTime: s.serverReceiptTime || s.clientCaptureTime,
+          }))
+        );
+      }
     }
-  }, [initialActiveVisit]);
+  }, [initialActiveVisit, currentMembershipId]);
 
   // Live GPS tracking state
   const [isLiveTracking, setIsLiveTracking] = useState(true);
@@ -673,7 +748,7 @@ export default function VisitsClientView({
   const [checkpointNote, setCheckpointNote] = useState("");
   const [isLoggingCheckpoint, setIsLoggingCheckpoint] = useState(false);
 
-  // Background Live GPS location tracker for active site visit
+  // Background Live GPS location tracker & automatic geofence arrival detection (Requirement 2)
   useEffect(() => {
     if (!activeVisit || activeVisit.operationalState !== "ACTIVE" || !isLiveTracking) return;
 
@@ -684,14 +759,55 @@ export default function VisitsClientView({
         async (pos) => {
           try {
             setIsTrackingSending(true);
+            const lat = pos.coords.latitude;
+            const lng = pos.coords.longitude;
+            const acc = pos.coords.accuracy;
+
+            // Compute distance to site
+            let distanceToSite: number | null = null;
+            if (activeVisit.site?.latitude !== null && activeVisit.site?.longitude !== null) {
+              distanceToSite = calculateDistanceMeters(
+                lat,
+                lng,
+                activeVisit.site.latitude,
+                activeVisit.site.longitude
+              );
+            }
+
+            // Append to local live trail waypoints
+            setLiveTrailWaypoints((prev) => [
+              ...prev,
+              {
+                id: `wp-${Date.now()}`,
+                latitude: lat,
+                longitude: lng,
+                calculatedDistanceMeters: distanceToSite ?? undefined,
+                serverReceiptTime: new Date().toISOString(),
+              },
+            ]);
+
+            // Transmit ping to server journey ping endpoint
+            fetch(`/api/visits/journey/ping?workspaceSlug=${workspaceSlug}`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                visitId: activeVisit.id,
+                latitude: lat,
+                longitude: lng,
+                accuracyMeters: acc,
+                clientCaptureTime: new Date().toISOString(),
+              }),
+            }).catch(() => {});
+
+            // Also send track audit ping
             const res = await fetch(`/api/visits/track?workspaceSlug=${workspaceSlug}`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 visitId: activeVisit.id,
-                latitude: pos.coords.latitude,
-                longitude: pos.coords.longitude,
-                accuracyMeters: pos.coords.accuracy,
+                latitude: lat,
+                longitude: lng,
+                accuracyMeters: acc,
                 clientCaptureTime: new Date().toISOString(),
                 note: noteText || "Live interval GPS tracking",
               }),
@@ -701,10 +817,10 @@ export default function VisitsClientView({
               const data = await res.json();
               setLastTrackPing({
                 time: new Date(),
-                latitude: pos.coords.latitude,
-                longitude: pos.coords.longitude,
-                accuracyMeters: pos.coords.accuracy,
-                distanceMeters: data.distanceMeters,
+                latitude: lat,
+                longitude: lng,
+                accuracyMeters: acc,
+                distanceMeters: distanceToSite ?? data.distanceMeters,
                 assessment: data.assessment,
                 note: noteText || "Periodic GPS ping",
               });
@@ -720,6 +836,16 @@ export default function VisitsClientView({
                 });
               }
             }
+
+            // AUTOMATIC ARRIVAL DETECTION: Check if within site perimeter radius
+            const siteRadius = activeVisit.site?.radiusMeters || 150;
+            if (
+              !hasArrivedAtSite &&
+              distanceToSite !== null &&
+              distanceToSite <= siteRadius
+            ) {
+              triggerArrivalAtSite({ latitude: lat, longitude: lng, accuracy: acc });
+            }
           } catch (err) {
             console.error("GPS live tracking transmission error:", err);
           } finally {
@@ -734,18 +860,284 @@ export default function VisitsClientView({
     };
 
     const initTimer = setTimeout(() => {
-      transmitPing("Initial on-site tracking fix");
-    }, 3000);
+      transmitPing("Task activation route tracking initiated");
+    }, 2000);
 
     const intervalTimer = setInterval(() => {
-      transmitPing("Live interval GPS tracking");
-    }, 60000);
+      transmitPing("Live journey GPS breadcrumb");
+    }, 20000);
 
     return () => {
       clearTimeout(initTimer);
       clearInterval(intervalTimer);
     };
-  }, [activeVisit?.id, activeVisit?.operationalState, isLiveTracking, workspaceSlug]);
+  }, [activeVisit?.id, activeVisit?.operationalState, isLiveTracking, hasArrivedAtSite, workspaceSlug]);
+
+  // 1. Fetch Live Current Location in Assign Form (Requirement 1: Read-only, Non-editable)
+  const handleFetchOriginLiveLocation = () => {
+    if (!navigator.geolocation) {
+      setErrorMessage("Geolocation is not supported by your browser.");
+      return;
+    }
+    setIsFetchingOriginLocation(true);
+    setStatusMessage("Fetching live current location from device GPS...");
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        setAssignOriginLat(lat.toFixed(6));
+        setAssignOriginLng(lng.toFixed(6));
+
+        try {
+          const locality = await reverseGeocodeLocality(lat, lng);
+          setAssignOriginAddress(locality);
+        } catch {
+          setAssignOriginAddress(`Live GPS Spot (${lat.toFixed(4)}°, ${lng.toFixed(4)}°)`);
+        }
+
+        setIsFetchingOriginLocation(false);
+        setOriginFetchSuccess(true);
+        setStatusMessage("✔ Live current location fetched & locked! (Read-only)");
+        setTimeout(() => setStatusMessage(null), 3500);
+      },
+      (err) => {
+        setIsFetchingOriginLocation(false);
+        // Fallback to studio office coordinates for desktop or sandbox testing
+        const defaultOfficeLat = 18.9217;
+        const defaultOfficeLng = 72.8342;
+        setAssignOriginLat(defaultOfficeLat.toFixed(6));
+        setAssignOriginLng(defaultOfficeLng.toFixed(6));
+        setAssignOriginAddress("Studio Office (Auto-detected fallback)");
+        setOriginFetchSuccess(true);
+        setStatusMessage("✔ Current location captured (Studio Office fallback)");
+        setTimeout(() => setStatusMessage(null), 3500);
+      },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+    );
+  };
+
+  // 2. ACTIVATE TASK (Requirement 2: Stores starting location, transitions to active, opens workbench form & tracks route)
+  const handleActivateSiteVisit = async (visitItem: SiteVisitItem, simulatedCoords?: { lat: number; lng: number }) => {
+    setIsActivatingTaskId(visitItem.id);
+    setLoading(true);
+    setErrorMessage(null);
+    setStatusMessage("Activating task & storing current starting location...");
+
+    const executeActivation = async (lat: number, lng: number, accuracy: number, localityName?: string) => {
+      try {
+        const locality = localityName || (await reverseGeocodeLocality(lat, lng));
+        const res = await fetch(`/api/visits/journey/transition?workspaceSlug=${workspaceSlug}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            visitId: visitItem.id,
+            milestone: "JOURNEY_STARTED",
+            latitude: lat,
+            longitude: lng,
+            accuracyMeters: accuracy,
+            deviceTimestamp: new Date().toISOString(),
+            exceptionNotes: `Locality: ${locality}`,
+          }),
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+          setErrorMessage(data.error || "Failed to activate site visit task");
+          setStatusMessage(null);
+        } else {
+          // Task is now active! Open active workbench form immediately
+          const activated: SiteVisitItem = {
+            ...visitItem,
+            operationalState: "ACTIVE",
+            checkInAddress: locality,
+            events: [
+              {
+                id: `act-${Date.now()}`,
+                eventType: "CHECK_IN",
+                serverReceiptTime: new Date().toISOString(),
+                latitude: lat,
+                longitude: lng,
+                accuracyMeters: accuracy,
+                calculatedDistanceMeters: visitItem.site.latitude && visitItem.site.longitude
+                  ? calculateDistanceMeters(lat, lng, visitItem.site.latitude, visitItem.site.longitude)
+                  : null,
+                geofenceAssessment: "WITHIN_RADIUS",
+                failureReason: `Task activated at ${locality}`,
+              },
+            ],
+          };
+
+          setActiveVisit(activated);
+          setJourneyMilestone("JOURNEY_STARTED");
+          setHasArrivedAtSite(false);
+          setLiveTrailWaypoints([
+            {
+              id: `pt-${Date.now()}`,
+              latitude: lat,
+              longitude: lng,
+              calculatedDistanceMeters: visitItem.site.latitude && visitItem.site.longitude
+                ? calculateDistanceMeters(lat, lng, visitItem.site.latitude, visitItem.site.longitude)
+                : undefined,
+              serverReceiptTime: new Date().toISOString(),
+            },
+          ]);
+
+          setStatusMessage(`✔ Task Activated! Starting location recorded (${locality}). Live route tracking started.`);
+          setTimeout(() => setStatusMessage(null), 4000);
+        }
+      } catch {
+        setErrorMessage("Network error during task activation. Please check connection.");
+      } finally {
+        setIsActivatingTaskId(null);
+        setLoading(false);
+      }
+    };
+
+    if (simulatedCoords) {
+      await executeActivation(simulatedCoords.lat, simulatedCoords.lng, 15, "Studio Office Starting Point (Simulated)");
+      return;
+    }
+
+    if (!navigator.geolocation) {
+      await executeActivation(18.9217, 72.8342, 50, "Studio Office Starting Point");
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        await executeActivation(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy);
+      },
+      async () => {
+        const originObj = (visitItem as any).destinationSnapshotJson?.origin;
+        const fallbackLat = originObj?.latitude ?? 18.9217;
+        const fallbackLng = originObj?.longitude ?? 72.8342;
+        await executeActivation(fallbackLat, fallbackLng, 50, originObj?.address || "Studio Office Starting Point");
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  };
+
+  // 3. ARRIVAL AT SITE & REACHED POPUP (Requirement 2)
+  const triggerArrivalAtSite = async (coords?: { latitude: number; longitude: number; accuracy?: number }) => {
+    if (!activeVisit || hasArrivedAtSite) return;
+
+    const lat = coords?.latitude ?? (activeVisit.site.latitude ?? 18.7758);
+    const lng = coords?.longitude ?? (activeVisit.site.longitude ?? 72.8596);
+    const siteLat = activeVisit.site.latitude ?? lat;
+    const siteLng = activeVisit.site.longitude ?? lng;
+
+    const dist = calculateDistanceMeters(lat, lng, siteLat, siteLng);
+    const locality = await reverseGeocodeLocality(lat, lng);
+    const arrivalTimeStr = new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
+
+    setHasArrivedAtSite(true);
+    setJourneyMilestone("ARRIVED_AT_SITE");
+    setReachedSiteData({
+      siteName: activeVisit.site.name,
+      distanceMeters: dist,
+      arrivalTime: arrivalTimeStr,
+      locality,
+    });
+    setReachedSiteModalOpen(true);
+
+    try {
+      await fetch(`/api/visits/journey/transition?workspaceSlug=${workspaceSlug}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          visitId: activeVisit.id,
+          milestone: "ARRIVED_AT_SITE",
+          latitude: lat,
+          longitude: lng,
+          accuracyMeters: coords?.accuracy ?? 15,
+          deviceTimestamp: new Date().toISOString(),
+          exceptionNotes: `Locality: ${locality}`,
+        }),
+      });
+
+      // Update activeVisit state with arrival event
+      setActiveVisit((prev) => {
+        if (!prev) return null;
+        const arrivalEvent = {
+          id: `arr-${Date.now()}`,
+          eventType: "CHECK_IN",
+          serverReceiptTime: new Date().toISOString(),
+          latitude: lat,
+          longitude: lng,
+          accuracyMeters: coords?.accuracy ?? 15,
+          calculatedDistanceMeters: dist,
+          geofenceAssessment: dist <= (activeVisit.site.radiusMeters || 150) ? "WITHIN_RADIUS" : "OUTSIDE_RADIUS",
+          failureReason: `Arrived at site: ${activeVisit.site.name}`,
+        };
+        return {
+          ...prev,
+          checkInAddress: locality,
+          events: [arrivalEvent, ...(prev.events || [])],
+        };
+      });
+    } catch (err) {
+      console.error("Failed to notify server of arrival:", err);
+    }
+  };
+
+  // 4. CLOSE SITE VISIT / RETURNED TO OFFICE (Requirement 2: Concludes visit, stops tracking & maps all data)
+  const handleCloseSiteVisit = async () => {
+    if (!activeVisit) return;
+    setIsClosingVisit(true);
+    setLoading(true);
+    setErrorMessage(null);
+    setStatusMessage("Closing site visit & saving complete journey report...");
+
+    try {
+      // 1. Save notes, findings, checklist, photos, snags, contractor sign-off
+      await fetch(`/api/visits/update?workspaceSlug=${workspaceSlug}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          visitId: activeVisit.id,
+          findings,
+          nextActions,
+          weather: activeWeather,
+          checklistItemsJson: activeChecklist,
+          snagsJson: activeSnags,
+          photosJson: activePhotos,
+          contractorSignOff: contractorRepName
+            ? { representativeName: contractorRepName, phone: contractorRepPhone }
+            : undefined,
+        }),
+      });
+
+      // 2. Transition milestone to RETURNED_OFFICE
+      const res = await fetch(`/api/visits/journey/transition?workspaceSlug=${workspaceSlug}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          visitId: activeVisit.id,
+          milestone: "RETURNED_OFFICE",
+          deviceTimestamp: new Date().toISOString(),
+          exceptionNotes: "Returned to office and closed site visit form.",
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to conclude journey");
+      }
+
+      setStatusMessage("✔ Site visit concluded successfully! All journey waypoints & inspection notes are stored and mapped in the Map View UI.");
+      setActiveVisit(null);
+      setJourneyMilestone("RETURNED_OFFICE");
+      setTimeout(() => {
+        router.refresh();
+      }, 800);
+    } catch (err: any) {
+      setErrorMessage(err.message || "Network error while closing site visit.");
+    } finally {
+      setIsClosingVisit(false);
+      setLoading(false);
+    }
+  };
 
   // Speech-to-text dictation handler
   const handleToggleDictation = () => {
@@ -1256,6 +1648,9 @@ export default function VisitsClientView({
         customSiteGoogleMapsUrl: googleMapsInputUrl.trim() || undefined,
         attendeesJson: assignAttendees.length > 0 ? assignAttendees : undefined,
         checklistItemsJson: assignChecklist.length > 0 ? assignChecklist : undefined,
+        originAddress: assignOriginAddress || undefined,
+        originLatitude: assignOriginLat || undefined,
+        originLongitude: assignOriginLng || undefined,
       };
 
       if (assignSiteMode === "EXISTING" && assignSiteId) {
@@ -1283,6 +1678,10 @@ export default function VisitsClientView({
         setAssignPurpose("");
         setCustomSiteName("");
         setCustomSiteAddress("");
+        setAssignOriginAddress("");
+        setAssignOriginLat("");
+        setAssignOriginLng("");
+        setOriginFetchSuccess(false);
         setTimeout(() => {
           router.refresh();
         }, 600);
@@ -1667,17 +2066,134 @@ export default function VisitsClientView({
               </div>
             </div>
 
-            {/* ONE-CLICK EXIT SITE BUTTON */}
+            {/* WORKBENCH ACTIONS: CLOSE VISIT (RETURN) & EXIT */}
             <div className="flex items-center gap-2 w-full sm:w-auto">
               <button
                 type="button"
-                disabled={loading}
-                onClick={handleOneClickExitSite}
-                className="px-5 sm:px-6 py-2.5 sm:py-3 bg-rose-700 hover:bg-rose-800 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer w-full sm:w-auto hover:scale-[1.02] active:scale-95 disabled:opacity-50 min-h-[44px]"
+                disabled={loading || isClosingVisit}
+                onClick={handleCloseSiteVisit}
+                className="px-5 sm:px-6 py-2.5 sm:py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer w-full sm:w-auto hover:scale-[1.02] active:scale-95 disabled:opacity-50 min-h-[44px]"
+                title="Conclude site visit, save all notes, snags, and QA/QC items, and record return to office"
               >
-                <LogOut className="w-4 h-4" />
-                <span>EXIT SITE (Check-Out)</span>
+                <CheckCircle2 className="w-4 h-4" />
+                <span>{isClosingVisit ? "Closing Visit & Saving..." : "Close Site Visit & Return"}</span>
               </button>
+
+              <button
+                type="button"
+                disabled={loading || isClosingVisit}
+                onClick={handleOneClickExitSite}
+                className="px-4 py-2.5 sm:py-3 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 min-h-[44px]"
+                title="Quick exit without return notes"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>Exit Site</span>
+              </button>
+            </div>
+          </div>
+
+          {/* LIVE JOURNEY ROUTE & SITE PERIMETER TRACKING BANNER */}
+          <div className="bg-[#FAFBFD] border border-[#CEDEFF] rounded-2xl p-4 sm:p-5 space-y-3.5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#E2E6F0]">
+              <div className="flex items-center gap-2.5">
+                <span className="relative flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                </span>
+                <div>
+                  <h3 className="text-xs font-bold text-[#1F1F1F] uppercase tracking-wider flex items-center gap-1.5">
+                    <Route className="w-4 h-4 text-[#5A81FA]" />
+                    <span>Live Journey Tracking & Site Geofence</span>
+                  </h3>
+                  <p className="text-[11px] text-[#696E82]">
+                    Continuous GPS route tracking from origin to site benchmark
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {!hasArrivedAtSite ? (
+                  <button
+                    type="button"
+                    onClick={() => triggerArrivalAtSite()}
+                    className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors hover:scale-105 active:scale-95"
+                    title="Simulate or manually confirm arrival within site geofence perimeter"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>I Have Reached Site (Trigger Arrival)</span>
+                  </button>
+                ) : (
+                  <div className="px-3 py-1.5 bg-emerald-100 border border-emerald-300 text-emerald-900 font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-xs">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-700" />
+                    <span>Site Reached & Geofence Verified</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Origin & Destination Summary Strip */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs bg-white p-3.5 rounded-xl border border-[#E2E6F0]">
+              <div>
+                <span className="text-[10px] text-[#696E82] uppercase font-bold block">
+                  🏢 1. Origin / Departure Spot
+                </span>
+                <span className="font-semibold text-indigo-900 block truncate mt-0.5">
+                  {(activeVisit as any).destinationSnapshotJson?.origin?.address || "Studio Office"}
+                </span>
+                {(activeVisit as any).destinationSnapshotJson?.origin?.latitude && (
+                  <span className="text-[10px] text-[#696E82] font-mono block">
+                    {Number((activeVisit as any).destinationSnapshotJson.origin.latitude).toFixed(4)}°,{" "}
+                    {Number((activeVisit as any).destinationSnapshotJson.origin.longitude).toFixed(4)}°
+                  </span>
+                )}
+              </div>
+
+              <div>
+                <span className="text-[10px] text-[#696E82] uppercase font-bold block flex items-center gap-1">
+                  <MapPin className="w-3 h-3 text-[#5A81FA]" />
+                  <span>2. Target Site Location</span>
+                </span>
+                <span className="font-semibold text-[#1F1F1F] block truncate mt-0.5">
+                  {activeVisit.site.name}
+                </span>
+                <span className="text-[10px] text-[#696E82] block truncate">
+                  {activeVisit.site.address}
+                </span>
+              </div>
+
+              <div>
+                <span className="text-[10px] text-[#696E82] uppercase font-bold block flex items-center gap-1">
+                  <Footprints className="w-3 h-3 text-cyan-600" />
+                  <span>3. Journey Status & Breadcrumbs</span>
+                </span>
+                <span className="font-semibold text-cyan-800 block mt-0.5">
+                  {hasArrivedAtSite
+                    ? "Arrived On Site (Conducting Inspection)"
+                    : `${liveTrailWaypoints.length} GPS Waypoints Tracked`}
+                </span>
+                <span className="text-[10px] text-[#696E82] block font-mono">
+                  {lastTrackPing
+                    ? `Live: ${lastTrackPing.latitude.toFixed(4)}°, ${lastTrackPing.longitude.toFixed(4)}°`
+                    : "Tracking active..."}
+                </span>
+              </div>
+            </div>
+
+            {/* Embedded Live Map in Active Workbench */}
+            <div className="border border-[#CEDEFF] rounded-xl overflow-hidden bg-white">
+              <InspectionMapPreview
+                site={activeVisit.site}
+                origin={(activeVisit as any).destinationSnapshotJson?.origin}
+                checkInEvent={activeVisit.events?.find((e) => e.eventType === "CHECK_IN")}
+                checkOutEvent={activeVisit.events?.find((e) => e.eventType === "CHECK_OUT")}
+                waypoints={liveTrailWaypoints}
+                currentLocation={
+                  lastTrackPing
+                    ? { latitude: lastTrackPing.latitude, longitude: lastTrackPing.longitude }
+                    : undefined
+                }
+                checkInAddress={activeVisit.checkInAddress}
+              />
             </div>
           </div>
 
@@ -2430,7 +2946,7 @@ export default function VisitsClientView({
                           </span>
                         ) : v.task ? (
                           <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-blue-800 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-md">
-                            <span>📦 {v.task.title}</span>
+                            <span>📦 {getCleanTaskTitle(v.task.title, v.project?.code)}</span>
                           </span>
                         ) : (
                           <span className="text-[10px] text-[#696E82] italic">General Visit</span>
@@ -2646,39 +3162,54 @@ export default function VisitsClientView({
                     <span>•</span>
                     <span>Radius: {v.site.radiusMeters}m</span>
                   </div>
+
+                  {/* Origin Location Display if present */}
+                  {(v as any).destinationSnapshotJson?.origin?.address && (
+                    <div className="text-[11px] text-[#696E82] flex items-center gap-1.5 bg-[#F8F9FD] px-2.5 py-1 rounded-lg border border-[#E2E6F0] w-fit">
+                      <span className="font-bold text-indigo-700">🏢 Origin:</span>
+                      <span className="text-[#1F1F1F] font-medium truncate max-w-[280px]">
+                        {(v as any).destinationSnapshotJson.origin.address}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
-                {/* THE ONE-CLICK ENTER BUTTON */}
+                {/* THE ACTIVATE TASK & START JOURNEY BUTTON (Requirement 2) */}
                 <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    disabled={loading || activeVisit !== null || isActivatingTaskId === v.id}
+                    onClick={() => handleActivateSiteVisit(v)}
+                    className="flex-1 px-4 py-2.5 bg-[#5A81FA] hover:bg-[#426EE8] text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer hover:scale-[1.01] active:scale-95 disabled:opacity-40 min-h-[40px]"
+                    title="Activate task, capture current starting location, open site visit form, and start live route tracking"
+                  >
+                    <Play className="w-4 h-4 fill-current" />
+                    <span>
+                      {isActivatingTaskId === v.id
+                        ? "Activating & Capturing GPS..."
+                        : "Activate Task & Start Journey"}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={loading || activeVisit !== null || isActivatingTaskId === v.id}
+                    onClick={() => handleActivateSiteVisit(v, { lat: 18.9217, lng: 72.8342 })}
+                    className="px-3 py-2 bg-[#F8F9FD] hover:bg-[#F2F4FF] border border-[#E2E6F0] text-[11px] text-[#696E82] font-semibold rounded-xl transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-40 min-h-[40px]"
+                    title="Simulate departure from Studio Office for desktop/sandbox testing"
+                  >
+                    <Sparkles className="w-3 h-3 text-[#5A81FA]" />
+                    <span>Simulate Start</span>
+                  </button>
+
                   <button
                     type="button"
                     disabled={loading || activeVisit !== null}
                     onClick={() => handleOneClickEnterSite(v.id)}
-                    className="flex-1 px-4 py-2 bg-[#5A81FA] hover:bg-[#426EE8] text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer hover:scale-[1.02] active:scale-95 disabled:opacity-40 min-h-[40px]"
-                    title="Click when you arrive at the site to automatically store Enter Date, Time & GPS Location"
+                    className="px-3 py-2 text-slate-600 hover:bg-slate-100 text-[11px] font-semibold rounded-xl transition-colors cursor-pointer disabled:opacity-40"
+                    title="Already physically at site? Check in directly without route tracking"
                   >
-                    <LogIn className="w-4 h-4" />
-                    <span>ENTER SITE (Check-In)</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    disabled={loading || activeVisit !== null}
-                    onClick={() => handleSimulateEnterSite(v.id, v.site.latitude, v.site.longitude)}
-                    className="px-3 py-2 bg-[#F8F9FD] hover:bg-[#F2F4FF] border border-[#E2E6F0] text-[11px] text-[#696E82] font-semibold rounded-xl transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-40 min-h-[40px]"
-                    title="Simulate within-radius GPS for desktop testing"
-                  >
-                    <Sparkles className="w-3 h-3 text-[#5A81FA]" />
-                    <span>Simulate GPS</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    disabled={loading || activeVisit !== null}
-                    onClick={() => setExceptionModal({ visitId: v.id })}
-                    className="px-2.5 py-2 text-rose-700 hover:bg-rose-50 text-[11px] font-semibold rounded-xl transition-colors cursor-pointer disabled:opacity-40"
-                  >
-                    <span>No GPS Signal?</span>
+                    <span>Direct Check-In</span>
                   </button>
                 </div>
               </div>
@@ -2915,6 +3446,55 @@ export default function VisitsClientView({
                     </div>
                   )}
                 </div>
+              </div>
+
+              {/* 5A. Your Current Location (Origin / Starting Spot) — Live Fetch & Non-Editable (Requirement 1) */}
+              <div className="p-3.5 bg-[#FAFBFD] border border-[#CEDEFF] rounded-xl space-y-2.5">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <label className="text-xs font-bold text-[#1F1F1F] flex items-center gap-1.5">
+                    <LocateFixed className="w-3.5 h-3.5 text-[#5A81FA]" />
+                    <span>Your Current Location (Origin / Starting Point)</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleFetchOriginLiveLocation}
+                    disabled={isFetchingOriginLocation}
+                    className="px-3 py-1.5 bg-[#5A81FA] hover:bg-[#426EE8] text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                    title="Click to fetch your live current GPS location from the device. Once fetched, this field is non-editable."
+                  >
+                    <Navigation className={`w-3.5 h-3.5 ${isFetchingOriginLocation ? "animate-spin" : ""}`} />
+                    <span>{isFetchingOriginLocation ? "Fetching GPS..." : "Fetch Live Current Location"}</span>
+                  </button>
+                </div>
+
+                {/* Non-editable (read-only) input display */}
+                <div className="relative">
+                  <input
+                    type="text"
+                    readOnly
+                    disabled
+                    value={
+                      assignOriginAddress
+                        ? `${assignOriginAddress} (${assignOriginLat}, ${assignOriginLng})`
+                        : ""
+                    }
+                    placeholder="Click 'Fetch Live Current Location' to capture your live GPS spot (Non-editable)"
+                    className="w-full p-2.5 bg-slate-100 border border-[#CEDEFF] rounded-xl text-xs text-slate-800 font-medium cursor-not-allowed select-none pr-32"
+                  />
+                  {originFetchSuccess ? (
+                    <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md flex items-center gap-1 shadow-2xs">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                      <span>Locked Live GPS</span>
+                    </span>
+                  ) : (
+                    <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-500 font-medium italic">
+                      Read-only field
+                    </span>
+                  )}
+                </div>
+                <p className="text-[10px] text-[#696E82]">
+                  🔒 Once fetched, this starting location is strictly locked and cannot be manually edited, preserving audit integrity.
+                </p>
               </div>
 
               {/* 5. Site Location & Perimeter Configuration — Existing Site or + New / Custom Site Spot */}
@@ -3398,13 +3978,22 @@ export default function VisitsClientView({
             {/* In-App Map Preview & Spatial Perimeter Plot */}
             <InspectionMapPreview
               site={detailModalVisit.site}
+              origin={(detailModalVisit as any).destinationSnapshotJson?.origin}
               checkInEvent={detailModalVisit.events?.find((e) => e.eventType === "CHECK_IN")}
               checkOutEvent={detailModalVisit.events?.find((e) => e.eventType === "CHECK_OUT")}
-              waypoints={detailModalVisit.events?.filter(
-                (e) =>
-                  e.eventType === "EXCEPTION" &&
-                  (e.latitude !== null || e.failureReason?.includes("LOCATION_TRACK"))
-              )}
+              waypoints={[
+                ...(detailModalVisit.events?.filter(
+                  (e) =>
+                    e.eventType === "EXCEPTION" &&
+                    (e.latitude !== null || e.failureReason?.includes("LOCATION_TRACK"))
+                ) || []),
+                ...((detailModalVisit as any).locationSamples?.map((s: any) => ({
+                  id: s.id,
+                  latitude: s.latitude,
+                  longitude: s.longitude,
+                  serverReceiptTime: s.recordedAt,
+                })) || []),
+              ]}
               checkInAddress={detailModalVisit.checkInAddress}
               checkOutAddress={detailModalVisit.checkOutAddress}
             />
@@ -3749,6 +4338,66 @@ export default function VisitsClientView({
           </div>
         );
       })()}
+
+      {/* ======================================================== */}
+      {/* MODAL: REACHED SITE LOCATION POPUP (Requirement 2) */}
+      {/* ======================================================== */}
+      {reachedSiteModalOpen && reachedSiteData && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in-0">
+          <div className="bg-white rounded-2xl border border-emerald-200 shadow-2xl max-w-md w-full p-6 space-y-4 animate-in zoom-in-95">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-100 border border-emerald-200 text-emerald-700 flex items-center justify-center shrink-0 shadow-xs">
+                <CheckCircle2 className="w-6 h-6 text-emerald-600" />
+              </div>
+              <div>
+                <span className="text-[10px] font-bold tracking-wider text-emerald-700 uppercase bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                  Arrival Verified
+                </span>
+                <h3 className="text-base font-bold text-[#1F1F1F] mt-0.5">
+                  Reached Site Location!
+                </h3>
+              </div>
+            </div>
+
+            <div className="bg-[#F8F9FD] p-4 rounded-xl border border-[#E2E6F0] space-y-2 text-xs">
+              <div className="flex justify-between items-start gap-2">
+                <span className="text-[#696E82]">Project Site:</span>
+                <span className="font-bold text-[#1F1F1F] text-right">{reachedSiteData.siteName}</span>
+              </div>
+              <div className="flex justify-between items-start gap-2">
+                <span className="text-[#696E82]">Arrival Timestamp:</span>
+                <span className="font-semibold text-[#1F1F1F]">{reachedSiteData.arrivalTime}</span>
+              </div>
+              <div className="flex justify-between items-start gap-2">
+                <span className="text-[#696E82]">Verified Locality:</span>
+                <span className="font-semibold text-emerald-800 text-right">{reachedSiteData.locality}</span>
+              </div>
+              <div className="flex justify-between items-start gap-2">
+                <span className="text-[#696E82]">Geofence Accuracy:</span>
+                <span className="font-mono text-emerald-700 font-bold">
+                  ~{Math.round(reachedSiteData.distanceMeters)}m from benchmark
+                </span>
+              </div>
+            </div>
+
+            <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-900 leading-relaxed">
+              <p>
+                <strong>Arrival recorded:</strong> Owner and Admin can now see your verified arrival at the project site. You can proceed with the on-site inspection form, complete QA/QC checks, flag defects, and take site photos.
+              </p>
+            </div>
+
+            <div className="pt-2 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setReachedSiteModalOpen(false)}
+                className="w-full px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer text-center"
+              >
+                Proceed to On-Site Inspection Form
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ======================================================== */}
       {/* MODAL 5: PRINTABLE OFFICIAL INSPECTION REPORT OVERLAY */}

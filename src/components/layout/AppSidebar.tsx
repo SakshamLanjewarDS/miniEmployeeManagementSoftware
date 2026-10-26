@@ -350,13 +350,6 @@ export function AppSidebar({ context }: AppSidebarProps) {
             isPermitted: true,
           },
           {
-            id: "visits",
-            label: "Site Visits & Issues",
-            href: `/w/${context.tenantSlug}/visits`,
-            icon: MapPin,
-            isPermitted: true,
-          },
-          {
             id: "templates",
             label: "Project Templates",
             href: `/w/${context.tenantSlug}/templates`,
@@ -500,6 +493,13 @@ export function AppSidebar({ context }: AppSidebarProps) {
     // Enterprise Payroll also matches /payroll/calculate and any nested payroll subroutes
     if (item.id === "payroll") {
       return pathname === item.href || pathname.startsWith(item.href + "/");
+    }
+
+    if (item.id === "tasks") {
+      return (
+        pathname === `/w/${context.tenantSlug}/tasks` ||
+        pathname.startsWith(`/w/${context.tenantSlug}/tasks/`)
+      );
     }
 
     // Precise segment-aware matching (e.g. /projects matches /projects and /projects/abc, but not /projects-other)

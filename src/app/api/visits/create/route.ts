@@ -37,6 +37,9 @@ export async function POST(req: NextRequest) {
       milestoneId,
       attendeesJson,
       checklistItemsJson,
+      originAddress,
+      originLatitude,
+      originLongitude,
     } = body;
 
     if (!projectId) {
@@ -75,6 +78,9 @@ export async function POST(req: NextRequest) {
       milestoneId: milestoneId || undefined,
       attendeesJson,
       checklistItemsJson,
+      originAddress: originAddress?.trim() || undefined,
+      originLatitude: originLatitude !== undefined && originLatitude !== null && originLatitude !== "" ? parseFloat(originLatitude) : undefined,
+      originLongitude: originLongitude !== undefined && originLongitude !== null && originLongitude !== "" ? parseFloat(originLongitude) : undefined,
     });
 
     return NextResponse.json({ success: true, visit });

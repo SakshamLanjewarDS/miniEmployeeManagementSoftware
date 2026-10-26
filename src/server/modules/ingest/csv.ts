@@ -28,6 +28,7 @@ export interface CSVParseOptions {
   batchType: "LEAVE" | "ATTENDANCE" | "BANK_DETAILS";
 }
 
+// shortcut: Synchronous regex formula escaping (ceiling: uploads up to 25MB / 10,000 rows in memory), upgrade: move CSV parser into streaming worker queue (e.g. BullMQ / Node streams) if single upload exceeds 50,000 rows
 /**
  * Strips potential CSV spreadsheet formula injection characters (=, +, -, @, \t, \r, \n, |, %)
  */

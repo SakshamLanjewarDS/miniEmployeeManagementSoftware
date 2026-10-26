@@ -31,7 +31,7 @@ export interface TaskGridProps {
   canDeleteTask: (task: any) => boolean;
 }
 
-export function TaskGrid({
+export const TaskGrid = React.memo(function TaskGrid({
   tasks,
   isLoading = false,
   isFilterActive = false,
@@ -171,4 +171,4 @@ export function TaskGrid({
       </div>
     </div>
   );
-}
+});

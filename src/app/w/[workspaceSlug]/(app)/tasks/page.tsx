@@ -1,41 +1,55 @@
 import React from "react";
 import { getCurrentTenantContext } from "@/server/auth/session";
 import { findTasks, getTaskDashboardMetrics } from "@/server/modules/tasks/repository";
-import { findProjects } from "@/server/modules/projects/repository";
 import { prisma } from "@/server/db/prisma";
 import {
   getCustomFieldDefinitions,
   getCustomFieldValues,
 } from "@/server/modules/custom-fields/repository";
-import TasksClientView from "./TasksClientView";
 import { compareTasksByWorkflow } from "@/components/tasks/task-utils";
+import { serializeForClient } from "@/server/utils/serialize";
+import StudioTasksHubView from "./StudioTasksHubView";
 
 interface TasksPageProps {
   params: Promise<{ workspaceSlug: string }>;
-  searchParams: Promise<{ filter?: string; view?: string; scope?: string; projectId?: string; assigneeId?: string }>;
+  searchParams: Promise<{
+    tab?: string;
+    filter?: string;
+    view?: string;
+    scope?: string;
+    projectId?: string;
+    assigneeId?: string;
+  }>;
 }
 
 export default async function TasksPage({ params, searchParams }: TasksPageProps) {
   const { workspaceSlug } = await params;
-  const { filter = "ALL", view = "grid", scope, projectId, assigneeId } = await searchParams;
+  const { tab = "tasks", filter = "ALL", view = "grid", scope, projectId, assigneeId } = await searchParams;
 
   const ctx = await getCurrentTenantContext(workspaceSlug);
   if (!ctx) return null;
 
   const isPrivileged = ctx.role === "OWNER" || ctx.role === "ADMIN";
-  // Scope selection: allows viewing all deliverables, deliverables assigned by me, or deliverables assigned to me
   const effectiveScope = scope || "all";
   const myTasksOnly = effectiveScope === "my";
+  const isVisitsTab = tab === "visits";
 
-  // Load all dashboard data in a single parallel batch for maximum speed
-  const [metrics, rawTasks, projects, members, upcomingVisit, customFieldDefinitions, customFieldValues] = await Promise.all([
-    getTaskDashboardMetrics(ctx, myTasksOnly),
-    findTasks(ctx, {
-      myTasksOnly,
-      filter: filter as any,
-      projectId,
-      assigneeId,
-    }),
+  const safeProjectSelect = {
+    select: {
+      id: true,
+      code: true,
+      name: true,
+    },
+  };
+
+  // 1. FAST COMMON DATA: Projects, members, and tab badge counters
+  const [
+    projects,
+    members,
+    activeVisitMinimal,
+    scheduledVisitsCount,
+    taskCountEstimate,
+  ] = await Promise.all([
     prisma.project.findMany({
       where: { tenantId: ctx.tenantId },
       select: {
@@ -83,223 +97,430 @@ export default async function TasksPage({ params, searchParams }: TasksPageProps
     prisma.siteVisit.findFirst({
       where: {
         tenantId: ctx.tenantId,
-        employeeId: ctx.membershipId,
-        operationalState: { in: ["SCHEDULED", "ACTIVE"] },
+        operationalState: "ACTIVE",
+        ...(isPrivileged
+          ? {}
+          : {
+              OR: [
+                { employeeId: ctx.membershipId },
+                { participants: { some: { membershipId: ctx.membershipId } } },
+              ],
+            }),
       },
-      include: {
-        site: true,
-        project: {
-          select: { id: true, code: true, name: true },
-        },
+      select: {
+        id: true,
+        operationalState: true,
       },
-      orderBy: { scheduledTime: "asc" },
     }),
-    getCustomFieldDefinitions(ctx, "TASK"),
-    getCustomFieldValues(ctx, "TASK"),
+    prisma.siteVisit.count({
+      where: {
+        tenantId: ctx.tenantId,
+        operationalState: "SCHEDULED",
+        ...(isPrivileged
+          ? {}
+          : {
+              OR: [
+                { employeeId: ctx.membershipId },
+                { participants: { some: { membershipId: ctx.membershipId } } },
+              ],
+            }),
+      },
+    }),
+    prisma.task.count({
+      where: {
+        tenantId: ctx.tenantId,
+        status: { not: "COMPLETED" },
+        ...(myTasksOnly ? { assignments: { some: { membershipId: ctx.membershipId } } } : {}),
+      },
+    }),
   ]);
 
-  // Serialize tasks to plain objects (convert Decimal estimatedHours and Dates to JSON-safe values)
-  const serializedTasks = rawTasks.map((t) => ({
-    ...t,
-    estimatedHours: t.estimatedHours !== null && t.estimatedHours !== undefined ? Number(t.estimatedHours) : null,
-    dueDate: t.dueDate ? t.dueDate.toISOString() : null,
-    startDate: t.startDate ? t.startDate.toISOString() : null,
-    completionDate: t.completionDate ? t.completionDate.toISOString() : null,
-    createdAt: t.createdAt.toISOString(),
-    updatedAt: t.updatedAt.toISOString(),
-    project: {
-      id: t.project.id,
-      code: t.project.code,
-      name: t.project.name,
-      projectType: (t.project as any).projectType ?? null,
-    },
-    phase: t.phase ? { id: t.phase.id, phaseName: t.phase.phaseName } : null,
-    reviewer: (t as any).reviewer
-      ? {
-          id: (t as any).reviewer.id,
-          user: { fullName: (t as any).reviewer.user.fullName },
-        }
-      : null,
-    assignments: ((t as any).assignments || []).map((a: any) => ({
-      id: a.id,
-      membershipId: a.membershipId,
-      acknowledgedAt: a.acknowledgedAt ? a.acknowledgedAt.toISOString() : null,
-      acknowledgedVersion: a.acknowledgedVersion,
-      isCompleted: a.isCompleted,
-      completedAt: a.completedAt ? a.completedAt.toISOString() : null,
-      memberName: a.membership?.user?.fullName || "Assigned Staff",
-      membership: a.membership
-        ? {
-            id: a.membership.id,
-            user: a.membership.user,
-            employee: a.membership.employee,
-          }
-        : null,
-    })),
-    submissions: ((t as any).submissions || []).map((s: any) => ({
-      id: s.id,
-      version: s.version,
-      summary: s.summary,
-      checklistTaskIds: Array.isArray(s.checklistTaskIds) ? s.checklistTaskIds : [],
-      criteriaSnapshot: s.criteriaSnapshot,
-      evidenceFiles: s.evidenceFiles,
-      evidenceLinks: Array.isArray(s.evidenceLinks)
-        ? s.evidenceLinks.map((el: any) =>
-            typeof el === "string"
-              ? { url: el, title: el }
-              : { url: el?.url || "", title: el?.title || el?.url || "" }
-          )
-        : [],
-      status: s.status,
-      reviewFeedback: s.reviewFeedback,
-      decidedAt: s.decidedAt ? s.decidedAt.toISOString() : null,
-      createdAt: s.createdAt.toISOString(),
-      submitterName: s.submitter?.user?.fullName || "Staff",
-      reviewerName: s.reviewer?.user?.fullName || null,
-    })),
-    extensionRequests: ((t as any).extensionRequests || []).map((er: any) => ({
-      id: er.id,
-      checklistItemId: er.checklistItemId,
-      itemTitle: er.checklistItem?.title || "Checklist Task",
-      requesterName: er.requester?.user?.fullName || "Staff",
-      currentDueDate: er.currentDueDate ? er.currentDueDate.toISOString() : null,
-      proposedDueDate: er.proposedDueDate ? er.proposedDueDate.toISOString() : null,
-      reason: er.reason,
-      status: er.status,
-      decisionReason: er.decisionReason,
-      decidedAt: er.decidedAt ? er.decidedAt.toISOString() : null,
-      createdAt: er.createdAt.toISOString(),
-    })),
-    clarifications: ((t as any).clarifications || []).map((c: any) => ({
-      id: c.id,
-      checklistItemId: c.checklistItemId,
-      question: c.question,
-      attachments: c.attachments,
-      authorName: c.author?.user?.fullName || "Staff",
-      createdAt: c.createdAt.toISOString(),
-      answers: (c.answers || []).map((ans: any) => ({
-        id: ans.id,
-        authorName: ans.author?.user?.fullName || "Leadership",
-        message: ans.message,
-        createdAt: ans.createdAt.toISOString(),
-      })),
-    })),
-    checklistItems: t.checklistItems.map((ci: any) => ({
-      id: ci.id,
-      title: ci.title,
-      description: ci.description || null,
-      acceptanceCriteria: ci.acceptanceCriteria || null,
-      isCompleted: ci.isCompleted,
-      sortOrder: ci.sortOrder,
-      priority: ci.priority,
-      status: ci.status,
-      dueDate: ci.dueDate ? ci.dueDate.toISOString() : null,
-      startedAt: ci.startedAt ? ci.startedAt.toISOString() : null,
-      completedAt: ci.completedAt ? ci.completedAt.toISOString() : null,
-      isBlocked: Boolean(ci.isBlocked),
-      blockerReason: ci.blockerReason || null,
-      blockerDetails: ci.blockerDetails || null,
-      prerequisiteItemId: ci.prerequisiteItemId || null,
-      prerequisiteItem: ci.prerequisiteItem
-        ? {
-            id: ci.prerequisiteItem.id,
-            title: ci.prerequisiteItem.title,
-            status: ci.prerequisiteItem.status,
-            isCompleted: ci.prerequisiteItem.isCompleted,
-          }
-        : null,
-      assignedMemberId: ci.assignedMemberId,
-      assignedMember: ci.assignedMember
-        ? {
-            id: ci.assignedMember.id,
-            user: ci.assignedMember.user,
-            employee: ci.assignedMember.employee,
-          }
-        : null,
-    })),
-    comments: t.comments.map((c) => ({
-      id: c.id,
-      content: c.content,
-      authorId: c.authorId,
-      createdAt: c.createdAt.toISOString(),
-    })),
-    activityHistory: (t as any).activityHistory?.map((ah: any) => ({
-      id: ah.id,
-      actorId: ah.actorId,
-      action: ah.action,
-      oldValue: ah.oldValue,
-      newValue: ah.newValue,
-      reason: ah.reason,
-      createdAt: ah.createdAt.toISOString(),
-    })) || [],
-    siteVisits: ((t as any).siteVisits || []).map((sv: any) => ({
-      id: sv.id,
-      purpose: sv.purpose,
-      operationalState: sv.operationalState,
-    })),
-    customFields: (customFieldValues && (customFieldValues as Record<string, any>)[t.id]) || {},
-  }));
+  // 2. CONDITIONALLY LOAD ACTIVE TAB DATA (Massive speed improvement & zero payload bloat)
+  let tasksProps: any = null;
+  let visitsProps: any = null;
+  let taskCount = taskCountEstimate;
 
-  // Initial sort strictly honoring the studio workflow priority:
-  // checking > ongoing > then others > at the end completed
-  serializedTasks.sort((a, b) => compareTasksByWorkflow(a, b, "DUE_DATE_ASC"));
+  if (!isVisitsTab) {
+    // --- LOAD STUDIO TASKS DATA ONLY ---
+    const [metrics, rawTasks, customFieldDefinitions, customFieldValues] = await Promise.all([
+      getTaskDashboardMetrics(ctx, myTasksOnly),
+      findTasks(ctx, {
+        myTasksOnly,
+        filter: filter as any,
+        projectId,
+        assigneeId,
+      }),
+      getCustomFieldDefinitions(ctx, "TASK"),
+      getCustomFieldValues(ctx, "TASK"),
+    ]);
+
+    taskCount = rawTasks.length;
+
+    // Serialize tasks to plain objects
+    const serializedTasks = rawTasks.map((t) => ({
+      ...t,
+      estimatedHours: t.estimatedHours !== null && t.estimatedHours !== undefined ? Number(t.estimatedHours) : null,
+      dueDate: t.dueDate ? t.dueDate.toISOString() : null,
+      startDate: t.startDate ? t.startDate.toISOString() : null,
+      completionDate: t.completionDate ? t.completionDate.toISOString() : null,
+      createdAt: t.createdAt.toISOString(),
+      updatedAt: t.updatedAt.toISOString(),
+      project: {
+        id: t.project.id,
+        code: t.project.code,
+        name: t.project.name,
+        projectType: (t.project as any).projectType ?? null,
+      },
+      phase: t.phase ? { id: t.phase.id, phaseName: t.phase.phaseName } : null,
+      reviewer: (t as any).reviewer
+        ? {
+            id: (t as any).reviewer.id,
+            user: { fullName: (t as any).reviewer.user.fullName },
+          }
+        : null,
+      assignments: ((t as any).assignments || []).map((a: any) => ({
+        id: a.id,
+        membershipId: a.membershipId,
+        acknowledgedAt: a.acknowledgedAt ? a.acknowledgedAt.toISOString() : null,
+        acknowledgedVersion: a.acknowledgedVersion,
+        isCompleted: a.isCompleted,
+        completedAt: a.completedAt ? a.completedAt.toISOString() : null,
+        memberName: a.membership?.user?.fullName || "Assigned Staff",
+        membership: a.membership
+          ? {
+              id: a.membership.id,
+              user: a.membership.user,
+              employee: a.membership.employee,
+            }
+          : null,
+      })),
+      submissions: ((t as any).submissions || []).map((s: any) => ({
+        id: s.id,
+        version: s.version,
+        summary: s.summary,
+        checklistTaskIds: Array.isArray(s.checklistTaskIds) ? s.checklistTaskIds : [],
+        criteriaSnapshot: s.criteriaSnapshot,
+        evidenceFiles: s.evidenceFiles,
+        evidenceLinks: Array.isArray(s.evidenceLinks)
+          ? s.evidenceLinks.map((el: any) =>
+              typeof el === "string"
+                ? { url: el, title: el }
+                : { url: el?.url || "", title: el?.title || el?.url || "" }
+            )
+          : [],
+        status: s.status,
+        reviewFeedback: s.reviewFeedback,
+        decidedAt: s.decidedAt ? s.decidedAt.toISOString() : null,
+        createdAt: s.createdAt.toISOString(),
+        submitterName: s.submitter?.user?.fullName || "Staff",
+        reviewerName: s.reviewer?.user?.fullName || null,
+      })),
+      extensionRequests: ((t as any).extensionRequests || []).map((er: any) => ({
+        id: er.id,
+        checklistItemId: er.checklistItemId,
+        itemTitle: er.checklistItem?.title || "Checklist Task",
+        requesterName: er.requester?.user?.fullName || "Staff",
+        currentDueDate: er.currentDueDate ? er.currentDueDate.toISOString() : null,
+        proposedDueDate: er.proposedDueDate ? er.proposedDueDate.toISOString() : null,
+        reason: er.reason,
+        status: er.status,
+        decisionReason: er.decisionReason,
+        decidedAt: er.decidedAt ? er.decidedAt.toISOString() : null,
+        createdAt: er.createdAt.toISOString(),
+      })),
+      clarifications: ((t as any).clarifications || []).map((c: any) => ({
+        id: c.id,
+        checklistItemId: c.checklistItemId,
+        question: c.question,
+        attachments: c.attachments,
+        authorName: c.author?.user?.fullName || "Staff",
+        createdAt: c.createdAt.toISOString(),
+        answers: (c.answers || []).map((ans: any) => ({
+          id: ans.id,
+          authorName: ans.author?.user?.fullName || "Leadership",
+          message: ans.message,
+          createdAt: ans.createdAt.toISOString(),
+        })),
+      })),
+      checklistItems: t.checklistItems.map((ci: any) => ({
+        id: ci.id,
+        title: ci.title,
+        description: ci.description || null,
+        acceptanceCriteria: ci.acceptanceCriteria || null,
+        isCompleted: ci.isCompleted,
+        sortOrder: ci.sortOrder,
+        priority: ci.priority,
+        status: ci.status,
+        dueDate: ci.dueDate ? ci.dueDate.toISOString() : null,
+        startedAt: ci.startedAt ? ci.startedAt.toISOString() : null,
+        completedAt: ci.completedAt ? ci.completedAt.toISOString() : null,
+        isBlocked: Boolean(ci.isBlocked),
+        blockerReason: ci.blockerReason || null,
+        blockerDetails: ci.blockerDetails || null,
+        prerequisiteItemId: ci.prerequisiteItemId || null,
+        prerequisiteItem: ci.prerequisiteItem
+          ? {
+              id: ci.prerequisiteItem.id,
+              title: ci.prerequisiteItem.title,
+              status: ci.prerequisiteItem.status,
+              isCompleted: ci.prerequisiteItem.isCompleted,
+            }
+          : null,
+        assignedMemberId: ci.assignedMemberId,
+        assignedMember: ci.assignedMember
+          ? {
+              id: ci.assignedMember.id,
+              user: ci.assignedMember.user,
+              employee: ci.assignedMember.employee,
+            }
+          : null,
+      })),
+      comments: t.comments.map((c) => ({
+        id: c.id,
+        content: c.content,
+        authorId: c.authorId,
+        createdAt: c.createdAt.toISOString(),
+      })),
+      activityHistory: (t as any).activityHistory?.map((ah: any) => ({
+        id: ah.id,
+        actorId: ah.actorId,
+        action: ah.action,
+        oldValue: ah.oldValue,
+        newValue: ah.newValue,
+        reason: ah.reason,
+        createdAt: ah.createdAt.toISOString(),
+      })) || [],
+      siteVisits: ((t as any).siteVisits || []).map((sv: any) => ({
+        id: sv.id,
+        purpose: sv.purpose,
+        operationalState: sv.operationalState,
+      })),
+      customFields: (customFieldValues && (customFieldValues as Record<string, any>)[t.id]) || {},
+    }));
+
+    // Initial sort strictly honoring studio workflow priority
+    serializedTasks.sort((a, b) => compareTasksByWorkflow(a, b, "DUE_DATE_ASC"));
+
+    tasksProps = {
+      initialTasks: serializedTasks,
+      projects: projects as any,
+      members: members as any,
+      workspaceSlug: ctx.tenantSlug,
+      currentUserId: ctx.userId,
+      currentMembershipId: ctx.membershipId,
+      userRole: ctx.role,
+      activeFilter: filter,
+      initialView: view,
+      currentScope: effectiveScope,
+      metrics,
+      contextUserFullName: ctx.userFullName,
+      workspaceTimezone: ctx.timezone,
+      initialCustomFields: (customFieldDefinitions || []) as any,
+      initialCustomValues: (customFieldValues || {}) as any,
+    };
+  } else {
+    // --- LOAD SITE VISITS DATA ONLY ---
+    const [
+      activeVisit,
+      scheduledVisits,
+      allVisits,
+      sites,
+      availableMilestones,
+      contractors,
+      consultants,
+      availableTasksSummary,
+    ] = await Promise.all([
+      // Active visit
+      prisma.siteVisit.findFirst({
+        where: {
+          tenantId: ctx.tenantId,
+          operationalState: "ACTIVE",
+          ...(isPrivileged
+            ? {}
+            : {
+                OR: [
+                  { employeeId: ctx.membershipId },
+                  { participants: { some: { membershipId: ctx.membershipId } } },
+                ],
+              }),
+        },
+        include: {
+          site: true,
+          project: safeProjectSelect,
+          events: {
+            orderBy: { serverReceiptTime: "desc" },
+            take: 25,
+          },
+          participants: {
+            include: {
+              membership: {
+                include: { user: true, employee: true },
+              },
+            },
+          },
+          locationSamples: {
+            orderBy: { clientCaptureTime: "asc" },
+            take: 35,
+          },
+        },
+        orderBy: { scheduledTime: "desc" },
+      }),
+
+      // Scheduled visits
+      prisma.siteVisit.findMany({
+        where: {
+          tenantId: ctx.tenantId,
+          operationalState: "SCHEDULED",
+          ...(isPrivileged
+            ? {}
+            : {
+                OR: [
+                  { employeeId: ctx.membershipId },
+                  { participants: { some: { membershipId: ctx.membershipId } } },
+                ],
+              }),
+        },
+        include: {
+          site: true,
+          project: safeProjectSelect,
+          participants: {
+            include: {
+              membership: {
+                include: { user: true, employee: true },
+              },
+            },
+          },
+        },
+        orderBy: { scheduledTime: "asc" },
+      }),
+
+      // Recent visits feed
+      prisma.siteVisit.findMany({
+        where: {
+          tenantId: ctx.tenantId,
+        },
+        include: {
+          site: true,
+          project: safeProjectSelect,
+          task: { select: { id: true, title: true, priority: true } },
+          milestone: { select: { id: true, title: true } },
+          employee: {
+            include: {
+              user: true,
+              employee: true,
+            },
+          },
+          events: {
+            orderBy: { serverReceiptTime: "asc" },
+            take: 20,
+          },
+          participants: {
+            include: {
+              membership: {
+                include: { user: true, employee: true },
+              },
+            },
+          },
+          locationSamples: {
+            orderBy: { clientCaptureTime: "asc" },
+            take: 35,
+          },
+        },
+        orderBy: { scheduledTime: "desc" },
+        take: 30,
+      }),
+
+      // Available sites
+      prisma.site.findMany({
+        where: { tenantId: ctx.tenantId, isActive: true },
+        include: { project: safeProjectSelect },
+      }),
+
+      // Active milestones
+      prisma.projectMilestone.findMany({
+        where: {
+          tenantId: ctx.tenantId,
+          status: "PENDING",
+        },
+        select: {
+          id: true,
+          projectId: true,
+          title: true,
+          targetDate: true,
+        },
+        orderBy: { targetDate: "asc" },
+      }),
+
+      // Active contractors
+      prisma.contractor.findMany({
+        where: { tenantId: ctx.tenantId, isActive: true },
+        select: {
+          id: true,
+          name: true,
+          firmName: true,
+          trade: true,
+          contact: true,
+        },
+        orderBy: { name: "asc" },
+      }),
+
+      // Active consultants
+      prisma.consultant.findMany({
+        where: { tenantId: ctx.tenantId, isActive: true },
+        select: {
+          id: true,
+          name: true,
+          firmName: true,
+          discipline: true,
+          contact: true,
+        },
+        orderBy: { name: "asc" },
+      }),
+
+      // Lightweight task summaries for site visit assignment link
+      prisma.task.findMany({
+        where: { tenantId: ctx.tenantId, status: { not: "COMPLETED" } },
+        select: {
+          id: true,
+          projectId: true,
+          title: true,
+          priority: true,
+          status: true,
+        },
+        take: 80,
+      }),
+    ]);
+
+    visitsProps = {
+      workspaceSlug: ctx.tenantSlug,
+      currentMembershipId: ctx.membershipId,
+      userRole: ctx.role,
+      activeVisit: serializeForClient(activeVisit) as any,
+      scheduledVisits: serializeForClient(scheduledVisits) as any,
+      allVisits: serializeForClient(allVisits) as any,
+      availableSites: serializeForClient(sites) as any,
+      availableProjects: serializeForClient(projects) as any,
+      teamMembers: serializeForClient(members) as any,
+      availableTasks: serializeForClient(availableTasksSummary) as any,
+      availableMilestones: serializeForClient(availableMilestones) as any,
+      contractors: serializeForClient(contractors.map((c) => ({ ...c, phone: c.contact }))) as any,
+      consultants: serializeForClient(consultants.map((c) => ({ ...c, phone: c.contact }))) as any,
+    };
+  }
 
   return (
-    <div className="space-y-6">
-      {/* Top Banner: Upcoming Visit Quick Action */}
-      {upcomingVisit && (
-        <div className="bg-[#F2F4FF] border border-[#CEDEFF] rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
-          <div className="flex items-start gap-3">
-            <div className="p-2.5 bg-[#5A81FA] text-white rounded-xl shrink-0 mt-0.5">
-              <span className="type-badge font-bold">Visit</span>
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="type-metadata font-semibold text-[#5A81FA]">
-                  {upcomingVisit.operationalState === "ACTIVE" ? "🟢 Currently active visit" : "⏰ Upcoming scheduled visit"}
-                </span>
-                <span className="type-helper text-[#696E82]">•</span>
-                <span className="type-metadata font-semibold text-[#1F1F1F] font-mono">{upcomingVisit.project.code}</span>
-              </div>
-              <h2 className="type-card-title text-[#1F1F1F] mt-0.5">
-                {upcomingVisit.purpose}
-              </h2>
-              <p className="type-body-compact text-[#696E82] mt-0.5">
-                Site: {upcomingVisit.site.name} — {upcomingVisit.site.address}
-              </p>
-            </div>
-          </div>
-
-          <a
-            href={`/w/${ctx.tenantSlug}/visits`}
-            className="px-4 py-2 bg-[#5A81FA] hover:bg-[#426EE8] text-white type-button-label rounded-xl shadow-xs transition-all text-center shrink-0"
-          >
-            {upcomingVisit.operationalState === "ACTIVE" ? "Go to active visit (check out) →" : "Check in at site →"}
-          </a>
-        </div>
-      )}
-
-
-
-      {/* Interactive Client Component */}
-      <TasksClientView
-        initialTasks={serializedTasks as any}
-        projects={projects as any}
-        members={members as any}
-        workspaceSlug={ctx.tenantSlug}
-        currentUserId={ctx.userId}
-        currentMembershipId={ctx.membershipId}
-        userRole={ctx.role}
-        activeFilter={filter}
-        initialView={view}
-        currentScope={effectiveScope}
-        metrics={metrics}
-        contextUserFullName={ctx.userFullName}
-        workspaceTimezone={ctx.timezone}
-        initialCustomFields={(customFieldDefinitions || []) as any}
-        initialCustomValues={(customFieldValues || {}) as any}
-      />
-    </div>
+    <StudioTasksHubView
+      initialTab={isVisitsTab ? "visits" : "tasks"}
+      workspaceSlug={ctx.tenantSlug}
+      userRole={ctx.role}
+      currentMembershipId={ctx.membershipId}
+      contextUserFullName={ctx.userFullName}
+      workspaceTimezone={ctx.timezone}
+      tasksProps={tasksProps}
+      visitsProps={visitsProps}
+      taskCount={taskCount}
+      scheduledVisitsCount={scheduledVisitsCount}
+      activeVisitCount={activeVisitMinimal ? 1 : 0}
+    />
   );
 }
-

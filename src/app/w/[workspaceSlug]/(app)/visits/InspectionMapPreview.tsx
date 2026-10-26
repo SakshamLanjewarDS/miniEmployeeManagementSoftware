@@ -49,8 +49,19 @@ interface MapPreviewProps {
   }>;
   checkInAddress?: string | null;
   checkOutAddress?: string | null;
+  origin?: {
+    address?: string | null;
+    latitude: number | null;
+    longitude: number | null;
+  } | null;
+  currentLocation?: {
+    latitude: number | null;
+    longitude: number | null;
+    accuracyMeters?: number | null;
+  } | null;
 }
 
+// shortcut: Equirectangular Euclidean projection approximation (ceiling: accurate within 15km local sites, minor distortion on continent-wide scales), upgrade: integrate Proj4js / MapLibre GL vector tiles if site bounding box spans across distinct UTM geographic zones
 // Convert latitude and longitude offset to approximate meters (equirectangular projection)
 function coordsToMetersOffset(
   refLat: number,
@@ -65,13 +76,15 @@ function coordsToMetersOffset(
   return { x: lngDist, y: -latDist }; // SVG y is down (South), positive lat is North
 }
 
-export default function InspectionMapPreview({
+export default React.memo(function InspectionMapPreview({
   site,
   checkInEvent,
   checkOutEvent,
   waypoints = [],
   checkInAddress,
   checkOutAddress,
+  origin,
+  currentLocation,
 }: MapPreviewProps) {
   const [viewMode, setViewMode] = useState<"VECTOR" | "OSM">("VECTOR");
 
@@ -85,7 +98,7 @@ export default function InspectionMapPreview({
   }, [waypoints]);
 
   // Compute SVG plot dimensions and scale
-  const { plotRadius, maxMeters, checkInPos, checkOutPos, waypointPositions, svgSize } =
+  const { plotRadius, maxMeters, checkInPos, checkOutPos, originPos, currentPos, waypointPositions, svgSize } =
     useMemo(() => {
       const size = 380;
       const center = size / 2;
@@ -98,13 +111,27 @@ export default function InspectionMapPreview({
       if (checkOutEvent?.calculatedDistanceMeters) {
         maxDist = Math.max(maxDist, checkOutEvent.calculatedDistanceMeters * 1.25);
       }
+      if (origin?.latitude && origin?.longitude) {
+        const offset = coordsToMetersOffset(siteLat, siteLng, origin.latitude, origin.longitude);
+        const dist = Math.sqrt(offset.x * offset.x + offset.y * offset.y);
+        maxDist = Math.max(maxDist, dist * 1.15);
+      }
+      if (currentLocation?.latitude && currentLocation?.longitude) {
+        const offset = coordsToMetersOffset(siteLat, siteLng, currentLocation.latitude, currentLocation.longitude);
+        const dist = Math.sqrt(offset.x * offset.x + offset.y * offset.y);
+        maxDist = Math.max(maxDist, dist * 1.15);
+      }
       validWaypoints.forEach((wp) => {
         if (wp.calculatedDistanceMeters) {
           maxDist = Math.max(maxDist, wp.calculatedDistanceMeters * 1.25);
+        } else if (wp.latitude && wp.longitude) {
+          const offset = coordsToMetersOffset(siteLat, siteLng, wp.latitude, wp.longitude);
+          const dist = Math.sqrt(offset.x * offset.x + offset.y * offset.y);
+          maxDist = Math.max(maxDist, dist * 1.15);
         }
       });
 
-      // Scale factor: maxDist meters maps to (center - 30) pixels
+      // Scale factor: maxDist meters maps to (center - 35) pixels
       const usableRadius = center - 35;
       const scale = usableRadius / Math.max(maxDist, 100);
 
@@ -139,6 +166,24 @@ export default function InspectionMapPreview({
         };
       }
 
+      let oPos: { x: number; y: number } | null = null;
+      if (origin?.latitude && origin?.longitude) {
+        const offset = coordsToMetersOffset(siteLat, siteLng, origin.latitude, origin.longitude);
+        oPos = {
+          x: Math.min(Math.max(center + offset.x * scale, 15), size - 15),
+          y: Math.min(Math.max(center + offset.y * scale, 15), size - 15),
+        };
+      }
+
+      let cPos: { x: number; y: number } | null = null;
+      if (currentLocation?.latitude && currentLocation?.longitude) {
+        const offset = coordsToMetersOffset(siteLat, siteLng, currentLocation.latitude, currentLocation.longitude);
+        cPos = {
+          x: Math.min(Math.max(center + offset.x * scale, 15), size - 15),
+          y: Math.min(Math.max(center + offset.y * scale, 15), size - 15),
+        };
+      }
+
       const wpPositions = validWaypoints.map((wp) => {
         const offset = coordsToMetersOffset(siteLat, siteLng, wp.latitude!, wp.longitude!);
         return {
@@ -156,9 +201,11 @@ export default function InspectionMapPreview({
         maxMeters: maxDist,
         checkInPos: inPos,
         checkOutPos: outPos,
+        originPos: oPos,
+        currentPos: cPos,
         waypointPositions: wpPositions,
       };
-    }, [radius, checkInEvent, checkOutEvent, validWaypoints, siteLat, siteLng]);
+    }, [radius, checkInEvent, checkOutEvent, validWaypoints, siteLat, siteLng, origin, currentLocation]);
 
   // Distance deviation calculations
   const inDistance = checkInEvent?.calculatedDistanceMeters ?? null;
@@ -252,10 +299,24 @@ export default function InspectionMapPreview({
               <span className="w-2.5 h-2.5 rounded-full bg-[#5A81FA] ring-2 ring-[#5A81FA]/40" />
               <span>Site Center</span>
             </div>
-            <div className="flex items-center gap-1.5 font-medium">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-emerald-500/40" />
-              <span>Enter Pin</span>
-            </div>
+            {originPos && (
+              <div className="flex items-center gap-1.5 font-medium">
+                <span className="w-2.5 h-2.5 rounded-full bg-indigo-400 ring-2 ring-indigo-400/40" />
+                <span>Office / Origin</span>
+              </div>
+            )}
+            {checkInPos && (
+              <div className="flex items-center gap-1.5 font-medium">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-emerald-500/40" />
+                <span>Enter Pin (Site)</span>
+              </div>
+            )}
+            {currentPos && (
+              <div className="flex items-center gap-1.5 font-medium">
+                <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse ring-2 ring-cyan-400/40" />
+                <span>Live Location</span>
+              </div>
+            )}
             {checkOutPos && (
               <div className="flex items-center gap-1.5 font-medium">
                 <span className="w-2.5 h-2.5 rounded-full bg-rose-500 ring-2 ring-rose-500/40" />
@@ -321,26 +382,34 @@ export default function InspectionMapPreview({
               {radius}m PERIMETER
             </text>
 
-            {/* Trail Line: Connect Check-in -> Waypoints -> Check-out */}
-            {checkInPos && (
-              <path
-                d={(() => {
-                  let pathStr = `M ${checkInPos.x} ${checkInPos.y}`;
-                  waypointPositions.forEach((wp) => {
-                    pathStr += ` L ${wp.x} ${wp.y}`;
-                  });
-                  if (checkOutPos) {
-                    pathStr += ` L ${checkOutPos.x} ${checkOutPos.y}`;
-                  }
-                  return pathStr;
-                })()}
-                fill="none"
-                stroke="#60A5FA"
-                strokeWidth="2"
-                strokeDasharray="4 4"
-                opacity="0.85"
-              />
-            )}
+            {/* Full Journey Trail Line: Connect Origin -> Check-in / Waypoints -> Current / Check-out */}
+            {(() => {
+              const pointsToConnect: Array<{ x: number; y: number }> = [];
+              if (originPos) pointsToConnect.push(originPos);
+              if (checkInPos && (!originPos || Math.hypot(checkInPos.x - originPos.x, checkInPos.y - originPos.y) > 5)) {
+                pointsToConnect.push(checkInPos);
+              }
+              waypointPositions.forEach((wp) => pointsToConnect.push({ x: wp.x, y: wp.y }));
+              if (currentPos) pointsToConnect.push(currentPos);
+              if (checkOutPos) pointsToConnect.push(checkOutPos);
+
+              if (pointsToConnect.length >= 2) {
+                const pathStr = pointsToConnect.reduce((acc, p, idx) => {
+                  return idx === 0 ? `M ${p.x} ${p.y}` : `${acc} L ${p.x} ${p.y}`;
+                }, "");
+                return (
+                  <path
+                    d={pathStr}
+                    fill="none"
+                    stroke="#60A5FA"
+                    strokeWidth="2.5"
+                    strokeDasharray="4 4"
+                    opacity="0.9"
+                  />
+                );
+              }
+              return null;
+            })()}
 
             {/* Intermediate Waypoints */}
             {waypointPositions.map((wp, idx) => (
@@ -349,6 +418,24 @@ export default function InspectionMapPreview({
                 <circle cx={wp.x} cy={wp.y} r="7" fill="none" stroke="#FBBF24" strokeOpacity="0.4" />
               </g>
             ))}
+
+            {/* ORIGIN / OFFICE PIN */}
+            {originPos && (
+              <g transform={`translate(${originPos.x}, ${originPos.y})`}>
+                <circle r="12" fill="#818CF8" fillOpacity="0.25" />
+                <circle r="7" fill="#6366F1" stroke="#FFFFFF" strokeWidth="2" />
+                <text
+                  y="-14"
+                  textAnchor="middle"
+                  fill="#A5B4FC"
+                  fontSize="10"
+                  fontWeight="bold"
+                  filter="drop-shadow(0 1px 2px rgba(0,0,0,0.8))"
+                >
+                  🏢 Office / Origin
+                </text>
+              </g>
+            )}
 
             {/* SITE CENTROID BENCHMARK PIN */}
             <g transform={`translate(${svgSize / 2}, ${svgSize / 2})`}>
@@ -384,6 +471,24 @@ export default function InspectionMapPreview({
               </g>
             )}
 
+            {/* CURRENT LIVE LOCATION PIN */}
+            {currentPos && (
+              <g transform={`translate(${currentPos.x}, ${currentPos.y})`}>
+                <circle r="14" fill="#22D3EE" fillOpacity="0.3" className="animate-ping" />
+                <circle r="6" fill="#06B6D4" stroke="#FFFFFF" strokeWidth="2" />
+                <text
+                  y="18"
+                  textAnchor="middle"
+                  fill="#67E8F9"
+                  fontSize="10"
+                  fontWeight="bold"
+                  filter="drop-shadow(0 1px 2px rgba(0,0,0,0.8))"
+                >
+                  📡 Live GPS
+                </text>
+              </g>
+            )}
+
             {/* CHECK-OUT PIN */}
             {checkOutPos && (
               <g transform={`translate(${checkOutPos.x}, ${checkOutPos.y})`}>
@@ -402,6 +507,7 @@ export default function InspectionMapPreview({
               </g>
             )}
           </svg>
+
 
           {/* Scale bar in bottom right */}
           <div className="absolute bottom-3 right-3 bg-slate-900/80 border border-slate-700 px-2 py-0.5 rounded text-[10px] text-slate-300 font-mono">
@@ -519,4 +625,4 @@ export default function InspectionMapPreview({
       </div>
     </div>
   );
-}
+});

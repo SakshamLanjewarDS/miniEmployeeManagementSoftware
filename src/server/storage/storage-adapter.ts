@@ -5,6 +5,7 @@ import net from "net";
 import { prisma } from "../db/prisma";
 import { TenantContext, assertTenantAccess, ForbiddenException } from "../tenancy/context";
 
+// shortcut: Local filesystem volume storage (ceiling: single-host disk capacity, not replicated across distributed serverless nodes), upgrade: replace with S3/GCS presigned URL adapter when moving to containerized multi-node orchestration
 const BASE_STORAGE_DIR = path.join(process.cwd(), "storage", "uploads");
 
 // Allowed MIME types and extensions for architectural deliverables

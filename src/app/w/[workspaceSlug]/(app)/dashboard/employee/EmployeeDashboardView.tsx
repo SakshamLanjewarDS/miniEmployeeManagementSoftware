@@ -52,6 +52,7 @@ import { TaskPriorityBadge } from "@/components/tasks/TaskPriorityBadge";
 import { useStudioRealtime } from "@/components/realtime/useStudioRealtime";
 import { LiveSyncIndicator } from "@/components/realtime/LiveSyncIndicator";
 import { ReopenedTaskAlertModal } from "@/components/dashboard/ReopenedTaskAlertModal";
+import { getCleanTaskTitle } from "@/components/tasks/task-utils";
 
 interface EmployeeDashboardViewProps {
   data: EmployeeDashboardData;
@@ -1443,8 +1444,8 @@ export default function EmployeeDashboardView({
                         </span>
                         <TaskPriorityBadge priority={task.priority} size="sm" />
                       </div>
-                      <h4 className="text-xs font-bold text-slate-900 truncate" title={task.title}>
-                        {task.title}
+                      <h4 className="text-xs font-bold text-slate-900 truncate" title={getCleanTaskTitle(task.title, task.projectCode)}>
+                        {getCleanTaskTitle(task.title, task.projectCode)}
                       </h4>
                       <p className="text-[10px] text-slate-400">
                         {task.dueDate ? `Due: ${new Date(task.dueDate).toLocaleDateString()}` : "No deadline"}

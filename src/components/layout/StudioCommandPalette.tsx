@@ -105,11 +105,11 @@ export function StudioCommandPalette({ context }: StudioCommandPaletteProps) {
       },
       {
         id: "nav-visits",
-        title: "Site Visits & GPS Check-In",
+        title: "Site Visit Tasks & Fieldwork",
         category: "Navigation",
         icon: MapPin,
         shortcut: "G V",
-        href: `/w/${slug}/visits`,
+        href: `/w/${slug}/tasks?tab=visits`,
       },
       {
         id: "nav-drawings",
@@ -239,7 +239,7 @@ export function StudioCommandPalette({ context }: StudioCommandPaletteProps) {
         category: "Quick Actions",
         icon: MapPin,
         action: () => {
-          router.push(`/w/${slug}/visits?action=checkin`);
+          router.push(`/w/${slug}/tasks?tab=visits&action=checkin`);
         },
       },
       {

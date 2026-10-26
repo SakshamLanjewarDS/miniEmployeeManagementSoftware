@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { TaskStatusDropdown } from "./TaskStatusDropdown";
 import { AssigneeInfo } from "./TaskAssignees";
-import { sanitizeTaskDescription } from "./task-utils";
+import { sanitizeTaskDescription, getCleanTaskTitle } from "./task-utils";
 import { CustomFieldDefinition } from "@/server/modules/custom-fields/repository";
 
 export interface TaskCardProps {
@@ -161,7 +161,7 @@ function getWorkflowStatusConfig(key: WorkflowConceptKey): WorkflowStatusConfig 
   }
 }
 
-export function TaskCard({
+export const TaskCard = React.memo(function TaskCard({
   task,
   assignees = [],
   currentMembershipId,
@@ -517,12 +517,13 @@ export function TaskCard({
 
   const awaitingReviewCount = employeeSections.filter((emp) => emp.isAwaitingReview).length;
   const approvedCount = employeeSections.filter((emp) => emp.isApproved).length;
+  const displayTitle = getCleanTaskTitle(task.title, projectCode, projectName);
 
   return (
     <article
       className="task-card rounded-2xl bg-white border border-[#E2E6F0] hover:border-[#CBD5E1] p-3.5 sm:p-4 flex flex-col justify-between hover:shadow-[0_8px_20px_rgba(15,23,42,0.06)] transition-all duration-150 group relative min-w-0 gap-3 text-left virtual-render press-feedback"
       style={{ overflowWrap: "anywhere" }}
-      aria-label={`Deliverable: ${task.title}`}
+      aria-label={`Deliverable: ${displayTitle}`}
     >
       {/* ============================================================== */}
       {/* 1. HEADER: Project Badge & Discipline + Status Badges          */}
@@ -573,7 +574,7 @@ export function TaskCard({
           className="text-left w-full group/title cursor-pointer focus:outline-none"
         >
           <h3 className="type-card-title text-slate-900 group-hover/title:text-blue-600 transition-colors line-clamp-1 font-semibold leading-tight">
-            {task.title || "Untitled Deliverable"}
+            {displayTitle}
           </h3>
         </button>
 
@@ -806,4 +807,4 @@ export function TaskCard({
       </div>
     </article>
   );
-}
+});

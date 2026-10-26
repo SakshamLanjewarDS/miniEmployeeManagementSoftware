@@ -45,7 +45,9 @@ import { DynamicCardFields } from "@/components/custom-fields/DynamicCardFields"
 import { SearchableDropdown, SearchableSelect } from "@/components/ui/SearchableDropdown";
 import { MobileFilterDrawer } from "@/components/ui/MobileFilterDrawer";
 import { TaskGrid } from "@/components/tasks/TaskGrid";
-import { sanitizeTaskDescription, compareTasksByWorkflow, getTaskWorkflowRank } from "@/components/tasks/task-utils";
+import { TaskMetricsCards } from "@/components/tasks/TaskMetricsCards";
+import { TaskClarificationModal } from "@/components/tasks/TaskClarificationModal";
+import { sanitizeTaskDescription, compareTasksByWorkflow, getTaskWorkflowRank, getCleanTaskTitle } from "@/components/tasks/task-utils";
 import { CustomFieldDefinition } from "@/server/modules/custom-fields/repository";
 import {
   getAllTypologies,
@@ -347,7 +349,7 @@ export default function TasksClientView({
     () => {
       router.refresh();
     },
-    { intervalMs: 20000 }
+    { intervalMs: 60000, throttleMs: 30000 }
   );
 
   // Automatically open task details if taskId is present in query parameters
@@ -408,6 +410,23 @@ export default function TasksClientView({
   );
   const [taskSortBy, setTaskSortBy] = useState<string>("DUE_DATE_ASC");
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
+  // shortcut: Progressive chunk limit 24 items with Load More (ceiling: smooth DOM up to ~300 rendered cards), upgrade: switch to virtualized list windowing (@tanstack/react-virtual) if single studio column exceeds 500 tasks
+  const [displayLimit, setDisplayLimit] = useState(24);
+
+  // Progressive rendering: reset display limit when filters change
+  useEffect(() => {
+    setDisplayLimit(24);
+  }, [
+    searchQuery,
+    selectedProjectFilter,
+    selectedTypologyFilter,
+    selectedAssigneeFilter,
+    selectedPriorityFilter,
+    selectedDueDateCategory,
+    selectedStatusCategory,
+    taskSortBy,
+    currentScope,
+  ]);
 
   const activeFilterCount = useMemo(() => {
     let count = 0;
@@ -929,6 +948,10 @@ export default function TasksClientView({
     members,
   ]);
 
+  const displayedTasks = useMemo(() => {
+    return filteredTasks.slice(0, displayLimit);
+  }, [filteredTasks, displayLimit]);
+
   const handleScopeChange = (newScope: string) => {
     router.push(`/w/${workspaceSlug}/tasks?filter=${activeFilter}&view=${view}&scope=${newScope}`);
   };
@@ -1152,8 +1175,10 @@ export default function TasksClientView({
     const primaryAssigneeId = taskAssigneeIds[0];
     const targetAssignee = members.find((m) => m.id === primaryAssigneeId);
 
-    const generatedTitle = targetProj
-      ? `${targetProj.code} — Deliverable`
+    const generatedTitle = targetPhase
+      ? `${targetPhase.phaseName} Deliverable`
+      : targetProj
+      ? `${targetProj.name} Deliverable`
       : "Architectural Deliverable";
 
     const assignedNames = members
@@ -2577,114 +2602,14 @@ export default function TasksClientView({
         </div>
       </div>
 
-      {/* 2. SUMMARY METRIC CARDS */}
+      {/* 2. SUMMARY METRIC CARDS (Modularized & Memoized) */}
       {metrics && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
-          {/* Card 1: Due Today */}
-          <button
-            type="button"
-            suppressHydrationWarning
-            onClick={() => handleMetricCardClick("TODAY")}
-            className={`p-4 sm:p-5 rounded-2xl border text-left transition-all cursor-pointer shadow-2xs ${
-              selectedDueDateCategory === "TODAY"
-                ? "bg-[#F8F9FE] border-[#3562E8] ring-2 ring-[#3562E8]/20"
-                : "bg-white border-[#E2E6F0] hover:border-[#CEDEFF]"
-            }`}
-          >
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="type-kpi-label text-[#0B122B] font-medium">Due today</span>
-              <Calendar className="w-4 h-4 text-[#3562E8]" />
-            </div>
-            <div className="type-kpi-value text-[#0B122B] mt-1 tabular-nums">
-              {metrics.dueToday}
-            </div>
-            <p className="type-helper text-[#696E82] mt-1">Pending today</p>
-          </button>
-
-          {/* Card 2: Overdue */}
-          <button
-            type="button"
-            suppressHydrationWarning
-            onClick={() => handleMetricCardClick("OVERDUE")}
-            className={`p-4 sm:p-5 rounded-2xl border text-left transition-all cursor-pointer shadow-2xs ${
-              selectedDueDateCategory === "OVERDUE"
-                ? "bg-rose-50 border-rose-500 ring-2 ring-rose-500/20"
-                : "bg-white border-[#E2E6F0] hover:border-rose-200"
-            }`}
-          >
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="type-kpi-label text-rose-600 font-medium">Overdue</span>
-              <AlertTriangle className="w-4 h-4 text-rose-500" />
-            </div>
-            <div className="type-kpi-value text-[#0B122B] mt-1 tabular-nums">
-              {metrics.overdue}
-            </div>
-            <p className="type-helper text-rose-600/80 mt-1">Requires immediate attention</p>
-          </button>
-
-          {/* Card 3: In Progress */}
-          <button
-            type="button"
-            suppressHydrationWarning
-            onClick={() => handleMetricCardClick("IN_PROGRESS")}
-            className={`p-4 sm:p-5 rounded-2xl border text-left transition-all cursor-pointer shadow-2xs ${
-              selectedStatusCategory === "IN_PROGRESS"
-                ? "bg-[#F8F9FE] border-[#3562E8] ring-2 ring-[#3562E8]/20"
-                : "bg-white border-[#E2E6F0] hover:border-[#CEDEFF]"
-            }`}
-          >
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="type-kpi-label text-[#3562E8] font-medium">In progress</span>
-              <Play className="w-4 h-4 text-[#3562E8] fill-current" />
-            </div>
-            <div className="type-kpi-value text-[#0B122B] mt-1 tabular-nums">
-              {metrics.inProgress}
-            </div>
-            <p className="type-helper text-[#696E82] mt-1">Active studio drafting</p>
-          </button>
-
-          {/* Card 4: Waiting for Review */}
-          <button
-            type="button"
-            suppressHydrationWarning
-            onClick={() => handleMetricCardClick("WAITING_REVIEW")}
-            className={`p-4 sm:p-5 rounded-2xl border text-left transition-all cursor-pointer shadow-2xs ${
-              selectedStatusCategory === "WAITING_REVIEW"
-                ? "bg-purple-50 border-purple-500 ring-2 ring-purple-500/20"
-                : "bg-white border-[#E2E6F0] hover:border-purple-200"
-            }`}
-          >
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="type-kpi-label text-purple-700 font-medium">Waiting review</span>
-              <Clock className="w-4 h-4 text-purple-600" />
-            </div>
-            <div className="type-kpi-value text-[#0B122B] mt-1 tabular-nums">
-              {metrics.waitingReview}
-            </div>
-            <p className="type-helper text-[#696E82] mt-1">Submitted for approval</p>
-          </button>
-
-          {/* Card 5: Completed */}
-          <button
-            type="button"
-            suppressHydrationWarning
-            onClick={() => handleMetricCardClick("COMPLETED")}
-            className={`p-4 sm:p-5 rounded-2xl border text-left transition-all cursor-pointer shadow-2xs col-span-2 sm:col-span-1 ${
-              selectedStatusCategory === "COMPLETED"
-                ? "bg-emerald-50 border-emerald-500 ring-2 ring-emerald-500/20"
-                : "bg-white border-[#E2E6F0] hover:border-emerald-200"
-            }`}
-          >
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="type-kpi-label text-emerald-700 font-medium">Completed</span>
-              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-            </div>
-            <div className="type-kpi-value text-[#0B122B] mt-1 tabular-nums">
-              {metrics.completed}
-            </div>
-            <p className="type-helper text-emerald-700/80 mt-1">Approved deliverables</p>
-          </button>
-        </div>
+        <TaskMetricsCards
+          metrics={metrics}
+          selectedDueDateCategory={selectedDueDateCategory}
+          selectedStatusCategory={selectedStatusCategory}
+          onMetricClick={handleMetricCardClick}
+        />
       )}
 
       {/* Notifications */}
@@ -3285,32 +3210,59 @@ export default function TasksClientView({
 
       {/* 4. MAIN VIEW: GRID, LIST OR KANBAN */}
       {view === "grid" && (
-        <TaskGrid
-          tasks={filteredTasks}
-          isFilterActive={isFilterActive}
-          canAssignDeliverable={isPrivileged || true}
-          currentMembershipId={currentMembershipId}
-          isPrivileged={isPrivileged}
-          workspaceTimezone={workspaceTimezone}
-          customFields={customFields}
-          customValuesByTask={customValuesByTask}
-          loadingTaskId={loadingTaskId}
-          onOpenCreateTask={() => {
-            setCustomFieldValues({});
-            setIsCreateTaskModalOpen(true);
-          }}
-          onClearFilters={handleClearFilters}
-          onUpdateStatus={updateStatus}
-          onOpenDetails={(task, _assignmentId) => setDrawerTask(task)}
-          onEdit={(task) => openEditModal(task)}
-          onDelegate={(task) => openReassignModal(task)}
-          onDelete={(task) => setTaskToDelete(task)}
-          onRequestChanges={(task) => setChangeRequestModal({ taskId: task.id, title: task.title })}
-          onToggleChecklist={handleToggleChecklist}
-          getTaskAssignees={getTaskAssignees}
-          canEditTask={canEditTask}
-          canDeleteTask={canDeleteTask}
-        />
+        <div className="space-y-4">
+          <TaskGrid
+            tasks={displayedTasks}
+            isFilterActive={isFilterActive}
+            canAssignDeliverable={isPrivileged || true}
+            currentMembershipId={currentMembershipId}
+            isPrivileged={isPrivileged}
+            workspaceTimezone={workspaceTimezone}
+            customFields={customFields}
+            customValuesByTask={customValuesByTask}
+            loadingTaskId={loadingTaskId}
+            onOpenCreateTask={() => {
+              setCustomFieldValues({});
+              setIsCreateTaskModalOpen(true);
+            }}
+            onClearFilters={handleClearFilters}
+            onUpdateStatus={updateStatus}
+            onOpenDetails={(task, _assignmentId) => setDrawerTask(task)}
+            onEdit={(task) => openEditModal(task)}
+            onDelegate={(task) => openReassignModal(task)}
+            onDelete={(task) => setTaskToDelete(task)}
+            onRequestChanges={(task) => setChangeRequestModal({ taskId: task.id, title: task.title })}
+            onToggleChecklist={handleToggleChecklist}
+            getTaskAssignees={getTaskAssignees}
+            canEditTask={canEditTask}
+            canDeleteTask={canDeleteTask}
+          />
+
+          {filteredTasks.length > displayLimit && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 bg-white border border-[#E2E6F0] rounded-2xl shadow-xs">
+              <span className="text-xs font-semibold text-[#696E82]">
+                Showing <strong className="text-[#1F1F1F]">{displayedTasks.length}</strong> of{" "}
+                <strong className="text-[#1F1F1F]">{filteredTasks.length}</strong> deliverables
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setDisplayLimit((prev) => prev + 24)}
+                  className="px-4 py-2 bg-[#F2F4FF] hover:bg-[#E2E6F0] text-[#1F1F1F] font-semibold text-xs rounded-xl border border-[#CEDEFF] transition-colors cursor-pointer"
+                >
+                  Load 24 More Deliverables ↓
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDisplayLimit(filteredTasks.length)}
+                  className="px-3 py-2 text-[#5A81FA] hover:underline font-semibold text-xs cursor-pointer"
+                >
+                  Show All ({filteredTasks.length})
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
       {view === "list" && (
@@ -3333,7 +3285,7 @@ export default function TasksClientView({
             </div>
           ) : (
             <div className="divide-y divide-[#E2E6F0]">
-              {filteredTasks.map((task) => {
+              {displayedTasks.map((task) => {
                 const isOverdue =
                   task.dueDate && new Date(task.dueDate) < new Date() && task.status !== "COMPLETED";
                 const isMyTask = isTaskAssignedToMe(task);
@@ -3377,7 +3329,7 @@ export default function TasksClientView({
                           className="text-left group cursor-pointer"
                         >
                           <h4 className="text-sm font-bold text-[#1F1F1F] tracking-tight group-hover:text-[#5A81FA] group-hover:underline">
-                            {task.title}
+                            {getCleanTaskTitle(task.title, task.project?.code, task.project?.name)}
                           </h4>
                         </button>
                         {sanitizeTaskDescription(task.description) && (
@@ -3596,6 +3548,31 @@ export default function TasksClientView({
               })}
             </div>
           )}
+
+          {filteredTasks.length > displayLimit && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 bg-slate-50 border-t border-[#E2E6F0]">
+              <span className="text-xs font-semibold text-[#696E82]">
+                Showing <strong className="text-[#1F1F1F]">{displayedTasks.length}</strong> of{" "}
+                <strong className="text-[#1F1F1F]">{filteredTasks.length}</strong> deliverables
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setDisplayLimit((prev) => prev + 24)}
+                  className="px-4 py-2 bg-white hover:bg-slate-100 text-[#1F1F1F] font-semibold text-xs rounded-xl border border-[#CEDEFF] transition-colors cursor-pointer shadow-2xs"
+                >
+                  Load 24 More Deliverables ↓
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDisplayLimit(filteredTasks.length)}
+                  className="px-3 py-2 text-[#5A81FA] hover:underline font-semibold text-xs cursor-pointer"
+                >
+                  Show All ({filteredTasks.length})
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -3691,7 +3668,7 @@ export default function TasksClientView({
                           className="text-left block w-full group/title cursor-pointer"
                         >
                           <h4 className="text-xs font-bold text-[#1F1F1F] line-clamp-2 group-hover/title:text-[#5A81FA] group-hover/title:underline">
-                            {task.title}
+                            {getCleanTaskTitle(task.title, task.project?.code, task.project?.name)}
                           </h4>
                         </button>
 
@@ -3824,7 +3801,7 @@ export default function TasksClientView({
               <div className="space-y-1.5 min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight leading-tight">
-                    {drawerTask.title}
+                    {getCleanTaskTitle(drawerTask.title, drawerTask.project?.code, drawerTask.project?.name)}
                   </h2>
                   {(isPrivileged || isTaskAssignedToMe(drawerTask) || drawerTask.creatorId === currentMembershipId || drawerTask.creator?.id === currentMembershipId) && (
                     <button
@@ -4848,10 +4825,10 @@ export default function TasksClientView({
                     </h4>
                     <div className="flex items-center gap-2">
                       <a
-                        href={`/w/${workspaceSlug}/visits`}
+                        href={`/w/${workspaceSlug}/tasks?tab=visits`}
                         className="text-[11px] font-semibold text-[#5A81FA] hover:underline"
                       >
-                        Open Site Visits & Issues →
+                        Open Site Visit Tasks →
                       </a>
                       <button
                         type="button"
@@ -5086,7 +5063,9 @@ export default function TasksClientView({
             </div>
 
             <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-900 space-y-1">
-              <div className="font-semibold text-blue-950 truncate">{reassignModal.task.title}</div>
+              <div className="font-semibold text-blue-950 truncate">
+                {getCleanTaskTitle(reassignModal.task.title, reassignModal.task.project?.code, reassignModal.task.project?.name)}
+              </div>
               <div className="text-[11px] text-blue-800">
                 Currently assigned to:{" "}
                 <strong>{reassignModal.task.assignee?.user.fullName || "Unassigned"}</strong>
@@ -6666,71 +6645,15 @@ export default function TasksClientView({
         </div>
       )}
 
-      {/* ==================================================== */}
-      {/* 18. WORKFLOW: REPLY TO CLARIFICATION MODAL           */}
-      {/* ==================================================== */}
-      {replyModal && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white border border-[#E2E6F0] rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-[#E2E6F0] pb-3">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-[#5A81FA] text-white flex items-center justify-center">
-                  <MessageSquare className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-[#1F1F1F]">Reply to Clarification</h3>
-                  <p className="text-xs text-[#696E82]">Provide guidance to assigned staff</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setReplyModal(null)}
-                className="text-[#696E82] hover:text-[#1F1F1F] p-1 rounded-lg hover:bg-[#F2F4FF] cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="p-3 bg-[#F8F9FD] border border-[#E2E6F0] rounded-xl text-xs space-y-1">
-              <span className="font-bold text-[#696E82] block">Question:</span>
-              <p className="text-[#1F1F1F] leading-relaxed">{replyModal.question}</p>
-            </div>
-
-            <form onSubmit={handleReplyClarification} className="space-y-4 text-xs">
-              <div>
-                <label className="block font-semibold text-[#1F1F1F] mb-1">
-                  Your Answer / Clarification <span className="text-red-600">*</span>
-                </label>
-                <textarea
-                  rows={3}
-                  required
-                  value={replyMessageInput}
-                  onChange={(e) => setReplyMessageInput(e.target.value)}
-                  placeholder="Provide clarification, link approved drawing revision, or confirm specification..."
-                  className="w-full p-2.5 bg-white border border-[#E2E6F0] rounded-xl text-[#1F1F1F] focus:outline-none focus:ring-2 focus:ring-[#5A81FA]"
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2 border-t border-[#E2E6F0]">
-                <button
-                  type="button"
-                  onClick={() => setReplyModal(null)}
-                  className="px-4 py-2 bg-[#F2F4FF] text-[#696E82] font-semibold rounded-xl cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submittingReply || !replyMessageInput.trim()}
-                  className="px-5 py-2 bg-[#5A81FA] hover:bg-[#426EE8] text-white font-semibold rounded-xl shadow-xs cursor-pointer disabled:opacity-50"
-                >
-                  {submittingReply ? "Posting..." : "Post Answer"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* 18. WORKFLOW: REPLY TO CLARIFICATION MODAL (Modularized & Memoized) */}
+      <TaskClarificationModal
+        modal={replyModal}
+        replyMessageInput={replyMessageInput}
+        submittingReply={submittingReply}
+        onClose={() => setReplyModal(null)}
+        onInputChange={setReplyMessageInput}
+        onSubmit={handleReplyClarification}
+      />
 
       {/* Dynamic Form Fields Manager Modal */}
       <CustomFieldsManagerModal

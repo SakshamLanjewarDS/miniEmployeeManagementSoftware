@@ -10,6 +10,7 @@ import {
 import { sendDevicePushNotification } from "../notifications/push";
 import { dispatchNotification } from "../notifications/dispatch";
 
+// shortcut: In-memory Haversine distance formula (ceiling: up to a few thousand inspection points per tenant), upgrade: use PostGIS or MySQL ST_Distance_Sphere spatial index if inspection history exceeds 100,000 coordinate points
 /**
  * Calculates Haversine great-circle distance between two GPS coordinates in meters.
  */
@@ -661,6 +662,9 @@ export interface CreateSiteVisitInput {
   milestoneId?: string;
   attendeesJson?: any;
   checklistItemsJson?: any;
+  originAddress?: string;
+  originLatitude?: number;
+  originLongitude?: number;
 }
 
 /**
@@ -761,6 +765,11 @@ export async function createSiteVisit(ctx: TenantContext, input: CreateSiteVisit
     accuracyThresholdMeters: site.accuracyThresholdMeters,
     landmarkNotes: site.landmarkNotes,
     googleMapsUrl: site.googleMapsUrl,
+    origin: (input.originAddress || (input.originLatitude !== undefined && input.originLongitude !== undefined)) ? {
+      address: input.originAddress || "Origin Starting Spot",
+      latitude: input.originLatitude ?? null,
+      longitude: input.originLongitude ?? null,
+    } : null,
   };
 
   // 4. Default 4 QA/QC checklist items if none provided
@@ -832,8 +841,28 @@ export async function createSiteVisit(ctx: TenantContext, input: CreateSiteVisit
           visitId: newVisit.id,
           membershipId: mId,
           journeyState: JourneyState.ASSIGNED,
+          lastLatitude: input.originLatitude ?? null,
+          lastLongitude: input.originLongitude ?? null,
         },
       });
+
+      // If origin coordinates exist, record initial location sample for participant
+      if (input.originLatitude !== undefined && input.originLongitude !== undefined) {
+        await tx.siteVisitLocationSample.create({
+          data: {
+            tenantId: ctx.tenantId,
+            visitId: newVisit.id,
+            participantId: p.id,
+            latitude: input.originLatitude,
+            longitude: input.originLongitude,
+            accuracyMeters: 20,
+            clientCaptureTime: resolvedScheduledTime,
+            serverReceiptTime: new Date(),
+            exceptionReason: input.originAddress ? `Origin: ${input.originAddress}` : "Assigned origin starting spot",
+          },
+        });
+      }
+
       createdParticipants.push(p);
     }
 
@@ -1103,6 +1132,9 @@ export async function transitionParticipantJourney(
   const currentState = participant.journeyState;
 
   // 2. Validate state transitions
+  if (currentState === milestone) {
+    return { ...participant, operationalState: currentState };
+  }
   if (currentState === JourneyState.RETURNED_OFFICE && milestone !== JourneyState.ASSIGNED) {
     throw new Error("Journey has already concluded (Returned to Office). It cannot be transitioned further.");
   }
@@ -1111,10 +1143,10 @@ export async function transitionParticipantJourney(
   }
 
   const validTransitions: Record<JourneyState, JourneyState[]> = {
-    ASSIGNED: [JourneyState.JOURNEY_STARTED, JourneyState.CANCELLED],
-    JOURNEY_STARTED: [JourneyState.ARRIVED_AT_SITE, JourneyState.RETURN_STARTED, JourneyState.CANCELLED],
-    ARRIVED_AT_SITE: [JourneyState.INSPECTION_STARTED, JourneyState.RETURN_STARTED, JourneyState.CANCELLED],
-    INSPECTION_STARTED: [JourneyState.INSPECTION_FINISHED, JourneyState.CANCELLED],
+    ASSIGNED: [JourneyState.JOURNEY_STARTED, JourneyState.ARRIVED_AT_SITE, JourneyState.RETURNED_OFFICE, JourneyState.CANCELLED],
+    JOURNEY_STARTED: [JourneyState.ARRIVED_AT_SITE, JourneyState.RETURN_STARTED, JourneyState.RETURNED_OFFICE, JourneyState.CANCELLED],
+    ARRIVED_AT_SITE: [JourneyState.INSPECTION_STARTED, JourneyState.RETURN_STARTED, JourneyState.RETURNED_OFFICE, JourneyState.CANCELLED],
+    INSPECTION_STARTED: [JourneyState.INSPECTION_FINISHED, JourneyState.RETURN_STARTED, JourneyState.RETURNED_OFFICE, JourneyState.CANCELLED],
     INSPECTION_FINISHED: [JourneyState.RETURN_STARTED, JourneyState.RETURNED_OFFICE, JourneyState.INSPECTION_STARTED, JourneyState.CANCELLED],
     RETURN_STARTED: [JourneyState.RETURNED_OFFICE, JourneyState.CANCELLED],
     RETURNED_OFFICE: [],
@@ -1201,22 +1233,45 @@ export async function transitionParticipantJourney(
       });
     }
 
+    // Calculate geofence and distance if site coordinates exist
+    let calcDist: number | null = null;
+    let geofence: GeofenceAssessment = GeofenceAssessment.UNCERTAIN;
+    if (visit.site.latitude !== null && visit.site.longitude !== null && latitude !== undefined && longitude !== undefined) {
+      calcDist = calculateHaversineDistanceMeters(
+        latitude,
+        longitude,
+        visit.site.latitude,
+        visit.site.longitude
+      );
+      geofence = evaluateGeofence(
+        calcDist,
+        accuracyMeters ?? 50,
+        visit.site.radiusMeters,
+        visit.site.accuracyThresholdMeters
+      );
+    }
+
     // Record audit event
+    const eventType = (milestone === JourneyState.ARRIVED_AT_SITE || milestone === JourneyState.JOURNEY_STARTED)
+      ? SiteVisitEventType.CHECK_IN
+      : milestone === JourneyState.RETURNED_OFFICE
+      ? SiteVisitEventType.CHECK_OUT
+      : SiteVisitEventType.EXCEPTION;
+
     await tx.siteVisitEvent.create({
       data: {
         tenantId: ctx.tenantId,
         visitId,
-        eventType: milestone === JourneyState.JOURNEY_STARTED ? SiteVisitEventType.CHECK_IN :
-                   milestone === JourneyState.RETURNED_OFFICE ? SiteVisitEventType.CHECK_OUT :
-                   SiteVisitEventType.EXCEPTION,
+        eventType,
         actorId: ctx.membershipId,
         serverReceiptTime: now,
         clientCaptureTime: effectiveCaptureTime,
         latitude: latitude ?? null,
         longitude: longitude ?? null,
         accuracyMeters: accuracyMeters ?? null,
+        calculatedDistanceMeters: calcDist,
+        geofenceAssessment: geofence,
         failureReason: `JOURNEY_TRANSITION: ${milestone}${exceptionNotes ? ` (${exceptionNotes})` : ""}`,
-        geofenceAssessment: GeofenceAssessment.UNCERTAIN,
         idempotencyKey: `ms-${participant.id.replace(/-/g, "").slice(0, 16)}-${milestone.slice(0, 12)}-${now.getTime()}`.slice(0, 64),
         siteCenterLat: visit.site.latitude,
         siteCenterLng: visit.site.longitude,
@@ -1224,11 +1279,31 @@ export async function transitionParticipantJourney(
       },
     });
 
-    // If visit is still SCHEDULED and journey starts, move operationalState to ACTIVE
-    if (milestone === JourneyState.JOURNEY_STARTED && visit.operationalState === SiteVisitOperationalState.SCHEDULED) {
+    // If journey starts, move operationalState to ACTIVE
+    if (milestone === JourneyState.JOURNEY_STARTED) {
       await tx.siteVisit.update({
         where: { id: visit.id },
-        data: { operationalState: SiteVisitOperationalState.ACTIVE },
+        data: {
+          operationalState: SiteVisitOperationalState.ACTIVE,
+        },
+      });
+    } else if (milestone === JourneyState.ARRIVED_AT_SITE) {
+      const arrivedLocality = exceptionNotes?.startsWith("Locality:") ? exceptionNotes.replace("Locality:", "").trim() : visit.site.name;
+      await tx.siteVisit.update({
+        where: { id: visit.id },
+        data: {
+          operationalState: SiteVisitOperationalState.ACTIVE,
+          checkInAddress: arrivedLocality || visit.checkInAddress || visit.site.address,
+        },
+      });
+    } else if (milestone === JourneyState.RETURNED_OFFICE) {
+      const returnLocality = exceptionNotes?.startsWith("Locality:") ? exceptionNotes.replace("Locality:", "").trim() : "Office / Studio Headquarter";
+      await tx.siteVisit.update({
+        where: { id: visit.id },
+        data: {
+          operationalState: SiteVisitOperationalState.CHECKED_OUT,
+          checkOutAddress: returnLocality || "Office / Studio Headquarter",
+        },
       });
     }
 
