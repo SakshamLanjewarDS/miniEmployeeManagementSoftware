@@ -23,9 +23,9 @@ export default async function TasksPage({ params, searchParams }: TasksPageProps
   if (!ctx) return null;
 
   const isPrivileged = ctx.role === "OWNER" || ctx.role === "ADMIN";
-  // Non-privileged employees are strictly limited to their own tasks
-  const effectiveScope = isPrivileged ? (scope || "all") : "my";
-  const myTasksOnly = effectiveScope === "my" || !isPrivileged;
+  // Scope selection: allows viewing all deliverables, deliverables assigned by me, or deliverables assigned to me
+  const effectiveScope = scope || "all";
+  const myTasksOnly = effectiveScope === "my";
 
   // Load all dashboard data in a single parallel batch for maximum speed
   const [metrics, rawTasks, projects, members, upcomingVisit, customFieldDefinitions, customFieldValues] = await Promise.all([

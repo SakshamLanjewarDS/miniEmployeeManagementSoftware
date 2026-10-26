@@ -1507,16 +1507,14 @@ export default function VisitsClientView({
               <span>Export CSV (Audit Protected)</span>
             </button>
 
-            {isPrivileged && (
-              <button
-                type="button"
-                onClick={() => setAssignModalOpen(true)}
-                className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 bg-[#5A81FA] hover:bg-[#426EE8] text-white text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer min-h-[44px]"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Assign a site visit</span>
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => setAssignModalOpen(true)}
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 bg-[#5A81FA] hover:bg-[#426EE8] text-white text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer min-h-[44px]"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Assign a site visit</span>
+            </button>
           </div>
         </div>
 
@@ -2341,16 +2339,14 @@ export default function VisitsClientView({
               <p className="text-xs text-[#696E82] mt-1 max-w-sm mx-auto">
                 Visit records will appear here after the first site check-in.
               </p>
-              {isPrivileged && (
-                <button
-                  type="button"
-                  onClick={() => setAssignModalOpen(true)}
-                  className="mt-4 px-4 py-2 bg-white hover:bg-slate-50 border border-[#CEDEFF] text-[#5A81FA] text-xs font-bold rounded-xl transition-all inline-flex items-center gap-1.5 cursor-pointer shadow-2xs"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Assign a site visit</span>
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => setAssignModalOpen(true)}
+                className="mt-4 px-4 py-2 bg-white hover:bg-slate-50 border border-[#CEDEFF] text-[#5A81FA] text-xs font-bold rounded-xl transition-all inline-flex items-center gap-1.5 cursor-pointer shadow-2xs"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Assign a site visit</span>
+              </button>
             </div>
           ) : filteredAndSortedVisits.length === 0 ? (
             <div className="p-8 text-center text-[#696E82] space-y-1">

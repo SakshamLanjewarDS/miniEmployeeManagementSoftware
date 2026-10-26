@@ -21,6 +21,16 @@ export const metadata: Metadata = {
   title: "100% DESIGN Studio — Project & Employee Management OS",
   description: "Enterprise architectural employee, project, drawings, and site visit management platform",
   applicationName: "100% DESIGN Studio OS",
+  robots: {
+    index: false,
+    follow: false,
+    nocache: true,
+    googleBot: {
+      index: false,
+      follow: false,
+      noimageindex: true,
+    },
+  },
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,

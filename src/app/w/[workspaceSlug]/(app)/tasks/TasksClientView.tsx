@@ -625,9 +625,7 @@ export default function TasksClientView({
   const [selectedProjectId, setSelectedProjectId] = useState<string>(projects[0]?.id || "");
   const [selectedPhaseId, setSelectedPhaseId] = useState<string>("");
   const [taskDescription, setTaskDescription] = useState("");
-  const [taskAssigneeIds, setTaskAssigneeIds] = useState<string[]>(
-    userRole === "OWNER" || userRole === "ADMIN" ? [] : [currentMembershipId]
-  );
+  const [taskAssigneeIds, setTaskAssigneeIds] = useState<string[]>([]);
   const [taskPriority, setTaskPriority] = useState<string>("MEDIUM");
   const [taskEstimatedHours, setTaskEstimatedHours] = useState("");
   
@@ -866,10 +864,12 @@ export default function TasksClientView({
         }
       }
 
-      // 4.5 Scope Filter (Assigned by Me)
+      // 4.5 Scope Filter (Assigned by Me / Assigned to Me)
       if (currentScope === "assigned_by_me") {
         const isCreator = task.creatorId === currentMembershipId || task.creator?.id === currentMembershipId;
         if (!isCreator) return false;
+      } else if (currentScope === "my") {
+        if (!isTaskAssignedToMe(task)) return false;
       }
 
       // 5. Status Category Filter
@@ -1272,7 +1272,7 @@ export default function TasksClientView({
       setTaskReviewerId("");
       setTaskEstimatedHours("");
       setTaskIsSiteVisit(false);
-      setTaskAssigneeIds(userRole === "OWNER" || userRole === "ADMIN" ? [] : [currentMembershipId]);
+      setTaskAssigneeIds([]);
       setEmployeeChecklists({});
       setFormErrors({});
     } catch (err: any) {
@@ -2536,46 +2536,44 @@ export default function TasksClientView({
             <span>Assign deliverable</span>
           </button>
 
-          {isPrivileged && (
-            <div className="flex items-center p-1 bg-white border border-[#E2E6F0] rounded-xl shadow-2xs">
-              <button
-                type="button"
-                suppressHydrationWarning
-                onClick={() => handleScopeChange("all")}
-                className={`px-3 py-1.5 rounded-lg type-nav-label transition-all cursor-pointer ${
-                  currentScope === "all"
-                    ? "bg-[#3562E8] text-white shadow-2xs font-semibold"
-                    : "text-[#696E82] hover:text-[#0B122B]"
-                }`}
-              >
-                All deliverables
-              </button>
-              <button
-                type="button"
-                suppressHydrationWarning
-                onClick={() => handleScopeChange("assigned_by_me")}
-                className={`px-3 py-1.5 rounded-lg type-nav-label transition-all cursor-pointer ${
-                  currentScope === "assigned_by_me"
-                    ? "bg-[#3562E8] text-white shadow-2xs font-semibold"
-                    : "text-[#696E82] hover:text-[#0B122B]"
-                }`}
-              >
-                Assigned by me
-              </button>
-              <button
-                type="button"
-                suppressHydrationWarning
-                onClick={() => handleScopeChange("my")}
-                className={`px-3 py-1.5 rounded-lg type-nav-label transition-all cursor-pointer ${
-                  currentScope === "my"
-                    ? "bg-[#3562E8] text-white shadow-2xs font-semibold"
-                    : "text-[#696E82] hover:text-[#0B122B]"
-                }`}
-              >
-                Assigned to me
-              </button>
-            </div>
-          )}
+          <div className="flex items-center p-1 bg-white border border-[#E2E6F0] rounded-xl shadow-2xs">
+            <button
+              type="button"
+              suppressHydrationWarning
+              onClick={() => handleScopeChange("all")}
+              className={`px-3 py-1.5 rounded-lg type-nav-label transition-all cursor-pointer ${
+                currentScope === "all"
+                  ? "bg-[#3562E8] text-white shadow-2xs font-semibold"
+                  : "text-[#696E82] hover:text-[#0B122B]"
+              }`}
+            >
+              All deliverables
+            </button>
+            <button
+              type="button"
+              suppressHydrationWarning
+              onClick={() => handleScopeChange("assigned_by_me")}
+              className={`px-3 py-1.5 rounded-lg type-nav-label transition-all cursor-pointer ${
+                currentScope === "assigned_by_me"
+                  ? "bg-[#3562E8] text-white shadow-2xs font-semibold"
+                  : "text-[#696E82] hover:text-[#0B122B]"
+              }`}
+            >
+              Assigned by me
+            </button>
+            <button
+              type="button"
+              suppressHydrationWarning
+              onClick={() => handleScopeChange("my")}
+              className={`px-3 py-1.5 rounded-lg type-nav-label transition-all cursor-pointer ${
+                currentScope === "my"
+                  ? "bg-[#3562E8] text-white shadow-2xs font-semibold"
+                  : "text-[#696E82] hover:text-[#0B122B]"
+              }`}
+            >
+              Assigned to me
+            </button>
+          </div>
         </div>
       </div>
 

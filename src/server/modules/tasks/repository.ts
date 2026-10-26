@@ -137,7 +137,16 @@ export async function findTasks(ctx: TenantContext, params: TaskFilterParams = {
   ];
 
   // Employees can see their primary assigned tasks, co-assigned tasks (in assignedMemberIds), or deliverables they created
-  if (params.myTasksOnly || !isAdminOrOwner(ctx)) {
+  if (params.myTasksOnly) {
+    const multiTaskIds = await getMultiAssignedTaskIds(ctx.tenantId, ctx.membershipId);
+    const orClauses: any[] = [
+      { assigneeId: ctx.membershipId },
+    ];
+    if (multiTaskIds.length > 0) {
+      orClauses.push({ id: { in: multiTaskIds } });
+    }
+    andConditions.push({ OR: orClauses });
+  } else if (!isAdminOrOwner(ctx)) {
     const multiTaskIds = await getMultiAssignedTaskIds(ctx.tenantId, ctx.membershipId);
     const orClauses: any[] = [
       { assigneeId: ctx.membershipId },
@@ -669,22 +678,6 @@ export async function createTask(ctx: TenantContext, data: CreateTaskData) {
     throw new Error("At least one eligible assignee must be selected for the deliverable.");
   }
 
-  // Scratchpad & non-management security: Employees cannot assign other members or bypass management permissions
-  if (!isAdminOrOwner(ctx)) {
-    if (allAssigneeIds.length !== 1 || allAssigneeIds[0] !== ctx.membershipId) {
-      throw new Error("Forbidden: Employees can only create personal tasks assigned to themselves. Management assignments require Studio Owner or Admin permissions.");
-    }
-    const isMember = await prisma.projectMember.findFirst({
-      where: {
-        tenantId: ctx.tenantId,
-        projectId: project.id,
-        membershipId: ctx.membershipId,
-      },
-    });
-    if (!isMember && project.projectArchitectId !== ctx.membershipId && project.projectManagerId !== ctx.membershipId) {
-      throw new Error("Forbidden: You must be an assigned member of this project to create deliverable tasks.");
-    }
-  }
 
   // Validate all assignees exist, are active, and belong to this tenant
   const activeMembers = await prisma.tenantMembership.findMany({
@@ -1309,9 +1302,11 @@ export async function reassignTask(
     : [];
   const isCurrentAssignee = task.assigneeId === ctx.membershipId || assignedMemberIds.includes(ctx.membershipId);
 
-  if (!isPrivileged && !isCurrentAssignee) {
+  const isCreator = task.creatorId === ctx.membershipId;
+
+  if (!isPrivileged && !isCurrentAssignee && !isCreator) {
     throw new ForbiddenException(
-      "You can only delegate tasks assigned to you. Studio Boss or Admin privileges required to reassign tasks for other members."
+      "You can only delegate tasks assigned to you or created by you. Studio Boss or Admin privileges required to reassign tasks for other members."
     );
   }
 
@@ -1983,7 +1978,16 @@ export async function getTaskDashboardMetrics(ctx: TenantContext, myTasksOnly: b
   const { startOfToday, endOfToday } = getWorkspaceDayBoundaries(ctx.timezone);
 
   const andConditions: any[] = [{ tenantId: ctx.tenantId }];
-  if (myTasksOnly || !isAdminOrOwner(ctx)) {
+  if (myTasksOnly) {
+    const multiTaskIds = await getMultiAssignedTaskIds(ctx.tenantId, ctx.membershipId);
+    const orClauses: any[] = [
+      { assigneeId: ctx.membershipId },
+    ];
+    if (multiTaskIds.length > 0) {
+      orClauses.push({ id: { in: multiTaskIds } });
+    }
+    andConditions.push({ OR: orClauses });
+  } else if (!isAdminOrOwner(ctx)) {
     const multiTaskIds = await getMultiAssignedTaskIds(ctx.tenantId, ctx.membershipId);
     const orClauses: any[] = [
       { assigneeId: ctx.membershipId },

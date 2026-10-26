@@ -29,15 +29,18 @@ export interface CSVParseOptions {
 }
 
 /**
- * Strips potential CSV spreadsheet formula injection characters (=, +, -, @, \t, \r)
+ * Strips potential CSV spreadsheet formula injection characters (=, +, -, @, \t, \r, \n, |, %)
  */
 export function sanitizeSpreadsheetFormula(val: string): string {
   if (!val) return "";
+  if (/^[=+\-@\t\r\n|%]/.test(val)) {
+    return `'${val}`;
+  }
   const trimmed = val.trim();
-  if (/^[=+\-@\t\r]/.test(trimmed)) {
+  if (/^[=+\-@\t\r\n|%]/.test(trimmed)) {
     return `'${trimmed}`;
   }
-  return trimmed;
+  return val;
 }
 
 /**

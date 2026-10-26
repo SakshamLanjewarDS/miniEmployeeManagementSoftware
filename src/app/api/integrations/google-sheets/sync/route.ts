@@ -25,27 +25,7 @@ export async function GET(req: NextRequest) {
     }
 
     const syncType = searchParams.get("syncType"); // "LEAVE_SHEET" | "VENDOR_SHEET" | null
-    const auto = searchParams.get("auto") === "true";
-
-    // Auto-sync trigger if stale (> 60 seconds)
-    if (auto) {
-      const targetType = syncType || "LEAVE_SHEET";
-      const config = await prisma.studioSyncConfig.findUnique({
-        where: { tenantId_syncType: { tenantId: ctx.tenantId, syncType: targetType } },
-      });
-
-      const now = Date.now();
-      const lastAttemptMs = config?.lastAttemptAt ? new Date(config.lastAttemptAt).getTime() : 0;
-      const isStale = now - lastAttemptMs > 60 * 1000; // 60s debounce
-
-      if (isStale) {
-        if (targetType === "LEAVE_SHEET") {
-          await syncLiveLeaveSheet(ctx);
-        } else if (targetType === "VENDOR_SHEET") {
-          await syncLiveVendorSheet(ctx);
-        }
-      }
-    }
+    // GET is strictly idempotent and read-only. State-mutating synchronizations are restricted to authenticated POST/PUT methods.
 
     // Retrieve configs and latest metrics
     const [leaveConfig, vendorConfig, totalLeaves, totalVendors, latestLeaveRun, latestVendorRun, tenant] =

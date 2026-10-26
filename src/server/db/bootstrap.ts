@@ -74,27 +74,39 @@ async function runBootstrap(): Promise<void> {
       });
     }
 
-    // 3. Default Passwords Hash
+    // 3. Ensure Principal Owner / Admin account exists without modifying existing credentials
+    const targetAdminEmail = (process.env.INITIAL_ADMIN_EMAIL || "admin@100percentdesign.in").toLowerCase().trim();
 
-    // 4. Default Passwords Hash
-    const defaultPasswordHash = await bcrypt.hash("Saksham@2003", 10);
-
-    // 5. Ensure Principal Owner / Admin: Saksham Lanjewar
     let adminUser = await prisma.user.findFirst({
       where: {
         OR: [
-          { email: "designsaksham1@gmail.com" },
+          { email: targetAdminEmail },
           { email: "admin@100percentdesign.in" },
+          { email: "designsaksham1@gmail.com" },
         ],
       },
     });
 
     if (!adminUser) {
+      const initialPassword =
+        process.env.INITIAL_ADMIN_PASSWORD ||
+        (process.env.NODE_ENV === "production"
+          ? null
+          : process.env.DEV_SEED_DEFAULT_PASSWORD || "DevStudio@Local2026!");
+
+      if (!initialPassword) {
+        console.warn(
+          "[Bootstrap] Production initialization: No admin account found and INITIAL_ADMIN_PASSWORD not set. Skipping automated provisioning. Run `npx tsx scripts/restore-admin.ts` to provision initial administrator safely."
+        );
+        return;
+      }
+
+      const passwordHash = await bcrypt.hash(initialPassword, 12);
       adminUser = await prisma.user.create({
         data: {
-          email: "designsaksham1@gmail.com",
-          passwordHash: defaultPasswordHash,
-          fullName: "Saksham Lanjewar",
+          email: targetAdminEmail,
+          passwordHash,
+          fullName: "Studio Principal",
           accountState: UserAccountState.ACTIVE,
         },
       });

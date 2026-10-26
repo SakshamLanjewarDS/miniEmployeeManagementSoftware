@@ -78,8 +78,8 @@ export async function loginWithWorkspace(params: LoginParams): Promise<AuthResul
   let membership: any;
 
   if (isEmail) {
-    // Find user by email, then verify membership in this tenant
-    let user = await prisma.user.findUnique({
+    // Find user by exact email, then verify active membership in this tenant
+    const user = await prisma.user.findUnique({
       where: { email: lowerId },
       include: {
         memberships: {
@@ -90,28 +90,6 @@ export async function loginWithWorkspace(params: LoginParams): Promise<AuthResul
         },
       },
     });
-
-    // Fallback: If not found, check if identifier is Saksham/Admin alias
-    if (!user || user.memberships.length === 0) {
-      user = await prisma.user.findFirst({
-        where: {
-          OR: [
-            { email: lowerId },
-            { email: "designsaksham1@gmail.com" },
-            { email: "admin@100percentdesign.in" },
-            { fullName: { contains: rawId } },
-          ],
-        },
-        include: {
-          memberships: {
-            where: { tenantId: tenant.id, isActive: true },
-            include: {
-              employee: true,
-            },
-          },
-        },
-      });
-    }
 
     if (!user || user.memberships.length === 0) {
       return { success: false, error: "Invalid credentials or account inactive" };
@@ -140,8 +118,8 @@ export async function loginWithWorkspace(params: LoginParams): Promise<AuthResul
         : []),
     ]));
 
-    // Find employee by Employee ID (support all standard formats)
-    let employee = await prisma.employee.findFirst({
+    // Find employee by Employee ID (support standard formatted variations)
+    const employee = await prisma.employee.findFirst({
       where: {
         tenantId: tenant.id,
         membership: { isActive: true },
@@ -155,37 +133,6 @@ export async function loginWithWorkspace(params: LoginParams): Promise<AuthResul
         },
       },
     });
-
-    // Fallback: check case-insensitive or by user full name / username / admin aliases
-    if (!employee || !employee.membership || !employee.membership.isActive) {
-      employee = await prisma.employee.findFirst({
-        where: {
-          tenantId: tenant.id,
-          membership: {
-            isActive: true,
-            user: {
-              OR: [
-                { email: { startsWith: lowerId } },
-                { fullName: { contains: rawId } },
-                ...(lowerId === "admin" || lowerId === "saksham" || strippedId === "EMP001"
-                  ? [
-                      { email: "designsaksham1@gmail.com" },
-                      { email: "admin@100percentdesign.in" },
-                    ]
-                  : []),
-              ],
-            },
-          },
-        },
-        include: {
-          membership: {
-            include: {
-              user: true,
-            },
-          },
-        },
-      });
-    }
 
     if (!employee || !employee.membership || !employee.membership.isActive) {
       return { success: false, error: "Invalid credentials or account inactive" };
@@ -208,10 +155,9 @@ export async function loginWithWorkspace(params: LoginParams): Promise<AuthResul
     isPasswordValid = false;
   }
 
-  // Development/Test fallback for studio accounts when non-production
-  if (!isPasswordValid && process.env.NODE_ENV !== "production") {
-    const devFallback = process.env.DEV_SEED_DEFAULT_PASSWORD || "StudioDev@Pass2026!";
-    if (password === "Saksham@2003" || password === devFallback || password === "StudioDev@Pass2026!") {
+  // Test fallback ONLY when executing in automated test suites with explicit env variable
+  if (!isPasswordValid && process.env.NODE_ENV === "test" && process.env.DEV_SEED_DEFAULT_PASSWORD) {
+    if (password === process.env.DEV_SEED_DEFAULT_PASSWORD) {
       isPasswordValid = true;
     }
   }
@@ -278,7 +224,10 @@ export async function loginWithWorkspace(params: LoginParams): Promise<AuthResul
         challengeId: challenge.challengeId,
         maskedEmail: challenge.maskedEmail,
         expiresInSeconds: challenge.expiresInSeconds,
-        otpPreview: challenge.otp,
+        // Plaintext OTP is NEVER returned to clients in production, staging, or dev
+        ...(process.env.NODE_ENV === "test" && process.env.EXPOSE_TEST_OTP_PREVIEW === "true"
+          ? { otpPreview: challenge.otp }
+          : {}),
         user: userData,
       };
     } catch (otpErr: any) {

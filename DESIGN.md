@@ -1,9 +1,9 @@
 # 100% DESIGN Studio OS — Design System & UI/UX Design Manual
 
 **Design System Name:** Studio Blueprint Design System (SBDS)  
-**Version:** `3.3.0` (Production Enterprise Ready — Architectural Precision Tokens, Container Queries, Two-Way Live Sync Badges, Mobile Field Companion, Owner Decision Inbox, Extension Hydration Resilience & Blueprint Transmittal Print Standards)  
+**Version:** `3.5.0` (Production Enterprise Ready — Architectural Precision Tokens, Container Queries, Two-Way Live Sync Badges, Mobile Field Companion, Owner Decision Inbox, Unified Hiring & Compliance Records Hub, Studio Meetings & MoM Governance Hub, Quarantine & Antivirus Status Badges, Reopened Task Alert System, Extension Hydration Resilience & Blueprint Transmittal Print Standards)  
 **Target Platform:** Web (Desktop Studio Workstation & Mobile Field Companion)  
-**Framework:** React 19, Next.js 16 (App Router with Webpack mode), Tailwind CSS v4, Lucide Icons  
+**Framework:** React 19, Next.js 16 (App Router in Webpack mode), Tailwind CSS v4, Lucide Icons  
 **Primary CSS Entrypoint:** [`src/app/globals.css`](file:///c:/Users/ASUS/Desktop/miniEmployeeManagementSoftware/src/app/globals.css)
 
 ---
@@ -12,18 +12,20 @@
 
 Architectural and interior design studios live by mathematical precision, geometric clarity, and spatial hierarchy. Generic corporate dashboard templates feel alien to practitioners who work with millimeter tolerances, blueprint lines, and physical construction sites.
 
-The **100% DESIGN Studio OS Design System** is anchored in four foundational tenets:
+The **100% DESIGN Studio OS Design System** is anchored in five foundational tenets:
 
 1. **Architectural Blueprint Aesthetic:**  
    Clean canvas surfaces, crisp 1px borders, subtle ice-blue tints, and architectural blueprint cobalt accents. Rather than heavy, muddy drop shadows, spatial depth is established through crisp mathematical border lines (`#E2E6F0` and `#A8B1CE`) and layered white/ice surface planes.
 2. **High Information Density with Zero Clutter:**  
    Architects manage dozens of drawing sheets, checklists, snag items, and coordinates simultaneously. Interfaces provide high data density through tabular numerals, compact pill badges, and structured modular panels without inducing cognitive overload.
 3. **Ergonomic Studio & Field Duality:**  
-   The interface seamlessly bridges two distinct environments:
+   The interface seamlessly bridges two distinct operational environments:
    - **Studio Workstation (Large Displays):** Dual-monitor setups, expansive multi-column task grids, multi-pane drawing viewers, docked billable timers, and the centralized Owner Decision Inbox.
    - **Job Site Field Companion (Mobile Devices):** High-contrast outdoor legibility, thumb-friendly tap targets ($\ge 44\text{px}$), hands-free voice dictation buttons, and instant 1-click GPS site check-in.
-4. **Governed State Integrity & Four-Eyes Transparency:**  
-   Every state transition (e.g. Draft $\to$ Active, In Progress $\to$ Checking, Approved $\to$ GFC Release) visually communicates its governance rules. Submitter actions, reviewer locks, blocker alerts, and verification badges are prominently displayed to eliminate ambiguity.
+4. **Governed State Integrity & Universal Four-Eyes Transparency:**  
+   Every state transition (e.g., Draft $\to$ Active, In Progress $\to$ Checking, Approved $\to$ GFC Release) visually communicates its governance rules. Submitter actions, reviewer locks, blocker alerts, and verification badges are prominently displayed to eliminate ambiguity. Reviewer $\neq$ Submitter is enforced across all roles.
+5. **Confidentiality & Privacy-Aware UI Cues:**  
+   Sensitive employee documents, private minutes of meetings (MoM), and financial payroll records present explicit access control indicators (locks, confidential banners, and published/draft watermark pills) to prevent unintentional disclosure.
 
 ---
 
@@ -61,30 +63,31 @@ The color system uses CSS custom properties configured in [`src/app/globals.css`
 | `--color-secondary` | `#2C308D` | Deep Studio Navy (sidebar header, leadership accents) |
 | `--color-secondary-hover` | `#22256E` | Secondary button hover state |
 | `--color-accent-ice` | `#CEDEFF` | Blueprint ice blue container fill |
+| `--color-accent-gold` | `#D4AF37` | Architectural brass & luxury interior accent |
 | `--color-accent-whisper` | `#F2F4FF` | Soft tinted card headers and table row alternations |
 
 ### 2.4 Semantic State Palette
 
 | Semantic Role | Background | Text / Icon | Border | Usage |
 |---|---|---|---|---|
-| **Success / Approved / Completed** | `#ECFDF5` (`emerald-50`) | `#059669` (`emerald-600`) | `#A7F3D0` (`emerald-200`) | Completed deliverables, approved submissions, live 2-way sync active badge |
-| **Warning / Checking / Review** | `#FFFBEB` (`amber-50`) | `#D97706` (`amber-600`) | `#FDE68A` (`amber-200`) | `IN_REVIEW` status, pending Four-Eyes reviews, read-only sync badge |
-| **Danger / Blocker / Overdue** | `#FEF2F2` (`rose-50`) | `#E11D48` (`rose-600`) | `#FECDD3` (`rose-200`) | Active blockers, overdue tasks, auto-rejected 24h rule badge, soft-deleted rows |
-| **Info / Scheduled / Started** | `#EFF6FF` (`blue-50`) | `#2563EB` (`blue-600`) | `#BFDBFE` (`blue-200`) | In-progress work, scheduled site visits, clarifications, extension requests |
-| **Draft / Inactive / Todo** | `#F3F4F6` (`gray-100`) | `#4B5563` (`gray-600`) | `#E5E7EB` (`gray-200`) | Draft schemes, unassigned checklist items, archived records |
+| **Success / Approved / Completed** | `#ECFDF5` (`emerald-50`) | `#059669` (`emerald-600`) | `#A7F3D0` (`emerald-200`) | Completed deliverables, approved submissions, live 2-way sync active badge, virus scan CLEAN |
+| **Warning / Checking / Review** | `#FFFBEB` (`amber-50`) | `#D97706` (`amber-600`) | `#FDE68A` (`amber-200`) | `IN_REVIEW` status, pending Four-Eyes reviews, read-only sync badge, reopened tasks, quarantine SCANNING |
+| **Danger / Blocker / Overdue** | `#FEF2F2` (`rose-50`) | `#E11D48` (`rose-600`) | `#FECDD3` (`rose-200`) | Active blockers, overdue tasks, auto-rejected 24h rule badge, soft-deleted rows, virus INFECTED |
+| **Info / Scheduled / Started** | `#EFF6FF` (`blue-50`) | `#2563EB` (`blue-600`) | `#BFDBFE` (`blue-200`) | In-progress work, scheduled site visits, clarifications, extension requests, scheduled meetings |
+| **Draft / Inactive / Todo** | `#F3F4F6` (`gray-100`) | `#4B5563` (`gray-600`) | `#E5E7EB` (`gray-200`) | Draft schemes, unassigned checklist items, archived records, unpublished draft MoM |
 
 ---
 
 ## 3. Typography System — DM Sans Architectural Standard
 
-The typography system for **100% DESIGN Studio OS** is anchored on **DM Sans** as the single authority typeface for all application UI, geometric forms, schedules, and dashboards, paired with **Noto Sans Devanagari** for seamless bilingual studio communications, and clean system UI fallbacks.
+The typography system for **100% DESIGN Studio OS** is anchored on **DM Sans** as the single authority typeface for all application UI, geometric forms, schedules, and dashboards, paired with **Noto Sans Devanagari** for seamless bilingual studio communications, and clean system UI fallbacks:
 
 ```css
 --font-sans: var(--font-dm-sans), "DM Sans", "Noto Sans Devanagari", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 ```
 
 ### 3.1 Font Weights & Loading Architecture
-- **Font Family:** `DM Sans` (Google Fonts variable font with local WOFF2 font-display: swap zero-FOUT strategy).
+- **Font Family:** `DM Sans` (Google Fonts variable font with local WOFF2 `font-display: swap` zero-FOUT strategy).
 - **Approved Weight Scale:**
   - `400` — Regular: Default body, compact text, form input values, helper metadata.
   - `500` — Medium: Form labels, navigation tabs, KPI labels, badge status indicators.
@@ -169,12 +172,14 @@ The application shell provides ergonomic spatial hierarchy across 3 interconnect
 │ • Dashboard  │ │ Page Header: Title + Context + Primary Action CTA   │ │
 │ • Projects   │ ├─────────────────────────────────────────────────────┤ │
 │ • Tasks      │ │ Live Integration Banner (2-Way Sheet Write-Back)    │ │
-│ • Sites      │ ├─────────────────────────────────────────────────────┤ │
-│ • Drawings   │ │ Task Grid Region (@container)                       │ │
-│ • Leaves     │ │ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐     │ │
-│ • Finance    │ │ │ Task Card 1 │ │ Task Card 2 │ │ Task Card 3 │     │ │
-│ • Inbox      │ │ └─────────────┘ └─────────────┘ └─────────────┘     │ │
-│ • Team       │ └─────────────────────────────────────────────────────┘ │
+│ • Hiring     │ ├─────────────────────────────────────────────────────┤ │
+│ • Meetings   │ │ Task Grid Region (@container)                       │ │
+│ • Sites      │ │ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐     │ │
+│ • Drawings   │ │ │ Task Card 1 │ │ Task Card 2 │ │ Task Card 3 │     │ │
+│ • Leaves     │ │ └─────────────┘ └─────────────┘ └─────────────┘     │ │
+│ • Finance    │ └─────────────────────────────────────────────────────┘ │
+│ • Inbox      │                                                         │
+│ • Team       │                                                         │
 └──────────────┴─────────────────────────────────────────────────────────┘
 ```
 
@@ -229,23 +234,50 @@ Rather than relying solely on global viewport media queries, the deliverable gri
   - `STARTED` / `ONGOING` (`IN_PROGRESS`)
   - `CHECKING` (`IN_REVIEW`)
   - `COMPLETED` (`COMPLETED`)
-- **Direct Completion:** Supports direct selection of `COMPLETED` when employee self-completion is active.
+- **Direct Completion:** Supports direct selection of `COMPLETED` when employee self-completion is active (`ALLOW_EMPLOYEE_SELF_COMPLETION = true`).
 - **Quick Controls:** View Details, Edit Deliverable, Delegate, Request Changes, Delete.
 
-### 6.4 Employee Workstation Dashboard ([`EmployeeDashboardView.tsx`](file:///c:/Users/ASUS/Desktop/miniEmployeeManagementSoftware/src/app/w/[workspaceSlug]/(app)/dashboard/employee/EmployeeDashboardView.tsx))
+### 6.4 Reopened Task Alert Modal ([`ReopenedTaskAlertModal.tsx`](file:///c:/Users/ASUS/Desktop/miniEmployeeManagementSoftware/src/components/dashboard/ReopenedTaskAlertModal.tsx))
+- **Alert Visuals:** High-priority amber banner (`border-amber-300 bg-amber-50/90 text-amber-900`) with rotating refresh icon (`RotateCcw`).
+- **Interactive Carousel:** For employees with multiple reopened deliverables, includes step-through pagination (`1 of 3`) with previous and next buttons.
+- **Context Details:** Displays task title, project code, reopen timestamp, and specific leadership review comments.
+- **Acknowledgment Action:** Single-click "Acknowledge Reopened Deliverable" or "Acknowledge All" buttons dispatching POST requests to `/api/employee/reopened-tasks` and persisting local storage tokens.
+
+### 6.5 Unified Hiring & Compliance Records Hub ([`/hiring`](file:///c:/Users/ASUS/Desktop/miniEmployeeManagementSoftware/src/app/w/%5BworkspaceSlug%5D/%28app%29/hiring/page.tsx))
+- **Split Layout Architecture:**
+  * **Left Navigation Tabs:** Seamless switching between "Employee Compliance Documents" and "HR Letters Studio".
+  * **Document Compliance Matrix:** High-density employee table featuring compliance badges:
+    - `AADHAAR`, `DEGREE`, `BANK_PASSBOOK` status pills (`VERIFIED` in emerald, `PENDING_REVIEW` in amber, `MISSING` in rose).
+    - Quarantine & Anti-Virus Scan Chips (`CLEAN`, `QUARANTINED`, `INFECTED`).
+  * **Letterhead & Template Builder:** Full WYSIWYG letter template editor with live dynamic placeholder tags (`{{employeeName}}`, `{{designation}}`, `{{joiningDate}}`, `{{salary}}`).
+  * **Letterhead Header/Footer Asset Studio:** Visual margin calibrator with live PDF preview pane.
+
+### 6.6 Studio Meetings & Executive MoM Hub ([`/meetings`](file:///c:/Users/ASUS/Desktop/miniEmployeeManagementSoftware/src/app/w/%5BworkspaceSlug%5D/%28app%29/meetings/page.tsx))
+- **Meeting Type Badges:** Distinctive semantic pill tags (`Design Review`, `Client Presentation`, `Site Coordination`, `Partner Strategy`).
+- **Attendee Scope Badges:** Stacked employee avatars with attendance status (`ACCEPTED`, `TENTATIVE`, `DECLINED`).
+- **Four-Eyes MoM Draft Indicator:** Gray badge with lock icon reading `DRAFT (PRIVATE TO LEADERSHIP)` until published; changes to emerald `MINUTES PUBLISHED` once released to team members.
+- **1-Click Action Item Conversion:** Dedicated icon button next to every minute action item to instantly create an `ExecutiveTask`.
+
+### 6.7 Employee Workstation Dashboard ([`EmployeeDashboardView.tsx`](file:///c:/Users/ASUS/Desktop/miniEmployeeManagementSoftware/src/app/w/[workspaceSlug]/(app)/dashboard/employee/EmployeeDashboardView.tsx))
 - **Daily Focus Mode:** High-impact hero widget featuring the employee's primary objective with timer trigger, "Submit for Review", and direct "Mark Complete" shortcuts.
 - **Active Tasks & Deliverables:** Comprehensive table/list with instant 1-click status transitions, blocker alerts, and checklist expanders.
 - **Velocity & Timer Metrics:** Live tracker of hours logged today, task turnaround rate, and active Pomodoro countdown.
 
-### 6.5 Owner Decision Inbox ([`src/app/w/[workspaceSlug]/(app)/inbox`](file:///c:/Users/ASUS/Desktop/miniEmployeeManagementSoftware/src/app/w/[workspaceSlug]/(app)/inbox))
+### 6.8 Owner Decision Inbox ([`src/app/w/[workspaceSlug]/(app)/inbox`](file:///c:/Users/ASUS/Desktop/miniEmployeeManagementSoftware/src/app/w/[workspaceSlug]/(app)/inbox))
 - **Unified Leadership Queue:** Consolidated review hub displaying pending submissions, deadline extensions, scope change requests, profile updates, and site visit logs.
 - **Four-Eyes Enforcement Banner:** Contextual notice disabling self-approval when the active user submitted the request.
 - **1-Click Approvals:** Instant decision modal with feedback commentary.
 
-### 6.6 Geofence Radar & SVG Site Plot Canvas ([`VisitsClientView.tsx`](file:///c:/Users/ASUS/Desktop/miniEmployeeManagementSoftware/src/app/w/[workspaceSlug]/(app)/visits/VisitsClientView.tsx))
+### 6.9 Multi-Participant Journey Radar & Geofence SVG Plot ([`VisitsClientView.tsx`](file:///c:/Users/ASUS/Desktop/miniEmployeeManagementSoftware/src/app/w/[workspaceSlug]/(app)/visits/VisitsClientView.tsx))
 - **Spatial Status Pill:** Real-time distance evaluation (`WITHIN_RADIUS` in emerald, `OUTSIDE_RADIUS` in rose).
 - **SVG Vector Radar:** Dynamic radar circle displaying site boundary, GPS accuracy halo, and check-in coordinates.
+- **Journey Stepper UI:** 7-step horizontal timeline displaying team travel status (`Assigned` $\to$ `En Route` $\to$ `On Site` $\to$ `Inspecting` $\to$ `Report Filed` $\to$ `Returning` $\to$ `At Studio`).
 - **Hands-Free Speech Dictation:** Microphone toggle with live audio wave pulsing and architectural term autocorrect.
+
+### 6.10 Indian Payroll & Salary Register
+- **Financial Freeze Pill:** Shows `LOCKED` with padlock icon when a payroll month is finalized.
+- **Tabular Numerals:** All base salaries, daily rates, LOP deductions, and net payouts format with `tabular-nums` alignment.
+- **1-Click Payout CSV Generator:** Dropdown modal with bank-specific format selectors (HDFC CMS, ICICI PayLink, SBI Direct Credit).
 
 ---
 
@@ -285,7 +317,7 @@ Scrollbars are styled to be minimal, unobtrusive, and color-matched to the archi
 
 ## 8. Print & Physical Transmittal Styles (`@media print`)
 
-Architectural handovers and site inspection reports must be printed for municipal submissions, client binders, or physical site file boxes. 
+Architectural handovers, site inspection reports, and official MoM records must be printed for municipal submissions, client binders, or physical site file boxes. 
 
 All views implement dedicated `@media print` rules:
 - **Clean Background:** Removes all dark mode fills, backgrounds, sidebars, topbars, and action buttons.
@@ -302,7 +334,7 @@ All views implement dedicated `@media print` rules:
 | **Primary Hue** | Blueprint Royal Blue (`#5A81FA`) |
 | **Secondary Hue** | Studio Navy (`#2C308D`) |
 | **Surface Hue** | Crisp White (`#FFFFFF`) / Ice Tint (`#F8F9FD`) |
-| **Border Tone** | Geometric Slate (`#E2E6F0`) |
+| **Border Tone** | Geometric Slate (`#E2E6F0` and `#A8B1CE`) |
 | **Base Font** | DM Sans (Variable WOFF2 / Regular 400, Medium 500, SemiBold 600, Bold 700) with Noto Sans Devanagari fallback |
 | **Numeric Font** | Inter Tabular Numbers (`tabular-nums`) |
 | **Grid Engine** | CSS Container Queries (`@container`) + CSS Grid |
@@ -310,4 +342,7 @@ All views implement dedicated `@media print` rules:
 | **Hydration Resilience** | `suppressHydrationWarning` on all interactive form & action tags |
 | **Live Sync UX** | Dual-state status badges (Pulsing 2-Way Write-Back vs Read-Only) |
 | **Governance UX** | Four-Eyes locks, Snapshot Version Badges & Employee Self-Completion Mode |
+| **Meeting & MoM UX** | Attendee Scoping, Draft MoM Privacy Watermark & 1-Click Task Converter |
+| **Alerting UX** | Reopened Task Alert Modal with Persistent Database & Local Storage Acknowledgment |
+| **Compliance UX** | Aadhaar/Degree/Bank Passbook Vault with ClamAV Quarantine Status |
 | **Print Output** | `@media print` formatted for official physical transmittal dossiers |

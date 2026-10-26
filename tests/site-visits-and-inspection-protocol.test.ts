@@ -206,6 +206,32 @@ test("Site Visits & Enterprise Inspection Protocol Test Suite", async (t) => {
     assert.equal(reviewRes.reviewComment, "Reinforcement verified against structural drawing R2. Approved for casting.");
   });
 
+  await t.test("5. Employee Assignment Access: Employees can schedule and assign site visits", async () => {
+    const scheduledTime = new Date(Date.now() + 7200000);
+    const employeeAssignedVisit = await createSiteVisit(employeeCtx, {
+      projectId: project.id,
+      customSiteName: "Employee Assigned Site Audit",
+      customSiteAddress: "Sector 10, Kharadi, Pune",
+      customSiteLatitude: 18.5512,
+      customSiteLongitude: 73.9389,
+      customSiteRadiusMeters: 200,
+      employeeId: employeeMembership.id,
+      purpose: "Routine progress & MEP inspection scheduled by staff architect",
+      scheduledTime,
+      inspectionType: "ROUTINE",
+      priority: "ROUTINE",
+    });
+
+    assert.ok(employeeAssignedVisit.id, "Employee should successfully create site visit");
+    assert.equal(employeeAssignedVisit.purpose, "Routine progress & MEP inspection scheduled by staff architect");
+    assert.equal(employeeAssignedVisit.operationalState, "SCHEDULED");
+
+    // Cleanup
+    await prisma.siteVisitEvent.deleteMany({ where: { visitId: employeeAssignedVisit.id } });
+    await prisma.siteVisit.delete({ where: { id: employeeAssignedVisit.id } });
+    await prisma.site.delete({ where: { id: employeeAssignedVisit.siteId } });
+  });
+
   // Cleanup test visit and site
   await prisma.siteVisitEvent.deleteMany({ where: { visitId: testVisitId } });
   await prisma.siteVisit.delete({ where: { id: testVisitId } });

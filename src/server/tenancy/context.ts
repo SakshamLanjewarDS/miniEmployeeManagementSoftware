@@ -102,7 +102,7 @@ export function canManageDirectories(context: TenantContext): boolean {
 }
 
 export function canManageFinance(context: TenantContext): boolean {
-  return isAdminOrOwner(context) || context.hasFinanceAccess;
+  return isOwner(context) || Boolean(context.hasFinanceAccess);
 }
 
 export function canApproveWork(context: TenantContext): boolean {
@@ -128,7 +128,7 @@ export function assertCanManageFinance(context: TenantContext, message = "Forbid
 }
 
 export function canManageHR(context: TenantContext): boolean {
-  return isOwner(context) || isAdmin(context) || Boolean(context.hasHrAccess);
+  return isOwner(context) || Boolean(context.hasHrAccess);
 }
 
 export function assertCanManageHR(context: TenantContext, message = "Forbidden: HR management privileges required"): void {
@@ -138,17 +138,18 @@ export function assertCanManageHR(context: TenantContext, message = "Forbidden: 
 }
 
 /**
- * An Admin cannot verify their own HR documents or approve their own employment letter.
- * Route these to the Owner or another authorized reviewer.
+ * An Admin or Owner cannot verify their own HR documents or approve their own employment letter.
+ * Four-eyes principle strictly enforced across all roles.
  */
 export function assertCannotSelfReview(
   context: TenantContext,
   targetEmployeeOrMembershipId: string,
-  message = "Forbidden: Administrators cannot verify their own HR documents or approve their own employment letter"
+  message = "Forbidden: Cannot verify own HR documents or self-approve employment letters (four-eyes principle enforced)"
 ): void {
   if (
-    context.role !== TenantRole.OWNER &&
-    (context.employeeId === targetEmployeeOrMembershipId || context.membershipId === targetEmployeeOrMembershipId)
+    context.employeeId === targetEmployeeOrMembershipId ||
+    context.membershipId === targetEmployeeOrMembershipId ||
+    (context.userId && context.userId === targetEmployeeOrMembershipId)
   ) {
     throw new ForbiddenException(message);
   }

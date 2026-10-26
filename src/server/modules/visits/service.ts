@@ -511,8 +511,20 @@ export async function reviewSiteVisit(
   decision: SiteVisitReviewDecision,
   comment?: string
 ) {
+  if (ctx.role !== "OWNER" && ctx.role !== "ADMIN") {
+    throw new ForbiddenException("Only Owner or Admin can review site visits.");
+  }
+
+  const existingVisit = await prisma.siteVisit.findFirst({
+    where: { id: visitId, tenantId: ctx.tenantId },
+  });
+
+  if (!existingVisit) {
+    throw new Error("Site visit not found in this studio workspace.");
+  }
+
   const updated = await prisma.siteVisit.update({
-    where: { id: visitId },
+    where: { id: existingVisit.id },
     data: {
       reviewDecision: decision,
       reviewComment: comment,
@@ -652,21 +664,18 @@ export interface CreateSiteVisitInput {
 }
 
 /**
- * Assign and schedule a new site visit (Owner, Admin, or Project Manager)
+ * Assign and schedule a new site visit (Studio workspace members)
  */
 export async function createSiteVisit(ctx: TenantContext, input: CreateSiteVisitInput) {
-  const isPrivileged = ctx.role === "OWNER" || ctx.role === "ADMIN";
-  if (!isPrivileged) {
-    const isPM = await prisma.project.findFirst({
-      where: {
-        id: input.projectId,
-        tenantId: ctx.tenantId,
-        projectManagerId: ctx.membershipId,
-      },
-    });
-    if (!isPM) {
-      throw new Error("Only studio Partners, Admins, or Project Managers can schedule and assign site visits.");
-    }
+  // Validate target project belongs to this studio workspace
+  const project = await prisma.project.findFirst({
+    where: {
+      id: input.projectId,
+      tenantId: ctx.tenantId,
+    },
+  });
+  if (!project) {
+    throw new Error("Target project not found in this studio workspace or access denied.");
   }
 
   // 1. Resolve Assignees (Searchable multi-select: at least 1 active, no duplicates)
@@ -695,8 +704,14 @@ export async function createSiteVisit(ctx: TenantContext, input: CreateSiteVisit
   let targetSiteId = input.siteId;
 
   if (targetSiteId && (input.customSiteRadiusMeters || input.customSiteLandmarkNotes || input.customSiteGoogleMapsUrl)) {
+    const existingSite = await prisma.site.findFirst({
+      where: { id: targetSiteId, tenantId: ctx.tenantId },
+    });
+    if (!existingSite) {
+      throw new Error("Target site not found or access denied.");
+    }
     await prisma.site.update({
-      where: { id: targetSiteId },
+      where: { id: existingSite.id },
       data: {
         ...(input.customSiteRadiusMeters ? { radiusMeters: input.customSiteRadiusMeters } : {}),
         ...(input.customSiteLandmarkNotes ? { landmarkNotes: input.customSiteLandmarkNotes.trim() } : {}),
@@ -1440,8 +1455,16 @@ export async function reviewInspectionReport(
     throw new ForbiddenException("Only Owner or Admin can review inspection reports.");
   }
 
+  const existingReport = await prisma.siteVisitInspectionReport.findFirst({
+    where: { id: reportId, tenantId: ctx.tenantId },
+  });
+
+  if (!existingReport) {
+    throw new Error("Inspection report not found in this studio workspace.");
+  }
+
   const updated = await prisma.siteVisitInspectionReport.update({
-    where: { id: reportId },
+    where: { id: existingReport.id },
     data: {
       status: decision,
       reviewerId: ctx.membershipId,

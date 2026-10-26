@@ -395,10 +395,10 @@ export async function reopenCompletedTask(
       },
     });
 
-    // 2. Reopen assignments
+    // 2. Reopen assignments: reset completion state and clear acknowledgment
     await tx.taskAssignment.updateMany({
       where: { taskId: task.id },
-      data: { isCompleted: false, completedAt: null },
+      data: { isCompleted: false, completedAt: null, acknowledgedAt: null },
     });
 
     // 3. Reopen checklist items if any

@@ -25,6 +25,7 @@ export function MobileBottomNav({ context }: MobileBottomNavProps) {
   const [decisionCount, setDecisionCount] = useState<number | null>(null);
 
   useEffect(() => {
+    if (!isLeader) return;
     let isMounted = true;
     const fetchDecisionCount = async () => {
       try {

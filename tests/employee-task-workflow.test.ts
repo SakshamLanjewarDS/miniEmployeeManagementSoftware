@@ -572,4 +572,39 @@ describe("End-to-End Employee Task Workflow & Governance Test Suite", () => {
       /Only assigned employees, the task creator, or Studio Admin\/Boss can update checklist items/i
     );
   });
+
+  test("17. Employee Task Assignment: Employee can assign deliverables and site visit tasks to colleagues", async () => {
+    // Employee 1 assigns a task to Employee 2
+    const assignedTask = await createTask(employee1Ctx, {
+      projectId: testProject.id,
+      title: "HVAC Section Detailing & Site Visit Coordination",
+      description: "Detailed sections for ducting routes and on-site clearance verification",
+      assigneeId: employee2Ctx.membershipId,
+      assigneeIds: [employee2Ctx.membershipId],
+      priority: TaskPriority.HIGH,
+      checklistItems: [
+        {
+          title: "Verify riser dimensions against architectural core",
+          assignedMemberId: employee2Ctx.membershipId,
+        },
+      ],
+    });
+
+    assert.ok(assignedTask.id, "Deliverable task assigned by employee should be created");
+    assert.equal(assignedTask.creatorId, employee1Ctx.membershipId);
+    assert.equal(assignedTask.assigneeId, employee2Ctx.membershipId);
+
+    // Verify TaskAssignment record
+    const assignments = await prisma.taskAssignment.findMany({
+      where: { taskId: assignedTask.id },
+    });
+    assert.equal(assignments.length, 1);
+    assert.equal(assignments[0].membershipId, employee2Ctx.membershipId);
+
+    // Clean up
+    await prisma.taskChecklistItem.deleteMany({ where: { taskId: assignedTask.id } });
+    await prisma.taskAssignment.deleteMany({ where: { taskId: assignedTask.id } });
+    await prisma.auditEvent.deleteMany({ where: { entityId: assignedTask.id } });
+    await prisma.task.delete({ where: { id: assignedTask.id } });
+  });
 });

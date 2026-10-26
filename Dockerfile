@@ -1,5 +1,5 @@
 # Multi-stage production Dockerfile for 100% DESIGN Studio OS
-# Stage 1: Dependencies
+# Stage 1: Build Dependencies (includes devDependencies for TypeScript compilation)
 FROM node:20-alpine AS deps
 WORKDIR /app
 RUN apk add --no-cache libc6-compat openssl
@@ -7,7 +7,15 @@ COPY package.json package-lock.json* ./
 COPY prisma ./prisma/
 RUN npm install
 
-# Stage 2: Builder
+# Stage 2: Production Dependencies Only (isolated for minimal runtime image)
+FROM node:20-alpine AS prod-deps
+WORKDIR /app
+RUN apk add --no-cache libc6-compat openssl
+COPY package.json package-lock.json* ./
+COPY prisma ./prisma/
+RUN npm ci --omit=dev
+
+# Stage 3: Builder
 FROM node:20-alpine AS builder
 WORKDIR /app
 RUN apk add --no-cache openssl
@@ -18,7 +26,7 @@ ENV NODE_ENV=production
 RUN npx prisma generate
 RUN npm run build
 
-# Stage 3: Runner
+# Stage 4: Runner (Minimal attack surface)
 FROM node:20-alpine AS runner
 WORKDIR /app
 
@@ -38,7 +46,9 @@ RUN mkdir -p /app/storage/uploads /app/.next/cache/images && \
 
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
+COPY --from=prod-deps --chown=nextjs:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 COPY --from=builder --chown=nextjs:nodejs /app/scripts ./scripts

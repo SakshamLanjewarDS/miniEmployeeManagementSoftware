@@ -2,6 +2,7 @@ import { spawn } from "child_process";
 import fs from "fs";
 import path from "path";
 import zlib from "zlib";
+import crypto from "crypto";
 
 function parseDatabaseUrl(urlStr: string) {
   try {
@@ -25,7 +26,6 @@ async function runBackup() {
     process.exit(1);
   }
 
-  // Read .env if not already in process.env
   const envContent = fs.readFileSync(envPath, "utf8");
   const match = envContent.match(/DATABASE_URL=["']?([^"'\r\n]+)["']?/);
   const databaseUrl = process.env.DATABASE_URL || (match ? match[1] : "");
@@ -49,11 +49,15 @@ async function runBackup() {
     .replace(/\..+/, "");
   const filename = `pre_deploy_backup_${timestamp}.sql.gz`;
   const filePath = path.join(backupsDir, filename);
+  const shaFilePath = path.join(backupsDir, `${filename}.sha256`);
 
-  console.log(`📦 Starting pre-migration database snapshot...`);
-  console.log(`Database: ${dbConfig.database} @ ${dbConfig.host}:${dbConfig.port}`);
-  console.log(`Output:   ${filePath}`);
+  console.log(`====================================================================`);
+  console.log(`📦 100% DESIGN Studio OS — Audited Database Snapshot Engine`);
+  console.log(`====================================================================`);
+  console.log(`Target Database : ${dbConfig.database} @ ${dbConfig.host}:${dbConfig.port}`);
+  console.log(`Output Archive  : ${filePath}`);
 
+  // Safeguard: Never pass database password via command-line arguments (visible in ps -ef)
   const args = [
     `--host=${dbConfig.host}`,
     `--port=${dbConfig.port}`,
@@ -63,49 +67,83 @@ async function runBackup() {
     `--routines`,
     `--triggers`,
     `--default-character-set=utf8mb4`,
+    dbConfig.database,
   ];
 
-  if (dbConfig.password) {
-    args.push(`--password=${dbConfig.password}`);
-  }
-
-  args.push(dbConfig.database);
+  // Securely pass password via MYSQL_PWD environment variable
+  const spawnEnv = {
+    ...process.env,
+    MYSQL_PWD: dbConfig.password,
+  };
 
   const dumpProc = spawn("mysqldump", args, {
+    env: spawnEnv,
     stdio: ["ignore", "pipe", "pipe"],
   });
 
-  const gzipStream = zlib.createGzip();
+  const gzipStream = zlib.createGzip({ level: 9 });
   const writeStream = fs.createWriteStream(filePath);
+  const hash = crypto.createHash("sha256");
 
   let stderr = "";
   dumpProc.stderr.on("data", (chunk) => {
     stderr += chunk.toString();
   });
 
-  dumpProc.stdout.pipe(gzipStream).pipe(writeStream);
-
   dumpProc.on("error", (err) => {
     console.error(`❌ Failed to start mysqldump: ${err.message}`);
-    console.error(`Please ensure mysqldump is installed and accessible in PATH.`);
+    console.error(`Please ensure mysqldump is installed in PATH.`);
     process.exit(1);
   });
+
+  gzipStream.on("error", (err) => {
+    console.error(`❌ Gzip compression failure: ${err.message}`);
+    cleanupFailedBackup(filePath, shaFilePath);
+    process.exit(1);
+  });
+
+  writeStream.on("error", (err) => {
+    console.error(`❌ File write failure: ${err.message}`);
+    cleanupFailedBackup(filePath, shaFilePath);
+    process.exit(1);
+  });
+
+  dumpProc.stdout.on("data", (chunk) => {
+    hash.update(chunk);
+  });
+
+  dumpProc.stdout.pipe(gzipStream).pipe(writeStream);
 
   dumpProc.on("close", (code) => {
     if (code !== 0) {
       console.error(`❌ mysqldump failed with exit code ${code}`);
       if (stderr) console.error(stderr);
-      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+      cleanupFailedBackup(filePath, shaFilePath);
       process.exit(code || 1);
     }
 
-    const stats = fs.statSync(filePath);
-    console.log(`✅ Snapshot completed successfully!`);
-    console.log(`File: ${filename} (${(stats.size / 1024).toFixed(2)} KB)`);
+    writeStream.on("finish", () => {
+      const stats = fs.statSync(filePath);
+      const digest = hash.digest("hex");
+      fs.writeFileSync(shaFilePath, `${digest}  ${filename}\n`, "utf8");
+
+      console.log(`✅ Snapshot completed successfully!`);
+      console.log(`   Archive Size : ${(stats.size / 1024).toFixed(2)} KB`);
+      console.log(`   SHA-256 Checksum : ${digest}`);
+      console.log(`   Checksum File: ${shaFilePath}`);
+      console.log(`====================================================================`);
+    });
   });
 }
 
+function cleanupFailedBackup(filePath: string, shaFilePath: string) {
+  try {
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    if (fs.existsSync(shaFilePath)) fs.unlinkSync(shaFilePath);
+  } catch (_) {}
+}
+
 runBackup().catch((err) => {
-  console.error("Backup failed:", err);
+  console.error("Backup fatal failure:", err);
   process.exit(1);
 });

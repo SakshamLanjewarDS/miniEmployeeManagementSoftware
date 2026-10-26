@@ -55,21 +55,40 @@ export function ReopenedTaskAlertModal({
     }
   }, [reopenedTasks, workspaceSlug, forceOpen]);
 
-  const handleAcknowledgeAll = () => {
-    // Save acknowledgment for all current reopened items
+  const handleAcknowledgeAll = async () => {
+    // 1. Save acknowledgment for all current reopened items to local storage for instant UI responsiveness
     for (const task of reopenedTasks) {
       const ackKey = `reopened_task_ack_${workspaceSlug}_${task.id}_${task.reopenedAt}`;
       localStorage.setItem(ackKey, "true");
     }
+
+    // 2. Authoritative server-side persistence
+    try {
+      await fetch(`/api/employee/reopened-tasks?workspaceSlug=${encodeURIComponent(workspaceSlug)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ workspaceSlug, acknowledgeAll: true }),
+      });
+    } catch (_) {}
+
     setIsOpen(false);
     onClose?.();
   };
 
-  const handleDismissCurrent = () => {
+  const handleDismissCurrent = async () => {
     const current = reopenedTasks[currentIndex];
     if (current) {
       const ackKey = `reopened_task_ack_${workspaceSlug}_${current.id}_${current.reopenedAt}`;
       localStorage.setItem(ackKey, "true");
+
+      // Authoritative server-side persistence
+      try {
+        await fetch(`/api/employee/reopened-tasks?workspaceSlug=${encodeURIComponent(workspaceSlug)}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ workspaceSlug, taskId: current.taskId, checklistItemId: current.checklistItemId }),
+        });
+      } catch (_) {}
     }
 
     if (currentIndex < reopenedTasks.length - 1) {

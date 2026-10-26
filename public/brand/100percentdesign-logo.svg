@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 48" fill="none">
+  <rect width="40" height="40" x="4" y="4" rx="10" fill="#5A81FA"/>
+  <text x="24" y="29" fill="#FFFFFF" font-family="system-ui, -apple-system, sans-serif" font-weight="800" font-size="16" text-anchor="middle">100%</text>
+  <text x="56" y="25" fill="#1F1F1F" font-family="system-ui, -apple-system, sans-serif" font-weight="700" font-size="15" letter-spacing="-0.3">100% DESIGN</text>
+  <text x="56" y="38" fill="#696E82" font-family="system-ui, -apple-system, sans-serif" font-weight="500" font-size="10" letter-spacing="0.5">STUDIO ARCHITECTURE</text>
+</svg>

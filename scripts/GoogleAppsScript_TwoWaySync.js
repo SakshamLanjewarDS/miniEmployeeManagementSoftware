@@ -220,12 +220,49 @@ function onFormSubmit(e) {
 
 
 // ==========================================================
-// 2. ADMIN APPROVAL EMAIL DISPATCHER (WITH 1-CLICK BUTTONS)
+// 1.1 SECURITY & TOKEN AUTHORIZATION HELPERS
+// ==========================================================
+
+function getDecisionSecret() {
+  const props = PropertiesService.getScriptProperties();
+  let secret = props.getProperty("STUDIO_DECISION_SECRET");
+  if (!secret) {
+    secret = "d100_gas_decision_secret_prod_2026_secure";
+  }
+  return secret;
+}
+
+function generateDecisionToken(row, action, timestamp) {
+  const secret = getDecisionSecret();
+  const payload = String(row) + ":" + String(action) + ":" + String(timestamp);
+  const signature = Utilities.computeHmacSha256Signature(payload, secret);
+  return Utilities.base64EncodeWebSafe(signature);
+}
+
+function verifyDecisionToken(row, action, timestamp, token) {
+  if (!row || !action || !timestamp || !token) return false;
+  const now = Date.now();
+  const ts = parseInt(timestamp, 10);
+  // Expire after 7 days (604,800,000 ms)
+  if (isNaN(ts) || now - ts > 7 * 24 * 60 * 60 * 1000) {
+    return false;
+  }
+  const expected = generateDecisionToken(row, action, timestamp);
+  return expected === token;
+}
+
+
+// ==========================================================
+// 2. ADMIN APPROVAL EMAIL DISPATCHER (WITH SIGNED CONFIRMATION)
 // ==========================================================
 
 function sendAdminApprovalEmail(data) {
-  const approveUrl = WEB_APP_URL + "?row=" + encodeURIComponent(data.row) + "&action=approve";
-  const rejectUrl = WEB_APP_URL + "?row=" + encodeURIComponent(data.row) + "&action=reject";
+  const now = Date.now();
+  const approveToken = generateDecisionToken(data.row, "approve", now);
+  const rejectToken = generateDecisionToken(data.row, "reject", now);
+
+  const approveUrl = WEB_APP_URL + "?row=" + encodeURIComponent(data.row) + "&action=approve&token=" + encodeURIComponent(approveToken) + "&ts=" + now;
+  const rejectUrl = WEB_APP_URL + "?row=" + encodeURIComponent(data.row) + "&action=reject&token=" + encodeURIComponent(rejectToken) + "&ts=" + now;
 
   let leaveDetails = "";
   if (data.isFewHours) {
@@ -292,15 +329,15 @@ function sendAdminApprovalEmail(data) {
 
       <div style="margin:28px 0 16px;text-align:center;">
         <a href="${approveUrl}" style="display:inline-block;background:#16A34A;color:#ffffff;text-decoration:none;padding:12px 28px;margin:6px;border-radius:8px;font-weight:700;font-size:14px;box-shadow:0 2px 8px rgba(22,163,74,0.3);">
-          ✓ APPROVE
+          ✓ REVIEW & APPROVE
         </a>
         <a href="${rejectUrl}" style="display:inline-block;background:#DC2626;color:#ffffff;text-decoration:none;padding:12px 28px;margin:6px;border-radius:8px;font-weight:700;font-size:14px;box-shadow:0 2px 8px rgba(220,38,38,0.3);">
-          ✕ REJECT
+          ✕ REVIEW & REJECT
         </a>
       </div>
 
       <p style="margin-top:20px;color:#94A3B8;font-size:11px;text-align:center;">
-        Clicking Approve or Reject will update the spreadsheet and immediately notify the employee.
+        Protected by single-use expiring token. Clicking opens a secure confirmation gateway before recording the decision.
       </p>
     </div>
   </div>
@@ -315,7 +352,7 @@ function sendAdminApprovalEmail(data) {
 
 
 // ==========================================================
-// 3. WEB APP GET REQUEST (1-CLICK EMAIL APPROVAL / REJECTION)
+// 3. WEB APP GET REQUEST (SECURE CONFIRMATION GATEWAY)
 // ==========================================================
 
 function doGet(e) {
@@ -326,6 +363,8 @@ function doGet(e) {
 
     const row = parseInt(e.parameter.row, 10);
     const action = String(e.parameter.action || "").toLowerCase().trim();
+    const token = String(e.parameter.token || "").trim();
+    const ts = String(e.parameter.ts || "").trim();
 
     if (!row || row < 2) {
       return createResultPage("Invalid Request", "Invalid spreadsheet row identifier.", "#DC2626");
@@ -333,6 +372,15 @@ function doGet(e) {
 
     if (action !== "approve" && action !== "reject") {
       return createResultPage("Invalid Action", "Action must be 'approve' or 'reject'.", "#DC2626");
+    }
+
+    // Cryptographic Token Verification (Replay & Tampering Protection)
+    if (!verifyDecisionToken(row, action, ts, token)) {
+      return createResultPage(
+        "Invalid or Expired Link",
+        "This decision link has expired or the security token is invalid. Please review this request via the studio dashboard.",
+        "#DC2626"
+      );
     }
 
     const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -355,7 +403,8 @@ function doGet(e) {
     if (
       currentStatus.toLowerCase() === "approved" ||
       currentStatus.toLowerCase() === "rejected" ||
-      currentStatus.toLowerCase().indexOf("auto rejected") === 0
+      currentStatus.toLowerCase().indexOf("auto rejected") === 0 ||
+      currentStatus.toLowerCase() === "cancelled"
     ) {
       return createResultPage("Already Processed", "This request was already marked as: " + currentStatus + " on the studio ledger.", "#64748B");
     }
@@ -364,8 +413,15 @@ function doGet(e) {
     // HTTP GET NEVER commits decisions! Link scanners & antivirus crawlers are safely blocked.
     // Decision requires explicit user click submitting a signed POST request.
     const isApprove = action === "approve";
-    const btnColor = isApprove ? "#2563EB" : "#DC2626";
-    const actionLabel = isApprove ? "Approve Leave Request" : "Reject Leave Request";
+    const btnColor = isApprove ? "#16A34A" : "#DC2626";
+    const actionLabel = isApprove ? "Confirm Approval" : "Confirm Rejection";
+
+    const reasonFieldHtml = !isApprove
+      ? `<div style="text-align:left;margin-bottom:16px;">
+           <label style="font-size:12px;font-weight:600;color:#475569;display:block;margin-bottom:6px;">Rejection Reason (Optional):</label>
+           <textarea name="rejectionReason" rows="2" style="width:100%;border:1px solid #CBD5E1;border-radius:8px;padding:8px;font-family:inherit;font-size:13px;box-sizing:border-box;" placeholder="Reason for staff records..."></textarea>
+         </div>`
+      : "";
 
     const htmlContent = `
       <!DOCTYPE html>
@@ -377,7 +433,7 @@ function doGet(e) {
         <style>
           body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #F8FAFC; color: #0F172A; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
           .card { background: white; border-radius: 16px; border: 1px solid #E2E8F0; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05); max-width: 480px; width: 100%; padding: 32px; text-align: center; }
-          .badge { display: inline-block; padding: 4px 12px; border-radius: 9999px; font-size: 12px; font-weight: 700; background: #EEF2F6; color: #334155; margin-bottom: 16px; }
+          .badge { display: inline-block; padding: 4px 12px; border-radius: 9999px; font-size: 11px; font-weight: 700; background: #EEF2F6; color: #334155; margin-bottom: 16px; letter-spacing: 0.5px; }
           h2 { margin: 0 0 8px 0; font-size: 20px; font-weight: 700; color: #0F172A; }
           p { margin: 0 0 20px 0; font-size: 14px; color: #64748B; line-height: 1.5; }
           .details { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; padding: 16px; text-align: left; font-size: 13px; margin-bottom: 24px; }
@@ -385,16 +441,16 @@ function doGet(e) {
           .row:last-child { margin-bottom: 0; }
           .label { color: #64748B; font-weight: 500; }
           .val { font-weight: 600; color: #0F172A; }
-          button { background: ${btnColor}; color: white; border: none; padding: 12px 24px; border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer; width: 100%; transition: opacity 0.2s; }
+          button { background: ${btnColor}; color: white; border: none; padding: 12px 24px; border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer; width: 100%; transition: opacity 0.2s; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
           button:hover { opacity: 0.9; }
           .note { font-size: 11px; color: #94A3B8; margin-top: 16px; }
         </style>
       </head>
       <body>
         <div class="card">
-          <div class="badge">LEAVE DECISION GATEWAY</div>
-          <h2>Confirm Decision</h2>
-          <p>Please confirm your decision for the staff leave request below. Automated link scanners cannot trigger decisions.</p>
+          <div class="badge">SECURE DECISION GATEWAY</div>
+          <h2>Confirm Leave Decision</h2>
+          <p>Please confirm your decision below. Link pre-fetchers and scanners cannot trigger actions.</p>
           <div class="details">
             <div class="row"><span class="label">Employee:</span><span class="val">${employeeName}</span></div>
             <div class="row"><span class="label">Leave Type:</span><span class="val">${leaveType}</span></div>
@@ -404,9 +460,12 @@ function doGet(e) {
           <form method="POST" action="${ScriptApp.getService().getUrl()}">
             <input type="hidden" name="action" value="${action}">
             <input type="hidden" name="row" value="${row}">
+            <input type="hidden" name="token" value="${token}">
+            <input type="hidden" name="ts" value="${ts}">
+            ${reasonFieldHtml}
             <button type="submit">${actionLabel}</button>
           </form>
-          <div class="note">100% DESIGN Studio OS • Protected against email bot pre-fetching</div>
+          <div class="note">100% DESIGN Studio OS • Single-Use Cryptographic Decision Gateway</div>
         </div>
       </body>
       </html>
@@ -421,13 +480,92 @@ function doGet(e) {
 
 
 // ==========================================================
-// 4. WEB APP POST REQUEST (LIVE TWO-WAY SYNC FROM STUDIO OS)
-// When Studio OS approves, rejects, or deletes, this runs!
+// 4. WEB APP POST REQUEST (DECISION MUTATION & STUDIO OS SYNC)
 // ==========================================================
 
 function doPost(e) {
   try {
-    const contents = JSON.parse(e.postData.contents);
+    // --------------------------------------------------------
+    // CASE A: FORM POST FROM CONFIRMATION GATEWAY (EMAIL DECISION)
+    // --------------------------------------------------------
+    if (e && e.parameter && e.parameter.token && e.parameter.row) {
+      const row = parseInt(e.parameter.row, 10);
+      const action = String(e.parameter.action || "").toLowerCase().trim();
+      const token = String(e.parameter.token || "").trim();
+      const ts = String(e.parameter.ts || "").trim();
+      const rejectionReason = String(e.parameter.rejectionReason || "").trim();
+
+      if (!verifyDecisionToken(row, action, ts, token)) {
+        return createResultPage("Unauthorized", "Invalid or expired decision token.", "#DC2626");
+      }
+
+      const ss = SpreadsheetApp.getActiveSpreadsheet();
+      const sheet = ss.getSheetByName(SHEET_NAME) || ss.getActiveSheet();
+      if (!sheet || row > sheet.getLastRow()) {
+        return createResultPage("Error", "Spreadsheet row no longer exists.", "#DC2626");
+      }
+
+      const currentStatus = sheet.getRange(row, 14).getDisplayValue().trim();
+      if (
+        currentStatus.toLowerCase() === "approved" ||
+        currentStatus.toLowerCase() === "rejected" ||
+        currentStatus.toLowerCase() === "cancelled"
+      ) {
+        return createResultPage("Already Processed", "This request was already marked as " + currentStatus + ".", "#64748B");
+      }
+
+      const isApprove = action === "approve";
+      const newStatus = isApprove ? "Approved" : "Rejected";
+      const employeeName = sheet.getRange(row, 2).getDisplayValue().trim();
+      const leaveType = sheet.getRange(row, 4).getDisplayValue().trim();
+      const employeeEmail = sheet.getRange(row, 9).getDisplayValue().trim();
+      const actionDate = new Date();
+
+      sheet.getRange(row, 14).setValue(newStatus);
+      sheet.getRange(row, 15).setValue(ADMIN_EMAIL + " (Confirmed via Gateway)");
+      sheet.getRange(row, 16).setValue(actionDate).setNumberFormat("dd/MM/yyyy hh:mm:ss AM/PM");
+
+      if (rejectionReason) {
+        sheet.getRange(row, 14).setNote("Rejection Reason: " + rejectionReason);
+      }
+
+      SpreadsheetApp.flush();
+
+      // Send decision email to employee
+      sendDecisionEmail(employeeEmail, employeeName, leaveType, newStatus, rejectionReason);
+
+      return createResultPage(
+        isApprove ? "Leave Approved" : "Leave Rejected",
+        "The leave application for " + employeeName + " has been marked as " + newStatus + ". A notification has been sent.",
+        isApprove ? "#16A34A" : "#DC2626"
+      );
+    }
+
+    // --------------------------------------------------------
+    // CASE B: JSON POST FROM 100% DESIGN STUDIO OS (TWO-WAY SYNC)
+    // --------------------------------------------------------
+    let contents: any = {};
+    try {
+      contents = JSON.parse(e.postData.contents);
+    } catch (parseErr) {
+      return ContentService.createTextOutput(JSON.stringify({
+        success: false,
+        error: "Malformed request payload"
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // Webhook Secret Verification
+    const configuredWebhookSecret = PropertiesService.getScriptProperties().getProperty("STUDIO_WEBHOOK_SECRET");
+    if (configuredWebhookSecret) {
+      const incomingSecret = contents.webhookSecret || (e.parameter && e.parameter.secret);
+      if (incomingSecret !== configuredWebhookSecret) {
+        return ContentService.createTextOutput(JSON.stringify({
+          success: false,
+          error: "Unauthorized: Invalid webhook secret token"
+        })).setMimeType(ContentService.MimeType.JSON);
+      }
+    }
+
     const action = String(contents.action || "").toUpperCase().trim();
     const targetEmail = (contents.employeeEmail || "").toLowerCase().trim();
     const targetStatus = contents.status || (action === "APPROVE" ? "Approved" : action === "REJECT" ? "Rejected" : action === "CANCEL" ? "Cancelled" : "[DELETED]");

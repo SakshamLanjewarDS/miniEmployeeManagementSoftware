@@ -1232,6 +1232,9 @@ export async function getEmployeeDashboardData(ctx: TenantContext): Promise<Empl
           include: {
             project: { select: { id: true, code: true, name: true } },
             checklistItems: true,
+            assignments: {
+              where: { membershipId: ctx.membershipId },
+            },
           },
         },
       },
@@ -1273,6 +1276,16 @@ export async function getEmployeeDashboardData(ctx: TenantContext): Promise<Empl
   const reopenedTasksMap = new Map<string, ReopenedTaskAlert>();
 
   for (const act of reopenedActivities) {
+    const userAssignment = (act.task as any).assignments?.[0];
+    if (
+      userAssignment &&
+      userAssignment.acknowledgedAt &&
+      new Date(userAssignment.acknowledgedAt).getTime() >= new Date(act.createdAt).getTime() - 2000
+    ) {
+      // Reopened cycle already authoritatively acknowledged server-side after this reopen event
+      continue;
+    }
+
     let actorName = actorNameMap.get(act.actorId) || "Studio Leadership";
     let itemTitle = "";
     let cleanReason = act.reason || "Deliverable work was reopened by studio leadership.";
