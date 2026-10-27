@@ -325,20 +325,26 @@ export default function RootLayout({
                   }
                 });
 
-                // Clean up preloaded links on window load to prevent Chromium unused-preload timer warnings
+                // Clean up preloaded links early to prevent Chromium unused-preload timer warnings
                 if (typeof window !== 'undefined') {
-                  window.addEventListener('load', function() {
-                    setTimeout(function() {
-                      try {
-                        var preloads = document.querySelectorAll('link[rel="preload"]');
-                        preloads.forEach(function(l) {
-                          if (l && l.parentNode) {
-                            l.parentNode.removeChild(l);
-                          }
-                        });
-                      } catch(e) {}
-                    }, 500);
-                  });
+                  var cleanPreloads = function() {
+                    try {
+                      var preloads = document.querySelectorAll('link[rel="preload"]');
+                      preloads.forEach(function(l) {
+                        if (l && l.parentNode) {
+                          l.parentNode.removeChild(l);
+                        }
+                      });
+                    } catch(e) {}
+                  };
+                  if (document.readyState === 'complete' || document.readyState === 'interactive') {
+                    setTimeout(cleanPreloads, 50);
+                  } else {
+                    document.addEventListener('DOMContentLoaded', function() { setTimeout(cleanPreloads, 50); });
+                    window.addEventListener('load', function() { setTimeout(cleanPreloads, 50); });
+                  }
+                  setTimeout(cleanPreloads, 1200);
+                  setTimeout(cleanPreloads, 2500);
                 }
               })();
             `,
