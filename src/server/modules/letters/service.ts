@@ -126,7 +126,7 @@ export async function ensureDefaultTemplates(ctx: TenantContext): Promise<void> 
  * Get all available letter templates for the studio
  */
 export async function getLetterTemplates(ctx: TenantContext) {
-  assertCanManageHR(ctx);
+  assertAdminOnly(ctx, "Forbidden: Only Studio Administrators or Owners can view letter templates.");
   await ensureDefaultTemplates(ctx);
 
   return await prisma.letterTemplate.findMany({

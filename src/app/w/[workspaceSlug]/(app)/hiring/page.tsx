@@ -1,6 +1,7 @@
 import React from "react";
 import { redirect } from "next/navigation";
 import { getCurrentTenantContext } from "@/server/auth/session";
+import { canManageHR } from "@/server/tenancy/context";
 import { listEmployeesService } from "@/server/modules/employees/service";
 import { getLetterTemplates } from "@/server/modules/letters/service";
 import { getAllEmployeesDocumentRecords } from "@/server/modules/documents/service";
@@ -24,11 +25,29 @@ export default async function HiringPage({ params }: HiringPageProps) {
     redirect(`/w/${workspaceSlug}/team`);
   }
 
-  const [employees, templates, documentRecords] = await Promise.all([
-    listEmployeesService(ctx),
-    getLetterTemplates(ctx),
-    getAllEmployeesDocumentRecords(ctx),
-  ]);
+  let employees: any[] = [];
+  let templates: any[] = [];
+  let documentRecords: any[] = [];
+
+  try {
+    employees = await listEmployeesService(ctx);
+  } catch (err) {
+    console.error("[HiringPage] Failed to load employees:", err);
+  }
+
+  try {
+    templates = await getLetterTemplates(ctx);
+  } catch (err) {
+    console.error("[HiringPage] Failed to load letter templates:", err);
+  }
+
+  if (canManageHR(ctx)) {
+    try {
+      documentRecords = await getAllEmployeesDocumentRecords(ctx);
+    } catch (err) {
+      console.error("[HiringPage] Failed to load employee document records:", err);
+    }
+  }
 
   return (
     <HiringClientView

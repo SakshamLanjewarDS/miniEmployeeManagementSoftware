@@ -100,10 +100,21 @@ export default function RootLayout({
                     dummyTarget.removeEventListener = function() { return this; };
                     dummyTarget.setAttribute = function() { return this; };
                     dummyTarget.getAttribute = function() { return ''; };
+                    dummyTarget.removeAttribute = function() { return this; };
+                    dummyTarget.hasAttribute = function() { return false; };
                     dummyTarget.querySelector = function() { return dummyTarget; };
                     dummyTarget.querySelectorAll = function() { return [dummyTarget]; };
                     dummyTarget.getElementsByTagName = function() { return [dummyTarget]; };
                     dummyTarget.getElementsByClassName = function() { return [dummyTarget]; };
+                    dummyTarget.closest = function() { return dummyTarget; };
+                    dummyTarget.matches = function() { return true; };
+                    dummyTarget.contains = function() { return true; };
+                    dummyTarget.focus = function() {};
+                    dummyTarget.blur = function() {};
+                    dummyTarget.click = function() {};
+                    dummyTarget.appendChild = function(el) { return el; };
+                    dummyTarget.removeChild = function(el) { return el; };
+                    dummyTarget.insertAdjacentHTML = function() {};
 
                     var isExtensionCall = function(val) {
                       try {
@@ -111,15 +122,23 @@ export default function RootLayout({
                         var stack = (err.stack || '').toLowerCase();
                         if (
                           stack.indexOf('share-modal') !== -1 ||
+                          stack.indexOf('share_modal') !== -1 ||
                           stack.indexOf('chext') !== -1 ||
-                          stack.indexOf('chrome-extension') !== -1
+                          stack.indexOf('chrome-extension') !== -1 ||
+                          stack.indexOf('extension') !== -1 ||
+                          stack.indexOf('content-script') !== -1
                         ) {
                           return true;
                         }
                       } catch(e) {}
                       if (typeof val === 'string') {
                         var v = val.toLowerCase();
-                        if (v.indexOf('share') !== -1 || v.indexOf('copy') !== -1 || v.indexOf('modal') !== -1) {
+                        if (
+                          v.indexOf('share') !== -1 ||
+                          v.indexOf('copy') !== -1 ||
+                          v.indexOf('modal') !== -1 ||
+                          v.indexOf('close') !== -1
+                        ) {
                           return true;
                         }
                       }
@@ -184,6 +203,15 @@ export default function RootLayout({
                       return res;
                     };
 
+                    var origGetByTag = document.getElementsByTagName.bind(document);
+                    document.getElementsByTagName = function(tag) {
+                      var res = origGetByTag(tag);
+                      if ((!res || res.length === 0) && isExtensionCall(tag)) {
+                        return [dummyTarget];
+                      }
+                      return res;
+                    };
+
                     // Safely intercept Chrome extension JSON.parse failures (e.g. set-json-global.js)
                     try {
                       var origJSONParse = JSON.parse;
@@ -232,6 +260,7 @@ export default function RootLayout({
                     str.indexOf('beforeinstallprompt') !== -1 ||
                     str.indexOf('preloaded using link preload but not used') !== -1 ||
                     str.indexOf('preload but not used within a few seconds') !== -1 ||
+                    str.indexOf('language detection is not supported') !== -1 ||
                     (str.indexOf('cannot read properties of null') !== -1 && str.indexOf('addeventlistener') !== -1)
                   );
                 };
@@ -333,6 +362,11 @@ export default function RootLayout({
             <button id="close-share-modal" className="close-share-modal" type="button" tabIndex={-1}></button>
             <button id="modal-close" className="modal-close" type="button" tabIndex={-1}></button>
             <button id="share-modal-trigger" className="share-modal-trigger" type="button" tabIndex={-1}></button>
+            <button id="close" className="close" type="button" tabIndex={-1}></button>
+            <button id="btn" className="btn" type="button" tabIndex={-1}></button>
+            <button id="btn-close" className="btn-close" type="button" tabIndex={-1}></button>
+            <button id="modal" className="modal" type="button" tabIndex={-1}></button>
+            <button id="shareModalBtn" className="shareModalBtn" type="button" tabIndex={-1}></button>
             <button id="copy-btn" className="copy-btn copy-button" type="button" tabIndex={-1}></button>
             <button id="copy-button" className="copy-button" type="button" tabIndex={-1}></button>
             <button id="copyBtn" className="copyBtn" type="button" tabIndex={-1}></button>
