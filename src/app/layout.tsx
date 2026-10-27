@@ -90,154 +90,30 @@ export default function RootLayout({
                     };
                   }
                 } catch(e) {}
-
-                // 2. Safe element fallback for extension content scripts (share-modal, chext) querying DOM before complete
+                // 2. Safely intercept Chrome extension JSON.parse failures (e.g. set-json-global.js)
                 try {
-                  if (typeof document !== 'undefined') {
-                    var dummyTarget = document.createElement('div');
-                    dummyTarget.id = 'share-modal-dummy';
-                    dummyTarget.addEventListener = function() { return this; };
-                    dummyTarget.removeEventListener = function() { return this; };
-                    dummyTarget.setAttribute = function() { return this; };
-                    dummyTarget.getAttribute = function() { return ''; };
-                    dummyTarget.removeAttribute = function() { return this; };
-                    dummyTarget.hasAttribute = function() { return false; };
-                    dummyTarget.querySelector = function() { return dummyTarget; };
-                    dummyTarget.querySelectorAll = function() { return [dummyTarget]; };
-                    dummyTarget.getElementsByTagName = function() { return [dummyTarget]; };
-                    dummyTarget.getElementsByClassName = function() { return [dummyTarget]; };
-                    dummyTarget.closest = function() { return dummyTarget; };
-                    dummyTarget.matches = function() { return true; };
-                    dummyTarget.contains = function() { return true; };
-                    dummyTarget.focus = function() {};
-                    dummyTarget.blur = function() {};
-                    dummyTarget.click = function() {};
-                    dummyTarget.appendChild = function(el) { return el; };
-                    dummyTarget.removeChild = function(el) { return el; };
-                    dummyTarget.insertAdjacentHTML = function() {};
-
-                    var isExtensionCall = function(val) {
-                      try {
-                        var err = new Error();
-                        var stack = (err.stack || '').toLowerCase();
-                        if (
-                          stack.indexOf('share-modal') !== -1 ||
-                          stack.indexOf('share_modal') !== -1 ||
-                          stack.indexOf('chext') !== -1 ||
-                          stack.indexOf('chrome-extension') !== -1 ||
-                          stack.indexOf('extension') !== -1 ||
-                          stack.indexOf('content-script') !== -1
-                        ) {
-                          return true;
-                        }
-                      } catch(e) {}
-                      if (typeof val === 'string') {
-                        var v = val.toLowerCase();
-                        if (
-                          v.indexOf('share') !== -1 ||
-                          v.indexOf('copy') !== -1 ||
-                          v.indexOf('modal') !== -1 ||
-                          v.indexOf('close') !== -1
-                        ) {
-                          return true;
-                        }
-                      }
-                      return false;
-                    };
-
-                    var origGetById = document.getElementById.bind(document);
-                    document.getElementById = function(id) {
-                      var el = origGetById(id);
-                      if (!el && isExtensionCall(id)) {
-                        return dummyTarget;
-                      }
-                      return el;
-                    };
-
-                    var origQuerySel = document.querySelector.bind(document);
-                    document.querySelector = function(sel) {
-                      var el = origQuerySel(sel);
-                      if (!el && isExtensionCall(sel)) {
-                        return dummyTarget;
-                      }
-                      return el;
-                    };
-
-                    var origQuerySelAll = document.querySelectorAll.bind(document);
-                    document.querySelectorAll = function(sel) {
-                      var res = origQuerySelAll(sel);
-                      if ((!res || res.length === 0) && isExtensionCall(sel)) {
-                        return [dummyTarget];
-                      }
-                      return res;
-                    };
-
-                    var origElemQuerySel = Element.prototype.querySelector;
-                    if (origElemQuerySel) {
-                      Element.prototype.querySelector = function(sel) {
-                        var el = origElemQuerySel.apply(this, arguments);
-                        if (!el && isExtensionCall(sel)) {
-                          return dummyTarget;
-                        }
-                        return el;
-                      };
-                    }
-
-                    var origElemQuerySelAll = Element.prototype.querySelectorAll;
-                    if (origElemQuerySelAll) {
-                      Element.prototype.querySelectorAll = function(sel) {
-                        var res = origElemQuerySelAll.apply(this, arguments);
-                        if ((!res || res.length === 0) && isExtensionCall(sel)) {
-                          return [dummyTarget];
-                        }
-                        return res;
-                      };
-                    }
-
-                    var origGetByClass = document.getElementsByClassName.bind(document);
-                    document.getElementsByClassName = function(cls) {
-                      var res = origGetByClass(cls);
-                      if ((!res || res.length === 0) && isExtensionCall(cls)) {
-                        return [dummyTarget];
-                      }
-                      return res;
-                    };
-
-                    var origGetByTag = document.getElementsByTagName.bind(document);
-                    document.getElementsByTagName = function(tag) {
-                      var res = origGetByTag(tag);
-                      if ((!res || res.length === 0) && isExtensionCall(tag)) {
-                        return [dummyTarget];
-                      }
-                      return res;
-                    };
-
-                    // Safely intercept Chrome extension JSON.parse failures (e.g. set-json-global.js)
+                  var origJSONParse = JSON.parse;
+                  JSON.parse = function(text, reviver) {
                     try {
-                      var origJSONParse = JSON.parse;
-                      JSON.parse = function(text, reviver) {
+                      return origJSONParse.apply(this, arguments);
+                    } catch (err) {
+                      if (err instanceof SyntaxError) {
                         try {
-                          return origJSONParse.apply(this, arguments);
-                        } catch (err) {
-                          if (err instanceof SyntaxError) {
-                            try {
-                              var stack = (new Error().stack || '') + ' ' + ((err && err.stack) || '');
-                              stack = stack.toLowerCase();
-                              if (
-                                stack.indexOf('set-json-global') !== -1 ||
-                                stack.indexOf('bcjindcccaagfpapjjmafapmmgkkhgoa') !== -1 ||
-                                stack.indexOf('chrome-extension') !== -1 ||
-                                stack.indexOf('json-formatter') !== -1
-                              ) {
-                                return {};
-                              }
-                            } catch(e) {}
+                          var stack = (new Error().stack || '') + ' ' + ((err && err.stack) || '');
+                          stack = stack.toLowerCase();
+                          if (
+                            stack.indexOf('set-json-global') !== -1 ||
+                            stack.indexOf('bcjindcccaagfpapjjmafapmmgkkhgoa') !== -1 ||
+                            stack.indexOf('chrome-extension') !== -1 ||
+                            stack.indexOf('json-formatter') !== -1
+                          ) {
+                            return {};
                           }
-                          throw err;
-                        }
-                      };
-                    } catch(e) {}
-                  }
+                        } catch(e) {}
+                      }
+                      throw err;
+                    }
+                  };
                 } catch(e) {}
 
                 // 2. Identify and filter known noisy external browser extension errors and hydration false-positives
@@ -324,28 +200,6 @@ export default function RootLayout({
                     if (event.stopImmediatePropagation) event.stopImmediatePropagation();
                   }
                 });
-
-                // Clean up preloaded links early to prevent Chromium unused-preload timer warnings
-                if (typeof window !== 'undefined') {
-                  var cleanPreloads = function() {
-                    try {
-                      var preloads = document.querySelectorAll('link[rel="preload"]');
-                      preloads.forEach(function(l) {
-                        if (l && l.parentNode) {
-                          l.parentNode.removeChild(l);
-                        }
-                      });
-                    } catch(e) {}
-                  };
-                  if (document.readyState === 'complete' || document.readyState === 'interactive') {
-                    setTimeout(cleanPreloads, 50);
-                  } else {
-                    document.addEventListener('DOMContentLoaded', function() { setTimeout(cleanPreloads, 50); });
-                    window.addEventListener('load', function() { setTimeout(cleanPreloads, 50); });
-                  }
-                  setTimeout(cleanPreloads, 1200);
-                  setTimeout(cleanPreloads, 2500);
-                }
               })();
             `,
           }}
