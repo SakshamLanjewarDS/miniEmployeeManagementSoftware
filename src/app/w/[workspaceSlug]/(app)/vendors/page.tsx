@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 import { broadcastRealtimeEvent, useRealtimeSubscription } from "@/lib/realtime";
 import MobileFilterDrawer from "@/components/ui/MobileFilterDrawer";
+import { AdvancedPagination, usePagination } from "@/components/ui/AdvancedPagination";
 
 export default function VendorManagementPage() {
   const params = useParams();
@@ -430,6 +431,11 @@ export default function VendorManagementPage() {
       }
     });
   }, [vendors, ratingFilter, contactFilter, meetingFilter, vendorSortBy]);
+
+  const { paginatedItems: paginatedVendors, paginationProps: vendorPaginationProps } = usePagination(
+    filteredVendors,
+    { initialPageSize: 12, itemName: "vendors" }
+  );
 
   // Real-time dynamic updates: visible polling + tab focus revalidation + cross-tab live events
   useRealtimeSubscription(
@@ -922,7 +928,7 @@ export default function VendorManagementPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredVendors.map((v) => (
+          {paginatedVendors.map((v) => (
             <div
               key={v.id}
               className="bg-white rounded-3xl border border-[#E2E6F0] p-5 shadow-2xs hover:shadow-xs transition-all space-y-3 text-xs flex flex-col justify-between"
@@ -1182,6 +1188,15 @@ export default function VendorManagementPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {filteredVendors.length > 0 && (
+        <div className="pt-2">
+          <AdvancedPagination
+            {...vendorPaginationProps}
+            pageSizeOptions={[6, 12, 24, 48]}
+          />
         </div>
       )}
 

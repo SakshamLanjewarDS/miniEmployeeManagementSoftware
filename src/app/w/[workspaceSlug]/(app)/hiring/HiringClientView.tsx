@@ -39,6 +39,7 @@ import {
   Sparkles,
   Phone,
 } from "lucide-react";
+import { AdvancedPagination, usePagination } from "@/components/ui/AdvancedPagination";
 
 interface EmployeeOption {
   id: string;
@@ -318,6 +319,11 @@ export default function HiringClientView({
       return true;
     });
   }, [documentRecords, searchQuery, statusFilter]);
+
+  const { paginatedItems: paginatedRecords, paginationProps: recordsPaginationProps } = usePagination(
+    filteredRecords,
+    { initialPageSize: 12, itemName: "staff records" }
+  );
 
   // Telemetry metrics for records
   const metrics = useMemo(() => {
@@ -992,7 +998,7 @@ export default function HiringClientView({
 
           {/* Employee Records Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredRecords.map((rec) => {
+            {paginatedRecords.map((rec) => {
               const isOwner = rec.isOwner;
 
               return (
@@ -1141,6 +1147,15 @@ export default function HiringClientView({
               );
             })}
           </div>
+
+          {filteredRecords.length > 0 && (
+            <div className="pt-2">
+              <AdvancedPagination
+                {...recordsPaginationProps}
+                pageSizeOptions={[6, 12, 24, 48]}
+              />
+            </div>
+          )}
 
           {filteredRecords.length === 0 && (
             <div className="bg-white rounded-3xl border border-[#E2E6F0] p-12 text-center space-y-3">

@@ -53,6 +53,7 @@ import {
   Play,
 } from "lucide-react";
 import { SearchableDropdown, SearchableSelect } from "@/components/ui/SearchableDropdown";
+import { AdvancedPagination, usePagination } from "@/components/ui/AdvancedPagination";
 import {
   getAllTypologies,
   ProjectProfileCircle,
@@ -623,6 +624,11 @@ export default function VisitsClientView({
     visitSearch,
     visitSortBy,
   ]);
+
+  const { paginatedItems: paginatedVisits, paginationProps: visitsPaginationProps } = usePagination(
+    filteredAndSortedVisits,
+    { initialPageSize: 10, itemName: "site visits" }
+  );
 
   const [isMobileVisitFilterOpen, setIsMobileVisitFilterOpen] = useState(false);
 
@@ -2899,7 +2905,7 @@ export default function VisitsClientView({
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E2E6F0]">
-                {filteredAndSortedVisits.map((v) => {
+                {paginatedVisits.map((v) => {
                   const checkIn = v.events?.find((e) => e.eventType === "CHECK_IN");
                   const checkOut = v.events?.find((e) => e.eventType === "CHECK_OUT");
                   const photosCount = Array.isArray(v.photosJson) ? v.photosJson.length : 0;
@@ -3079,9 +3085,14 @@ export default function VisitsClientView({
           )}
         </div>
 
-        <div className="pt-3 border-t border-[#E2E6F0] text-xs text-[#696E82]">
-          {filteredAndSortedVisits.length} records
-        </div>
+        {filteredAndSortedVisits.length > 0 && (
+          <div className="pt-3 border-t border-[#E2E6F0]">
+            <AdvancedPagination
+              {...visitsPaginationProps}
+              pageSizeOptions={[10, 25, 50, 100]}
+            />
+          </div>
+        )}
       </div>
 
       {/* Bottom Inspection Records Info Card */}

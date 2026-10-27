@@ -37,6 +37,7 @@ import {
   Share2,
 } from "lucide-react";
 import { useRealtimeSubscription } from "@/lib/realtime";
+import { AdvancedPagination, usePagination } from "@/components/ui/AdvancedPagination";
 
 interface EmployeeOption {
   id: string; // membershipId
@@ -742,6 +743,11 @@ ${m.actionItems?.map((a, i) => `${i + 1}. [${a.status}] ${a.description} ${a.ass
       return true;
     });
   }, [meetings, activeTab, searchQuery, selectedProjectType, selectedMeetingType]);
+
+  const { paginatedItems: paginatedMeetings, paginationProps: meetingsPaginationProps } = usePagination(
+    filteredMeetings,
+    { initialPageSize: 10, itemName: "meetings" }
+  );
 
   // Calendar calculations
   const calendarDays = useMemo(() => {
@@ -1477,7 +1483,7 @@ ${m.actionItems?.map((a, i) => `${i + 1}. [${a.status}] ${a.description} ${a.ass
               </p>
             </div>
           ) : (
-            filteredMeetings.map((m) => {
+            paginatedMeetings.map((m) => {
               const attendees = m.attendeesJson || {};
               const isCompleted = m.status === "COMPLETED";
 
@@ -1643,6 +1649,13 @@ ${m.actionItems?.map((a, i) => `${i + 1}. [${a.status}] ${a.description} ${a.ass
               );
             })
           )}
+
+          {/* Advanced Pagination for Meetings List & History */}
+          <AdvancedPagination
+            {...meetingsPaginationProps}
+            pageSizeOptions={[5, 10, 20, 50]}
+            className="rounded-3xl border border-[#E2E6F0] shadow-2xs"
+          />
         </div>
       )}
 

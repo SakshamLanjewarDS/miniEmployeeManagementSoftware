@@ -57,6 +57,7 @@ import { SearchableDropdown, SearchableSelect } from "@/components/ui/Searchable
 import { correctGrammar } from "@/lib/grammar/grammarEngine";
 import { EmployeeDocumentVaultView } from "@/components/documents/EmployeeDocumentVaultView";
 import { EmployeeLettersView } from "@/components/letters/EmployeeLettersView";
+import { AdvancedPagination } from "@/components/ui/AdvancedPagination";
 
 const DEPARTMENT_OPTIONS = [
   { value: "Architecture", label: "Architecture", subLabel: "Design & Masterplanning" },
@@ -160,7 +161,7 @@ export default function TeamClientView({
   const [profileTab, setProfileTab] = useState<"OVERVIEW" | "PROJECTS" | "ACTIVITY" | "DOCUMENTS" | "LETTERS">("OVERVIEW");
   const [accountManagementOpen, setAccountManagementOpen] = useState(false);
   const [moreOptionsOpen, setMoreOptionsOpen] = useState(false);
-  const pageSize = 12;
+  const [pageSize, setPageSize] = useState<number>(12);
 
   // Modals state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -1677,55 +1678,17 @@ export default function TeamClientView({
           </div>
         )}
 
-        {/* Pagination Bar matching reference design */}
-        {filteredEmployees.length > 0 && (
-          <div className="p-4 border-t border-[#E2E6F0] bg-[#F8F9FD] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[#696E82]">
-            <div className="font-medium text-[#696E82]">
-              Showing <span className="font-semibold text-[#1F1F1F]">{(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, filteredEmployees.length)}</span> of <span className="font-semibold text-[#1F1F1F]">{filteredEmployees.length}</span> members
-            </div>
-            {totalPages > 1 && (
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  disabled={currentPage === 1}
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  className="px-3 py-1.5 bg-white border border-[#CEDEFF] rounded-lg disabled:opacity-40 hover:bg-[#F2F4FF] text-[#1F1F1F] font-medium flex items-center gap-1 transition-colors cursor-pointer"
-                >
-                  <ChevronLeft className="w-3.5 h-3.5" />
-                  <span>Previous</span>
-                </button>
-                <div className="flex items-center gap-1">
-                  {Array.from({ length: totalPages }).map((_, idx) => {
-                    const pageNum = idx + 1;
-                    return (
-                      <button
-                        key={pageNum}
-                        type="button"
-                        onClick={() => setCurrentPage(pageNum)}
-                        className={`w-7 h-7 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
-                          currentPage === pageNum
-                            ? "bg-[#5A81FA] text-white"
-                            : "text-[#696E82] hover:bg-[#F2F4FF]"
-                        }`}
-                      >
-                        {pageNum}
-                      </button>
-                    );
-                  })}
-                </div>
-                <button
-                  type="button"
-                  disabled={currentPage === totalPages}
-                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                  className="px-3 py-1.5 bg-white border border-[#CEDEFF] rounded-lg disabled:opacity-40 hover:bg-[#F2F4FF] text-[#1F1F1F] font-medium flex items-center gap-1 transition-colors cursor-pointer"
-                >
-                  <span>Next</span>
-                  <ChevronRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            )}
-          </div>
-        )}
+        {/* Advanced Pagination Bar */}
+        <AdvancedPagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={filteredEmployees.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={setPageSize}
+          pageSizeOptions={[6, 12, 24, 48]}
+          itemName="members"
+        />
       </div>
 
       {/* Focused Employee Profile Drawer (matches reference panel 3) */}

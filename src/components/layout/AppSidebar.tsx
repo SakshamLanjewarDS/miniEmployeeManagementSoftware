@@ -314,13 +314,6 @@ export function AppSidebar({ context }: AppSidebarProps) {
             isPermitted: isOwnerOrAdmin,
           },
           {
-            id: "executive-tasks",
-            label: "Executive Tasks",
-            href: `/w/${context.tenantSlug}/executive-tasks`,
-            icon: Shield,
-            isPermitted: isOwnerOrAdmin,
-          },
-          {
             id: "meetings",
             label: "Studio Meetings",
             href: `/w/${context.tenantSlug}/meetings`,

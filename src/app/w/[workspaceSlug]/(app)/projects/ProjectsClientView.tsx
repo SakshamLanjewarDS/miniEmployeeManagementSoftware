@@ -48,6 +48,7 @@ import { DynamicFormFields } from "@/components/custom-fields/DynamicFormFields"
 import { DynamicCardFields } from "@/components/custom-fields/DynamicCardFields";
 import { SearchableDropdown, SearchableSelect } from "@/components/ui/SearchableDropdown";
 import { MobileFilterDrawer } from "@/components/ui/MobileFilterDrawer";
+import { AdvancedPagination, usePagination } from "@/components/ui/AdvancedPagination";
 import {
   getAllTypologies,
   ProjectProfileCircle,
@@ -456,6 +457,11 @@ export function ProjectsClientView({
     clientFilter,
     projectSortBy,
   ]);
+
+  const { paginatedItems: paginatedProjects, paginationProps: projectPaginationProps } = usePagination(
+    filteredProjects,
+    { initialPageSize: 8, itemName: "projects" }
+  );
 
   const handleToggleSelect = (id: string) => {
     setSelectedProjectIds((prev) =>
@@ -1893,7 +1899,7 @@ export function ProjectsClientView({
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-          {filteredProjects.map((p) => {
+          {paginatedProjects.map((p) => {
             const isSelected = selectedProjectIds.includes(p.id);
             return (
               <div
@@ -2252,6 +2258,15 @@ export function ProjectsClientView({
               </div>
             );
           })}
+        </div>
+      )}
+
+      {filteredProjects.length > 0 && (
+        <div className="pt-2">
+          <AdvancedPagination
+            {...projectPaginationProps}
+            pageSizeOptions={[6, 8, 12, 24]}
+          />
         </div>
       )}
 

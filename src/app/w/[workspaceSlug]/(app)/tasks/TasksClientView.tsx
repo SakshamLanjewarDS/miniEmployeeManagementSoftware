@@ -44,6 +44,7 @@ import { DynamicFormFields } from "@/components/custom-fields/DynamicFormFields"
 import { DynamicCardFields } from "@/components/custom-fields/DynamicCardFields";
 import { SearchableDropdown, SearchableSelect } from "@/components/ui/SearchableDropdown";
 import { MobileFilterDrawer } from "@/components/ui/MobileFilterDrawer";
+import { AdvancedPagination, usePagination } from "@/components/ui/AdvancedPagination";
 import { TaskGrid } from "@/components/tasks/TaskGrid";
 import { TaskMetricsCards } from "@/components/tasks/TaskMetricsCards";
 import { TaskClarificationModal } from "@/components/tasks/TaskClarificationModal";
@@ -410,23 +411,6 @@ export default function TasksClientView({
   );
   const [taskSortBy, setTaskSortBy] = useState<string>("DUE_DATE_ASC");
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
-  // shortcut: Progressive chunk limit 24 items with Load More (ceiling: smooth DOM up to ~300 rendered cards), upgrade: switch to virtualized list windowing (@tanstack/react-virtual) if single studio column exceeds 500 tasks
-  const [displayLimit, setDisplayLimit] = useState(24);
-
-  // Progressive rendering: reset display limit when filters change
-  useEffect(() => {
-    setDisplayLimit(24);
-  }, [
-    searchQuery,
-    selectedProjectFilter,
-    selectedTypologyFilter,
-    selectedAssigneeFilter,
-    selectedPriorityFilter,
-    selectedDueDateCategory,
-    selectedStatusCategory,
-    taskSortBy,
-    currentScope,
-  ]);
 
   const activeFilterCount = useMemo(() => {
     let count = 0;
@@ -948,9 +932,10 @@ export default function TasksClientView({
     members,
   ]);
 
-  const displayedTasks = useMemo(() => {
-    return filteredTasks.slice(0, displayLimit);
-  }, [filteredTasks, displayLimit]);
+  const { paginatedItems: paginatedTasks, paginationProps: tasksPaginationProps } = usePagination(
+    filteredTasks,
+    { initialPageSize: 6, itemName: "deliverables" }
+  );
 
   const handleScopeChange = (newScope: string) => {
     router.push(`/w/${workspaceSlug}/tasks?filter=${activeFilter}&view=${view}&scope=${newScope}`);
@@ -2522,7 +2507,7 @@ export default function TasksClientView({
   }
 
   return (
-    <div className="space-y-6" suppressHydrationWarning>
+    <div id="tasks-workbench-root" className="space-y-6" suppressHydrationWarning>
       {/* 1. STUDIO DELIVERABLES HEADER */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -3212,7 +3197,7 @@ export default function TasksClientView({
       {view === "grid" && (
         <div className="space-y-4">
           <TaskGrid
-            tasks={displayedTasks}
+            tasks={paginatedTasks}
             isFilterActive={isFilterActive}
             canAssignDeliverable={isPrivileged || true}
             currentMembershipId={currentMembershipId}
@@ -3238,28 +3223,13 @@ export default function TasksClientView({
             canDeleteTask={canDeleteTask}
           />
 
-          {filteredTasks.length > displayLimit && (
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 bg-white border border-[#E2E6F0] rounded-2xl shadow-xs">
-              <span className="text-xs font-semibold text-[#696E82]">
-                Showing <strong className="text-[#1F1F1F]">{displayedTasks.length}</strong> of{" "}
-                <strong className="text-[#1F1F1F]">{filteredTasks.length}</strong> deliverables
-              </span>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setDisplayLimit((prev) => prev + 24)}
-                  className="px-4 py-2 bg-[#F2F4FF] hover:bg-[#E2E6F0] text-[#1F1F1F] font-semibold text-xs rounded-xl border border-[#CEDEFF] transition-colors cursor-pointer"
-                >
-                  Load 24 More Deliverables ↓
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDisplayLimit(filteredTasks.length)}
-                  className="px-3 py-2 text-[#5A81FA] hover:underline font-semibold text-xs cursor-pointer"
-                >
-                  Show All ({filteredTasks.length})
-                </button>
-              </div>
+          {filteredTasks.length > 0 && (
+            <div className="bg-white border border-[#E2E6F0] rounded-2xl shadow-xs overflow-hidden">
+              <AdvancedPagination
+                {...tasksPaginationProps}
+                pageSizeOptions={[6, 12, 24, 48]}
+                scrollTargetId="tasks-workbench-root"
+              />
             </div>
           )}
         </div>
@@ -3285,7 +3255,7 @@ export default function TasksClientView({
             </div>
           ) : (
             <div className="divide-y divide-[#E2E6F0]">
-              {displayedTasks.map((task) => {
+              {paginatedTasks.map((task) => {
                 const isOverdue =
                   task.dueDate && new Date(task.dueDate) < new Date() && task.status !== "COMPLETED";
                 const isMyTask = isTaskAssignedToMe(task);
@@ -3549,28 +3519,13 @@ export default function TasksClientView({
             </div>
           )}
 
-          {filteredTasks.length > displayLimit && (
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 bg-slate-50 border-t border-[#E2E6F0]">
-              <span className="text-xs font-semibold text-[#696E82]">
-                Showing <strong className="text-[#1F1F1F]">{displayedTasks.length}</strong> of{" "}
-                <strong className="text-[#1F1F1F]">{filteredTasks.length}</strong> deliverables
-              </span>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setDisplayLimit((prev) => prev + 24)}
-                  className="px-4 py-2 bg-white hover:bg-slate-100 text-[#1F1F1F] font-semibold text-xs rounded-xl border border-[#CEDEFF] transition-colors cursor-pointer shadow-2xs"
-                >
-                  Load 24 More Deliverables ↓
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDisplayLimit(filteredTasks.length)}
-                  className="px-3 py-2 text-[#5A81FA] hover:underline font-semibold text-xs cursor-pointer"
-                >
-                  Show All ({filteredTasks.length})
-                </button>
-              </div>
+          {filteredTasks.length > 0 && (
+            <div className="p-3 bg-white border-t border-[#E2E6F0]">
+              <AdvancedPagination
+                {...tasksPaginationProps}
+                pageSizeOptions={[6, 12, 24, 48]}
+                scrollTargetId="tasks-workbench-root"
+              />
             </div>
           )}
         </div>
@@ -3578,60 +3533,62 @@ export default function TasksClientView({
 
       {/* 5. KANBAN BOARD WITH DRAG AND DROP (5 STATUS COLUMNS) */}
       {view === "kanban" && (
-        <div className="flex lg:grid gap-4 overflow-x-auto lg:overflow-x-visible pb-4 lg:pb-0 touch-scroll-x lg:grid-cols-5 snap-x snap-mandatory lg:snap-none">
-          {[
-            {
-              statuses: ["TODO", "NOT_STARTED"],
-              dropStatus: "TODO",
-              title: "Todo",
-              color: "border-slate-300",
-              bg: "bg-slate-50/50",
-            },
-            {
-              statuses: ["STARTED"],
-              dropStatus: "STARTED",
-              title: "Started",
-              color: "border-sky-400",
-              bg: "bg-sky-50/30",
-            },
-            {
-              statuses: ["ONGOING", "IN_PROGRESS"],
-              dropStatus: "ONGOING",
-              title: "Ongoing",
-              color: "border-blue-500",
-              bg: "bg-blue-50/30",
-            },
-            {
-              statuses: ["CHECKING", "IN_REVIEW"],
-              dropStatus: "CHECKING",
-              title: "Checking",
-              color: "border-purple-400",
-              bg: "bg-purple-50/30",
-            },
-            {
-              statuses: ["COMPLETED"],
-              dropStatus: "COMPLETED",
-              title: "Completed",
-              color: "border-emerald-500",
-              bg: "bg-emerald-50/30",
-            },
-          ].map((col) => {
-            const colTasks = filteredTasks.filter((t) => col.statuses.includes(t.status as any));
-            return (
-              <div
-                key={col.title}
-                onDragOver={handleDragOver}
-                onDrop={() => handleDropOnColumn(col.dropStatus as any)}
-                className={`bg-white border border-[#E2E6F0] rounded-2xl p-3.5 flex flex-col min-h-[480px] lg:min-h-[500px] w-[285px] sm:w-[320px] lg:w-auto shrink-0 snap-center transition-colors ${col.bg}`}
-              >
-                <div className={`flex items-center justify-between pb-3 border-b-2 ${col.color} mb-3`}>
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-[#1F1F1F]">{col.title}</h3>
+        <div className="space-y-4">
+          <div className="flex lg:grid gap-4 overflow-x-auto lg:overflow-x-visible pb-4 lg:pb-0 touch-scroll-x lg:grid-cols-5 snap-x snap-mandatory lg:snap-none">
+            {[
+              {
+                statuses: ["TODO", "NOT_STARTED"],
+                dropStatus: "TODO",
+                title: "Todo",
+                color: "border-slate-300",
+                bg: "bg-slate-50/50",
+              },
+              {
+                statuses: ["STARTED"],
+                dropStatus: "STARTED",
+                title: "Started",
+                color: "border-sky-400",
+                bg: "bg-sky-50/30",
+              },
+              {
+                statuses: ["ONGOING", "IN_PROGRESS"],
+                dropStatus: "ONGOING",
+                title: "Ongoing",
+                color: "border-blue-500",
+                bg: "bg-blue-50/30",
+              },
+              {
+                statuses: ["CHECKING", "IN_REVIEW"],
+                dropStatus: "CHECKING",
+                title: "Checking",
+                color: "border-purple-400",
+                bg: "bg-purple-50/30",
+              },
+              {
+                statuses: ["COMPLETED"],
+                dropStatus: "COMPLETED",
+                title: "Completed",
+                color: "border-emerald-500",
+                bg: "bg-emerald-50/30",
+              },
+            ].map((col) => {
+              const colTasks = paginatedTasks.filter((t) => col.statuses.includes(t.status as any));
+              const allColTasks = filteredTasks.filter((t) => col.statuses.includes(t.status as any));
+              return (
+                <div
+                  key={col.title}
+                  onDragOver={handleDragOver}
+                  onDrop={() => handleDropOnColumn(col.dropStatus as any)}
+                  className={`bg-white border border-[#E2E6F0] rounded-2xl p-3.5 flex flex-col min-h-[480px] lg:min-h-[500px] w-[285px] sm:w-[320px] lg:w-auto shrink-0 snap-center transition-colors ${col.bg}`}
+                >
+                  <div className={`flex items-center justify-between pb-3 border-b-2 ${col.color} mb-3`}>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-[#1F1F1F]">{col.title}</h3>
+                    </div>
+                    <span className="text-xs font-mono font-semibold px-2 py-0.5 rounded-full bg-[#F2F4FF] text-[#696E82]">
+                      {allColTasks.length}
+                    </span>
                   </div>
-                  <span className="text-xs font-mono font-semibold px-2 py-0.5 rounded-full bg-[#F2F4FF] text-[#696E82]">
-                    {colTasks.length}
-                  </span>
-                </div>
 
                 <div className="space-y-3 flex-1 overflow-y-auto pr-1">
                   {colTasks.map((task) => {
@@ -3776,7 +3733,18 @@ export default function TasksClientView({
             );
           })}
         </div>
-      )}
+
+        {filteredTasks.length > 0 && (
+          <div className="bg-white border border-[#E2E6F0] rounded-2xl shadow-xs overflow-hidden">
+            <AdvancedPagination
+              {...tasksPaginationProps}
+              pageSizeOptions={[6, 12, 24, 48]}
+              scrollTargetId="tasks-workbench-root"
+            />
+          </div>
+        )}
+      </div>
+    )}
 
       {/* ==================================================== */}
       {/* 6. TASK DETAIL DRAWER (SLIDE OVER)                   */}

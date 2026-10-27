@@ -33,6 +33,7 @@ import { DynamicCardFields } from "@/components/custom-fields/DynamicCardFields"
 import { CustomFieldDefinition } from "@/server/modules/custom-fields/repository";
 import { ContactShareModal, ShareableContact, ClientOption } from "@/components/share/ContactShareModal";
 import { SearchableDropdown } from "@/components/ui/SearchableDropdown";
+import { AdvancedPagination, usePagination } from "@/components/ui/AdvancedPagination";
 
 export interface ProjectContractorItem {
   id: string;
@@ -338,6 +339,11 @@ export default function ContractorsClientView({
       }
     });
   }, [contractors, statusTab, selectedTrade, searchQuery, contractorSortBy]);
+
+  const { paginatedItems: paginatedContractors, paginationProps: contractorPaginationProps } = usePagination(
+    filteredContractors,
+    { initialPageSize: 12, itemName: "contractors" }
+  );
 
   // Open Edit Modal
   const openEditModal = (contractor: ContractorItem) => {
@@ -949,7 +955,7 @@ export default function ContractorsClientView({
             <p className="text-xs text-[#696E82] mt-1">Try adjusting your search terms or active status tabs.</p>
           </div>
         ) : (
-          filteredContractors.map((contractor) => {
+          paginatedContractors.map((contractor) => {
             const isSelected = selectedContractorIds.includes(contractor.id);
             return (
               <div
@@ -1129,6 +1135,13 @@ export default function ContractorsClientView({
         })
       )}
       </div>
+
+      {filteredContractors.length > 0 && (
+        <AdvancedPagination
+          {...contractorPaginationProps}
+          pageSizeOptions={[6, 12, 24, 48]}
+        />
+      )}
 
       {/* ==================================================== */}
       {/* ADD CONTRACTOR MODAL (OWNER / ADMIN ONLY)            */}

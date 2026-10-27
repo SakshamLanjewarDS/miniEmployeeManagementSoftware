@@ -24,6 +24,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { getCleanTaskTitle } from "@/components/tasks/task-utils";
+import { AdvancedPagination } from "@/components/ui/AdvancedPagination";
 
 interface CompletedTasksClientViewProps {
   workspaceSlug: string;
@@ -70,6 +71,7 @@ export default function CompletedTasksClientView({
   const [hasReopenHistory, setHasReopenHistory] = useState(false);
   const [sortBy, setSortBy] = useState("completedAt_desc");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
 
   // Data State
   const [loading, setLoading] = useState(true);
@@ -110,7 +112,7 @@ export default function CompletedTasksClientView({
       if (hasReopenHistory) q.set("hasReopenHistory", "true");
       q.set("sortBy", sortBy);
       q.set("page", String(page));
-      q.set("pageSize", "25");
+      q.set("pageSize", String(pageSize));
 
       const res = await fetch(`/api/tasks/completed?${q.toString()}`);
       const data = await res.json();
@@ -118,7 +120,7 @@ export default function CompletedTasksClientView({
 
       setTasks(data.tasks || []);
       setMetrics(data.metrics || {});
-      setPagination(data.pagination || { page: 1, pageSize: 25, totalCount: 0, totalPages: 1 });
+      setPagination(data.pagination || { page: 1, pageSize, totalCount: 0, totalPages: 1 });
 
       // Update URL search parameters without full reload
       const newUrl = `/w/${workspaceSlug}/tasks/completed?${q.toString()}`;
@@ -132,7 +134,7 @@ export default function CompletedTasksClientView({
 
   useEffect(() => {
     fetchTasks();
-  }, [selectedEmployeeId, selectedProjectId, selectedPriority, dateRange, startDate, endDate, onTimeStatus, hasReopenHistory, sortBy, page]);
+  }, [selectedEmployeeId, selectedProjectId, selectedPriority, dateRange, startDate, endDate, onTimeStatus, hasReopenHistory, sortBy, page, pageSize]);
 
   // Debounced search
   useEffect(() => {
@@ -632,32 +634,20 @@ export default function CompletedTasksClientView({
           </div>
         )}
 
-        {/* Pagination Footer */}
-        {pagination.totalPages > 1 && (
-          <div className="p-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs text-slate-600">
-            <span>
-              Showing Page {pagination.page} of {pagination.totalPages} ({pagination.totalCount} total)
-            </span>
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                disabled={pagination.page <= 1}
-                onClick={() => setPage((p) => Math.max(p - 1, 1))}
-                className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white font-semibold disabled:opacity-50 cursor-pointer"
-              >
-                Previous
-              </button>
-              <button
-                type="button"
-                disabled={pagination.page >= pagination.totalPages}
-                onClick={() => setPage((p) => Math.min(p + 1, pagination.totalPages))}
-                className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white font-semibold disabled:opacity-50 cursor-pointer"
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        )}
+        {/* Advanced Pagination Footer */}
+        <AdvancedPagination
+          currentPage={pagination.page}
+          totalPages={pagination.totalPages}
+          totalItems={pagination.totalCount}
+          pageSize={pagination.pageSize || pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={(newSize) => {
+            setPageSize(newSize);
+            setPage(1);
+          }}
+          pageSizeOptions={[10, 25, 50, 100]}
+          itemName="completed tasks"
+        />
       </div>
 
       {/* Task Details Drawer */}

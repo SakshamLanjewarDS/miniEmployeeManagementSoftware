@@ -17,6 +17,7 @@ import {
   Check,
 } from "lucide-react";
 import { broadcastRealtimeEvent, useRealtimeSubscription } from "@/lib/realtime";
+import { AdvancedPagination, usePagination } from "@/components/ui/AdvancedPagination";
 
 export default function AttendanceManagementPage() {
   const params = useParams();
@@ -75,6 +76,11 @@ export default function AttendanceManagementPage() {
       return empName.includes(q) || empId.includes(q);
     });
   }, [records, searchQuery]);
+
+  const { paginatedItems: paginatedRecords, paginationProps } = usePagination(
+    filteredRecords,
+    { initialPageSize: 10, itemName: "records" }
+  );
 
   useEffect(() => {
     fetchAttendance();
@@ -267,93 +273,102 @@ export default function AttendanceManagementPage() {
               : `No attendance records recorded for ${selectedDate}.`}
           </div>
         ) : (
-          <div className="divide-y divide-[#E2E6F0]">
-            {filteredRecords.map((rec) => {
-              const empName = rec.employee?.membership?.user?.fullName || "Staff Member";
-              const empId = rec.employee?.employeeId || "EMP";
-              const pInStr = rec.punchIn
-                ? new Date(rec.punchIn).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })
-                : "--:--";
-              const pOutStr = rec.punchOut
-                ? new Date(rec.punchOut).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })
-                : "--:--";
-              const hoursWorked = rec.totalMinutes ? (rec.totalMinutes / 60).toFixed(1) : "0.0";
+          <>
+            <div className="divide-y divide-[#E2E6F0]">
+              {paginatedRecords.map((rec) => {
+                const empName = rec.employee?.membership?.user?.fullName || "Staff Member";
+                const empId = rec.employee?.employeeId || "EMP";
+                const pInStr = rec.punchIn
+                  ? new Date(rec.punchIn).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })
+                  : "--:--";
+                const pOutStr = rec.punchOut
+                  ? new Date(rec.punchOut).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })
+                  : "--:--";
+                const hoursWorked = rec.totalMinutes ? (rec.totalMinutes / 60).toFixed(1) : "0.0";
 
-              return (
-                <div
-                  key={rec.id}
-                  className="p-3.5 hover:bg-[#F8F9FE] transition-colors flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs"
-                >
-                  <div className="flex items-center gap-3 min-w-[220px]">
-                    <div className="w-8 h-8 rounded-full bg-[#CEDEFF] text-[#2C308D] font-bold text-xs flex items-center justify-center shrink-0">
-                      {empName.slice(0, 2).toUpperCase()}
-                    </div>
-                    <div>
-                      <div className="font-bold text-[#1F1F1F]">{empName}</div>
-                      <div className="text-[11px] text-[#696E82] font-mono mt-0.5">
-                        {empId} • {rec.employee?.department || "General"}
+                return (
+                  <div
+                    key={rec.id}
+                    className="p-3.5 hover:bg-[#F8F9FE] transition-colors flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs"
+                  >
+                    <div className="flex items-center gap-3 min-w-[220px]">
+                      <div className="w-8 h-8 rounded-full bg-[#CEDEFF] text-[#2C308D] font-bold text-xs flex items-center justify-center shrink-0">
+                        {empName.slice(0, 2).toUpperCase()}
+                      </div>
+                      <div>
+                        <div className="font-bold text-[#1F1F1F]">{empName}</div>
+                        <div className="text-[11px] text-[#696E82] font-mono mt-0.5">
+                          {empId} • {rec.employee?.department || "General"}
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Punch times */}
-                  <div className="flex items-center gap-6 font-mono text-xs">
-                    <div>
-                      <span className="text-[10px] text-[#696E82] block font-sans">Punch In</span>
-                      <strong className="text-[#1F1F1F]">{pInStr}</strong>
+                    {/* Punch times */}
+                    <div className="flex items-center gap-6 font-mono text-xs">
+                      <div>
+                        <span className="text-[10px] text-[#696E82] block font-sans">Punch In</span>
+                        <strong className="text-[#1F1F1F]">{pInStr}</strong>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-[#696E82] block font-sans">Punch Out</span>
+                        <strong className="text-[#1F1F1F]">{pOutStr}</strong>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-[#696E82] block font-sans">Total Hours</span>
+                        <span className="text-[#5A81FA] font-bold">{hoursWorked} hrs</span>
+                      </div>
                     </div>
-                    <div>
-                      <span className="text-[10px] text-[#696E82] block font-sans">Punch Out</span>
-                      <strong className="text-[#1F1F1F]">{pOutStr}</strong>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-[#696E82] block font-sans">Total Hours</span>
-                      <span className="text-[#5A81FA] font-bold">{hoursWorked} hrs</span>
+
+                    {/* Status & Correction */}
+                    <div className="flex items-center gap-3 shrink-0">
+                      <span
+                        className={`px-2.5 py-1 rounded-full text-[11px] font-bold border ${
+                          rec.status === "PRESENT"
+                            ? "bg-emerald-100 text-emerald-800 border-emerald-200"
+                            : rec.status === "HALF_DAY"
+                            ? "bg-indigo-100 text-indigo-800 border-indigo-200"
+                            : rec.status === "ON_LEAVE"
+                            ? "bg-blue-100 text-blue-800 border-blue-200"
+                            : rec.status === "ABSENT"
+                            ? "bg-rose-100 text-rose-800 border-rose-200"
+                            : "bg-amber-100 text-amber-800 border-amber-200"
+                        }`}
+                      >
+                        {rec.status}
+                      </span>
+
+                      <button
+                        onClick={() => {
+                          setCorrectingRecord(rec);
+                          setCorrectionForm({
+                            punchIn: rec.punchIn
+                              ? new Date(rec.punchIn).toTimeString().slice(0, 5)
+                              : "10:30",
+                            punchOut: rec.punchOut
+                              ? new Date(rec.punchOut).toTimeString().slice(0, 5)
+                              : "18:30",
+                            status: rec.status,
+                            correctionReason: rec.correctionReason || "",
+                          });
+                        }}
+                        className="p-1.5 text-[#696E82] hover:text-[#5A81FA] hover:bg-[#F2F4FF] rounded-lg transition-colors"
+                        title="Audited Punch Correction"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   </div>
+                );
+              })}
+            </div>
 
-                  {/* Status & Correction */}
-                  <div className="flex items-center gap-3 shrink-0">
-                    <span
-                      className={`px-2.5 py-1 rounded-full text-[11px] font-bold border ${
-                        rec.status === "PRESENT"
-                          ? "bg-emerald-100 text-emerald-800 border-emerald-200"
-                          : rec.status === "HALF_DAY"
-                          ? "bg-indigo-100 text-indigo-800 border-indigo-200"
-                          : rec.status === "ON_LEAVE"
-                          ? "bg-blue-100 text-blue-800 border-blue-200"
-                          : rec.status === "ABSENT"
-                          ? "bg-rose-100 text-rose-800 border-rose-200"
-                          : "bg-amber-100 text-amber-800 border-amber-200"
-                      }`}
-                    >
-                      {rec.status}
-                    </span>
-
-                    <button
-                      onClick={() => {
-                        setCorrectingRecord(rec);
-                        setCorrectionForm({
-                          punchIn: rec.punchIn
-                            ? new Date(rec.punchIn).toTimeString().slice(0, 5)
-                            : "10:30",
-                          punchOut: rec.punchOut
-                            ? new Date(rec.punchOut).toTimeString().slice(0, 5)
-                            : "18:30",
-                          status: rec.status,
-                          correctionReason: rec.correctionReason || "",
-                        });
-                      }}
-                      className="p-1.5 text-[#696E82] hover:text-[#5A81FA] hover:bg-[#F2F4FF] rounded-lg transition-colors"
-                      title="Audited Punch Correction"
-                    >
-                      <Edit2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+            {/* Attendance Advanced Pagination */}
+            <AdvancedPagination
+              {...paginationProps}
+              pageSizeOptions={[10, 25, 50, 100]}
+              itemName="attendance records"
+            />
+          </>
         )}
       </div>
 

@@ -37,6 +37,7 @@ import {
 } from "lucide-react";
 import { SearchableDropdown, SearchableSelect } from "@/components/ui/SearchableDropdown";
 import { MobileFilterDrawer } from "@/components/ui/MobileFilterDrawer";
+import { AdvancedPagination } from "@/components/ui/AdvancedPagination";
 
 export interface ApprovalRequestItem {
   id: string;
@@ -529,7 +530,7 @@ export default function DrawingsClientView({
   const draftsCount = drawings.filter((d) => d.latestVersion?.approvalState === "DRAFT").length;
   const approvedCount = drawings.filter((d) => d.latestVersion?.approvalState === "APPROVED").length;
 
-  const pageSize = 8;
+  const [pageSize, setPageSize] = useState<number>(8);
   const totalPages = Math.max(1, Math.ceil(filteredDrawings.length / pageSize));
   const paginatedDrawings = filteredDrawings.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   const selectedDrawing = drawings.find((d) => d.id === selectedDrawingId) || filteredDrawings[0] || drawings[0] || null;
@@ -1096,46 +1097,17 @@ export default function DrawingsClientView({
                 </tbody>
               </table>
 
-              {/* Desktop Pagination */}
-              <div className="p-3.5 border-t border-[#E2E6F0] bg-[#F8F9FD] flex items-center justify-between text-xs text-[#696E82]">
-                <span>
-                  Showing {Math.min((currentPage - 1) * pageSize + 1, filteredDrawings.length)} –{" "}
-                  {Math.min(currentPage * pageSize, filteredDrawings.length)} of {filteredDrawings.length}
-                </span>
-
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    disabled={currentPage <= 1}
-                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                    className="px-2.5 py-1 rounded-lg border border-[#E2E6F0] bg-white text-[#1F1F1F] hover:bg-[#F2F4FF] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-                  >
-                    &lt; Previous
-                  </button>
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
-                    <button
-                      key={pageNum}
-                      type="button"
-                      onClick={() => setCurrentPage(pageNum)}
-                      className={`w-7 h-7 rounded-lg text-xs font-semibold cursor-pointer ${
-                        currentPage === pageNum
-                          ? "bg-[#5A81FA] text-white"
-                          : "bg-white border border-[#E2E6F0] text-[#1F1F1F] hover:bg-[#F2F4FF]"
-                      }`}
-                    >
-                      {pageNum}
-                    </button>
-                  ))}
-                  <button
-                    type="button"
-                    disabled={currentPage >= totalPages}
-                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                    className="px-2.5 py-1 rounded-lg border border-[#E2E6F0] bg-white text-[#1F1F1F] hover:bg-[#F2F4FF] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-                  >
-                    Next &gt;
-                  </button>
-                </div>
-              </div>
+              {/* Desktop Advanced Pagination */}
+              <AdvancedPagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalItems={filteredDrawings.length}
+                pageSize={pageSize}
+                onPageChange={setCurrentPage}
+                onPageSizeChange={setPageSize}
+                pageSizeOptions={[4, 8, 16, 32]}
+                itemName="drawings"
+              />
             </div>
 
             {/* Mobile Cards View (< lg) */}
@@ -1198,6 +1170,21 @@ export default function DrawingsClientView({
                   </div>
                 );
               })}
+
+              {/* Mobile Advanced Pagination */}
+              <div className="pt-2">
+                <AdvancedPagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  totalItems={filteredDrawings.length}
+                  pageSize={pageSize}
+                  onPageChange={setCurrentPage}
+                  onPageSizeChange={setPageSize}
+                  pageSizeOptions={[4, 8, 16, 32]}
+                  itemName="drawings"
+                  className="rounded-2xl border border-[#E2E6F0]"
+                />
+              </div>
             </div>
           </div>
 

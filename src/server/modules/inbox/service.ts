@@ -31,7 +31,8 @@ export type InboxItemType =
   | "SITE_VISIT"
   | "TASK_BLOCKER"
   | "LEAVE_APPLICATION"
-  | "LEAVE_CANCELLATION";
+  | "LEAVE_CANCELLATION"
+  | "MEETING";
 
 export type InboxUrgency = "CRITICAL" | "URGENT" | "NORMAL";
 
@@ -75,6 +76,7 @@ export interface DecisionInboxOverview {
     siteVisits: number;
     leaveApplications: number;
     leaveCancellations: number;
+    meetings: number;
   };
 }
 
@@ -336,6 +338,29 @@ export async function getOwnerDecisionInbox(
       leaveRequest: true,
     },
     orderBy: { createdAt: "desc" },
+  });
+
+  // 10. Fetch Meetings needing review or action
+  const pendingMeetings = await prisma.studioMeeting.findMany({
+    where: {
+      tenantId: ctx.tenantId,
+      OR: [
+        { isMinutesPublished: false },
+        { status: "SCHEDULED" },
+      ],
+    },
+    include: {
+      project: { select: { id: true, code: true, name: true } },
+      creator: {
+        include: {
+          user: { select: { fullName: true, email: true } },
+          employee: { select: { designation: true } },
+        },
+      },
+      actionItems: true,
+    },
+    orderBy: { meetingDate: "desc" },
+    take: 20,
   });
 
   // Transform each domain type into unified DecisionInboxItem
@@ -741,6 +766,47 @@ export async function getOwnerDecisionInbox(
     });
   }
 
+  // 10. Studio Meetings
+  for (const m of pendingMeetings) {
+    const ageMs = now.getTime() - new Date(m.createdAt).getTime();
+    const ageHours = Math.floor(ageMs / (1000 * 60 * 60));
+    const ageDays = Math.floor(ageHours / 24);
+    const isSelf = m.creatorId === ctx.membershipId;
+
+    allItems.push({
+      id: `meeting-${m.id}`,
+      rawId: m.id,
+      type: "MEETING",
+      typeLabel: "Studio Meeting Review",
+      title: m.title,
+      subtitle: m.project ? `${m.project.code} • ${m.meetingType}` : m.meetingType,
+      projectId: m.projectId || undefined,
+      projectCode: m.project?.code,
+      projectName: m.project?.name,
+      requesterId: m.creatorId,
+      requesterName: m.creator?.user?.fullName || "Studio Leadership",
+      requesterRole: m.creator?.employee?.designation || "Studio Leadership",
+      requesterAvatarUrl: undefined,
+      submittedAt: m.createdAt.toISOString(),
+      ageHours,
+      ageDays,
+      urgency: m.meetingDate <= now ? "URGENT" : "NORMAL",
+      canApprove: true,
+      status: m.isMinutesPublished ? "PUBLISHED" : "MINUTES_PENDING",
+      summary: m.agenda || (m.isMinutesPublished ? "Meeting conducted" : "Meeting minutes / decisions pending publishing."),
+      details: {
+        meetingDate: formatDateOnly(m.meetingDate),
+        startTime: m.startTime,
+        endTime: m.endTime,
+        meetingType: m.meetingType,
+        locationType: m.locationType,
+        locationDetails: m.locationDetails,
+        isMinutesPublished: m.isMinutesPublished,
+        actionItemsCount: m.actionItems?.length || 0,
+      },
+    });
+  }
+
   // Sort descending by urgency then age
   allItems.sort((a, b) => {
     const urgencyScore = { CRITICAL: 3, URGENT: 2, NORMAL: 1 };
@@ -769,6 +835,7 @@ export async function getOwnerDecisionInbox(
     siteVisits: allItems.filter((i) => i.type === "SITE_VISIT").length,
     leaveApplications: allItems.filter((i) => i.type === "LEAVE_APPLICATION").length,
     leaveCancellations: allItems.filter((i) => i.type === "LEAVE_CANCELLATION").length,
+    meetings: allItems.filter((i) => i.type === "MEETING").length,
   };
 
   // Filter items based on active tab and optional search query
@@ -785,7 +852,17 @@ export async function getOwnerDecisionInbox(
   }
 
   if (params?.type && params.type !== "ALL") {
-    filteredItems = filteredItems.filter((item) => item.type === params.type);
+    if (params.type === "LEAVE") {
+      filteredItems = filteredItems.filter(
+        (item) => item.type === "LEAVE_APPLICATION" || item.type === "LEAVE_CANCELLATION"
+      );
+    } else if (params.type === "TASK") {
+      filteredItems = filteredItems.filter(
+        (item) => item.type === "DELIVERABLE_SUBMISSION" || item.type === "TASK_BLOCKER" || item.type === "DEADLINE_EXTENSION"
+      );
+    } else {
+      filteredItems = filteredItems.filter((item) => item.type === params.type);
+    }
   }
 
   if (params?.urgency && params.urgency !== "ALL") {
@@ -963,6 +1040,29 @@ export async function executeInboxDecision(
         rejectionReason:
           feedback?.trim() || (action === "REJECT" ? "Cancellation rejected by studio leadership" : undefined),
       });
+      break;
+    }
+
+    case "MEETING": {
+      if (action === "APPROVE") {
+        await prisma.studioMeeting.update({
+          where: { id, tenantId: ctx.tenantId },
+          data: {
+            isMinutesPublished: true,
+            publishedMinutesAt: new Date(),
+            status: "COMPLETED",
+            notes: feedback?.trim() || undefined,
+          },
+        });
+      } else {
+        await prisma.studioMeeting.update({
+          where: { id, tenantId: ctx.tenantId },
+          data: {
+            notes: feedback?.trim() || undefined,
+          },
+        });
+      }
+      executionResult = { success: true };
       break;
     }
 

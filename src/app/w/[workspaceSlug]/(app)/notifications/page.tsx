@@ -18,6 +18,7 @@ import {
   ExternalLink,
   CheckCheck,
 } from "lucide-react";
+import { AdvancedPagination, usePagination } from "@/components/ui/AdvancedPagination";
 
 interface NotificationItem {
   id: string;
@@ -106,6 +107,11 @@ export default function NotificationsPage() {
     return fallbackItems;
   }, [notifications, fallbackItems]);
 
+  const { paginatedItems: paginatedNotifications, paginationProps: notificationsPaginationProps } = usePagination(
+    activeList,
+    { initialPageSize: 10, itemName: "notifications" }
+  );
+
   const effectiveUnreadCount = useMemo(() => {
     if (notifications.length > 0) return unreadCount;
     return fallbackItems.filter((item) => !item.isRead).length;
@@ -185,7 +191,7 @@ export default function NotificationsPage() {
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
     const startOfYesterday = startOfToday - 24 * 60 * 60 * 1000;
 
-    activeList.forEach((item) => {
+    paginatedNotifications.forEach((item) => {
       const itemTime = new Date(item.createdAt).getTime();
       if (itemTime >= startOfToday) {
         today.push(item);
@@ -197,7 +203,7 @@ export default function NotificationsPage() {
     });
 
     return { today, yesterday, earlier };
-  }, [activeList]);
+  }, [paginatedNotifications]);
 
   // Icon styling mapping matching Image A
   const getIconConfig = (item: NotificationItem) => {
@@ -511,6 +517,15 @@ export default function NotificationsPage() {
                 </section>
               )}
             </>
+          )}
+
+          {activeList.length > 0 && (
+            <div className="p-4 border-t border-slate-100">
+              <AdvancedPagination
+                {...notificationsPaginationProps}
+                pageSizeOptions={[5, 10, 20, 50]}
+              />
+            </div>
           )}
         </div>
       </div>

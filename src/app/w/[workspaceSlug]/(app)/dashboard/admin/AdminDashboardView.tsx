@@ -27,8 +27,6 @@ import { TaskPriorityBadge } from "@/components/tasks/TaskPriorityBadge";
 import { MorningBriefingModal } from "@/components/dashboard/MorningBriefingModal";
 import { useStudioRealtime } from "@/components/realtime/useStudioRealtime";
 import { LiveSyncIndicator } from "@/components/realtime/LiveSyncIndicator";
-import { StudioHealthIndexCard } from "@/components/dashboard/StudioHealthIndexCard";
-
 interface AdminDashboardViewProps {
   data: AdminDashboardData;
   workspaceSlug: string;
@@ -47,6 +45,7 @@ export default function AdminDashboardView({
   const router = useRouter();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<"OPERATIONS" | "REVIEWS" | "ASSIGNMENTS" | "TEAM">("OPERATIONS");
+  const [reviewFilterTab, setReviewFilterTab] = useState<"ALL" | "LEAVE" | "TASK" | "SITE_VISIT" | "MEETING">("ALL");
 
   // Realtime Live SSE Bus
   const { isConnected, lastEvent, forceRefresh } = useStudioRealtime({
@@ -302,69 +301,280 @@ export default function AdminDashboardView({
         {/* LEFT / MAIN COLUMN (~70%) */}
         <div className="lg:col-span-2 space-y-6">
           {/* Review Queue Card Section */}
-          {(activeTab === "OPERATIONS" || activeTab === "REVIEWS") && (
-            <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-xs space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-amber-500" />
-                  <h2 className="type-card-title text-slate-900">
-                    Review queue ({data.reviewQueue.length})
-                  </h2>
+          {(activeTab === "OPERATIONS" || activeTab === "REVIEWS") && (() => {
+            const leaves = data.readyForReview?.leaves || [];
+            const tasks = data.readyForReview?.tasks || data.reviewQueue.map((item) => ({
+              id: item.id,
+              title: item.title,
+              projectCode: item.projectCode,
+              projectName: item.projectName,
+              requesterName: item.submitterName,
+              submittedAt: item.submittedAt,
+              priority: item.priority,
+              taskId: item.taskId,
+              status: "WAITING_REVIEW",
+            }));
+            const siteVisits = data.readyForReview?.siteVisits || [];
+            const meetings = data.readyForReview?.meetings || [];
+            const totalCount = leaves.length + tasks.length + siteVisits.length + meetings.length;
+
+            return (
+              <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-xs space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-amber-500" />
+                    <h2 className="type-card-title text-slate-900">
+                      Review queue ({totalCount})
+                    </h2>
+                  </div>
+                  <Link
+                    href={`/w/${workspaceSlug}/inbox`}
+                    className="type-button-label text-[#3562E8] hover:underline"
+                  >
+                    Open decision inbox →
+                  </Link>
                 </div>
-                <Link
-                  href={`/w/${workspaceSlug}/tasks?filter=WAITING_REVIEW`}
-                  className="type-button-label text-[#3562E8] hover:underline"
-                >
-                  View full queue →
-                </Link>
-              </div>
 
-              {data.reviewQueue.length === 0 ? (
-                <div className="p-8 text-center bg-slate-50/60 rounded-2xl border border-dashed border-slate-200 space-y-1">
-                  <CheckCircle2 className="w-6 h-6 text-emerald-600 mx-auto" />
-                  <p className="type-minor-heading text-slate-900">Review queue is clear</p>
-                  <p className="type-helper text-slate-500">No submitted work waiting for review decision.</p>
+                {/* Sub-Tabs: All, Leave, Task, Site Visit, Meetings */}
+                <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl overflow-x-auto touch-scroll-x">
+                  <button
+                    type="button"
+                    onClick={() => setReviewFilterTab("ALL")}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-lg transition whitespace-nowrap cursor-pointer ${
+                      reviewFilterTab === "ALL"
+                        ? "bg-white text-slate-900 shadow-xs"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    All ({totalCount})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setReviewFilterTab("LEAVE")}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-lg transition whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+                      reviewFilterTab === "LEAVE"
+                        ? "bg-white text-teal-700 shadow-xs"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    <Calendar className="w-3.5 h-3.5" />
+                    <span>Leave ({leaves.length})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setReviewFilterTab("TASK")}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-lg transition whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+                      reviewFilterTab === "TASK"
+                        ? "bg-white text-blue-700 shadow-xs"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    <CheckSquare className="w-3.5 h-3.5" />
+                    <span>Task ({tasks.length})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setReviewFilterTab("SITE_VISIT")}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-lg transition whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+                      reviewFilterTab === "SITE_VISIT"
+                        ? "bg-white text-indigo-700 shadow-xs"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    <MapPin className="w-3.5 h-3.5" />
+                    <span>Site Visit ({siteVisits.length})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setReviewFilterTab("MEETING")}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-lg transition whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+                      reviewFilterTab === "MEETING"
+                        ? "bg-white text-purple-700 shadow-xs"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    <Clock className="w-3.5 h-3.5" />
+                    <span>Meetings ({meetings.length})</span>
+                  </button>
                 </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {data.reviewQueue.map((item) => (
-                    <div
-                      key={item.id}
-                      className="p-4 bg-slate-50/50 hover:bg-white rounded-2xl border border-slate-200/80 hover:border-[#3562E8] transition-all space-y-3 shadow-2xs group"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <span className="font-mono type-badge text-[#3562E8] bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
-                            {item.projectCode}
-                          </span>
-                          <h3 className="type-minor-heading text-slate-900 truncate mt-1 group-hover:text-[#3562E8] transition-colors">
-                            {item.title}
-                          </h3>
-                          <p className="type-metadata text-slate-500 mt-0.5">
-                            Waiting: <strong className="text-amber-700 font-semibold tabular-nums">{item.waitingHours}h</strong>
-                          </p>
-                        </div>
 
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <TaskPriorityBadge priority={item.priority} size="sm" />
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-                        <span className="type-helper text-slate-500">Submissions audit</span>
-                        <Link
-                          href={`/w/${workspaceSlug}/tasks?taskId=${item.taskId}`}
-                          className="px-3 py-1 bg-[#3562E8] hover:bg-blue-700 text-white type-button-label rounded-lg transition-colors"
-                        >
-                          Review now
-                        </Link>
-                      </div>
+                {/* Tab content */}
+                {reviewFilterTab === "ALL" && (
+                  totalCount === 0 ? (
+                    <div className="p-8 text-center bg-slate-50/60 rounded-2xl border border-dashed border-slate-200 space-y-1">
+                      <CheckCircle2 className="w-6 h-6 text-emerald-600 mx-auto" />
+                      <p className="type-minor-heading text-slate-900">Review queue is clear</p>
+                      <p className="type-helper text-slate-500">No submitted work waiting for review decision.</p>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {leaves.slice(0, 2).map((l) => (
+                        <div key={`l-${l.id}`} className="p-3.5 rounded-2xl border border-teal-100 bg-teal-50/30 flex items-center justify-between gap-3 shadow-2xs">
+                          <div className="min-w-0">
+                            <span className="type-badge bg-teal-100 text-teal-800 px-2 py-0.5 rounded font-medium">Leave Request</span>
+                            <div className="type-minor-heading text-slate-900 truncate mt-1">{l.requesterName} • {l.leaveType}</div>
+                            <div className="type-metadata text-slate-500 truncate mt-0.5">{l.startDate} to {l.endDate} ({l.daysCount}d)</div>
+                          </div>
+                          <Link href={`/w/${workspaceSlug}/inbox?tab=all-authorized&type=LEAVE`} className="px-3 py-1 bg-teal-600 hover:bg-teal-700 text-white type-button-label rounded-lg transition-colors shrink-0">
+                            Review
+                          </Link>
+                        </div>
+                      ))}
+
+                      {tasks.slice(0, 4).map((item) => (
+                        <div
+                          key={`t-${item.id}`}
+                          className="p-4 bg-slate-50/50 hover:bg-white rounded-2xl border border-slate-200/80 hover:border-[#3562E8] transition-all space-y-3 shadow-2xs group"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <span className="font-mono type-badge text-[#3562E8] bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
+                                {item.projectCode}
+                              </span>
+                              <h3 className="type-minor-heading text-slate-900 truncate mt-1 group-hover:text-[#3562E8] transition-colors">
+                                {item.title}
+                              </h3>
+                              <p className="type-metadata text-slate-500 mt-0.5">
+                                Submitter: {item.requesterName}
+                              </p>
+                            </div>
+                            <TaskPriorityBadge priority={item.priority as any} size="sm" />
+                          </div>
+
+                          <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                            <span className="type-helper text-slate-500">Submissions audit</span>
+                            <Link
+                              href={`/w/${workspaceSlug}/tasks?taskId=${item.taskId}`}
+                              className="px-3 py-1 bg-[#3562E8] hover:bg-blue-700 text-white type-button-label rounded-lg transition-colors"
+                            >
+                              Review now
+                            </Link>
+                          </div>
+                        </div>
+                      ))}
+
+                      {siteVisits.slice(0, 2).map((v) => (
+                        <div key={`v-${v.id}`} className="p-3.5 rounded-2xl border border-indigo-100 bg-indigo-50/30 flex items-center justify-between gap-3 shadow-2xs">
+                          <div className="min-w-0">
+                            <span className="type-badge bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded font-medium">Site Visit</span>
+                            <div className="type-minor-heading text-slate-900 truncate mt-1">{v.siteName} • {v.projectCode}</div>
+                            <div className="type-metadata text-slate-500 truncate mt-0.5">Inspector: {v.inspectorName} • {v.purpose}</div>
+                          </div>
+                          <Link href={`/w/${workspaceSlug}/visits`} className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white type-button-label rounded-lg transition-colors shrink-0">
+                            Review
+                          </Link>
+                        </div>
+                      ))}
+
+                      {meetings.slice(0, 2).map((m) => (
+                        <div key={`m-${m.id}`} className="p-3.5 rounded-2xl border border-purple-100 bg-purple-50/30 flex items-center justify-between gap-3 shadow-2xs">
+                          <div className="min-w-0">
+                            <span className="type-badge bg-purple-100 text-purple-800 px-2 py-0.5 rounded font-medium">Meeting Review</span>
+                            <div className="type-minor-heading text-slate-900 truncate mt-1">{m.title}</div>
+                            <div className="type-metadata text-slate-500 truncate mt-0.5">{new Date(m.meetingDate).toLocaleDateString()} • {m.meetingType}</div>
+                          </div>
+                          <Link href={`/w/${workspaceSlug}/meetings`} className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white type-button-label rounded-lg transition-colors shrink-0">
+                            Review
+                          </Link>
+                        </div>
+                      ))}
+                    </div>
+                  )
+                )}
+
+                {reviewFilterTab === "LEAVE" && (
+                  leaves.length === 0 ? (
+                    <div className="p-8 text-center bg-slate-50/60 rounded-2xl border border-dashed border-slate-200">
+                      <p className="type-minor-heading text-slate-900">No pending leave requests</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2.5">
+                      {leaves.map((l) => (
+                        <div key={l.id} className="p-3.5 rounded-2xl border border-slate-200/80 bg-slate-50/40 hover:bg-white flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="type-minor-heading text-slate-900 truncate">{l.requesterName} • <span className="text-teal-700">{l.leaveType}</span></div>
+                            <div className="type-metadata text-slate-500 truncate mt-0.5">{l.startDate} to {l.endDate} ({l.daysCount} days) • {l.reason}</div>
+                          </div>
+                          <Link href={`/w/${workspaceSlug}/inbox?tab=all-authorized&type=LEAVE`} className="px-3 py-1 bg-teal-600 hover:bg-teal-700 text-white type-button-label rounded-lg shrink-0">Review</Link>
+                        </div>
+                      ))}
+                    </div>
+                  )
+                )}
+
+                {reviewFilterTab === "TASK" && (
+                  tasks.length === 0 ? (
+                    <div className="p-8 text-center bg-slate-50/60 rounded-2xl border border-dashed border-slate-200">
+                      <p className="type-minor-heading text-slate-900">No tasks waiting review</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {tasks.map((item) => (
+                        <div key={item.id} className="p-4 bg-slate-50/50 hover:bg-white rounded-2xl border border-slate-200/80 hover:border-[#3562E8] transition-all space-y-3 shadow-2xs group">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <span className="font-mono type-badge text-[#3562E8] bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
+                                {item.projectCode}
+                              </span>
+                              <h3 className="type-minor-heading text-slate-900 truncate mt-1 group-hover:text-[#3562E8] transition-colors">
+                                {item.title}
+                              </h3>
+                              <p className="type-metadata text-slate-500 mt-0.5">Submitter: {item.requesterName}</p>
+                            </div>
+                            <TaskPriorityBadge priority={item.priority as any} size="sm" />
+                          </div>
+                          <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                            <span className="type-helper text-slate-500">Submissions audit</span>
+                            <Link href={`/w/${workspaceSlug}/tasks?taskId=${item.taskId}`} className="px-3 py-1 bg-[#3562E8] hover:bg-blue-700 text-white type-button-label rounded-lg transition-colors">Review now</Link>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )
+                )}
+
+                {reviewFilterTab === "SITE_VISIT" && (
+                  siteVisits.length === 0 ? (
+                    <div className="p-8 text-center bg-slate-50/60 rounded-2xl border border-dashed border-slate-200">
+                      <p className="type-minor-heading text-slate-900">No site visits waiting review</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2.5">
+                      {siteVisits.map((v) => (
+                        <div key={v.id} className="p-3.5 rounded-2xl border border-slate-200/80 bg-slate-50/40 hover:bg-white flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="type-minor-heading text-slate-900 truncate">{v.siteName} • {v.projectCode}</div>
+                            <div className="type-metadata text-slate-500 truncate mt-0.5">Inspector: {v.inspectorName} • {v.purpose}</div>
+                          </div>
+                          <Link href={`/w/${workspaceSlug}/visits`} className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white type-button-label rounded-lg shrink-0">Review</Link>
+                        </div>
+                      ))}
+                    </div>
+                  )
+                )}
+
+                {reviewFilterTab === "MEETING" && (
+                  meetings.length === 0 ? (
+                    <div className="p-8 text-center bg-slate-50/60 rounded-2xl border border-dashed border-slate-200">
+                      <p className="type-minor-heading text-slate-900">No meetings pending review</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2.5">
+                      {meetings.map((m) => (
+                        <div key={m.id} className="p-3.5 rounded-2xl border border-slate-200/80 bg-slate-50/40 hover:bg-white flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="type-minor-heading text-slate-900 truncate">{m.title}</div>
+                            <div className="type-metadata text-slate-500 truncate mt-0.5">{new Date(m.meetingDate).toLocaleDateString()} • {m.meetingType} • {m.isMinutesPublished ? "Minutes published" : "Minutes pending"}</div>
+                          </div>
+                          <Link href={`/w/${workspaceSlug}/meetings`} className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white type-button-label rounded-lg shrink-0">Review</Link>
+                        </div>
+                      ))}
+                    </div>
+                  )
+                )}
+              </div>
+            );
+          })()}
 
           {/* Assignment Queue Section */}
           {(activeTab === "OPERATIONS" || activeTab === "ASSIGNMENTS") && (

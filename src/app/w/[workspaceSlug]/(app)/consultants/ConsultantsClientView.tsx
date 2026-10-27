@@ -33,6 +33,7 @@ import { DynamicCardFields } from "@/components/custom-fields/DynamicCardFields"
 import { CustomFieldDefinition } from "@/server/modules/custom-fields/repository";
 import { ContactShareModal, ShareableContact, ClientOption } from "@/components/share/ContactShareModal";
 import { SearchableDropdown } from "@/components/ui/SearchableDropdown";
+import { AdvancedPagination, usePagination } from "@/components/ui/AdvancedPagination";
 
 export interface ProjectConsultantItem {
   id: string;
@@ -331,6 +332,11 @@ export default function ConsultantsClientView({
       }
     });
   }, [consultants, statusTab, selectedDiscipline, selectedProjectId, engagementFilter, contactChannelFilter, searchQuery, consultantSortBy]);
+
+  const { paginatedItems: paginatedConsultants, paginationProps: consultantPaginationProps } = usePagination(
+    filteredConsultants,
+    { initialPageSize: 12, itemName: "consultants" }
+  );
 
   // Open Edit Modal
   const openEditModal = (consultant: ConsultantItem) => {
@@ -949,7 +955,7 @@ export default function ConsultantsClientView({
             <p className="text-xs text-[#696E82] mt-1">Try adjusting your search terms or active status tabs.</p>
           </div>
         ) : (
-          filteredConsultants.map((consultant) => {
+          paginatedConsultants.map((consultant) => {
             const isSelected = selectedConsultantIds.includes(consultant.id);
             return (
               <div
@@ -1116,6 +1122,13 @@ export default function ConsultantsClientView({
         })
       )}
       </div>
+
+      {filteredConsultants.length > 0 && (
+        <AdvancedPagination
+          {...consultantPaginationProps}
+          pageSizeOptions={[6, 12, 24, 48]}
+        />
+      )}
 
       {/* ==================================================== */}
       {/* ADD CONSULTANT MODAL (OWNER / ADMIN ONLY)            */}

@@ -2,6 +2,56 @@ import { prisma } from "../../db/prisma";
 import { TenantContext, isAdminOrOwner, ForbiddenException } from "../../tenancy/context";
 import { TaskWorkflowStatus, TaskPriority } from "@prisma/client";
 import { getWorkspaceDayBoundaries } from "../tasks/repository";
+import { formatDateOnly } from "../leave/policy";
+
+export interface ReadyForReviewData {
+  leaves: Array<{
+    id: string;
+    requesterName: string;
+    requesterDesignation?: string | null;
+    leaveType: string;
+    startDate: string;
+    endDate: string;
+    daysCount: number;
+    reason: string;
+    submittedAt: Date;
+    status: string;
+  }>;
+  tasks: Array<{
+    id: string;
+    title: string;
+    projectCode: string;
+    projectName: string;
+    requesterName: string;
+    submittedAt: Date;
+    priority: TaskPriority | string;
+    taskId: string;
+    status: string;
+  }>;
+  siteVisits: Array<{
+    id: string;
+    siteName: string;
+    projectCode: string;
+    projectName: string;
+    inspectorName: string;
+    purpose: string;
+    scheduledTime: Date;
+    operationalState: string;
+  }>;
+  meetings: Array<{
+    id: string;
+    title: string;
+    meetingDate: Date;
+    startTime: string;
+    endTime: string;
+    meetingType: string;
+    projectCode?: string;
+    projectName?: string;
+    creatorName?: string;
+    status: string;
+    isMinutesPublished: boolean;
+  }>;
+}
 
 export interface StudioHealthIndex {
   score: number;
@@ -107,6 +157,7 @@ export interface OwnerDashboardData {
     safeChangeSummary: string;
     timestamp: Date;
   }>;
+  readyForReview?: ReadyForReviewData;
 }
 
 export interface AdminDashboardData {
@@ -182,7 +233,7 @@ export interface AdminDashboardData {
     status: TaskWorkflowStatus;
     dueDate: Date | null;
   }>;
-
+  readyForReview?: ReadyForReviewData;
 }
 
 export interface ReopenedTaskAlert {
@@ -409,6 +460,10 @@ export async function getOwnerDashboardData(ctx: TenantContext): Promise<OwnerDa
     members,
     siteVisits,
     auditEvents,
+    pendingLeaves,
+    pendingSubmissions,
+    pendingSiteVisits,
+    pendingMeetings,
   ] = await Promise.all([
     // 1. Projects Query
     prisma.project.findMany({
@@ -491,6 +546,62 @@ export async function getOwnerDashboardData(ctx: TenantContext): Promise<OwnerDa
     prisma.auditEvent.findMany({
       where: { tenantId: ctx.tenantId },
       orderBy: { timestamp: "desc" },
+      take: 8,
+    }),
+    // 10. Pending Leaves for Review
+    prisma.studioLeaveRequest.findMany({
+      where: { tenantId: ctx.tenantId, deletedAt: null, status: "PENDING" },
+      include: {
+        employee: {
+          include: {
+            membership: { include: { user: { select: { fullName: true } } } },
+          },
+        },
+      },
+      orderBy: { submittedAt: "desc" },
+      take: 8,
+    }),
+    // 11. Tasks Pending Submission Review
+    prisma.taskSubmission.findMany({
+      where: { tenantId: ctx.tenantId, status: "PENDING" },
+      include: {
+        task: { include: { project: { select: { code: true, name: true } } } },
+        submitter: { include: { user: { select: { fullName: true } } } },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 8,
+    }),
+    // 12. Site Visits Pending Review
+    prisma.siteVisit.findMany({
+      where: {
+        tenantId: ctx.tenantId,
+        OR: [
+          { operationalState: "CHECKED_OUT" },
+          { operationalState: "SCHEDULED" },
+        ],
+      },
+      include: {
+        project: { select: { code: true, name: true } },
+        site: { select: { name: true } },
+        employee: { include: { user: { select: { fullName: true } } } },
+      },
+      orderBy: { scheduledTime: "desc" },
+      take: 8,
+    }),
+    // 13. Studio Meetings
+    prisma.studioMeeting.findMany({
+      where: {
+        tenantId: ctx.tenantId,
+        OR: [
+          { isMinutesPublished: false },
+          { status: "SCHEDULED" },
+        ],
+      },
+      include: {
+        project: { select: { code: true, name: true } },
+        creator: { include: { user: { select: { fullName: true } } } },
+      },
+      orderBy: { meetingDate: "desc" },
       take: 8,
     }),
   ]);
@@ -708,6 +819,69 @@ export async function getOwnerDashboardData(ctx: TenantContext): Promise<OwnerDa
       disclaimer: "Recorded collections minus expenses reflects operational cashflow, not final studio margin.",
     },
     approvalInbox,
+    readyForReview: {
+      leaves: pendingLeaves.map((l) => ({
+        id: l.id,
+        requesterName: l.employee?.membership?.user?.fullName || "Staff",
+        requesterDesignation: l.employee?.designation || null,
+        leaveType: l.leaveType,
+        startDate: formatDateOnly(l.startDate),
+        endDate: formatDateOnly(l.endDate),
+        daysCount: Number(l.days),
+        reason: l.reason || "Staff leave request",
+        submittedAt: l.submittedAt,
+        status: l.status,
+      })),
+      tasks: [
+        ...pendingSubmissions.map((s) => ({
+          id: s.id,
+          title: s.task.title,
+          projectCode: s.task.project.code,
+          projectName: s.task.project.name,
+          requesterName: s.submitter?.user?.fullName || "Staff",
+          submittedAt: s.createdAt,
+          priority: s.task.priority,
+          taskId: s.task.id,
+          status: "WAITING_REVIEW",
+        })),
+        ...allTasks
+          .filter((t) => t.status === TaskWorkflowStatus.IN_REVIEW && !pendingSubmissions.some((s) => s.taskId === t.id))
+          .map((t) => ({
+            id: t.id,
+            title: t.title,
+            projectCode: t.project.code,
+            projectName: t.project.name,
+            requesterName: "Assigned Staff",
+            submittedAt: new Date(),
+            priority: t.priority,
+            taskId: t.id,
+            status: "IN_REVIEW",
+          })),
+      ].slice(0, 10),
+      siteVisits: pendingSiteVisits.map((v) => ({
+        id: v.id,
+        siteName: v.site.name,
+        projectCode: v.project.code,
+        projectName: v.project.name,
+        inspectorName: v.employee?.user?.fullName || "Inspector",
+        purpose: v.purpose,
+        scheduledTime: v.scheduledTime,
+        operationalState: v.operationalState,
+      })),
+      meetings: pendingMeetings.map((m) => ({
+        id: m.id,
+        title: m.title,
+        meetingDate: m.meetingDate,
+        startTime: m.startTime,
+        endTime: m.endTime,
+        meetingType: m.meetingType,
+        projectCode: m.project?.code,
+        projectName: m.project?.name,
+        creatorName: m.creator?.user?.fullName,
+        status: m.status,
+        isMinutesPublished: m.isMinutesPublished,
+      })),
+    },
     teamWorkload,
     myWork: myTasks,
     upcomingSiteVisits,
@@ -750,6 +924,9 @@ export async function getAdminDashboardData(ctx: TenantContext): Promise<AdminDa
     pendingSubmissionsData,
     projects,
     members,
+    pendingLeavesAdmin,
+    pendingSiteVisitsAdmin,
+    pendingMeetingsAdmin,
   ] = await Promise.all([
     prisma.task.findMany({
       where: { tenantId: ctx.tenantId },
@@ -809,6 +986,52 @@ export async function getAdminDashboardData(ctx: TenantContext): Promise<AdminDa
         employee: { select: { designation: true, employeeId: true } },
       },
       orderBy: { joinedAt: "asc" },
+    }),
+    // Pending Leaves for Admin
+    prisma.studioLeaveRequest.findMany({
+      where: { tenantId: ctx.tenantId, deletedAt: null, status: "PENDING" },
+      include: {
+        employee: {
+          include: {
+            membership: { include: { user: { select: { fullName: true } } } },
+          },
+        },
+      },
+      orderBy: { submittedAt: "desc" },
+      take: 8,
+    }),
+    // Site Visits Pending for Admin
+    prisma.siteVisit.findMany({
+      where: {
+        tenantId: ctx.tenantId,
+        OR: [
+          { operationalState: "CHECKED_OUT" },
+          { operationalState: "SCHEDULED" },
+        ],
+      },
+      include: {
+        project: { select: { code: true, name: true } },
+        site: { select: { name: true } },
+        employee: { include: { user: { select: { fullName: true } } } },
+      },
+      orderBy: { scheduledTime: "desc" },
+      take: 8,
+    }),
+    // Studio Meetings for Admin
+    prisma.studioMeeting.findMany({
+      where: {
+        tenantId: ctx.tenantId,
+        OR: [
+          { isMinutesPublished: false },
+          { status: "SCHEDULED" },
+        ],
+      },
+      include: {
+        project: { select: { code: true, name: true } },
+        creator: { include: { user: { select: { fullName: true } } } },
+      },
+      orderBy: { meetingDate: "desc" },
+      take: 8,
     }),
   ]);
 
@@ -1016,6 +1239,54 @@ export async function getAdminDashboardData(ctx: TenantContext): Promise<AdminDa
     },
     assignmentQueue,
     reviewQueue: reviewTasks,
+    readyForReview: {
+      leaves: pendingLeavesAdmin.map((l) => ({
+        id: l.id,
+        requesterName: l.employee?.membership?.user?.fullName || "Staff",
+        requesterDesignation: l.employee?.designation || null,
+        leaveType: l.leaveType,
+        startDate: formatDateOnly(l.startDate),
+        endDate: formatDateOnly(l.endDate),
+        daysCount: Number(l.days),
+        reason: l.reason || "Staff leave request",
+        submittedAt: l.submittedAt,
+        status: l.status,
+      })),
+      tasks: reviewTasks.map((t) => ({
+        id: t.id,
+        title: t.title,
+        projectCode: t.projectCode,
+        projectName: t.projectName,
+        requesterName: t.submitterName,
+        submittedAt: t.submittedAt,
+        priority: t.priority,
+        taskId: t.taskId,
+        status: "WAITING_REVIEW",
+      })),
+      siteVisits: pendingSiteVisitsAdmin.map((v) => ({
+        id: v.id,
+        siteName: v.site.name,
+        projectCode: v.project.code,
+        projectName: v.project.name,
+        inspectorName: v.employee?.user?.fullName || "Inspector",
+        purpose: v.purpose,
+        scheduledTime: v.scheduledTime,
+        operationalState: v.operationalState,
+      })),
+      meetings: pendingMeetingsAdmin.map((m) => ({
+        id: m.id,
+        title: m.title,
+        meetingDate: m.meetingDate,
+        startTime: m.startTime,
+        endTime: m.endTime,
+        meetingType: m.meetingType,
+        projectCode: m.project?.code,
+        projectName: m.project?.name,
+        creatorName: m.creator?.user?.fullName,
+        status: m.status,
+        isMinutesPublished: m.isMinutesPublished,
+      })),
+    },
     projectDelivery,
     teamDistribution,
     todaySiteSchedule: siteVisitsToday.map((v) => ({

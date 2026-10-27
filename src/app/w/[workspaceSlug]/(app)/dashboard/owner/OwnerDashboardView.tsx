@@ -37,7 +37,6 @@ import { TypologyDot } from "@/lib/typology";
 import { MorningBriefingModal } from "@/components/dashboard/MorningBriefingModal";
 import { useStudioRealtime } from "@/components/realtime/useStudioRealtime";
 import { LiveSyncIndicator } from "@/components/realtime/LiveSyncIndicator";
-import { StudioHealthIndexCard } from "@/components/dashboard/StudioHealthIndexCard";
 import { VisualDrawingAirlock } from "@/components/drawings/VisualDrawingAirlock";
 
 interface OwnerDashboardViewProps {
@@ -58,6 +57,7 @@ export default function OwnerDashboardView({
   const router = useRouter();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<"OVERVIEW" | "ATTENTION" | "FINANCE" | "TEAM">("OVERVIEW");
+  const [reviewTab, setReviewTab] = useState<"ALL" | "LEAVE" | "TASK" | "SITE_VISIT" | "MEETING">("ALL");
 
   // Realtime Studio SSE Bus
   const { isConnected, lastEvent, forceRefresh } = useStudioRealtime({
@@ -295,64 +295,289 @@ export default function OwnerDashboardView({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* LEFT / MAIN COLUMN (~65%) */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Card A: Ready for your review */}
-          <div className="bg-white rounded-3xl border border-slate-200/90 p-5 sm:p-6 shadow-2xs space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="type-card-title text-slate-900 flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-sm bg-amber-500 inline-block" />
-                  <span>Ready for your review ({data.approvalInbox.length})</span>
-                </h2>
-                <p className="type-helper text-slate-500 mt-0.5">Keep project delivery moving.</p>
-              </div>
-              <Link
-                href={`/w/${workspaceSlug}/inbox`}
-                className="type-button-label text-[#2563EB] hover:text-blue-800 flex items-center gap-1"
-              >
-                <span>Open decision inbox</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-              </Link>
-            </div>
+          {/* Card A: Ready for your review (Leaves, Tasks, Site Visits, Meetings) */}
+          {(() => {
+            const leaves = data.readyForReview?.leaves || [];
+            const tasks = data.readyForReview?.tasks || data.approvalInbox.map((item) => ({
+              id: item.id,
+              title: item.title,
+              projectCode: item.projectCode,
+              projectName: item.projectName,
+              requesterName: item.requesterName,
+              submittedAt: item.submittedAt,
+              priority: "MEDIUM",
+              taskId: item.taskId || item.id,
+              status: item.status,
+            }));
+            const siteVisits = data.readyForReview?.siteVisits || [];
+            const meetings = data.readyForReview?.meetings || [];
+            const totalCount = leaves.length + tasks.length + siteVisits.length + meetings.length;
 
-            {data.approvalInbox.length === 0 ? (
-              <div className="p-8 text-center bg-slate-50/70 rounded-2xl border border-dashed border-slate-200 space-y-1">
-                <CheckCircle2 className="w-6 h-6 text-emerald-600 mx-auto" />
-                <p className="type-minor-heading text-slate-800">Review queue is clear</p>
-                <p className="type-helper text-slate-500">All submissions have been reviewed.</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {data.approvalInbox.slice(0, 4).map((item) => (
-                  <div
-                    key={item.id}
-                    className="p-3.5 rounded-2xl border border-slate-200/80 bg-slate-50/40 hover:bg-white transition-all flex items-center justify-between gap-3 type-body-compact group"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-9 h-9 rounded-xl bg-blue-50 text-[#2563EB] flex items-center justify-center shrink-0 border border-blue-100">
-                        <FileText className="w-4 h-4" />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="type-minor-heading text-slate-900 truncate group-hover:text-[#2563EB] transition-colors">
-                          {item.title}
-                        </div>
-                        <div className="type-metadata text-slate-500 truncate mt-0.5">
-                          {item.requesterName} • <span className="font-mono text-slate-600">{item.projectCode}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => setReviewingItem(item)}
-                      className="px-3.5 py-1.5 bg-[#2563EB] hover:bg-blue-700 text-white type-button-label rounded-xl shadow-2xs transition-all cursor-pointer shrink-0"
-                    >
-                      Review
-                    </button>
+            return (
+              <div className="bg-white rounded-3xl border border-slate-200/90 p-5 sm:p-6 shadow-2xs space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h2 className="type-card-title text-slate-900 flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-sm bg-amber-500 inline-block" />
+                      <span>Ready for your review ({totalCount})</span>
+                    </h2>
+                    <p className="type-helper text-slate-500 mt-0.5">Keep project delivery moving forward.</p>
                   </div>
-                ))}
+                  <Link
+                    href={`/w/${workspaceSlug}/inbox`}
+                    className="type-button-label text-[#2563EB] hover:text-blue-800 flex items-center gap-1 self-start sm:self-auto"
+                  >
+                    <span>Open decision inbox</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </Link>
+                </div>
+
+                {/* Sub-Tabs: All, Leave, Task, Site Visit, Meetings */}
+                <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl overflow-x-auto touch-scroll-x">
+                  <button
+                    type="button"
+                    onClick={() => setReviewTab("ALL")}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-lg transition whitespace-nowrap cursor-pointer ${
+                      reviewTab === "ALL"
+                        ? "bg-white text-slate-900 shadow-xs"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    All ({totalCount})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setReviewTab("LEAVE")}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-lg transition whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+                      reviewTab === "LEAVE"
+                        ? "bg-white text-teal-700 shadow-xs"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    <Calendar className="w-3.5 h-3.5" />
+                    <span>Leave ({leaves.length})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setReviewTab("TASK")}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-lg transition whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+                      reviewTab === "TASK"
+                        ? "bg-white text-blue-700 shadow-xs"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    <CheckSquare className="w-3.5 h-3.5" />
+                    <span>Task ({tasks.length})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setReviewTab("SITE_VISIT")}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-lg transition whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+                      reviewTab === "SITE_VISIT"
+                        ? "bg-white text-indigo-700 shadow-xs"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    <MapPin className="w-3.5 h-3.5" />
+                    <span>Site Visit ({siteVisits.length})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setReviewTab("MEETING")}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-lg transition whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+                      reviewTab === "MEETING"
+                        ? "bg-white text-purple-700 shadow-xs"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    <Clock className="w-3.5 h-3.5" />
+                    <span>Meetings ({meetings.length})</span>
+                  </button>
+                </div>
+
+                {/* Content based on selected tab */}
+                {reviewTab === "ALL" && (
+                  totalCount === 0 ? (
+                    <div className="p-8 text-center bg-slate-50/70 rounded-2xl border border-dashed border-slate-200 space-y-1">
+                      <CheckCircle2 className="w-6 h-6 text-emerald-600 mx-auto" />
+                      <p className="type-minor-heading text-slate-800">Review queue is clear</p>
+                      <p className="type-helper text-slate-500">All submissions have been reviewed.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2.5">
+                      {leaves.slice(0, 2).map((l) => (
+                        <div key={`leave-${l.id}`} className="p-3.5 rounded-2xl border border-teal-100 bg-teal-50/30 flex items-center justify-between gap-3 type-body-compact">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-9 h-9 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center shrink-0">
+                              <Calendar className="w-4 h-4" />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="type-minor-heading text-slate-900 truncate">
+                                {l.requesterName} • <span className="text-teal-700 font-semibold">{l.leaveType}</span> ({l.daysCount}d)
+                              </div>
+                              <div className="type-metadata text-slate-500 truncate mt-0.5">
+                                {l.startDate} to {l.endDate} • {l.reason}
+                              </div>
+                            </div>
+                          </div>
+                          <Link href={`/w/${workspaceSlug}/inbox?tab=all-authorized&type=LEAVE`} className="px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white type-button-label rounded-xl shadow-2xs transition-all shrink-0">
+                            Review
+                          </Link>
+                        </div>
+                      ))}
+
+                      {tasks.slice(0, 2).map((t) => (
+                        <div key={`task-${t.id}`} className="p-3.5 rounded-2xl border border-blue-100 bg-blue-50/30 flex items-center justify-between gap-3 type-body-compact">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center shrink-0">
+                              <FileText className="w-4 h-4" />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="type-minor-heading text-slate-900 truncate">
+                                {t.title}
+                              </div>
+                              <div className="type-metadata text-slate-500 truncate mt-0.5">
+                                {t.requesterName} • <span className="font-mono text-slate-700">{t.projectCode}</span>
+                              </div>
+                            </div>
+                          </div>
+                          <Link href={`/w/${workspaceSlug}/tasks?taskId=${t.taskId}`} className="px-3 py-1.5 bg-[#2563EB] hover:bg-blue-700 text-white type-button-label rounded-xl shadow-2xs transition-all shrink-0">
+                            Review
+                          </Link>
+                        </div>
+                      ))}
+
+                      {siteVisits.slice(0, 2).map((v) => (
+                        <div key={`visit-${v.id}`} className="p-3.5 rounded-2xl border border-indigo-100 bg-indigo-50/30 flex items-center justify-between gap-3 type-body-compact">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-9 h-9 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0">
+                              <MapPin className="w-4 h-4" />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="type-minor-heading text-slate-900 truncate">
+                                {v.siteName} • {v.projectCode}
+                              </div>
+                              <div className="type-metadata text-slate-500 truncate mt-0.5">
+                                Inspector: {v.inspectorName} • {v.purpose}
+                              </div>
+                            </div>
+                          </div>
+                          <Link href={`/w/${workspaceSlug}/visits`} className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white type-button-label rounded-xl shadow-2xs transition-all shrink-0">
+                            Review
+                          </Link>
+                        </div>
+                      ))}
+
+                      {meetings.slice(0, 2).map((m) => (
+                        <div key={`meet-${m.id}`} className="p-3.5 rounded-2xl border border-purple-100 bg-purple-50/30 flex items-center justify-between gap-3 type-body-compact">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-9 h-9 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center shrink-0">
+                              <Clock className="w-4 h-4" />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="type-minor-heading text-slate-900 truncate">
+                                {m.title}
+                              </div>
+                              <div className="type-metadata text-slate-500 truncate mt-0.5">
+                                {new Date(m.meetingDate).toLocaleDateString()} ({m.startTime} - {m.endTime}) • {m.meetingType}
+                              </div>
+                            </div>
+                          </div>
+                          <Link href={`/w/${workspaceSlug}/meetings`} className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white type-button-label rounded-xl shadow-2xs transition-all shrink-0">
+                            Review
+                          </Link>
+                        </div>
+                      ))}
+                    </div>
+                  )
+                )}
+
+                {reviewTab === "LEAVE" && (
+                  leaves.length === 0 ? (
+                    <div className="p-8 text-center bg-slate-50/70 rounded-2xl border border-dashed border-slate-200">
+                      <p className="type-minor-heading text-slate-800">No pending leave requests</p>
+                      <p className="type-helper text-slate-500 mt-1">All employee leave applications have been resolved.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2.5">
+                      {leaves.map((l) => (
+                        <div key={l.id} className="p-3.5 rounded-2xl border border-slate-200/80 bg-slate-50/40 hover:bg-white flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="type-minor-heading text-slate-900 truncate">{l.requesterName} • <span className="text-teal-700">{l.leaveType}</span></div>
+                            <div className="type-metadata text-slate-500 truncate mt-0.5">{l.startDate} to {l.endDate} ({l.daysCount} days) • {l.reason}</div>
+                          </div>
+                          <Link href={`/w/${workspaceSlug}/inbox?tab=all-authorized&type=LEAVE`} className="px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white type-button-label rounded-xl shrink-0">Review</Link>
+                        </div>
+                      ))}
+                    </div>
+                  )
+                )}
+
+                {reviewTab === "TASK" && (
+                  tasks.length === 0 ? (
+                    <div className="p-8 text-center bg-slate-50/70 rounded-2xl border border-dashed border-slate-200">
+                      <p className="type-minor-heading text-slate-800">No tasks waiting review</p>
+                      <p className="type-helper text-slate-500 mt-1">All deliverable submissions are reviewed.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2.5">
+                      {tasks.map((t) => (
+                        <div key={t.id} className="p-3.5 rounded-2xl border border-slate-200/80 bg-slate-50/40 hover:bg-white flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="type-minor-heading text-slate-900 truncate">{t.title}</div>
+                            <div className="type-metadata text-slate-500 truncate mt-0.5">{t.requesterName} • <span className="font-mono text-slate-600">{t.projectCode}</span></div>
+                          </div>
+                          <Link href={`/w/${workspaceSlug}/tasks?taskId=${t.taskId}`} className="px-3 py-1.5 bg-[#2563EB] hover:bg-blue-700 text-white type-button-label rounded-xl shrink-0">Review</Link>
+                        </div>
+                      ))}
+                    </div>
+                  )
+                )}
+
+                {reviewTab === "SITE_VISIT" && (
+                  siteVisits.length === 0 ? (
+                    <div className="p-8 text-center bg-slate-50/70 rounded-2xl border border-dashed border-slate-200">
+                      <p className="type-minor-heading text-slate-800">No site visits waiting review</p>
+                      <p className="type-helper text-slate-500 mt-1">All site inspections are current.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2.5">
+                      {siteVisits.map((v) => (
+                        <div key={v.id} className="p-3.5 rounded-2xl border border-slate-200/80 bg-slate-50/40 hover:bg-white flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="type-minor-heading text-slate-900 truncate">{v.siteName} • {v.projectCode}</div>
+                            <div className="type-metadata text-slate-500 truncate mt-0.5">Inspector: {v.inspectorName} • {v.purpose}</div>
+                          </div>
+                          <Link href={`/w/${workspaceSlug}/visits`} className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white type-button-label rounded-xl shrink-0">Review</Link>
+                        </div>
+                      ))}
+                    </div>
+                  )
+                )}
+
+                {reviewTab === "MEETING" && (
+                  meetings.length === 0 ? (
+                    <div className="p-8 text-center bg-slate-50/70 rounded-2xl border border-dashed border-slate-200">
+                      <p className="type-minor-heading text-slate-800">No meetings pending review</p>
+                      <p className="type-helper text-slate-500 mt-1">All meeting minutes have been recorded.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2.5">
+                      {meetings.map((m) => (
+                        <div key={m.id} className="p-3.5 rounded-2xl border border-slate-200/80 bg-slate-50/40 hover:bg-white flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="type-minor-heading text-slate-900 truncate">{m.title}</div>
+                            <div className="type-metadata text-slate-500 truncate mt-0.5">{new Date(m.meetingDate).toLocaleDateString()} • {m.meetingType} • {m.isMinutesPublished ? "Minutes published" : "Minutes pending"}</div>
+                          </div>
+                          <Link href={`/w/${workspaceSlug}/meetings`} className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white type-button-label rounded-xl shrink-0">Review</Link>
+                        </div>
+                      ))}
+                    </div>
+                  )
+                )}
               </div>
-            )}
-          </div>
+            );
+          })()}
 
           {/* Card B: Project delivery */}
           <div className="bg-white rounded-3xl border border-slate-200/90 p-5 sm:p-6 shadow-2xs space-y-4">
@@ -472,111 +697,6 @@ export default function OwnerDashboardView({
 
         {/* RIGHT COLUMN (~35%) */}
         <div className="space-y-6">
-          {/* Card 1: Studio Health */}
-          <div className="bg-white border border-slate-200/90 rounded-3xl p-5 sm:p-6 shadow-2xs space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-blue-50 text-[#2563EB] flex items-center justify-center border border-blue-100">
-                  <Activity className="w-4 h-4" />
-                </div>
-                <h2 className="type-card-title text-slate-900">Studio health</h2>
-              </div>
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full type-badge bg-emerald-50 text-emerald-700 border border-emerald-200">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                <span>Healthy</span>
-              </span>
-            </div>
-
-            {/* Score Ring & Trend */}
-            <div className="flex items-center gap-4 pt-2">
-              <div className="relative w-16 h-16 shrink-0 flex items-center justify-center">
-                <svg className="w-full h-full -rotate-90" viewBox="0 0 80 80">
-                  <circle cx="40" cy="40" r="32" stroke="#E2E8F0" strokeWidth="8" fill="none" />
-                  <circle
-                    cx="40"
-                    cy="40"
-                    r="32"
-                    stroke="#2563EB"
-                    strokeWidth="8"
-                    strokeDasharray={201}
-                    strokeDashoffset={201 - (201 * (data.studioHealthIndex?.score ?? 79)) / 100}
-                    strokeLinecap="round"
-                    fill="none"
-                  />
-                </svg>
-                <div className="absolute text-center">
-                  <span className="type-kpi-value font-mono text-slate-900 leading-none">
-                    {data.studioHealthIndex?.score ?? 79}
-                  </span>
-                  <span className="type-metadata text-slate-400 block font-mono -mt-1">/100</span>
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <div className="type-helper text-slate-500 flex items-center gap-1">
-                  <span className="text-rose-500 font-medium">↘ -1.6%</span>
-                  <span>vs last week</span>
-                </div>
-                <p className="type-helper text-slate-500 leading-tight">
-                  Composite rating of delivery, reviews, and capacity.
-                </p>
-              </div>
-            </div>
-
-            {/* 4 Health Dimension Progress Bars */}
-            <div className="space-y-2.5 pt-2 border-t border-slate-100 type-body-compact">
-              <div className="space-y-1">
-                <div className="flex justify-between text-slate-600 type-helper">
-                  <span>Deliverables</span>
-                  <span className="font-medium text-slate-800 tabular-nums">100%</span>
-                </div>
-                <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                  <div className="bg-blue-600 h-full rounded-full" style={{ width: "100%" }} />
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <div className="flex justify-between text-slate-600 type-helper">
-                  <span>Review latency</span>
-                  <span className="font-medium text-slate-800 tabular-nums">25%</span>
-                </div>
-                <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                  <div className="bg-emerald-500 h-full rounded-full" style={{ width: "25%" }} />
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <div className="flex justify-between text-slate-600 type-helper">
-                  <span>Team balance</span>
-                  <span className="font-medium text-slate-800 tabular-nums">100%</span>
-                </div>
-                <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                  <div className="bg-purple-600 h-full rounded-full" style={{ width: "100%" }} />
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <div className="flex justify-between text-slate-600 type-helper">
-                  <span>Cash velocity</span>
-                  <span className="font-medium text-slate-800 tabular-nums">90%</span>
-                </div>
-                <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                  <div className="bg-amber-500 h-full rounded-full" style={{ width: "90%" }} />
-                </div>
-              </div>
-            </div>
-
-            <div className="pt-2 text-right">
-              <Link
-                href={`/w/${workspaceSlug}/capacity`}
-                className="type-button-label text-[#2563EB] hover:text-blue-800 inline-flex items-center gap-1"
-              >
-                <span>View health details</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-              </Link>
-            </div>
-          </div>
-
           {/* Card 2: Next actions */}
           <div className="bg-white border border-slate-200/90 rounded-3xl p-5 sm:p-6 shadow-2xs space-y-3">
             <h2 className="type-card-title text-slate-900 flex items-center gap-2">

@@ -31,11 +31,21 @@ import {
   Target,
   Bell,
   Sparkles,
+  Plus,
+  Trash2,
+  ExternalLink,
+  Copy,
+  Tag,
+  CheckSquare,
+  Square,
 } from "lucide-react";
 import { useStudioRealtime } from "@/components/realtime/useStudioRealtime";
 import { LiveSyncIndicator } from "@/components/realtime/LiveSyncIndicator";
 import { VisualDrawingAirlock, DrawingAirlockData } from "@/components/drawings/VisualDrawingAirlock";
 import { getCleanTaskTitle } from "@/components/tasks/task-utils";
+import { LeadershipTodoHub } from "./LeadershipTodoHub";
+import { LeadershipCreateModal } from "./LeadershipCreateModal";
+import { AdvancedPagination, usePagination } from "@/components/ui/AdvancedPagination";
 
 export default function DailyEmployeeWorkDashboard() {
   const params = useParams();
@@ -43,7 +53,7 @@ export default function DailyEmployeeWorkDashboard() {
   const workspaceSlug = (params?.workspaceSlug as string) || "100percentdesign";
 
   // --- Primary Executive Dual-Lens State ---
-  const [primaryLens, setPrimaryLens] = useState<"my-work" | "delegated">("my-work");
+  const [primaryLens, setPrimaryLens] = useState<"my-work" | "executive-todo" | "delegated">("my-work");
   const [activeTab, setActiveTab] = useState<"awaiting-action" | "waiting-others">("awaiting-action");
   const [layoutMode, setLayoutMode] = useState<"LIST" | "GRID">("LIST");
 
@@ -87,17 +97,52 @@ export default function DailyEmployeeWorkDashboard() {
   const [scratchpadNote, setScratchpadNote] = useState<string>("");
   const [isScratchpadSaved, setIsScratchpadSaved] = useState<boolean>(true);
 
+  // --- Leadership To-Do Hub State (Owner & Admin) ---
+  const [executiveTasks, setExecutiveTasks] = useState<any[]>([]);
+  const [executiveMeetings, setExecutiveMeetings] = useState<any[]>([]);
+  const [leadershipNotes, setLeadershipNotes] = useState<any[]>([]);
+  const [todoFilterType, setTodoFilterType] = useState<"ALL" | "PERSONAL" | "DELEGATED" | "MEETING" | "NOTE">("ALL");
+  const [todoFilterStatus, setTodoFilterStatus] = useState<"ALL" | "PENDING" | "DONE">("ALL");
+  const [todoFilterPriority, setTodoFilterPriority] = useState<"ALL" | "URGENT" | "HIGH" | "MEDIUM" | "LOW">("ALL");
+  const [todoSearch, setTodoSearch] = useState<string>("");
+  const [isCreateTodoOpen, setIsCreateTodoOpen] = useState(false);
+  const [createTodoTab, setCreateTodoTab] = useState<"TASK" | "MEETING" | "NOTE">("TASK");
+  const [createTodoForm, setCreateTodoForm] = useState({
+    title: "",
+    description: "",
+    assigneeMembershipId: "myself",
+    priority: "MEDIUM",
+    dueDate: "",
+    category: "Operations",
+    projectId: "",
+    meetingDate: "",
+    startTime: "10:00",
+    endTime: "11:00",
+    meetingType: "INTERNAL_DESIGN_REVIEW",
+    agenda: "",
+    noteTag: "General",
+  });
+
   const [actionLoading, setActionLoading] = useState(false);
   const [toastMessage, setToastMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [expandedChecklistTaskId, setExpandedChecklistTaskId] = useState<string | null>(null);
 
-  // Load scratchpad from localStorage
+  // Load scratchpad & notes from localStorage
   useEffect(() => {
     try {
       const saved = localStorage.getItem(`studio_scratchpad_${workspaceSlug}`);
       if (saved) setScratchpadNote(saved);
+      const savedNotes = localStorage.getItem(`studio_leadership_notes_${workspaceSlug}`);
+      if (savedNotes) setLeadershipNotes(JSON.parse(savedNotes));
     } catch {}
   }, [workspaceSlug]);
+
+  const saveNotes = (updated: any[]) => {
+    setLeadershipNotes(updated);
+    try {
+      localStorage.setItem(`studio_leadership_notes_${workspaceSlug}`, JSON.stringify(updated));
+    } catch {}
+  };
 
   const handleSaveScratchpad = (val: string) => {
     setScratchpadNote(val);
@@ -106,6 +151,29 @@ export default function DailyEmployeeWorkDashboard() {
       localStorage.setItem(`studio_scratchpad_${workspaceSlug}`, val);
       setTimeout(() => setIsScratchpadSaved(true), 500);
     } catch {}
+  };
+
+  const fetchExecutiveData = async () => {
+    try {
+      const [taskRes, meetRes] = await Promise.all([
+        fetch(`/api/executive-tasks?workspaceSlug=${workspaceSlug}`),
+        fetch(`/api/meetings?workspaceSlug=${workspaceSlug}`),
+      ]);
+      if (taskRes.ok) {
+        const taskJson = await taskRes.json();
+        if (taskJson.success && Array.isArray(taskJson.tasks)) {
+          setExecutiveTasks(taskJson.tasks);
+        }
+      }
+      if (meetRes.ok) {
+        const meetJson = await meetRes.json();
+        if (meetJson.success && Array.isArray(meetJson.meetings)) {
+          setExecutiveMeetings(meetJson.meetings);
+        }
+      }
+    } catch (err) {
+      console.error("Error loading executive to-dos:", err);
+    }
   };
 
   const fetchWork = async () => {
@@ -119,6 +187,9 @@ export default function DailyEmployeeWorkDashboard() {
         throw new Error(json.error || "Failed to load work dashboard");
       }
       setData(json);
+      if (json.role === "OWNER" || json.role === "ADMIN") {
+        fetchExecutiveData();
+      }
       if (json.projects && json.projects.length > 0 && !focusProjectId) {
         setFocusProjectId(json.projects[0].id);
       }
@@ -131,6 +202,7 @@ export default function DailyEmployeeWorkDashboard() {
 
   useEffect(() => {
     fetchWork();
+    fetchExecutiveData();
   }, [workspaceSlug]);
 
   // Real-time SSE Live Bus Integration
@@ -395,6 +467,214 @@ export default function DailyEmployeeWorkDashboard() {
 
   const metrics = data?.metrics;
   const isPrivileged = data?.role === "OWNER" || data?.role === "ADMIN" || data?.role === "PROJECT_MANAGER";
+  const isLeadership = data?.role === "OWNER" || data?.role === "ADMIN";
+  const isOwner = data?.role === "OWNER";
+
+  const resetTodoForm = () => {
+    setCreateTodoForm({
+      title: "",
+      description: "",
+      assigneeMembershipId: "myself",
+      priority: "MEDIUM",
+      dueDate: "",
+      category: "Operations",
+      projectId: "",
+      meetingDate: "",
+      startTime: "10:00",
+      endTime: "11:00",
+      meetingType: "INTERNAL_DESIGN_REVIEW",
+      agenda: "",
+      noteTag: "General",
+    });
+  };
+
+  const isTaskPersonal = (task: any) => {
+    const myMembershipId = data?.employeeInfo?.membershipId;
+    if (!task.assignments || task.assignments.length === 0) return true;
+    return task.assignments.some(
+      (a: any) => a.assigneeId === myMembershipId || a.assignee?.id === myMembershipId
+    );
+  };
+
+  const handleToggleExecutiveTaskStatus = async (task: any) => {
+    const newStatus = task.status === "DONE" ? "TO_DO" : "DONE";
+    setExecutiveTasks((prev) =>
+      prev.map((t) => (t.id === task.id ? { ...t, status: newStatus } : t))
+    );
+    try {
+      const res = await fetch(`/api/executive-tasks/${task.id}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ workspaceSlug, status: newStatus }),
+      });
+      if (!res.ok) throw new Error("Failed to update status");
+      setToastMessage({
+        type: "success",
+        text: newStatus === "DONE" ? "Task marked complete." : "Task reopened.",
+      });
+    } catch (err: any) {
+      setToastMessage({ type: "error", text: err.message || "Failed to update task" });
+      fetchExecutiveData();
+    }
+  };
+
+  const handleCreateExecutiveTask = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!createTodoForm.title.trim()) return;
+    setActionLoading(true);
+    try {
+      const myMembershipId = data?.employeeInfo?.membershipId;
+      const targetAssigneeId =
+        createTodoForm.assigneeMembershipId === "myself" || !createTodoForm.assigneeMembershipId
+          ? myMembershipId
+          : createTodoForm.assigneeMembershipId;
+
+      const res = await fetch("/api/executive-tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          workspaceSlug,
+          title: createTodoForm.title.trim(),
+          description: createTodoForm.description.trim() || undefined,
+          priority: createTodoForm.priority || "MEDIUM",
+          dueDate: createTodoForm.dueDate || undefined,
+          category: createTodoForm.category || "Operations",
+          projectId: createTodoForm.projectId || undefined,
+          assigneeMembershipIds: targetAssigneeId ? [targetAssigneeId] : undefined,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Failed to create task");
+      setToastMessage({ type: "success", text: "To-Do created and assigned successfully." });
+      setIsCreateTodoOpen(false);
+      resetTodoForm();
+      fetchExecutiveData();
+    } catch (err: any) {
+      setToastMessage({ type: "error", text: err.message || "Failed to create task" });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleCreateMeeting = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!createTodoForm.title.trim() || !createTodoForm.meetingDate || !createTodoForm.startTime || !createTodoForm.endTime) {
+      setToastMessage({ type: "error", text: "Please enter meeting title, date, start time and end time." });
+      return;
+    }
+    setActionLoading(true);
+    try {
+      const res = await fetch("/api/meetings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          workspaceSlug,
+          title: createTodoForm.title.trim(),
+          meetingDate: createTodoForm.meetingDate,
+          startTime: createTodoForm.startTime,
+          endTime: createTodoForm.endTime,
+          meetingType: createTodoForm.meetingType || "GENERAL",
+          agenda: createTodoForm.agenda.trim() || undefined,
+          projectId: createTodoForm.projectId || undefined,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Failed to schedule meeting");
+      setToastMessage({ type: "success", text: "Meeting scheduled successfully." });
+      setIsCreateTodoOpen(false);
+      resetTodoForm();
+      fetchExecutiveData();
+      fetchWork();
+    } catch (err: any) {
+      setToastMessage({ type: "error", text: err.message || "Failed to schedule meeting" });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleCreateNote = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!createTodoForm.title.trim()) return;
+    const newNote = {
+      id: `note_${Date.now()}`,
+      title: createTodoForm.title.trim(),
+      content: createTodoForm.description.trim(),
+      tag: createTodoForm.noteTag.trim() || "General",
+      createdAt: new Date().toISOString(),
+      isDone: false,
+    };
+    saveNotes([newNote, ...leadershipNotes]);
+    setToastMessage({ type: "success", text: "Personal note added." });
+    setIsCreateTodoOpen(false);
+    resetTodoForm();
+  };
+
+  const handleDeleteNote = (id: string) => {
+    saveNotes(leadershipNotes.filter((n) => n.id !== id));
+    setToastMessage({ type: "success", text: "Note removed." });
+  };
+
+  // Filtered executive items
+  const filteredExecutiveTasks = executiveTasks.filter((t) => {
+    const isPersonal = isTaskPersonal(t);
+    if (todoFilterType === "PERSONAL" && !isPersonal) return false;
+    if (todoFilterType === "DELEGATED" && isPersonal) return false;
+    if (todoFilterType === "MEETING" || todoFilterType === "NOTE") return false;
+    if (todoFilterStatus === "PENDING" && t.status === "DONE") return false;
+    if (todoFilterStatus === "DONE" && t.status !== "DONE") return false;
+    if (todoFilterPriority !== "ALL" && t.priority !== todoFilterPriority) return false;
+    if (todoSearch.trim()) {
+      const q = todoSearch.toLowerCase();
+      const titleMatch = t.title?.toLowerCase().includes(q);
+      const descMatch = t.description?.toLowerCase().includes(q);
+      const catMatch = t.category?.toLowerCase().includes(q);
+      const assigneeMatch = t.assignments?.some((a: any) =>
+        a.assignee?.user?.fullName?.toLowerCase().includes(q)
+      );
+      if (!titleMatch && !descMatch && !catMatch && !assigneeMatch) return false;
+    }
+    return true;
+  });
+
+  const filteredMeetings = executiveMeetings.filter((m) => {
+    if (
+      todoFilterType === "PERSONAL" ||
+      todoFilterType === "DELEGATED" ||
+      todoFilterType === "NOTE"
+    )
+      return false;
+    if (todoFilterStatus === "PENDING" && m.status === "COMPLETED") return false;
+    if (todoFilterStatus === "DONE" && m.status !== "COMPLETED") return false;
+    if (todoSearch.trim()) {
+      const q = todoSearch.toLowerCase();
+      const titleMatch = m.title?.toLowerCase().includes(q);
+      const agendaMatch = m.agenda?.toLowerCase().includes(q);
+      if (!titleMatch && !agendaMatch) return false;
+    }
+    return true;
+  });
+
+  const filteredNotes = leadershipNotes.filter((n) => {
+    if (
+      todoFilterType === "PERSONAL" ||
+      todoFilterType === "DELEGATED" ||
+      todoFilterType === "MEETING"
+    )
+      return false;
+    if (todoFilterStatus === "PENDING" && n.isDone) return false;
+    if (todoFilterStatus === "DONE" && !n.isDone) return false;
+    if (todoSearch.trim()) {
+      const q = todoSearch.toLowerCase();
+      const titleMatch = n.title?.toLowerCase().includes(q);
+      const contentMatch = n.content?.toLowerCase().includes(q);
+      const tagMatch = n.tag?.toLowerCase().includes(q);
+      if (!titleMatch && !contentMatch && !tagMatch) return false;
+    }
+    return true;
+  });
+
+  const personalTasksCount = executiveTasks.filter((t) => isTaskPersonal(t)).length;
+  const delegatedTasksCount = executiveTasks.filter((t) => !isTaskPersonal(t)).length;
 
   const filterList = (items: any[]) =>
     items.filter((item: any) => {
@@ -421,6 +701,11 @@ export default function DailyEmployeeWorkDashboard() {
         ? awaitingActionItems
         : waitingOthersItems
       : delegatedItems;
+
+  const { paginatedItems: paginatedDeliverables, paginationProps: deliverablesPaginationProps } = usePagination(
+    activeDeliverablesList,
+    { initialPageSize: 8, itemName: "deliverables" }
+  );
 
   const formattedDate = new Date().toLocaleDateString("en-GB", {
     weekday: "long",
@@ -483,7 +768,7 @@ export default function DailyEmployeeWorkDashboard() {
       </div>
 
       {/* ================= PRIMARY LENS TOGGLE ================= */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         <button
           onClick={() => setPrimaryLens("my-work")}
           className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
@@ -502,6 +787,27 @@ export default function DailyEmployeeWorkDashboard() {
             {metrics?.totalActive ?? 0}
           </span>
         </button>
+
+        {isLeadership && (
+          <button
+            onClick={() => setPrimaryLens("executive-todo")}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+              primaryLens === "executive-todo"
+                ? "bg-[#3562E8] text-white shadow-xs"
+                : "bg-white text-[#696E82] border border-[#E2E6F0] hover:bg-[#F8F9FE] hover:text-[#0B122B]"
+            }`}
+          >
+            <ListTodo className="w-4 h-4" />
+            <span>Leadership To-Dos</span>
+            <span
+              className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                primaryLens === "executive-todo" ? "bg-white/20 text-white" : "bg-indigo-50 text-[#3562E8]"
+              }`}
+            >
+              {executiveTasks.filter((t) => t.status !== "DONE").length + leadershipNotes.length}
+            </span>
+          </button>
+        )}
 
         {isPrivileged && (
           <button
@@ -527,7 +833,54 @@ export default function DailyEmployeeWorkDashboard() {
 
       {/* ================= 4 KPI METRIC CARDS ================= */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {primaryLens === "my-work" ? (
+        {primaryLens === "executive-todo" ? (
+          <>
+            <div className="bg-white p-5 rounded-2xl border border-[#E2E6F0] shadow-2xs hover:border-[#CEDEFF] transition-all">
+              <div className="flex items-center gap-2 text-xs font-semibold text-[#0B122B]">
+                <ListTodo className="w-4 h-4 text-[#3562E8]" />
+                <span>Pending To-Dos</span>
+              </div>
+              <div className="text-3xl font-extrabold text-[#0B122B] mt-2 font-sans tracking-tight">
+                {executiveTasks.filter((t) => t.status !== "DONE").length}
+              </div>
+              <div className="text-xs text-[#696E82] mt-1">Active tasks needing action</div>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl border border-[#E2E6F0] shadow-2xs hover:border-[#CEDEFF] transition-all">
+              <div className="flex items-center gap-2 text-xs font-semibold text-indigo-600">
+                <Users className="w-4 h-4 text-indigo-500" />
+                <span>Personal vs Team</span>
+              </div>
+              <div className="text-3xl font-extrabold text-[#0B122B] mt-2 font-sans tracking-tight">
+                {personalTasksCount}
+                <span className="text-base font-normal text-[#696E82]"> / {delegatedTasksCount}</span>
+              </div>
+              <div className="text-xs text-[#696E82] mt-1">Personal / Assigned to others</div>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl border border-[#E2E6F0] shadow-2xs hover:border-[#CEDEFF] transition-all">
+              <div className="flex items-center gap-2 text-xs font-semibold text-amber-600">
+                <Calendar className="w-4 h-4 text-amber-500" />
+                <span>Studio Meetings</span>
+              </div>
+              <div className="text-3xl font-extrabold text-[#0B122B] mt-2 font-sans tracking-tight">
+                {executiveMeetings.length}
+              </div>
+              <div className="text-xs text-[#696E82] mt-1">Scheduled sessions</div>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl border border-[#E2E6F0] shadow-2xs hover:border-[#CEDEFF] transition-all">
+              <div className="flex items-center gap-2 text-xs font-semibold text-emerald-600">
+                <StickyNote className="w-4 h-4 text-emerald-500" />
+                <span>Personal Notes</span>
+              </div>
+              <div className="text-3xl font-extrabold text-[#0B122B] mt-2 font-sans tracking-tight">
+                {leadershipNotes.length}
+              </div>
+              <div className="text-xs text-[#696E82] mt-1">Saved leadership memos</div>
+            </div>
+          </>
+        ) : primaryLens === "my-work" ? (
           <>
             <div className="bg-white p-5 rounded-2xl border border-[#E2E6F0] shadow-2xs hover:border-[#CEDEFF] transition-all">
               <div className="flex items-center gap-2 text-xs font-semibold text-[#0B122B]">
@@ -624,9 +977,42 @@ export default function DailyEmployeeWorkDashboard() {
 
       {/* ================= MAIN SPLIT: LEFT CONTENT (68%) / RIGHT WIDGETS (32%) ================= */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-        {/* Left Column (Deliverables + Schedule + Focus session) */}
+        {/* Left Column (Deliverables + Schedule + Focus session OR Leadership To-Do Hub) */}
         <div className="lg:col-span-2 space-y-6">
-          {/* DELIVERABLES CARD */}
+          {primaryLens === "executive-todo" ? (
+            <LeadershipTodoHub
+              workspaceSlug={workspaceSlug}
+              executiveTasks={executiveTasks}
+              executiveMeetings={executiveMeetings}
+              leadershipNotes={leadershipNotes}
+              filteredExecutiveTasks={filteredExecutiveTasks}
+              filteredMeetings={filteredMeetings}
+              filteredNotes={filteredNotes}
+              todoFilterType={todoFilterType}
+              setTodoFilterType={setTodoFilterType}
+              todoFilterStatus={todoFilterStatus}
+              setTodoFilterStatus={setTodoFilterStatus}
+              todoFilterPriority={todoFilterPriority}
+              setTodoFilterPriority={setTodoFilterPriority}
+              todoSearch={todoSearch}
+              setTodoSearch={setTodoSearch}
+              isTaskPersonal={isTaskPersonal}
+              handleToggleExecutiveTaskStatus={handleToggleExecutiveTaskStatus}
+              handleDeleteNote={handleDeleteNote}
+              onOpenCreate={(tab) => {
+                setCreateTodoTab(tab);
+                setIsCreateTodoOpen(true);
+              }}
+              personalTasksCount={personalTasksCount}
+              delegatedTasksCount={delegatedTasksCount}
+              onCopyNote={(text) => {
+                navigator.clipboard.writeText(text);
+                setToastMessage({ type: "success", text: "Copied note to clipboard." });
+              }}
+            />
+          ) : (
+            <>
+              {/* DELIVERABLES CARD */}
           <div className="bg-white rounded-3xl border border-[#E2E6F0] p-5 sm:p-6 shadow-2xs space-y-5">
             {/* Top row: Title + List/Grid switcher */}
             <div className="flex items-center justify-between">
@@ -749,7 +1135,7 @@ export default function DailyEmployeeWorkDashboard() {
                     : "space-y-3"
                 }
               >
-                {activeDeliverablesList.map((task: any) => (
+                {paginatedDeliverables.map((task: any) => (
                   <div
                     key={task.id}
                     className={`p-4 rounded-2xl border transition-all ${
@@ -945,6 +1331,13 @@ export default function DailyEmployeeWorkDashboard() {
                 ))}
               </div>
             )}
+
+            {activeDeliverablesList.length > 0 && (
+              <AdvancedPagination
+                {...deliverablesPaginationProps}
+                pageSizeOptions={[6, 8, 16, 32]}
+              />
+            )}
           </div>
 
           {/* TODAY'S SCHEDULE CARD */}
@@ -1042,6 +1435,8 @@ export default function DailyEmployeeWorkDashboard() {
               </button>
             </div>
           </div>
+            </>
+          )}
         </div>
 
         {/* Right Column (Quick notes + My leave) */}
@@ -1067,49 +1462,113 @@ export default function DailyEmployeeWorkDashboard() {
             <div className="text-[11px] text-[#696E82]">Available offline on this device.</div>
           </div>
 
-          {/* MY LEAVE CARD */}
-          <div className="bg-white rounded-3xl border border-[#E2E6F0] p-5 sm:p-6 shadow-2xs space-y-4">
-            <div className="flex items-center gap-2 font-bold text-[#0B122B] text-base">
-              <Calendar className="w-5 h-5 text-[#3562E8]" />
-              <span>My leave</span>
-            </div>
-
-            <div className="space-y-3">
-              <div className="p-3.5 rounded-2xl border border-[#E2E6F0] bg-[#F8F9FE] space-y-1">
-                <div className="flex items-center gap-2 text-xs font-semibold text-[#696E82]">
-                  <Calendar className="w-4 h-4 text-[#3562E8]" />
-                  <span>Upcoming approved leave</span>
+          {/* LEADERSHIP PERSONAL TO-DOS MINI WIDGET */}
+          {isLeadership && (
+            <div className="bg-white rounded-3xl border border-[#E2E6F0] p-5 sm:p-6 shadow-2xs space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 font-bold text-[#0B122B] text-base">
+                  <ListTodo className="w-5 h-5 text-[#3562E8]" />
+                  <span>Personal To-Dos</span>
                 </div>
-                <div className="text-xs font-medium text-[#0B122B] pt-0.5">
-                  {upcomingLeaves.length === 0 ? (
-                    "None scheduled"
-                  ) : (
-                    <span>
-                      {upcomingLeaves[0].startDate} — {upcomingLeaves[0].endDate} ({upcomingLeaves[0].leaveType})
-                    </span>
-                  )}
+                <button
+                  onClick={() => {
+                    setCreateTodoTab("TASK");
+                    setIsCreateTodoOpen(true);
+                  }}
+                  className="p-1 rounded-lg hover:bg-slate-100 text-[#3562E8] text-xs font-bold flex items-center gap-1 cursor-pointer"
+                  title="Add quick to-do"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="space-y-2">
+                {executiveTasks
+                  .filter((t) => isTaskPersonal(t) && t.status !== "DONE")
+                  .slice(0, 4)
+                  .map((task) => (
+                    <div
+                      key={task.id}
+                      className="p-2.5 rounded-xl border border-[#E2E6F0] bg-[#F8F9FE] flex items-center gap-2.5 transition-all"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => handleToggleExecutiveTaskStatus(task)}
+                        className="w-4 h-4 rounded border border-slate-300 hover:border-[#3562E8] bg-white flex items-center justify-center shrink-0 cursor-pointer"
+                      >
+                        <Check className="w-3 h-3 text-transparent" />
+                      </button>
+                      <span className="text-xs font-medium text-[#0B122B] truncate flex-1">
+                        {task.title}
+                      </span>
+                      {task.priority === "URGENT" && (
+                        <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0" title="Urgent" />
+                      )}
+                    </div>
+                  ))}
+
+                {executiveTasks.filter((t) => isTaskPersonal(t) && t.status !== "DONE").length === 0 && (
+                  <div className="text-xs text-[#696E82] text-center py-2">
+                    No active personal to-dos.
+                  </div>
+                )}
+              </div>
+
+              <button
+                onClick={() => setPrimaryLens("executive-todo")}
+                className="w-full py-2.5 rounded-xl border border-[#3562E8] bg-white hover:bg-[#F8F9FE] text-[#3562E8] text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <span>Open Leadership Hub</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
+          {/* MY LEAVE CARD - Hidden for OWNER role */}
+          {!isOwner && (
+            <div className="bg-white rounded-3xl border border-[#E2E6F0] p-5 sm:p-6 shadow-2xs space-y-4">
+              <div className="flex items-center gap-2 font-bold text-[#0B122B] text-base">
+                <Calendar className="w-5 h-5 text-[#3562E8]" />
+                <span>My leave</span>
+              </div>
+
+              <div className="space-y-3">
+                <div className="p-3.5 rounded-2xl border border-[#E2E6F0] bg-[#F8F9FE] space-y-1">
+                  <div className="flex items-center gap-2 text-xs font-semibold text-[#696E82]">
+                    <Calendar className="w-4 h-4 text-[#3562E8]" />
+                    <span>Upcoming approved leave</span>
+                  </div>
+                  <div className="text-xs font-medium text-[#0B122B] pt-0.5">
+                    {upcomingLeaves.length === 0 ? (
+                      "None scheduled"
+                    ) : (
+                      <span>
+                        {upcomingLeaves[0].startDate} — {upcomingLeaves[0].endDate} ({upcomingLeaves[0].leaveType})
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="p-3.5 rounded-2xl border border-[#E2E6F0] bg-[#F8F9FE] space-y-1">
+                  <div className="flex items-center gap-2 text-xs font-semibold text-[#696E82]">
+                    <Clock className="w-4 h-4 text-amber-500" />
+                    <span>Pending requests</span>
+                  </div>
+                  <div className="text-xs font-medium text-[#0B122B] pt-0.5">
+                    {pendingLeaves.length === 0 ? "None" : `${pendingLeaves.length} application(s) under review`}
+                  </div>
                 </div>
               </div>
 
-              <div className="p-3.5 rounded-2xl border border-[#E2E6F0] bg-[#F8F9FE] space-y-1">
-                <div className="flex items-center gap-2 text-xs font-semibold text-[#696E82]">
-                  <Clock className="w-4 h-4 text-amber-500" />
-                  <span>Pending requests</span>
-                </div>
-                <div className="text-xs font-medium text-[#0B122B] pt-0.5">
-                  {pendingLeaves.length === 0 ? "None" : `${pendingLeaves.length} application(s) under review`}
-                </div>
-              </div>
+              <button
+                onClick={() => router.push(`/w/${workspaceSlug}/leave/my-leave`)}
+                className="w-full py-2.5 rounded-xl border border-[#3562E8] bg-white hover:bg-[#F8F9FE] text-[#3562E8] text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <span>Manage my leave</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
             </div>
-
-            <button
-              onClick={() => router.push(`/w/${workspaceSlug}/leave/my-leave`)}
-              className="w-full py-2.5 rounded-xl border border-[#3562E8] bg-white hover:bg-[#F8F9FE] text-[#3562E8] text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-            >
-              <span>Manage my leave</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
+          )}
         </div>
       </div>
 
@@ -1369,6 +1828,25 @@ export default function DailyEmployeeWorkDashboard() {
           </div>
         </div>
       )}
+
+      {/* Leadership Quick Create Modal */}
+      <LeadershipCreateModal
+        isOpen={isCreateTodoOpen}
+        onClose={() => {
+          setIsCreateTodoOpen(false);
+          resetTodoForm();
+        }}
+        createTodoTab={createTodoTab}
+        setCreateTodoTab={setCreateTodoTab}
+        createTodoForm={createTodoForm}
+        setCreateTodoForm={setCreateTodoForm}
+        handleCreateExecutiveTask={handleCreateExecutiveTask}
+        handleCreateMeeting={handleCreateMeeting}
+        handleCreateNote={handleCreateNote}
+        teamMembers={data?.teamMembers || []}
+        projects={data?.projects || []}
+        actionLoading={actionLoading}
+      />
     </div>
   );
 }

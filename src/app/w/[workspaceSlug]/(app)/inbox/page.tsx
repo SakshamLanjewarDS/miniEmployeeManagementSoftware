@@ -38,6 +38,7 @@ import {
   DecisionConsequenceCard,
   DecisionItemDetails,
 } from "@/components/inbox/DecisionConsequenceCard";
+import { AdvancedPagination } from "@/components/ui/AdvancedPagination";
 
 interface DecisionInboxData {
   items: DecisionItemDetails[];
@@ -54,6 +55,7 @@ interface DecisionInboxData {
     siteVisits: number;
     leaveApplications: number;
     leaveCancellations: number;
+    meetings: number;
   };
 }
 
@@ -79,6 +81,16 @@ export default function OwnerDecisionInboxPage() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<DecisionInboxData | null>(null);
+  const [pageSize, setPageSize] = useState<number>(10);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+
+  const totalItems = data?.items?.length || 0;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const paginatedItems = useMemo(() => {
+    if (!data?.items) return [];
+    const start = (currentPage - 1) * pageSize;
+    return data.items.slice(start, start + pageSize);
+  }, [data?.items, currentPage, pageSize]);
 
   // Realtime Live Bus Sync
   const { isConnected, lastEvent } = useStudioRealtime({
@@ -224,11 +236,13 @@ export default function OwnerDecisionInboxPage() {
   };
 
   useEffect(() => {
+    setCurrentPage(1);
     fetchInbox();
   }, [activeTab, selectedType, selectedUrgency]);
 
   // Quick Search submission with debounce
   useEffect(() => {
+    setCurrentPage(1);
     const timer = setTimeout(() => {
       fetchInbox();
     }, 300);
@@ -435,6 +449,8 @@ export default function OwnerDecisionInboxPage() {
         return { bg: "bg-teal-50 text-teal-700 border-teal-200", icon: Calendar, label: "Leave Application" };
       case "LEAVE_CANCELLATION":
         return { bg: "bg-orange-50 text-orange-700 border-orange-200", icon: RefreshCw, label: "Leave Cancellation" };
+      case "MEETING":
+        return { bg: "bg-blue-50 text-[#3562E8] border-blue-200", icon: Calendar, label: "Studio Meeting" };
       default:
         return { bg: "bg-slate-50 text-slate-700 border-slate-200", icon: Inbox, label: type };
     }
@@ -598,39 +614,96 @@ export default function OwnerDecisionInboxPage() {
       {/* ============================================================== */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-slate-200/90 shadow-2xs">
         {/* Segmented Tab Buttons */}
-        <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl overflow-x-auto touch-scroll-x max-w-full">
-          <button
-            onClick={() => setActiveTab("all-authorized")}
-            className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition whitespace-nowrap cursor-pointer ${
-              activeTab === "all-authorized"
-                ? "bg-white text-slate-900 shadow-xs"
-                : "text-slate-600 hover:text-slate-900"
-            }`}
-          >
-            All Authorized ({data?.counts.allAuthorized ?? 0})
-          </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl overflow-x-auto touch-scroll-x">
+            <button
+              onClick={() => setActiveTab("all-authorized")}
+              className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition whitespace-nowrap cursor-pointer ${
+                activeTab === "all-authorized"
+                  ? "bg-white text-slate-900 shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              All Authorized ({data?.counts.allAuthorized ?? 0})
+            </button>
 
-          <button
-            onClick={() => setActiveTab("my-decisions")}
-            className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer ${
-              activeTab === "my-decisions"
-                ? "bg-white text-blue-600 shadow-xs"
-                : "text-slate-600 hover:text-slate-900"
-            }`}
-          >
-            My Decisions ({data?.counts.myDecisions ?? 0})
-          </button>
+            <button
+              onClick={() => setActiveTab("my-decisions")}
+              className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer ${
+                activeTab === "my-decisions"
+                  ? "bg-white text-blue-600 shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              My Decisions ({data?.counts.myDecisions ?? 0})
+            </button>
 
-          <button
-            onClick={() => setActiveTab("blockers")}
-            className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer ${
-              activeTab === "blockers"
-                ? "bg-white text-rose-600 shadow-xs"
-                : "text-slate-600 hover:text-slate-900"
-            }`}
-          >
-            Blockers ({data?.counts.blockers ?? 0})
-          </button>
+            <button
+              onClick={() => setActiveTab("blockers")}
+              className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer ${
+                activeTab === "blockers"
+                  ? "bg-white text-rose-600 shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              Blockers ({data?.counts.blockers ?? 0})
+            </button>
+          </div>
+
+          {/* Quick Domain Pills: Leave, Task, Site Visit, Meetings */}
+          <div className="flex items-center gap-1 overflow-x-auto touch-scroll-x">
+            <button
+              type="button"
+              onClick={() => setSelectedType("LEAVE")}
+              className={`px-2.5 py-1 text-xs font-bold rounded-lg transition whitespace-nowrap cursor-pointer flex items-center gap-1 border ${
+                selectedType === "LEAVE"
+                  ? "bg-teal-600 text-white border-teal-600 shadow-xs"
+                  : "bg-teal-50/80 text-teal-800 border-teal-200 hover:bg-teal-100"
+              }`}
+            >
+              <Calendar className="w-3.5 h-3.5" />
+              <span>Leave ({(data?.counts.leaveApplications ?? 0) + (data?.counts.leaveCancellations ?? 0)})</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSelectedType("TASK")}
+              className={`px-2.5 py-1 text-xs font-bold rounded-lg transition whitespace-nowrap cursor-pointer flex items-center gap-1 border ${
+                selectedType === "TASK"
+                  ? "bg-blue-600 text-white border-blue-600 shadow-xs"
+                  : "bg-blue-50/80 text-blue-800 border-blue-200 hover:bg-blue-100"
+              }`}
+            >
+              <FileCheck2 className="w-3.5 h-3.5" />
+              <span>Task ({(data?.counts.deliverableSubmissions ?? 0) + (data?.counts.blockers ?? 0) + (data?.counts.deadlineExtensions ?? 0)})</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSelectedType("SITE_VISIT")}
+              className={`px-2.5 py-1 text-xs font-bold rounded-lg transition whitespace-nowrap cursor-pointer flex items-center gap-1 border ${
+                selectedType === "SITE_VISIT"
+                  ? "bg-indigo-600 text-white border-indigo-600 shadow-xs"
+                  : "bg-indigo-50/80 text-indigo-800 border-indigo-200 hover:bg-indigo-100"
+              }`}
+            >
+              <MapPin className="w-3.5 h-3.5" />
+              <span>Site Visit ({data?.counts.siteVisits ?? 0})</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSelectedType("MEETING")}
+              className={`px-2.5 py-1 text-xs font-bold rounded-lg transition whitespace-nowrap cursor-pointer flex items-center gap-1 border ${
+                selectedType === "MEETING"
+                  ? "bg-[#3562E8] text-white border-[#3562E8] shadow-xs"
+                  : "bg-blue-50/80 text-[#3562E8] border-blue-200 hover:bg-blue-100"
+              }`}
+            >
+              <Clock className="w-3.5 h-3.5" />
+              <span>Meetings ({data?.counts.meetings ?? 0})</span>
+            </button>
+          </div>
         </div>
 
         {/* Filter Selectors & Search */}
@@ -641,13 +714,15 @@ export default function OwnerDecisionInboxPage() {
             className="hidden sm:block px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20"
           >
             <option value="ALL">All Disciplines &amp; Categories</option>
+            <option value="LEAVE">Leaves (Applications &amp; Cancellations)</option>
+            <option value="TASK">Tasks (Deliverables &amp; Blockers)</option>
+            <option value="SITE_VISIT">Site Visits (Inspections)</option>
+            <option value="MEETING">Studio Meetings (Minutes &amp; Review)</option>
             <option value="DELIVERABLE_SUBMISSION">Deliverables</option>
             <option value="DRAWING_REVISION">GFC Drawings</option>
             <option value="SCOPE_CHANGE">Scope Variations</option>
             <option value="DEADLINE_EXTENSION">Extensions</option>
-            <option value="SITE_VISIT">Site Visits</option>
             <option value="PROFILE_CHANGE">HR Profile</option>
-            <option value="LEAVE_APPLICATION">Leaves</option>
           </select>
 
           <select
@@ -915,7 +990,7 @@ export default function OwnerDecisionInboxPage() {
 
             {/* Request Card List */}
             <div className="space-y-2 max-h-[720px] overflow-y-auto pr-1">
-              {data.items.map((item) => {
+              {paginatedItems.map((item) => {
                 const badge = getTypeBadge(item.type);
                 const isSelected = selectedItem?.id === item.id;
                 const initials = item.requesterName.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase();
@@ -957,6 +1032,22 @@ export default function OwnerDecisionInboxPage() {
                   </div>
                 );
               })}
+            </div>
+
+            {/* Pagination Controls for Cockpit Queue */}
+            <div className="pt-2">
+              <AdvancedPagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalItems={totalItems}
+                pageSize={pageSize}
+                onPageChange={setCurrentPage}
+                onPageSizeChange={setPageSize}
+                pageSizeOptions={[5, 10, 20, 50]}
+                itemName="requests"
+                showJumpToPage={false}
+                className="rounded-2xl border border-slate-200/80"
+              />
             </div>
           </div>
 
@@ -1150,7 +1241,7 @@ export default function OwnerDecisionInboxPage() {
         // B. CLASSIC CARD LIST WITH DRAWER VIEW
         // ============================================================
         <div className="space-y-3">
-          {data.items.map((item) => {
+          {paginatedItems.map((item) => {
             const badge = getTypeBadge(item.type);
             const Icon = badge.icon;
             const isChecked = selectedIds.has(item.id);
@@ -1211,6 +1302,21 @@ export default function OwnerDecisionInboxPage() {
               </div>
             );
           })}
+
+          {/* Classic Mode Advanced Pagination */}
+          <div className="pt-2">
+            <AdvancedPagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={totalItems}
+              pageSize={pageSize}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={setPageSize}
+              pageSizeOptions={[5, 10, 20, 50]}
+              itemName="requests"
+              className="rounded-2xl border border-slate-200/80 shadow-2xs"
+            />
+          </div>
         </div>
       )}
 

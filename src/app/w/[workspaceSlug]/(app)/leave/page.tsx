@@ -40,6 +40,7 @@ import {
 import { broadcastRealtimeEvent, useRealtimeSubscription } from "@/lib/realtime";
 import AdvancedLeaveFormModal from "@/components/leave/AdvancedLeaveFormModal";
 import { parseCompositeLeaveReason, formatMinutesToTime } from "@/lib/leave/form-helpers";
+import { AdvancedPagination } from "@/components/ui/AdvancedPagination";
 
 export default function LeaveManagementPage() {
   const params = useParams();
@@ -72,7 +73,7 @@ export default function LeaveManagementPage() {
   const [sortOrder, setSortOrder] = useState<string>("RECENT");
   const [viewMode, setViewMode] = useState<"table" | "grid">("table");
   const [page, setPage] = useState<number>(1);
-  const pageSize = 8;
+  const [pageSize, setPageSize] = useState<number>(8);
 
   // Review Drawer / Modal
   const [selectedLeave, setSelectedLeave] = useState<any | null>(null);
@@ -1501,48 +1502,17 @@ export default function LeaveManagementPage() {
               })}
             </div>
 
-            {/* Pagination Controls matching Reference */}
-            <div className="p-4 border-t border-[#E2E6F0] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[#696E82]">
-              <div>
-                Showing {(page - 1) * pageSize + 1} –{" "}
-                {Math.min(page * pageSize, filteredRecords.length)} of {filteredRecords.length}{" "}
-                records
-              </div>
-
-              {totalPages > 1 && (
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    disabled={page === 1}
-                    className="p-1.5 rounded-lg border border-[#E2E6F0] bg-white text-[#696E82] hover:bg-[#F8F9FE] disabled:opacity-40 transition-colors"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </button>
-
-                  {Array.from({ length: totalPages }).map((_, i) => (
-                    <button
-                      key={i + 1}
-                      onClick={() => setPage(i + 1)}
-                      className={`w-7 h-7 rounded-lg text-xs font-semibold transition-all ${
-                        page === i + 1
-                          ? "bg-[#1456F0] text-white shadow-2xs"
-                          : "border border-[#E2E6F0] bg-white text-[#1F1F1F] hover:bg-[#F8F9FE]"
-                      }`}
-                    >
-                      {i + 1}
-                    </button>
-                  ))}
-
-                  <button
-                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                    disabled={page === totalPages}
-                    className="p-1.5 rounded-lg border border-[#E2E6F0] bg-white text-[#696E82] hover:bg-[#F8F9FE] disabled:opacity-40 transition-colors"
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-                </div>
-              )}
-            </div>
+            {/* Advanced Pagination Controls */}
+            <AdvancedPagination
+              currentPage={page}
+              totalPages={totalPages}
+              totalItems={filteredRecords.length}
+              pageSize={pageSize}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+              pageSizeOptions={[8, 16, 24, 48]}
+              itemName="leave records"
+            />
           </>
         )}
       </div>
