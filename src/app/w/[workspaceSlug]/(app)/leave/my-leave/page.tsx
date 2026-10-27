@@ -117,6 +117,35 @@ export default function EmployeeMyLeavePage() {
     return `${months[m - 1]} ${d}`;
   };
 
+  const formatAppliedDateTime = (dateVal: string | Date | null | undefined) => {
+    if (!dateVal) return { date: "—", time: "", full: "—" };
+    try {
+      const d = typeof dateVal === "string" ? new Date(dateVal) : dateVal;
+      if (isNaN(d.getTime())) return { date: "—", time: "", full: "—" };
+
+      const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      const day = d.getDate();
+      const month = months[d.getMonth()];
+      const year = d.getFullYear();
+
+      let hours = d.getHours();
+      const mins = d.getMinutes().toString().padStart(2, "0");
+      const ampm = hours >= 12 ? "PM" : "AM";
+      hours = hours % 12;
+      hours = hours ? hours : 12;
+      const timeStr = `${hours}:${mins} ${ampm}`;
+      const dateStr = `${month} ${day}, ${year}`;
+
+      return {
+        date: dateStr,
+        time: timeStr,
+        full: `${dateStr} • ${timeStr}`,
+      };
+    } catch {
+      return { date: "—", time: "", full: "—" };
+    }
+  };
+
   // History search and filter
   const [historySearch, setHistorySearch] = useState("");
   const [historyStatusFilter, setHistoryStatusFilter] = useState("ALL");
@@ -1332,7 +1361,7 @@ export default function EmployeeMyLeavePage() {
                             v{req.version || 1} • Under Review
                           </span>
                         </div>
-                        <div className="text-[11px] text-[#696E82] flex items-center gap-2 mt-0.5">
+                        <div className="text-[11px] text-[#696E82] flex flex-wrap items-center gap-2 mt-0.5">
                           <span>{req.leaveType}</span>
                           <span>•</span>
                           <span>
@@ -1342,6 +1371,14 @@ export default function EmployeeMyLeavePage() {
                               ? `0.5 Day (${req.sessionType || "Half Day"})`
                               : `${Number(req.days)} Day(s)`}
                           </span>
+                          {(req.submittedAt || req.createdAt) && (
+                            <>
+                              <span>•</span>
+                              <span className="text-[#1456F0]" suppressHydrationWarning>
+                                Applied: {formatAppliedDateTime(req.submittedAt || req.createdAt).full}
+                              </span>
+                            </>
+                          )}
                         </div>
                         {req.reason && (
                           <div className="text-[11px] text-[#696E82] italic mt-1 line-clamp-1">
@@ -1648,6 +1685,11 @@ export default function EmployeeMyLeavePage() {
                   <span className="text-[#696E82] ml-2 font-mono">
                     ({Number(h.days)} Day(s), {h.leaveType})
                   </span>
+                  {(h.submittedAt || h.createdAt) && (
+                    <span className="text-[#1456F0] ml-2 text-[11px] font-medium" suppressHydrationWarning>
+                      • Applied: {formatAppliedDateTime(h.submittedAt || h.createdAt).full}
+                    </span>
+                  )}
                   {h.reason && (
                     <span className="text-[#696E82] ml-2 italic text-[11px] truncate max-w-xs inline-block align-bottom">
                       &ldquo;{h.reason}&rdquo;

@@ -960,7 +960,7 @@ export async function getEmployeeMyLeaveSummary(
         orderBy: { createdAt: "desc" },
       },
     },
-    orderBy: [{ startDate: "asc" }, { submittedAt: "asc" }, { id: "asc" }],
+    orderBy: [{ submittedAt: "desc" }, { id: "desc" }],
   });
 
   // Fetch tenant leave policy
@@ -1045,7 +1045,7 @@ export async function getEmployeeDossierForAdmin(
         include: { user: { select: { fullName: true } } },
       },
     },
-    orderBy: [{ startDate: "asc" }, { submittedAt: "asc" }, { id: "asc" }],
+    orderBy: [{ submittedAt: "desc" }, { id: "desc" }],
   });
 
   const policy = await prisma.studioLeavePolicy.findUnique({

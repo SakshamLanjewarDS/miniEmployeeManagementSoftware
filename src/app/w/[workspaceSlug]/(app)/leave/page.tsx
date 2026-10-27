@@ -158,6 +158,35 @@ export default function LeaveManagementPage() {
     return `${daysNum} ${daysNum === 1 ? "day" : "days"}`;
   };
 
+  const formatAppliedDateTime = (dateVal: string | Date | null | undefined) => {
+    if (!dateVal) return { date: "—", time: "", full: "—" };
+    try {
+      const d = typeof dateVal === "string" ? new Date(dateVal) : dateVal;
+      if (isNaN(d.getTime())) return { date: "—", time: "", full: "—" };
+
+      const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      const day = d.getDate();
+      const month = months[d.getMonth()];
+      const year = d.getFullYear();
+
+      let hours = d.getHours();
+      const mins = d.getMinutes().toString().padStart(2, "0");
+      const ampm = hours >= 12 ? "PM" : "AM";
+      hours = hours % 12;
+      hours = hours ? hours : 12;
+      const timeStr = `${hours}:${mins} ${ampm}`;
+      const dateStr = `${month} ${day}, ${year}`;
+
+      return {
+        date: dateStr,
+        time: timeStr,
+        full: `${dateStr} • ${timeStr}`,
+      };
+    } catch {
+      return { date: "—", time: "", full: "—" };
+    }
+  };
+
   const fetchSyncStatus = async (triggerAuto = false) => {
     try {
       const res = await fetch(
@@ -598,35 +627,47 @@ export default function LeaveManagementPage() {
 
       if (!matchesSearch || !matchesStatus || !matchesType || !matchesEmployee) return false;
 
-      if (dateFilter && dateFilter !== "ALL" && rec.startDate) {
-        const start = new Date(rec.startDate);
+      if (dateFilter && dateFilter !== "ALL") {
+        const start = rec.startDate ? new Date(rec.startDate) : null;
+        const applied = (rec.submittedAt || rec.createdAt) ? new Date(rec.submittedAt || rec.createdAt) : null;
         const now = new Date();
-        if (dateFilter === "THIS_MONTH") {
-          if (start.getFullYear() !== now.getFullYear() || start.getMonth() !== now.getMonth()) {
-            return false;
-          }
-        } else if (dateFilter === "NEXT_MONTH") {
+
+        const inThisMonth = (d: Date | null) => !!d && d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+        const inNextMonth = (d: Date | null) => {
+          if (!d) return false;
           const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-          if (start.getFullYear() !== nextMonth.getFullYear() || start.getMonth() !== nextMonth.getMonth()) {
-            return false;
-          }
-        } else if (dateFilter === "LAST_30_DAYS") {
+          return d.getFullYear() === nextMonth.getFullYear() && d.getMonth() === nextMonth.getMonth();
+        };
+        const inLast30Days = (d: Date | null) => {
+          if (!d) return false;
           const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-          if (start < thirtyDaysAgo || start > now) {
-            return false;
-          }
-        } else if (dateFilter === "THIS_YEAR") {
-          if (start.getFullYear() !== now.getFullYear()) {
-            return false;
-          }
-        }
+          return d >= thirtyDaysAgo && d <= now;
+        };
+        const inThisYear = (d: Date | null) => !!d && d.getFullYear() === now.getFullYear();
+
+        if (dateFilter === "THIS_MONTH" && !inThisMonth(start) && !inThisMonth(applied)) return false;
+        if (dateFilter === "NEXT_MONTH" && !inNextMonth(start) && !inNextMonth(applied)) return false;
+        if (dateFilter === "LAST_30_DAYS" && !inLast30Days(start) && !inLast30Days(applied)) return false;
+        if (dateFilter === "THIS_YEAR" && !inThisYear(start) && !inThisYear(applied)) return false;
       }
 
       return true;
     });
 
     list.sort((a, b) => {
+      const timeAppliedA = new Date(a.submittedAt || a.createdAt || 0).getTime();
+      const timeAppliedB = new Date(b.submittedAt || b.createdAt || 0).getTime();
+
       if (sortOrder === "OLDEST") {
+        if (timeAppliedA !== timeAppliedB) {
+          return timeAppliedA - timeAppliedB;
+        }
+        return (a.id || "").localeCompare(b.id || "");
+      }
+      if (sortOrder === "LEAVE_DATE_DESC") {
+        return new Date(b.startDate || 0).getTime() - new Date(a.startDate || 0).getTime();
+      }
+      if (sortOrder === "LEAVE_DATE_ASC") {
         return new Date(a.startDate || 0).getTime() - new Date(b.startDate || 0).getTime();
       }
       if (sortOrder === "DURATION") {
@@ -637,8 +678,11 @@ export default function LeaveManagementPage() {
         const nameB = b.employeeNameRaw || b.employee?.membership?.user?.fullName || "";
         return nameA.localeCompare(nameB);
       }
-      // Default: RECENT (newest start date first)
-      return new Date(b.startDate || 0).getTime() - new Date(a.startDate || 0).getTime();
+      // Default: RECENT - Strictly ordered by when the leave was applied (newest application first)
+      if (timeAppliedB !== timeAppliedA) {
+        return timeAppliedB - timeAppliedA;
+      }
+      return (b.id || "").localeCompare(a.id || "");
     });
 
     return list;
@@ -1051,8 +1095,10 @@ export default function LeaveManagementPage() {
             aria-label="Sort leave requests"
             className="text-xs bg-white border border-[#E2E6F0] rounded-xl px-3 py-1.5 text-[#1F1F1F] font-medium focus:outline-none focus:border-[#1456F0] cursor-pointer"
           >
-            <option value="RECENT">Sort: Recent requests ⇅</option>
-            <option value="OLDEST">Sort: Oldest first ⇅</option>
+            <option value="RECENT">Sort: Recently applied (newest first) ⇅</option>
+            <option value="OLDEST">Sort: Oldest applied first ⇅</option>
+            <option value="LEAVE_DATE_DESC">Sort: Leave start date (newest first) ⇅</option>
+            <option value="LEAVE_DATE_ASC">Sort: Leave start date (oldest first) ⇅</option>
             <option value="DURATION">Sort: Duration (High to Low) ⇅</option>
             <option value="NAME_ASC">Sort: Staff Name (A → Z) ⇅</option>
           </select>
@@ -1138,7 +1184,8 @@ export default function LeaveManagementPage() {
                   <thead>
                     <tr className="border-b border-[#E2E6F0] text-[#696E82] font-semibold bg-[#FAFBFF]">
                       <th className="py-3.5 px-5">Employee</th>
-                      <th className="py-3.5 px-4">Dates</th>
+                      <th className="py-3.5 px-4">Applied at</th>
+                      <th className="py-3.5 px-4">Leave dates</th>
                       <th className="py-3.5 px-4">Duration &amp; type</th>
                       <th className="py-3.5 px-4">Status</th>
                       <th className="py-3.5 px-4 text-right">Action</th>
@@ -1151,6 +1198,7 @@ export default function LeaveManagementPage() {
                       const role = rec.employee?.designation || rec.employee?.department || "Architect";
                       const datesStr = formatDisplayDates(rec.startDate, rec.endDate);
                       const durationStr = formatDuration(rec);
+                      const appliedInfo = formatAppliedDateTime(rec.submittedAt || rec.createdAt);
                       const empData = {
                         id: rec.employee?.id || rec.employeeId || rec.id,
                         employeeId: empId,
@@ -1188,7 +1236,18 @@ export default function LeaveManagementPage() {
                             </div>
                           </td>
 
-                          {/* Dates */}
+                          {/* Applied at (Exact Date & Time row created) */}
+                          <td className="py-3.5 px-4 text-[#1F1F1F]">
+                            <div className="font-semibold text-xs text-[#1F1F1F] flex items-center gap-1.5" suppressHydrationWarning>
+                              <Clock className="w-3.5 h-3.5 text-[#1456F0] shrink-0" />
+                              <span>{appliedInfo.date}</span>
+                            </div>
+                            <div className="text-[11px] text-[#696E82] pl-5 font-mono" suppressHydrationWarning>
+                              {appliedInfo.time}
+                            </div>
+                          </td>
+
+                          {/* Leave Dates */}
                           <td className="py-3.5 px-4 font-medium text-[#1F1F1F]">
                             {datesStr}
                           </td>
@@ -1369,6 +1428,15 @@ export default function LeaveManagementPage() {
                             <span className="font-bold text-[#1F1F1F]">{durationStr}</span>
                             <span className="capitalize">{rec.leaveType?.toLowerCase().replace(/_/g, " ")}</span>
                           </div>
+                          <div className="flex items-center justify-between text-[11px] text-[#696E82] pt-1.5 border-t border-[#E2E6F0]/70" suppressHydrationWarning>
+                            <span className="flex items-center gap-1 text-[#696E82]">
+                              <Clock className="w-3 h-3 text-[#1456F0]" />
+                              <span>Applied:</span>
+                            </span>
+                            <span className="font-semibold text-[#1F1F1F]">
+                              {formatAppliedDateTime(rec.submittedAt || rec.createdAt).full}
+                            </span>
+                          </div>
                         </div>
 
                         {rec.reason && (
@@ -1470,12 +1538,16 @@ export default function LeaveManagementPage() {
                     </div>
 
                     <div className="space-y-1.5 text-xs text-[#696E82] pt-1 border-t border-[#F2F4F8]">
-                      <div className="flex items-center gap-2">
-                        <Calendar className="w-3.5 h-3.5 text-[#696E82]" />
-                        <span className="font-medium text-[#1F1F1F]">{datesStr}</span>
+                      <div className="flex items-center gap-2" suppressHydrationWarning>
+                        <Clock className="w-3.5 h-3.5 text-[#1456F0] shrink-0" />
+                        <span>Applied: <strong className="text-[#1F1F1F] font-semibold">{formatAppliedDateTime(rec.submittedAt || rec.createdAt).full}</strong></span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Clock className="w-3.5 h-3.5 text-[#696E82]" />
+                        <Calendar className="w-3.5 h-3.5 text-[#696E82]" />
+                        <span className="font-medium text-[#1F1F1F]">Dates: {datesStr}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="w-3.5 text-center text-[#696E82] font-bold">•</span>
                         <span>
                           {durationStr} • {rec.leaveType?.toLowerCase().replace(/_/g, " ")}
                         </span>
@@ -1596,8 +1668,8 @@ export default function LeaveManagementPage() {
               <h4 className="text-lg font-bold text-[#1F1F1F] capitalize">
                 {selectedLeave.leaveType?.toLowerCase().replace(/_/g, " ")} leave
               </h4>
-              <div className="flex items-center gap-4 text-xs text-[#696E82]">
-                <div className="flex items-center gap-1.5">
+              <div className="flex flex-wrap items-center gap-3 text-xs text-[#696E82]">
+                <div className="flex items-center gap-1.5 font-medium text-[#1F1F1F]">
                   <Calendar className="w-3.5 h-3.5 text-[#1456F0]" />
                   <span>{formatDisplayDates(selectedLeave.startDate, selectedLeave.endDate)}</span>
                 </div>
@@ -1605,6 +1677,15 @@ export default function LeaveManagementPage() {
                   <Clock className="w-3.5 h-3.5 text-[#1456F0]" />
                   <span>{formatDuration(selectedLeave)}</span>
                 </div>
+                <div className="flex items-center gap-1.5 bg-[#F4F6FB] px-2.5 py-1 rounded-lg border border-[#E2E6F0] text-[11px]" suppressHydrationWarning>
+                  <Clock className="w-3 h-3 text-emerald-600" />
+                  <span>Applied at: <strong className="text-[#1F1F1F] font-semibold">{formatAppliedDateTime(selectedLeave.submittedAt || selectedLeave.createdAt).full}</strong></span>
+                </div>
+                {selectedLeave.sourceSystem && (
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700">
+                    {selectedLeave.sourceSystem === "GOOGLE_SHEETS" ? "Synced from Google Sheets" : "Studio Web Portal"}
+                  </span>
+                )}
               </div>
             </div>
 
